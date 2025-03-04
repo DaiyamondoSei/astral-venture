@@ -42,6 +42,30 @@ export type Database = {
         }
         Relationships: []
       }
+      energy_reflections: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          points_earned: number
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          points_earned?: number
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          points_earned?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       quantum_downloads: {
         Row: {
           category: string

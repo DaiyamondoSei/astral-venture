@@ -74,14 +74,14 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
       // Calculate points based on reflection content
       const pointsEarned = calculateEnergyPoints(reflection);
       
-      // Save reflection to database
+      // Save reflection to database - using generic approach since types aren't updated yet
       const { error } = await supabase
         .from('energy_reflections')
         .insert({
           user_id: user.id,
           content: reflection,
           points_earned: pointsEarned
-        });
+        } as any);
         
       if (error) throw error;
       

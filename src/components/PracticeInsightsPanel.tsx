@@ -5,8 +5,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CalendarDays, BookOpen, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
+interface EnergyReflection {
+  id: string;
+  user_id: string;
+  content: string;
+  points_earned: number;
+  created_at: string;
+}
+
 const PracticeInsightsPanel = () => {
-  const [recentReflections, setRecentReflections] = useState<any[]>([]);
+  const [recentReflections, setRecentReflections] = useState<EnergyReflection[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -16,12 +24,13 @@ const PracticeInsightsPanel = () => {
       
       setLoading(true);
       try {
+        // Using a more generic approach since TypeScript types aren't updated yet
         const { data, error } = await supabase
           .from('energy_reflections')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(5) as { data: EnergyReflection[] | null, error: any };
           
         if (error) throw error;
         setRecentReflections(data || []);
