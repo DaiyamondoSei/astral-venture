@@ -136,7 +136,7 @@ const EntryAnimation = ({ onComplete, className }: EntryAnimationProps) => {
             className="absolute inset-0 flex items-center justify-center"
           >
             <div className="relative">
-              {/* Astral Body Silhouette - Human-like form */}
+              {/* Improved Astral Body Silhouette - Human-like form */}
               <svg 
                 className="w-64 h-80 mx-auto astral-body-silhouette"
                 viewBox="0 0 200 320" 
@@ -146,24 +146,34 @@ const EntryAnimation = ({ onComplete, className }: EntryAnimationProps) => {
                 <circle cx="100" cy="60" r="30" className="astral-body-part" />
                 
                 {/* Neck */}
-                <rect x="95" y="90" width="10" height="15" className="astral-body-part" />
+                <path d="M90 90 L110 90 L108 105 L92 105 Z" className="astral-body-part" />
                 
                 {/* Torso */}
-                <path d="M70 105 L130 105 L140 200 L60 200 Z" className="astral-body-part" />
+                <path d="M75 105 L125 105 L135 200 L65 200 Z" className="astral-body-part" />
                 
                 {/* Arms */}
-                <path d="M70 115 L50 160 L55 165 L75 120" className="astral-body-part" />
-                <path d="M130 115 L150 160 L145 165 L125 120" className="astral-body-part" />
+                <path d="M75 115 L40 160 L48 170 L85 125" className="astral-body-part" />
+                <path d="M125 115 L160 160 L152 170 L115 125" className="astral-body-part" />
+                
+                {/* Hands */}
+                <circle cx="40" cy="168" r="8" className="astral-body-part" />
+                <circle cx="160" cy="168" r="8" className="astral-body-part" />
                 
                 {/* Legs */}
-                <path d="M85 200 L75 280 L85 280 L95 200" className="astral-body-part" />
-                <path d="M115 200 L125 280 L115 280 L105 200" className="astral-body-part" />
+                <path d="M85 200 L65 280 L85 285 L95 205" className="astral-body-part" />
+                <path d="M115 200 L135 280 L115 285 L105 205" className="astral-body-part" />
+                
+                {/* Feet */}
+                <path d="M65 280 L55 285 L65 295 L85 285" className="astral-body-part" />
+                <path d="M135 280 L145 285 L135 295 L115 285" className="astral-body-part" />
                 
                 {/* Energy Points (chakras) */}
-                <circle cx="100" cy="60" r="5" className="energy-point crown-chakra" />
-                <circle cx="100" cy="110" r="5" className="energy-point heart-chakra" />
-                <circle cx="100" cy="140" r="5" className="energy-point solar-chakra" />
-                <circle cx="100" cy="180" r="5" className="energy-point root-chakra" />
+                <circle cx="100" cy="60" r="6" className="energy-point crown-chakra" />
+                <circle cx="100" cy="90" r="5" className="energy-point throat-chakra" />
+                <circle cx="100" cy="120" r="7" className="energy-point heart-chakra" />
+                <circle cx="100" cy="150" r="6" className="energy-point solar-chakra" />
+                <circle cx="100" cy="180" r="5" className="energy-point sacral-chakra" />
+                <circle cx="100" cy="200" r="6" className="energy-point root-chakra" />
               </svg>
               
               <GlowEffect 
@@ -174,7 +184,7 @@ const EntryAnimation = ({ onComplete, className }: EntryAnimationProps) => {
               />
               
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-white text-xl font-display mt-8">Astral Field Activated</div>
+                <div className="text-white text-xl font-display mt-40">Astral Field Activated</div>
               </div>
             </div>
           </motion.div>
