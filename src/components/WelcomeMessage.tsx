@@ -30,7 +30,7 @@ const WelcomeMessage = () => {
       transition: { 
         duration: 2, 
         repeat: Infinity, 
-        repeatType: "reverse" // Changed from string to a valid enum value
+        repeatType: "reverse" as const // Explicitly type it as a const to match the expected enum
       }
     }
   };
@@ -57,7 +57,7 @@ const WelcomeMessage = () => {
             }}
             transition={{ 
               rotate: { duration: 20, repeat: Infinity, ease: "linear" },
-              scale: { duration: 3, repeat: Infinity, repeatType: "reverse" }
+              scale: { duration: 3, repeat: Infinity, repeatType: "reverse" as const }
             }}
           />
         </motion.div>
