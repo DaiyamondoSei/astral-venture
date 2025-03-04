@@ -2,7 +2,46 @@
 import React from 'react';
 import GlowEffect from '@/components/GlowEffect';
 
-const AstralBody = () => {
+interface AstralBodyProps {
+  emotionColors?: {
+    primary: string;
+    secondary: string;
+  };
+}
+
+const AstralBody = ({ emotionColors }: AstralBodyProps) => {
+  // Default colors if none provided
+  const primary = emotionColors?.primary || "quantum-400";
+  const secondary = emotionColors?.secondary || "quantum-700";
+  
+  // Get the stored user dream if available
+  const userDream = typeof window !== 'undefined' ? localStorage.getItem('userDream') : null;
+  
+  // Determine chakra activation based on dream content
+  const getChakraActivation = () => {
+    if (!userDream) return { crown: true, throat: true, heart: true };
+    
+    const dream = userDream.toLowerCase();
+    const activations = {
+      root: dream.includes('security') || dream.includes('stability') || dream.includes('safety'),
+      sacral: dream.includes('creativity') || dream.includes('passion') || dream.includes('emotion'),
+      solar: dream.includes('confidence') || dream.includes('power') || dream.includes('control'),
+      heart: dream.includes('love') || dream.includes('compassion') || dream.includes('healing'),
+      throat: dream.includes('expression') || dream.includes('truth') || dream.includes('communication'),
+      third: dream.includes('intuition') || dream.includes('vision') || dream.includes('insight'),
+      crown: dream.includes('connection') || dream.includes('spiritual') || dream.includes('consciousness')
+    };
+    
+    // Ensure at least heart chakra is active by default
+    if (!Object.values(activations).some(v => v)) {
+      activations.heart = true;
+    }
+    
+    return activations;
+  };
+  
+  const chakras = getChakraActivation();
+  
   return (
     <div className="relative">
       {/* Astral Body Silhouette - Human-like form */}
@@ -36,19 +75,19 @@ const AstralBody = () => {
         <path d="M65 280 L55 285 L65 295 L85 285" className="astral-body-part" />
         <path d="M135 280 L145 285 L135 295 L115 285" className="astral-body-part" />
         
-        {/* Energy Points (chakras) */}
-        <circle cx="100" cy="60" r="6" className="energy-point crown-chakra" />
-        <circle cx="100" cy="90" r="5" className="energy-point throat-chakra" />
-        <circle cx="100" cy="120" r="7" className="energy-point heart-chakra" />
-        <circle cx="100" cy="150" r="6" className="energy-point solar-chakra" />
-        <circle cx="100" cy="180" r="5" className="energy-point sacral-chakra" />
-        <circle cx="100" cy="200" r="6" className="energy-point root-chakra" />
+        {/* Energy Points (chakras) with emotional activation */}
+        <circle cx="100" cy="60" r="6" className={`energy-point crown-chakra ${chakras.crown ? 'active' : 'inactive'}`} style={{opacity: chakras.crown ? 1 : 0.3}} />
+        <circle cx="100" cy="90" r="5" className={`energy-point throat-chakra ${chakras.throat ? 'active' : 'inactive'}`} style={{opacity: chakras.throat ? 1 : 0.3}} />
+        <circle cx="100" cy="120" r="7" className={`energy-point heart-chakra ${chakras.heart ? 'active' : 'inactive'}`} style={{opacity: chakras.heart ? 1 : 0.3}} />
+        <circle cx="100" cy="150" r="6" className={`energy-point solar-chakra ${chakras.solar ? 'active' : 'inactive'}`} style={{opacity: chakras.solar ? 1 : 0.3}} />
+        <circle cx="100" cy="180" r="5" className={`energy-point sacral-chakra ${chakras.sacral ? 'active' : 'inactive'}`} style={{opacity: chakras.sacral ? 1 : 0.3}} />
+        <circle cx="100" cy="200" r="6" className={`energy-point root-chakra ${chakras.root ? 'active' : 'inactive'}`} style={{opacity: chakras.root ? 1 : 0.3}} />
       </svg>
       
       <GlowEffect 
         className="absolute inset-0 w-full h-full rounded-lg"
         animation="pulse"
-        color="rgba(124, 58, 237, 0.8)"
+        color={`rgba(124, 58, 237, 0.8)`}
         intensity="high"
       />
       
