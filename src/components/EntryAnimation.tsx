@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { cn } from "@/lib/utils";
 import { motion } from 'framer-motion';
 
@@ -10,6 +10,7 @@ import FocusStep from './entry-animation/FocusStep';
 import BreathingExercise from './entry-animation/BreathingExercise';
 import AstralBody from './entry-animation/AstralBody';
 import FinalStep from './entry-animation/FinalStep';
+import { useEntryAnimationState } from '@/hooks/useEntryAnimationState';
 
 interface EntryAnimationProps {
   onComplete: () => void;
@@ -17,34 +18,7 @@ interface EntryAnimationProps {
 }
 
 const EntryAnimation = ({ onComplete, className }: EntryAnimationProps) => {
-  const [animationStep, setAnimationStep] = useState(0);
-  const [breathCount, setBreathCount] = useState(0);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (animationStep < 3) {
-        setAnimationStep(prev => prev + 1);
-      } else if (animationStep === 3 && breathCount < 3) {
-        // Do nothing, waiting for user to complete breaths
-      } else if (animationStep === 3 && breathCount >= 3) {
-        setAnimationStep(4);
-        setTimeout(() => {
-          setAnimationStep(5);
-          setTimeout(() => {
-            onComplete();
-          }, 2000);
-        }, 3000);
-      }
-    }, animationStep === 0 ? 2000 : 3000);
-
-    return () => clearTimeout(timer);
-  }, [animationStep, breathCount, onComplete]);
-
-  const handleBreath = () => {
-    if (animationStep === 3 && breathCount < 3) {
-      setBreathCount(prev => prev + 1);
-    }
-  };
+  const { animationStep, breathCount, handleBreath } = useEntryAnimationState({ onComplete });
 
   return (
     <div className={cn(
