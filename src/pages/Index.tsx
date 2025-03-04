@@ -6,18 +6,21 @@ import EntryAnimation from '@/components/EntryAnimation';
 import SeedOfLife from '@/components/SeedOfLife';
 import EnergyAvatar from '@/components/EnergyAvatar';
 import ProgressTracker from '@/components/ProgressTracker';
+import CategoryExperience from '@/components/CategoryExperience';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import AuthForms from '@/components/AuthForms';
 import { supabase } from '@/integrations/supabase/client';
 import GlowEffect from '@/components/GlowEffect';
 import { useToast } from '@/components/ui/use-toast';
+import { Bell, Award, Sparkles } from 'lucide-react';
 
 const Index = () => {
   const [showEntryAnimation, setShowEntryAnimation] = useState(false);
   const [firstLoad, setFirstLoad] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [todayChallenge, setTodayChallenge] = useState<any>(null);
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -33,11 +36,12 @@ const Index = () => {
     }
   }, [user]);
 
-  // Fetch user profile when user is authenticated
+  // Fetch user profile and today's challenge when user is authenticated
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
         try {
+          // Fetch user profile
           const { data, error } = await supabase
             .from('user_profiles')
             .select('*')
@@ -46,6 +50,19 @@ const Index = () => {
             
           if (error) throw error;
           setUserProfile(data);
+          
+          // Fetch a random challenge for today
+          const { data: challengeData, error: challengeError } = await supabase
+            .from('challenges')
+            .select('*')
+            .limit(1)
+            .order('id', { ascending: false });
+            
+          if (challengeError) throw challengeError;
+          
+          if (challengeData && challengeData.length > 0) {
+            setTodayChallenge(challengeData[0]);
+          }
         } catch (error: any) {
           console.error('Error fetching user profile:', error);
           toast({
@@ -69,10 +86,20 @@ const Index = () => {
 
   const handleCategorySelect = (category: string) => {
     setActiveCategory(category);
-    // Later we'll implement the specific category experience
+  };
+  
+  const handleChallengeComplete = async (pointsEarned: number) => {
+    if (!userProfile) return;
+    
+    // Update local state
+    setUserProfile({
+      ...userProfile,
+      energy_points: userProfile.energy_points + pointsEarned
+    });
+    
     toast({
-      title: `${category} Selected`,
-      description: "This category experience will be available soon.",
+      title: "Energy Points Increased!",
+      description: `+${pointsEarned} points added to your profile`,
     });
   };
 
@@ -142,10 +169,22 @@ const Index = () => {
                   <h3 className="font-display text-lg mb-3">Energy Progress</h3>
                   <ProgressTracker progress={userProfile?.energy_points || 0} label="Energy Points" />
                 </div>
+                
                 <div className="glass-card p-4">
                   <h3 className="font-display text-lg mb-3">Today's Challenge</h3>
-                  <p className="text-white/70 text-sm">Complete your daily quantum challenge to advance</p>
+                  {todayChallenge ? (
+                    <div>
+                      <p className="text-white/90 mb-2">{todayChallenge.title}</p>
+                      <div className="flex items-center text-sm">
+                        <Sparkles size={14} className="mr-1 text-primary" />
+                        <span>{todayChallenge.energy_points} energy points</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-white/70 text-sm">Complete your daily quantum challenge to advance</p>
+                  )}
                 </div>
+                
                 <div className="glass-card p-4">
                   <h3 className="font-display text-lg mb-3">Astral Level</h3>
                   <div className="flex items-center">
@@ -155,19 +194,26 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="my-16">
-                <SeedOfLife className="w-full max-w-3xl mx-auto" onCategorySelect={handleCategorySelect} />
-              </div>
-              
-              {activeCategory && (
-                <div className="mt-8 glass-card p-6 max-w-2xl mx-auto">
-                  <h2 className="text-xl font-display mb-4">
-                    {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)} Path
-                  </h2>
-                  <p className="text-white/70">
-                    This path will be available in your next quantum update. 
-                    Continue exploring other dimensions of consciousness.
-                  </p>
+              {!activeCategory ? (
+                <div className="my-16">
+                  <SeedOfLife className="w-full max-w-3xl mx-auto" onCategorySelect={handleCategorySelect} />
+                  <div className="text-center mt-8 text-white/70">
+                    <p>Select a category to begin your practice</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="my-8 max-w-2xl mx-auto">
+                  <button 
+                    onClick={() => setActiveCategory(null)}
+                    className="mb-6 text-white/70 hover:text-white flex items-center"
+                  >
+                    ← Back to Seed of Life
+                  </button>
+                  
+                  <CategoryExperience 
+                    category={activeCategory} 
+                    onComplete={handleChallengeComplete}
+                  />
                 </div>
               )}
             </motion.div>
