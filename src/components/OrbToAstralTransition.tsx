@@ -7,28 +7,61 @@ import StarsBackground from '@/components/entry-animation/StarsBackground';
 
 interface OrbToAstralTransitionProps {
   onComplete?: () => void;
-  userDream?: string;
 }
 
-const OrbToAstralTransition = ({ onComplete, userDream }: OrbToAstralTransitionProps) => {
+const OrbToAstralTransition = ({ onComplete }: OrbToAstralTransitionProps) => {
   const [stage, setStage] = useState<'orb' | 'expanding' | 'astral'>('orb');
   const [message, setMessage] = useState<string | null>(null);
   
+  // Get user dream from localStorage
+  const userDream = typeof window !== 'undefined' ? localStorage.getItem('userDream') : null;
+  const dominantTheme = typeof window !== 'undefined' ? localStorage.getItem('dominantDreamTheme') : null;
+  
   // Emotional colors based on detected emotions in the user's dream
-  // This could be enhanced with real emotion detection/AI later
   const getEmotionalColors = () => {
-    if (!userDream) return { primary: 'quantum-400', secondary: 'quantum-700' };
+    if (!dominantTheme && !userDream) return { primary: 'quantum-400', secondary: 'quantum-700' };
     
-    const dream = userDream.toLowerCase();
+    // If we have an analyzed dominant theme, use that
+    if (dominantTheme) {
+      switch(dominantTheme) {
+        case 'love':
+          return { primary: 'rose-400', secondary: 'rose-700' };
+        case 'peace':
+          return { primary: 'sky-400', secondary: 'sky-700' };
+        case 'power':
+          return { primary: 'amber-400', secondary: 'amber-700' };
+        case 'wisdom':
+          return { primary: 'violet-400', secondary: 'violet-700' };
+        case 'creativity':
+          return { primary: 'orange-400', secondary: 'orange-700' };
+        case 'spirituality':
+          return { primary: 'indigo-400', secondary: 'indigo-700' };
+        case 'healing':
+          return { primary: 'emerald-400', secondary: 'emerald-700' };
+        default:
+          break;
+      }
+    }
     
-    if (dream.includes('love') || dream.includes('joy') || dream.includes('happy')) {
-      return { primary: 'rose-400', secondary: 'rose-700' };
-    } else if (dream.includes('peace') || dream.includes('calm') || dream.includes('harmony')) {
-      return { primary: 'sky-400', secondary: 'sky-700' };
-    } else if (dream.includes('power') || dream.includes('strength') || dream.includes('success')) {
-      return { primary: 'amber-400', secondary: 'amber-700' };
-    } else if (dream.includes('wisdom') || dream.includes('knowledge') || dream.includes('understand')) {
-      return { primary: 'violet-400', secondary: 'violet-700' };
+    // Fallback to keyword detection if no dominant theme or as secondary check
+    if (userDream) {
+      const dream = userDream.toLowerCase();
+      
+      if (dream.includes('love') || dream.includes('heart') || dream.includes('connect')) {
+        return { primary: 'rose-400', secondary: 'rose-700' };
+      } else if (dream.includes('peace') || dream.includes('calm') || dream.includes('harmony')) {
+        return { primary: 'sky-400', secondary: 'sky-700' };
+      } else if (dream.includes('power') || dream.includes('strength') || dream.includes('success')) {
+        return { primary: 'amber-400', secondary: 'amber-700' };
+      } else if (dream.includes('wisdom') || dream.includes('knowledge') || dream.includes('understand')) {
+        return { primary: 'violet-400', secondary: 'violet-700' };
+      } else if (dream.includes('create') || dream.includes('imagine') || dream.includes('express')) {
+        return { primary: 'orange-400', secondary: 'orange-700' };
+      } else if (dream.includes('spirit') || dream.includes('divine') || dream.includes('consciousness')) {
+        return { primary: 'indigo-400', secondary: 'indigo-700' };
+      } else if (dream.includes('heal') || dream.includes('health') || dream.includes('transform')) {
+        return { primary: 'emerald-400', secondary: 'emerald-700' };
+      }
     }
     
     return { primary: 'quantum-400', secondary: 'quantum-700' };
@@ -40,12 +73,12 @@ const OrbToAstralTransition = ({ onComplete, userDream }: OrbToAstralTransitionP
     // Start with the orb
     const expandTimer = setTimeout(() => {
       setStage('expanding');
-      setMessage("Connecting to your future self...");
+      setMessage(userDream ? "Analyzing your dream energy..." : "Connecting to your future self...");
       
       // After expanding, transform to astral body
       const astralTimer = setTimeout(() => {
         setStage('astral');
-        setMessage("Future self connection established");
+        setMessage(userDream ? "Dream energy integration complete" : "Future self connection established");
         
         // Notify when complete
         const completeTimer = setTimeout(() => {
@@ -61,7 +94,7 @@ const OrbToAstralTransition = ({ onComplete, userDream }: OrbToAstralTransitionP
     }, 2000);
     
     return () => clearTimeout(expandTimer);
-  }, [onComplete]);
+  }, [onComplete, userDream]);
   
   return (
     <div className="relative w-full h-full min-h-[50vh] flex flex-col items-center justify-center">

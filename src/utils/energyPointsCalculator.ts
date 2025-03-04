@@ -3,9 +3,10 @@ interface EmotionalFactors {
   emotionalDepth: number;  // 0-1 scale
   selfAwareness: number;   // 0-1 scale
   chakraResonance: number; // 0-1 scale
+  emotionalThemes: string[];
 }
 
-export const calculateEnergyPoints = (text: string): number => {
+export const calculateEnergyPoints = (text: string): { points: number; emotionalAnalysis: EmotionalFactors } => {
   // Base points for any reflection
   let points = 5;
   
@@ -61,10 +62,13 @@ export const calculateEnergyPoints = (text: string): number => {
   
   points += emotionalBonus;
   
-  return Math.min(points, 40); // Cap at 40 points max (increased from 30)
+  return { 
+    points: Math.min(points, 40), // Cap at 40 points max (increased from 30)
+    emotionalAnalysis: emotionalFactors
+  };
 };
 
-// Simple analysis of emotional factors (would be better with real NLP/AI)
+// Enhanced analysis of emotional factors (would be better with real NLP/AI)
 const analyzeEmotionalFactors = (text: string): EmotionalFactors => {
   const textLower = text.toLowerCase();
   
@@ -109,9 +113,77 @@ const analyzeEmotionalFactors = (text: string): EmotionalFactors => {
     }
   });
   
+  // Analyze for emotional themes
+  const emotionalThemeAnalysis = {
+    love: 0,
+    joy: 0,
+    peace: 0,
+    power: 0,
+    wisdom: 0,
+    creativity: 0,
+    healing: 0,
+    gratitude: 0,
+    spiritual: 0
+  };
+  
+  const themeKeywords = {
+    love: ['love', 'compassion', 'heart', 'connection', 'kindness', 'care'],
+    joy: ['joy', 'happiness', 'delight', 'pleasure', 'exciting', 'glad'],
+    peace: ['peace', 'calm', 'tranquil', 'serene', 'still', 'quiet', 'harmony'],
+    power: ['power', 'strength', 'confidence', 'ability', 'capable', 'strong'],
+    wisdom: ['wisdom', 'insight', 'understand', 'clarity', 'perspective', 'see'],
+    creativity: ['create', 'express', 'flow', 'imagine', 'inspire', 'idea'],
+    healing: ['heal', 'release', 'recover', 'better', 'transform', 'overcome'],
+    gratitude: ['grateful', 'thankful', 'appreciate', 'blessing', 'gift'],
+    spiritual: ['spirit', 'soul', 'divine', 'universe', 'cosmic', 'transcend']
+  };
+  
+  // Count theme keywords
+  Object.entries(themeKeywords).forEach(([theme, words]) => {
+    words.forEach(word => {
+      if (textLower.includes(word)) {
+        emotionalThemeAnalysis[theme]++;
+      }
+    });
+  });
+  
+  // Get top themes
+  const topThemes = Object.entries(emotionalThemeAnalysis)
+    .sort((a, b) => b[1] - a[1])
+    .filter(([_, count]) => count > 0)
+    .slice(0, 3)
+    .map(([theme]) => theme);
+  
   return {
     emotionalDepth: Math.min(emotionalDepthScore, 1), // Cap at 1.0
     selfAwareness: Math.min(selfAwarenessScore, 1),   // Cap at 1.0
-    chakraResonance: Math.min(chakraResonanceScore, 1) // Cap at 1.0
+    chakraResonance: Math.min(chakraResonanceScore, 1), // Cap at 1.0
+    emotionalThemes: topThemes
   };
+};
+
+// Utility to determine which chakras activate based on emotional themes
+export const getActivatedChakrasFromThemes = (themes: string[]): number[] => {
+  const chakraMap = {
+    love: 2,       // Heart chakra
+    joy: 3,        // Solar plexus
+    peace: 1,      // Throat chakra
+    power: 3,      // Solar plexus
+    wisdom: 0,     // Third eye
+    creativity: 4, // Sacral chakra  
+    healing: 2,    // Heart chakra
+    gratitude: 2,  // Heart chakra
+    spiritual: 0   // Crown chakra
+  };
+  
+  const activatedChakras: number[] = [];
+  
+  themes.forEach(theme => {
+    const chakraIndex = chakraMap[theme];
+    if (chakraIndex !== undefined && !activatedChakras.includes(chakraIndex)) {
+      activatedChakras.push(chakraIndex);
+    }
+  });
+  
+  return activatedChakras;
 };

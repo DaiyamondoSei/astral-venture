@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -29,9 +30,18 @@ const Index = () => {
   useEffect(() => {
     // Check if user just logged in and hasn't seen the entry animation yet
     if (user && !localStorage.getItem(`entry-animation-shown-${user.id}`)) {
-      setShowEntryAnimation(true);
+      // Check if dream capture is completed already
+      const dreamCaptureCompleted = localStorage.getItem('dreamCaptureCompleted');
+      
+      if (!dreamCaptureCompleted) {
+        // Redirect to dream capture first
+        navigate('/dream-capture');
+      } else {
+        // If dream capture is done, show regular entry animation
+        setShowEntryAnimation(true);
+      }
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const handleEntryAnimationComplete = () => {
     setAnimationCompleted(true);
@@ -66,17 +76,45 @@ const Index = () => {
     }
   };
 
-  const handleChallengeComplete = async (pointsEarned: number) => {
+  const handleChallengeComplete = async (pointsEarned: number, emotionalInsights?: any) => {
     if (!userProfile) return;
     
     updateUserProfile({
       energy_points: userProfile.energy_points + pointsEarned
     });
     
-    toast({
-      title: "Energy Points Increased!",
-      description: `+${pointsEarned} points added to your profile`,
-    });
+    // If emotional insights are provided, update activated chakras
+    if (emotionalInsights && emotionalInsights.chakrasActivated && emotionalInsights.chakrasActivated.length > 0) {
+      // Merge with existing chakras (avoiding duplicates)
+      const newChakras = [...activatedChakras];
+      emotionalInsights.chakrasActivated.forEach((chakraIndex: number) => {
+        if (!newChakras.includes(chakraIndex)) {
+          newChakras.push(chakraIndex);
+        }
+      });
+      
+      updateActivatedChakras(newChakras);
+      
+      // Customize message based on newly activated chakras
+      const newlyActivated = emotionalInsights.chakrasActivated.filter(
+        (chakra: number) => !activatedChakras.includes(chakra)
+      );
+      
+      let chakraMessage = '';
+      if (newlyActivated.length > 0) {
+        chakraMessage = ` Your ${CHAKRA_NAMES[newlyActivated[0]]} chakra energy is awakening.`;
+      }
+      
+      toast({
+        title: "Energy Points Increased!",
+        description: `+${pointsEarned} points added to your profile.${chakraMessage}`,
+      });
+    } else {
+      toast({
+        title: "Energy Points Increased!",
+        description: `+${pointsEarned} points added to your profile`,
+      });
+    }
   };
 
   const toggleDeveloperMode = () => {

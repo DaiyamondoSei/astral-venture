@@ -1,38 +1,31 @@
-
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Toaster } from '@/components/ui/toaster';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-// Pages
 import Index from '@/pages/Index';
 import Login from '@/pages/Login';
+import EntryAnimationPage from '@/pages/EntryAnimation';
+import DreamCapture from '@/pages/DreamCapture';
+import AstralBodyDemo from '@/pages/AstralBodyDemo';
 import Dashboard from '@/pages/Dashboard';
 import NotFound from '@/pages/NotFound';
-import AstralBodyDemo from '@/pages/AstralBodyDemo';
-import EntryAnimation from '@/pages/EntryAnimation';
-
-// Create a client
-const queryClient = new QueryClient();
+import { Toaster } from '@/components/ui/toast';
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/astral-body" element={<AstralBodyDemo />} />
-            <Route path="/entry" element={<EntryAnimation />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-        </Router>
-      </AuthProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/entry-animation" element={<EntryAnimationPage />} />
+          <Route path="/dream-capture" element={<DreamCapture />} />
+          <Route path="/astral-body-demo" element={<AstralBodyDemo />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+      <Toaster />
+    </AuthProvider>
   );
 }
 

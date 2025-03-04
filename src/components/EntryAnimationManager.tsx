@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import EntryAnimation from '@/components/EntryAnimation';
 import { Button } from '@/components/ui/button';
 import { Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface EntryAnimationManagerProps {
   user: any;
@@ -17,16 +18,25 @@ const EntryAnimationManager: React.FC<EntryAnimationManagerProps> = ({
 }) => {
   const [showEntryAnimation, setShowEntryAnimation] = useState(false);
   const [firstLoad, setFirstLoad] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const hasVisited = localStorage.getItem('hasVisitedQuanex');
+    const dreamCaptureCompleted = localStorage.getItem('dreamCaptureCompleted');
+    
     if (!hasVisited && user) {
-      setShowEntryAnimation(true);
+      // If first visit and dream not captured yet, navigate to dream capture
+      if (!dreamCaptureCompleted) {
+        navigate('/dream-capture');
+      } else {
+        // If they've already done dream capture, show entry animation
+        setShowEntryAnimation(true);
+      }
       localStorage.setItem('hasVisitedQuanex', 'true');
     } else {
       setFirstLoad(false);
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const handleEntryAnimationComplete = () => {
     setShowEntryAnimation(false);
@@ -38,8 +48,11 @@ const EntryAnimationManager: React.FC<EntryAnimationManagerProps> = ({
     // Clear the localStorage flag to allow the animation to show again
     if (user) {
       localStorage.removeItem(`entry-animation-shown-${user.id}`);
+      localStorage.removeItem('dreamCaptureCompleted'); // Also reset dream capture
     }
-    setShowEntryAnimation(true);
+    
+    // For test button, first go to dream capture
+    navigate('/dream-capture');
   };
 
   return (
