@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, incrementEnergyPoints } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import GlowEffect from './GlowEffect';
 import { CheckCircle, Clock, Zap, BookOpen, ChevronRight } from 'lucide-react';
@@ -79,16 +78,8 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
 
       if (error) throw error;
 
-      // Update user energy points
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({ 
-          energy_points: supabase.rpc('increment', { x: selectedChallenge.energy_points }),
-          last_active_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
+      // Update user energy points using our new function
+      await incrementEnergyPoints(user.id, selectedChallenge.energy_points);
 
       toast({
         title: 'Challenge Completed!',

@@ -8,14 +8,34 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Add custom function to handle incrementing values
-supabase.rpc = function(functionName: string, params: any = {}) {
-  if (functionName === 'increment') {
-    // Simulate an increment function since we don't have RPC functions set up yet
-    const value = params.x || 0;
-    return value;
+export const incrementEnergyPoints = async (userId: string, pointsToAdd: number) => {
+  try {
+    // Get current energy points
+    const { data: userData, error: fetchError } = await supabase
+      .from('user_profiles')
+      .select('energy_points')
+      .eq('id', userId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    const currentPoints = userData?.energy_points || 0;
+    const newPoints = currentPoints + pointsToAdd;
+    
+    // Update with new points value
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ 
+        energy_points: newPoints,
+        last_active_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+      
+    if (updateError) throw updateError;
+    
+    return newPoints;
+  } catch (error) {
+    console.error('Error incrementing energy points:', error);
+    throw error;
   }
-  
-  return this.functions.invoke(functionName, {
-    body: params
-  });
 };
