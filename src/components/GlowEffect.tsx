@@ -9,7 +9,7 @@ interface GlowEffectProps {
   intensity?: 'low' | 'medium' | 'high';
   animation?: 'none' | 'pulse' | 'breathe';
   style?: React.CSSProperties;
-  onClick?: () => void; // Added onClick handler prop
+  onClick?: () => void;
 }
 
 const GlowEffect = ({
@@ -46,7 +46,7 @@ const GlowEffect = ({
         className
       )}
       style={glowStyle}
-      onClick={onClick} // Added onClick handler to the div
+      onClick={onClick}
     >
       {children}
     </div>

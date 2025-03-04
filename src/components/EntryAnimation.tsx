@@ -164,4 +164,3 @@ const EntryAnimation = ({ onComplete, className }: EntryAnimationProps) => {
 };
 
 export default EntryAnimation;
-
