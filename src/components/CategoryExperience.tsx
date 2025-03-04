@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase, incrementEnergyPoints } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import GlowEffect from './GlowEffect';
-import { CheckCircle, Clock, Zap, BookOpen, ChevronRight } from 'lucide-react';
+import { CheckCircle, Clock, Zap, BookOpen, ChevronRight, PenLine } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import ReflectionTab from './ReflectionTab';
 
 interface CategoryExperienceProps {
   category: string;
@@ -15,7 +16,7 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
   const [challenges, setChallenges] = useState<any[]>([]);
   const [downloads, setDownloads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'practice' | 'wisdom'>('practice');
+  const [activeTab, setActiveTab] = useState<'practice' | 'wisdom' | 'reflection'>('practice');
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -157,9 +158,16 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
         >
           Quantum Wisdom
         </button>
+        <button
+          className={`px-4 py-2 font-medium ${activeTab === 'reflection' ? 'text-white border-b-2 border-primary' : 'text-white/60'}`}
+          onClick={() => setActiveTab('reflection')}
+        >
+          <PenLine size={14} className="inline mr-1" />
+          Reflect
+        </button>
       </div>
 
-      {/* Challenge or Wisdom Content */}
+      {/* Challenge, Wisdom, or Reflection Content */}
       <div className="pt-4">
         {activeTab === 'practice' ? (
           <>
@@ -229,7 +237,7 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === 'wisdom' ? (
           <div className="space-y-4">
             {downloads.map((download) => (
               <div key={download.id} className="glass-card p-5">
@@ -247,6 +255,8 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
               </div>
             )}
           </div>
+        ) : (
+          <ReflectionTab onReflectionComplete={onComplete} />
         )}
       </div>
     </div>
