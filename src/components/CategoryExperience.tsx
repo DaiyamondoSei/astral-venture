@@ -1,23 +1,44 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase, incrementEnergyPoints } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import GlowEffect from './GlowEffect';
-import { CheckCircle, Clock, Zap, BookOpen, ChevronRight, PenLine } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import GlowEffect from './GlowEffect';
 import ReflectionTab from './ReflectionTab';
+import CategoryHeader from './category-experience/CategoryHeader';
+import CategoryTabs from './category-experience/CategoryTabs';
+import PracticeTab from './category-experience/PracticeTab';
+import WisdomTab from './category-experience/WisdomTab';
+import { getCategoryGradient } from '@/utils/categoryUtils';
 
 interface CategoryExperienceProps {
   category: string;
   onComplete?: (pointsEarned: number) => void;
 }
 
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  duration_minutes: number;
+  energy_points: number;
+  level: number;
+  category: string;
+}
+
+interface QuantumDownload {
+  id: string;
+  title: string;
+  content: string;
+  level: number;
+  category: string;
+}
+
 const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) => {
-  const [challenges, setChallenges] = useState<any[]>([]);
-  const [downloads, setDownloads] = useState<any[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [downloads, setDownloads] = useState<QuantumDownload[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'practice' | 'wisdom' | 'reflection'>('practice');
-  const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -64,8 +85,8 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
     }
   }, [category, toast]);
 
-  const completeChallenge = async () => {
-    if (!user || !selectedChallenge) return;
+  const completeChallenge = async (selectedChallenge: Challenge) => {
+    if (!user) return;
     
     try {
       // Record the completed challenge
@@ -79,7 +100,7 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
 
       if (error) throw error;
 
-      // Update user energy points using our new function
+      // Update user energy points
       await incrementEnergyPoints(user.id, selectedChallenge.energy_points);
 
       toast({
@@ -90,8 +111,6 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
       if (onComplete) {
         onComplete(selectedChallenge.energy_points);
       }
-
-      setSelectedChallenge(null);
     } catch (error: any) {
       console.error('Error completing challenge:', error.message);
       toast({
@@ -113,148 +132,25 @@ const CategoryExperience = ({ category, onComplete }: CategoryExperienceProps) =
     );
   }
 
-  const getCategoryGradient = () => {
-    switch (category) {
-      case 'meditation': return 'from-quantum-300 to-quantum-600';
-      case 'energy': return 'from-ethereal-300 to-ethereal-600';
-      case 'connection': return 'from-ethereal-400 to-ethereal-600';
-      case 'astral': return 'from-astral-300 to-astral-600';
-      case 'dreams': return 'from-quantum-400 to-quantum-700';
-      case 'manifestation': return 'from-astral-300 to-quantum-500';
-      case 'intention': return 'from-astral-400 to-astral-600';
-      case 'chakras': return 'from-ethereal-300 to-astral-500';
-      case 'quantum': return 'from-quantum-300 to-quantum-600';
-      case 'healing': return 'from-ethereal-300 to-ethereal-600';
-      case 'awareness': return 'from-astral-300 to-astral-600';
-      case 'breathwork': return 'from-quantum-400 to-quantum-600';
-      case 'guidance': return 'from-quantum-300 to-astral-500';
-      default: return 'from-quantum-300 to-quantum-600';
-    }
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center text-center mb-6">
-        <GlowEffect 
-          className={`w-16 h-16 mb-4 rounded-full bg-gradient-to-br ${getCategoryGradient()} flex items-center justify-center`}
-        >
-          <div className="text-white text-lg font-semibold">{displayCategory.charAt(0)}</div>
-        </GlowEffect>
-        <h2 className="text-2xl font-display font-medium text-white">{displayCategory} Path</h2>
-        <p className="text-white/70 mt-1">Expand your consciousness through {displayCategory.toLowerCase()} practices</p>
-      </div>
+      <CategoryHeader 
+        category={category} 
+        displayCategory={displayCategory} 
+        getCategoryGradient={() => getCategoryGradient(category)} 
+      />
 
-      {/* Tabs */}
-      <div className="flex border-b border-white/10">
-        <button
-          className={`px-4 py-2 font-medium ${activeTab === 'practice' ? 'text-white border-b-2 border-primary' : 'text-white/60'}`}
-          onClick={() => setActiveTab('practice')}
-        >
-          Practice
-        </button>
-        <button
-          className={`px-4 py-2 font-medium ${activeTab === 'wisdom' ? 'text-white border-b-2 border-primary' : 'text-white/60'}`}
-          onClick={() => setActiveTab('wisdom')}
-        >
-          Quantum Wisdom
-        </button>
-        <button
-          className={`px-4 py-2 font-medium ${activeTab === 'reflection' ? 'text-white border-b-2 border-primary' : 'text-white/60'}`}
-          onClick={() => setActiveTab('reflection')}
-        >
-          <PenLine size={14} className="inline mr-1" />
-          Reflect
-        </button>
-      </div>
+      <CategoryTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Challenge, Wisdom, or Reflection Content */}
       <div className="pt-4">
         {activeTab === 'practice' ? (
-          <>
-            {selectedChallenge ? (
-              <div className="glass-card p-6 animate-fade-in">
-                <div className="mb-6">
-                  <h3 className="text-xl font-display mb-2">{selectedChallenge.title}</h3>
-                  <p className="text-white/80">{selectedChallenge.description}</p>
-                </div>
-                
-                <div className="flex justify-between items-center mb-6">
-                  <div className="flex items-center">
-                    <Clock size={16} className="mr-2 text-white/60" />
-                    <span className="text-white/60 text-sm">{selectedChallenge.duration_minutes} min</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Zap size={16} className="mr-2 text-primary" />
-                    <span className="text-primary text-sm">+{selectedChallenge.energy_points} points</span>
-                  </div>
-                </div>
-                
-                <Button 
-                  onClick={completeChallenge}
-                  className={`w-full bg-gradient-to-r ${getCategoryGradient()} hover:opacity-90`}
-                >
-                  <CheckCircle size={18} className="mr-2" />
-                  Mark Complete
-                </Button>
-                
-                <button 
-                  onClick={() => setSelectedChallenge(null)}
-                  className="w-full text-center mt-3 text-white/60 text-sm hover:text-white"
-                >
-                  Choose Another Challenge
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {challenges.map((challenge) => (
-                  <div 
-                    key={challenge.id}
-                    onClick={() => setSelectedChallenge(challenge)}
-                    className="glass-card p-4 cursor-pointer hover:bg-white/5 transition-colors flex justify-between items-center"
-                  >
-                    <div>
-                      <h3 className="font-medium">{challenge.title}</h3>
-                      <div className="flex mt-1 text-sm">
-                        <span className="flex items-center text-white/60 mr-4">
-                          <Clock size={14} className="mr-1" />
-                          {challenge.duration_minutes} min
-                        </span>
-                        <span className="flex items-center text-primary">
-                          <Zap size={14} className="mr-1" />
-                          {challenge.energy_points} points
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight size={20} className="text-white/40" />
-                  </div>
-                ))}
-                
-                {challenges.length === 0 && (
-                  <div className="text-center py-8 text-white/60">
-                    No challenges available for this category yet
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          <PracticeTab 
+            challenges={challenges} 
+            getCategoryGradient={() => getCategoryGradient(category)} 
+            onCompleteChallenge={completeChallenge} 
+          />
         ) : activeTab === 'wisdom' ? (
-          <div className="space-y-4">
-            {downloads.map((download) => (
-              <div key={download.id} className="glass-card p-5">
-                <div className="flex items-center mb-2">
-                  <BookOpen size={18} className="mr-2 text-primary" />
-                  <h3 className="font-display">{download.title}</h3>
-                </div>
-                <p className="text-white/80">{download.content}</p>
-              </div>
-            ))}
-            
-            {downloads.length === 0 && (
-              <div className="text-center py-8 text-white/60">
-                No quantum wisdom available for this category yet
-              </div>
-            )}
-          </div>
+          <WisdomTab downloads={downloads} />
         ) : (
           <ReflectionTab onReflectionComplete={onComplete} />
         )}
