@@ -1,17 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { CalendarDays, BookOpen, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-
-interface EnergyReflection {
-  id: string;
-  user_id: string;
-  content: string;
-  points_earned: number;
-  created_at: string;
-}
+import { EnergyReflection, fetchUserReflections } from '@/services/reflectionService';
 
 const PracticeInsightsPanel = () => {
   const [recentReflections, setRecentReflections] = useState<EnergyReflection[]>([]);
@@ -19,21 +11,13 @@ const PracticeInsightsPanel = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchRecentReflections = async () => {
+    const fetchRecentReflectionsData = async () => {
       if (!user) return;
       
       setLoading(true);
       try {
-        // Using a more generic approach since TypeScript types aren't updated yet
-        const { data, error } = await supabase
-          .from('energy_reflections')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5) as { data: EnergyReflection[] | null, error: any };
-          
-        if (error) throw error;
-        setRecentReflections(data || []);
+        const reflections = await fetchUserReflections(user.id);
+        setRecentReflections(reflections);
       } catch (error) {
         console.error('Error fetching reflections:', error);
       } finally {
@@ -41,7 +25,7 @@ const PracticeInsightsPanel = () => {
       }
     };
     
-    fetchRecentReflections();
+    fetchRecentReflectionsData();
   }, [user]);
 
   // Calculate total points earned from reflections

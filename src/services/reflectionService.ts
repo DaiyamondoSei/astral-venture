@@ -10,6 +10,7 @@ export interface EnergyReflection {
 }
 
 export const saveReflection = async (userId: string, content: string, pointsEarned: number) => {
+  // Use type assertion since TypeScript definitions don't know about the energy_reflections table yet
   const { error } = await supabase
     .from('energy_reflections')
     .insert({
@@ -46,4 +47,18 @@ export const updateUserPoints = async (userId: string, pointsEarned: number) => 
   if (updateError) throw updateError;
   
   return newPoints;
+};
+
+// New function to fetch user's recent reflections
+export const fetchUserReflections = async (userId: string, limit: number = 5): Promise<EnergyReflection[]> => {
+  // Type assertion to avoid TypeScript errors until types are updated
+  const { data, error } = await supabase
+    .from('energy_reflections')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit) as { data: EnergyReflection[] | null, error: any };
+    
+  if (error) throw error;
+  return data || [];
 };
