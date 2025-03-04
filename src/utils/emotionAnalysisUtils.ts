@@ -64,7 +64,7 @@ export const emotionToInsightMap: {[key: string]: string} = {
   love: 'Your heart-centered approach strengthens your connections.',
   joy: 'Joy is becoming a more consistent state in your practice.',
   peace: 'Your ability to remain centered is growing stronger.',
-  power: 'You're learning to harness your personal power effectively.',
+  power: 'You\'re learning to harness your personal power effectively.',
   wisdom: 'Your capacity for deeper insights is expanding.',
   creativity: 'Creative energy is flowing more freely in your practice.',
   fear: 'Working through fear is part of your growth journey now.',

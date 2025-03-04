@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserReflections } from '@/services/reflectionService';
@@ -6,7 +7,7 @@ import {
   analyzeReflectionContent,
   addReflectionBasedChakras,
   calculateEmotionalGrowth
-} from '@/utils/emotionAnalysisUtils';
+} from '@/utils/emotion';
 
 export const useEmotionalAnalysis = () => {
   const [loading, setLoading] = useState(true);
