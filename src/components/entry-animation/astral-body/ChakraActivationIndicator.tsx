@@ -1,9 +1,10 @@
 
 import React from 'react';
+import { ChakraActivation } from './ChakraPoints';
 
 interface ChakraActivationIndicatorProps {
   activatedCount: number;
-  chakraNames: { [key: string]: boolean };
+  chakraNames: ChakraActivation;
 }
 
 const ChakraActivationIndicator: React.FC<ChakraActivationIndicatorProps> = ({ 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -8,7 +9,7 @@ import DreamCapture from '@/pages/DreamCapture';
 import AstralBodyDemo from '@/pages/AstralBodyDemo';
 import Dashboard from '@/pages/Dashboard';
 import NotFound from '@/pages/NotFound';
-import { Toaster } from '@/components/ui/toast';
+import { Toaster } from '@/components/ui/toaster';
 
 function App() {
   return (

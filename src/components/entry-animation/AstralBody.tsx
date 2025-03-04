@@ -2,7 +2,7 @@
 import React from 'react';
 import GlowEffect from '@/components/GlowEffect';
 import HumanSilhouette from './astral-body/HumanSilhouette';
-import ChakraPoints from './astral-body/ChakraPoints';
+import ChakraPoints, { ChakraActivation } from './astral-body/ChakraPoints';
 import ChakraConnections from './astral-body/ChakraConnections';
 import ChakraActivationIndicator from './astral-body/ChakraActivationIndicator';
 import { useChakraActivation } from './astral-body/useChakraActivation';
