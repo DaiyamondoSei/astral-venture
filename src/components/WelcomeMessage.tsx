@@ -30,7 +30,7 @@ const WelcomeMessage = () => {
       transition: { 
         duration: 2, 
         repeat: Infinity, 
-        repeatType: "reverse" 
+        repeatType: "reverse" // Changed from string to a valid enum value
       }
     }
   };
