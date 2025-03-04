@@ -2,6 +2,7 @@
 import React from 'react';
 import { cn } from "@/lib/utils";
 import GlowEffect from './GlowEffect';
+import { Lock } from 'lucide-react';
 
 interface CategoryIconProps {
   id: string;
@@ -10,6 +11,7 @@ interface CategoryIconProps {
   description: string;
   gradientColor: string;
   isActive?: boolean;
+  isLocked?: boolean;
   onClick?: () => void;
 }
 
@@ -20,22 +22,35 @@ const CategoryIcon = ({
   description,
   gradientColor,
   isActive = false,
+  isLocked = false,
   onClick
 }: CategoryIconProps) => {
   return (
-    <div className="relative group" onClick={onClick}>
+    <div 
+      className={cn(
+        "relative group", 
+        isLocked ? "cursor-not-allowed" : "cursor-pointer"
+      )} 
+      onClick={isLocked ? undefined : onClick}
+    >
       <GlowEffect 
         animation={isActive ? 'pulse' : 'none'}
         intensity={isActive ? 'high' : 'medium'}
         className={cn(
-          "rounded-full w-16 h-16 flex items-center justify-center cursor-pointer transition-all duration-500",
+          "rounded-full w-16 h-16 flex items-center justify-center transition-all duration-500",
           "bg-gradient-to-br",
           gradientColor,
-          isActive ? "scale-110" : "scale-100 hover:scale-105"
+          isActive ? "scale-110" : "scale-100 hover:scale-105",
+          isLocked ? "opacity-50" : "opacity-100"
         )}
       >
-        <div className="text-white">
+        <div className="text-white relative">
           {icon}
+          {isLocked && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
+              <Lock size={14} className="text-white/90" />
+            </div>
+          )}
         </div>
       </GlowEffect>
       
@@ -48,6 +63,9 @@ const CategoryIcon = ({
       )}>
         <p className="font-display font-medium">{name}</p>
         <p className="text-xs mt-1 opacity-80">{description}</p>
+        {isLocked && (
+          <p className="text-xs mt-1 text-yellow-400">Complete previous challenges to unlock</p>
+        )}
       </div>
     </div>
   );
