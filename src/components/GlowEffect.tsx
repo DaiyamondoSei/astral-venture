@@ -4,10 +4,11 @@ import { cn } from "@/lib/utils";
 
 interface GlowEffectProps {
   className?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   color?: string;
   intensity?: 'low' | 'medium' | 'high';
   animation?: 'none' | 'pulse' | 'breathe';
+  style?: React.CSSProperties;
 }
 
 const GlowEffect = ({
@@ -15,7 +16,8 @@ const GlowEffect = ({
   children,
   color = 'rgba(138, 92, 246, 0.5)',
   intensity = 'medium',
-  animation = 'none'
+  animation = 'none',
+  style
 }: GlowEffectProps) => {
   const intensityMap = {
     low: '10px',
@@ -31,6 +33,7 @@ const GlowEffect = ({
 
   const glowStyle = {
     boxShadow: `0 0 ${intensityMap[intensity]} ${color}`,
+    ...style
   };
 
   return (
