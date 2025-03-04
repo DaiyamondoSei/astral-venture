@@ -1,14 +1,12 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import Layout from '@/components/Layout';
-import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import EnergyProgressCard from '@/components/astral-body-demo/EnergyProgressCard';
-import SimulationModeCard from '@/components/astral-body-demo/SimulationModeCard';
+import DemoHeader from '@/components/astral-body-demo/DemoHeader';
+import DemoContainer from '@/components/astral-body-demo/DemoContainer';
+import DemoCards from '@/components/astral-body-demo/DemoCards';
 import VisualizationTabs from '@/components/astral-body-demo/VisualizationTabs';
 import EnergyThresholds from '@/components/astral-body-demo/EnergyThresholds';
+import { useAstralDemo } from '@/hooks/useAstralDemo';
 
 /**
  * AstralBodyDemo Page
@@ -17,63 +15,39 @@ import EnergyThresholds from '@/components/astral-body-demo/EnergyThresholds';
  * which evolves based on the user's energy points.
  */
 const AstralBodyDemo = () => {
-  const navigate = useNavigate();
-  const { userProfile, updateUserProfile } = useUserProfile();
-  const [simulatedPoints, setSimulatedPoints] = useState<number>(0);
-  const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [incrementAmount, setIncrementAmount] = useState<number>(50);
-  
-  // Get the actual energy points from the user profile, or use simulated points
-  const energyPoints = isSimulating 
-    ? simulatedPoints 
-    : (userProfile?.energy_points || 0);
+  const {
+    userProfile,
+    updateUserProfile,
+    simulatedPoints,
+    setSimulatedPoints,
+    isSimulating,
+    setIsSimulating,
+    incrementAmount,
+    setIncrementAmount,
+    energyPoints
+  } = useAstralDemo();
   
   return (
     <Layout>
-      <motion.div 
-        className="container mx-auto px-4 py-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Button 
-          onClick={() => navigate('/')}
-          className="mb-6"
-          variant="outline"
-        >
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-1">
-            <path d="M8.84182 3.13514C9.04327 3.32401 9.05348 3.64042 8.86462 3.84188L5.43521 7.49991L8.86462 11.1579C9.05348 11.3594 9.04327 11.6758 8.84182 11.8647C8.64036 12.0535 8.32394 12.0433 8.13508 11.8419L4.38508 7.84188C4.20477 7.64955 4.20477 7.35027 4.38508 7.15794L8.13508 3.15794C8.32394 2.95648 8.64036 2.94628 8.84182 3.13514Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
-          </svg>
-          Back to Home
-        </Button>
+      <DemoContainer>
+        <DemoHeader />
         
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl md:text-4xl font-display text-center mb-8 text-blue-50 glow-text">
-            Astral Body Visualization
-          </h1>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <EnergyProgressCard
-              userProfile={userProfile}
-              updateUserProfile={updateUserProfile}
-              energyPoints={energyPoints}
-              incrementAmount={incrementAmount}
-              setIncrementAmount={setIncrementAmount}
-            />
-            
-            <SimulationModeCard
-              simulatedPoints={simulatedPoints}
-              setSimulatedPoints={setSimulatedPoints}
-              isSimulating={isSimulating}
-              setIsSimulating={setIsSimulating}
-            />
-          </div>
-          
-          <VisualizationTabs energyPoints={energyPoints} />
-          
-          <EnergyThresholds />
-        </div>
-      </motion.div>
+        <DemoCards 
+          userProfile={userProfile}
+          updateUserProfile={updateUserProfile}
+          energyPoints={energyPoints}
+          incrementAmount={incrementAmount}
+          setIncrementAmount={setIncrementAmount}
+          simulatedPoints={simulatedPoints}
+          setSimulatedPoints={setSimulatedPoints}
+          isSimulating={isSimulating}
+          setIsSimulating={setIsSimulating}
+        />
+        
+        <VisualizationTabs energyPoints={energyPoints} />
+        
+        <EnergyThresholds />
+      </DemoContainer>
     </Layout>
   );
 };
