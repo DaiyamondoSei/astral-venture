@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import EnergyReflectionForm from './EnergyReflectionForm';
 import PracticeInsightsPanel from './PracticeInsightsPanel';
 import EmotionalInsightsPanel from './EmotionalInsightsPanel';
+import PhilosophicalReflection from './philosophical/PhilosophicalReflection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, PenLine, Heart } from 'lucide-react';
+import { BookOpen, PenLine, Heart, Sparkles } from 'lucide-react';
 
 interface ReflectionTabProps {
   onReflectionComplete?: (pointsEarned: number, emotionalInsights?: any) => void;
@@ -31,7 +32,7 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid grid-cols-3 mb-6">
+      <TabsList className="grid grid-cols-4 mb-6">
         <TabsTrigger value="new" className="flex items-center">
           <PenLine size={16} className="mr-2" />
           New Reflection
@@ -43,6 +44,10 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
         <TabsTrigger value="emotional" className="flex items-center">
           <Heart size={16} className="mr-2" />
           Emotional Journey
+        </TabsTrigger>
+        <TabsTrigger value="philosophical" className="flex items-center">
+          <Sparkles size={16} className="mr-2" />
+          Consciousness
         </TabsTrigger>
       </TabsList>
       
@@ -56,6 +61,10 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
       
       <TabsContent value="emotional">
         <EmotionalInsightsPanel />
+      </TabsContent>
+      
+      <TabsContent value="philosophical">
+        <PhilosophicalReflection />
       </TabsContent>
     </Tabs>
   );
