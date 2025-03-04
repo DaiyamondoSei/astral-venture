@@ -9,6 +9,13 @@ interface BreathingExerciseProps {
 }
 
 const BreathingExercise = ({ breathCount, onBreath }: BreathingExerciseProps) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onBreath();
+    }
+  };
+
   return (
     <div className="relative">
       <GlowEffect 
@@ -21,13 +28,19 @@ const BreathingExercise = ({ breathCount, onBreath }: BreathingExerciseProps) =>
         intensity="high"
         onClick={onBreath}
       >
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+        <div 
+          className="absolute inset-0 flex flex-col items-center justify-center text-white"
+          role="button"
+          tabIndex={0}
+          aria-label={`Breathe in and out. ${breathCount} of 3 breaths completed`}
+          onKeyDown={handleKeyDown}
+        >
           <div className="text-xl font-display mb-2">Breathe</div>
           <div className="text-sm">{breathCount} / 3</div>
         </div>
       </GlowEffect>
       <p className="text-white/80 mt-6">
-        Tap the orb as you inhale deeply, then release.
+        Tap or press Enter on the orb as you inhale deeply, then release.
       </p>
     </div>
   );

@@ -55,10 +55,25 @@ const EntryAnimationManager: React.FC<EntryAnimationManagerProps> = ({
     navigate('/dream-capture');
   };
 
+  const handleSkipAnimation = () => {
+    setShowEntryAnimation(false);
+    setFirstLoad(false);
+    onComplete();
+  };
+
   return (
     <>
       {showEntryAnimation && (
-        <EntryAnimation onComplete={handleEntryAnimationComplete} />
+        <>
+          <a 
+            href="#main-content" 
+            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-black/80 focus:text-white focus:rounded-md"
+            onClick={handleSkipAnimation}
+          >
+            Skip animation and continue to main content
+          </a>
+          <EntryAnimation onComplete={handleEntryAnimationComplete} />
+        </>
       )}
       
       {showTestButton && !showEntryAnimation && (
@@ -67,6 +82,7 @@ const EntryAnimationManager: React.FC<EntryAnimationManagerProps> = ({
             onClick={handleTriggerAnimation}
             className="bg-gradient-to-r from-quantum-500 to-astral-500 hover:from-quantum-600 hover:to-astral-600 rounded-full"
             size="sm"
+            aria-label="Experience entry animation sequence"
           >
             <Sparkles size={16} className="mr-2" />
             Experience Entry Animation

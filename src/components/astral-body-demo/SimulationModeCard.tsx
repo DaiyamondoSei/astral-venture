@@ -25,7 +25,7 @@ const SimulationModeCard = ({
       </p>
       
       <div className="space-y-6">
-        <div className="flex justify-between items-center text-sm">
+        <div className="flex justify-between items-center text-sm" aria-hidden="true">
           <span>0 points</span>
           <span>2000 points</span>
         </div>
@@ -36,6 +36,10 @@ const SimulationModeCard = ({
           max={2000}
           step={50}
           className="mb-6"
+          aria-label="Simulated energy points"
+          aria-valuemin={0}
+          aria-valuemax={2000}
+          aria-valuenow={simulatedPoints}
         />
         
         <div className="flex justify-between">
@@ -47,6 +51,7 @@ const SimulationModeCard = ({
             variant="outline" 
             size="sm"
             onClick={() => setIsSimulating(!isSimulating)}
+            aria-pressed={isSimulating}
           >
             {isSimulating ? "Show Real Progress" : "Show Simulation"}
           </Button>

@@ -10,6 +10,7 @@ interface GlowEffectProps {
   animation?: 'none' | 'pulse' | 'breathe';
   style?: React.CSSProperties;
   onClick?: () => void;
+  ariaLabel?: string;
 }
 
 const GlowEffect = ({
@@ -19,7 +20,8 @@ const GlowEffect = ({
   intensity = 'medium',
   animation = 'none',
   style,
-  onClick
+  onClick,
+  ariaLabel
 }: GlowEffectProps) => {
   const intensityMap = {
     low: '10px',
@@ -38,15 +40,34 @@ const GlowEffect = ({
     ...style
   };
 
+  // Handle keyboard events if clickable
+  const handleKeyDown = onClick ? (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick();
+    }
+  } : undefined;
+
+  // Add interactive attributes if component is clickable
+  const interactiveProps = onClick ? {
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: handleKeyDown,
+    "aria-label": ariaLabel,
+  } : {};
+
   return (
     <div 
       className={cn(
         "relative",
         animationMap[animation],
+        onClick ? "cursor-pointer" : "",
         className
       )}
       style={glowStyle}
       onClick={onClick}
+      {...interactiveProps}
+      data-prefers-reduced-motion="respect"
     >
       {children}
     </div>

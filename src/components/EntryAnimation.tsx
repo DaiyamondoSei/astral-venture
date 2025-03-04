@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import GlowEffect from '@/components/GlowEffect';
 import StarsBackground from './entry-animation/StarsBackground';
 import WelcomeStep from './entry-animation/WelcomeStep';
@@ -18,8 +18,25 @@ const EntryAnimation = ({ onComplete }: EntryAnimationProps) => {
   const [breathCount, setBreathCount] = useState(0);
   const [animationComplete, setAnimationComplete] = useState(false);
   
+  // Check if user prefers reduced motion
+  const prefersReducedMotion = useReducedMotion();
+  
   useEffect(() => {
-    // Start with welcome message
+    // Skip directly to final step if user prefers reduced motion
+    if (prefersReducedMotion) {
+      setCurrentStep(4);
+      
+      const completionTimer = setTimeout(() => {
+        setAnimationComplete(true);
+        if (onComplete) {
+          onComplete();
+        }
+      }, 3000);
+      
+      return () => clearTimeout(completionTimer);
+    }
+    
+    // Start with welcome message for users without motion preferences
     const timer = setTimeout(() => {
       if (currentStep === 1) {
         setCurrentStep(2); // Move to focus step
@@ -27,7 +44,7 @@ const EntryAnimation = ({ onComplete }: EntryAnimationProps) => {
     }, 5000);
     
     return () => clearTimeout(timer);
-  }, [currentStep]);
+  }, [currentStep, onComplete, prefersReducedMotion]);
   
   useEffect(() => {
     // When breath exercise is complete
@@ -58,14 +75,18 @@ const EntryAnimation = ({ onComplete }: EntryAnimationProps) => {
   };
   
   return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden">
+    <div 
+      className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden" 
+      role="region" 
+      aria-label="Guided entry meditation experience"
+    >
       <StarsBackground />
       
       <motion.div 
         className="z-10 text-center px-6 max-w-lg"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1 }}
+        initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
+        animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1 }}
+        transition={prefersReducedMotion ? { duration: 0 } : { duration: 1 }}
       >
         <WelcomeStep step={1} currentStep={currentStep} />
         
@@ -81,9 +102,9 @@ const EntryAnimation = ({ onComplete }: EntryAnimationProps) => {
         
         {currentStep === 3 && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1 }}
+            initial={prefersReducedMotion ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.8 }}
+            animate={prefersReducedMotion ? { opacity: 1, scale: 1 } : { opacity: 1, scale: 1 }}
+            transition={prefersReducedMotion ? { duration: 0 } : { duration: 1 }}
           >
             <AstralBody />
           </motion.div>
