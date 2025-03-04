@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -23,6 +22,9 @@ const Index = () => {
   const { toast } = useToast();
   const { userProfile, todayChallenge, isLoading: profileLoading, updateUserProfile } = useUserProfile();
   const { userStreak, activatedChakras, updateStreak, updateActivatedChakras } = useUserStreak(user?.id);
+  const [isDeveloperMode, setIsDeveloperMode] = useState(() => {
+    return localStorage.getItem('developerMode') === 'true';
+  });
 
   useEffect(() => {
     // Check if user just logged in and hasn't seen the entry animation yet
@@ -77,6 +79,17 @@ const Index = () => {
     });
   };
 
+  const toggleDeveloperMode = () => {
+    const newMode = !isDeveloperMode;
+    setIsDeveloperMode(newMode);
+    localStorage.setItem('developerMode', newMode.toString());
+    
+    toast({
+      title: newMode ? "Developer Mode Enabled" : "Developer Mode Disabled",
+      description: newMode ? "You can now access testing features" : "Testing features are now hidden",
+    });
+  };
+
   if (isLoading || profileLoading) {
     return (
       <Layout className="flex min-h-screen items-center justify-center">
@@ -90,6 +103,12 @@ const Index = () => {
 
   return (
     <Layout>
+      <EntryAnimationManager 
+        user={user} 
+        onComplete={handleEntryAnimationComplete} 
+        showTestButton={isDeveloperMode}
+      />
+      
       {showEntryAnimation ? (
         <div className="h-screen flex flex-col items-center justify-center">
           <OrbToAstralTransition onComplete={handleEntryAnimationComplete} />
@@ -111,20 +130,44 @@ const Index = () => {
         <>
           <WelcomeMessage />
           <AuthForms className="mt-8" />
+          
+          {/* Developer Mode Toggle */}
+          <div className="fixed bottom-4 left-4 opacity-30 hover:opacity-100 transition-opacity">
+            <button 
+              onClick={toggleDeveloperMode}
+              className="text-xs text-white/50 hover:text-white/80 flex items-center"
+            >
+              <span className="sr-only">Developer Mode</span>
+              <span className={`w-3 h-3 rounded-full mr-1 ${isDeveloperMode ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+            </button>
+          </div>
         </>
       ) : (
-        <UserDashboardView
-          user={user}
-          userProfile={userProfile}
-          todayChallenge={todayChallenge}
-          userStreak={userStreak}
-          activatedChakras={activatedChakras}
-          onLogout={handleLogout}
-          updateStreak={updateStreak}
-          updateActivatedChakras={updateActivatedChakras}
-          updateUserProfile={updateUserProfile}
-          onChallengeComplete={handleChallengeComplete}
-        />
+        <>
+          <UserDashboardView
+            user={user}
+            userProfile={userProfile}
+            todayChallenge={todayChallenge}
+            userStreak={userStreak}
+            activatedChakras={activatedChakras}
+            onLogout={handleLogout}
+            updateStreak={updateStreak}
+            updateActivatedChakras={updateActivatedChakras}
+            updateUserProfile={updateUserProfile}
+            onChallengeComplete={handleChallengeComplete}
+          />
+          
+          {/* Developer Mode Toggle (also show for logged in users) */}
+          <div className="fixed bottom-4 left-4 opacity-30 hover:opacity-100 transition-opacity">
+            <button 
+              onClick={toggleDeveloperMode}
+              className="text-xs text-white/50 hover:text-white/80 flex items-center"
+            >
+              <span className="sr-only">Developer Mode</span>
+              <span className={`w-3 h-3 rounded-full mr-1 ${isDeveloperMode ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+            </button>
+          </div>
+        </>
       ))}
     </Layout>
   );
