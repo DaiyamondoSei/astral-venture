@@ -135,16 +135,48 @@ const EntryAnimation = ({ onComplete, className }: EntryAnimationProps) => {
             transition={{ duration: 1 }}
             className="absolute inset-0 flex items-center justify-center"
           >
-            <GlowEffect 
-              className="w-60 h-60 rounded-full bg-gradient-to-br from-ethereal-400 to-ethereal-600"
-              animation="pulse"
-              color="rgba(124, 58, 237, 0.8)"
-              intensity="high"
-            >
+            <div className="relative">
+              {/* Astral Body Silhouette - Human-like form */}
+              <svg 
+                className="w-64 h-80 mx-auto astral-body-silhouette"
+                viewBox="0 0 200 320" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {/* Head */}
+                <circle cx="100" cy="60" r="30" className="astral-body-part" />
+                
+                {/* Neck */}
+                <rect x="95" y="90" width="10" height="15" className="astral-body-part" />
+                
+                {/* Torso */}
+                <path d="M70 105 L130 105 L140 200 L60 200 Z" className="astral-body-part" />
+                
+                {/* Arms */}
+                <path d="M70 115 L50 160 L55 165 L75 120" className="astral-body-part" />
+                <path d="M130 115 L150 160 L145 165 L125 120" className="astral-body-part" />
+                
+                {/* Legs */}
+                <path d="M85 200 L75 280 L85 280 L95 200" className="astral-body-part" />
+                <path d="M115 200 L125 280 L115 280 L105 200" className="astral-body-part" />
+                
+                {/* Energy Points (chakras) */}
+                <circle cx="100" cy="60" r="5" className="energy-point crown-chakra" />
+                <circle cx="100" cy="110" r="5" className="energy-point heart-chakra" />
+                <circle cx="100" cy="140" r="5" className="energy-point solar-chakra" />
+                <circle cx="100" cy="180" r="5" className="energy-point root-chakra" />
+              </svg>
+              
+              <GlowEffect 
+                className="absolute inset-0 w-full h-full rounded-lg"
+                animation="pulse"
+                color="rgba(124, 58, 237, 0.8)"
+                intensity="high"
+              />
+              
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-white text-xl font-display">Astral Field Activated</div>
+                <div className="text-white text-xl font-display mt-8">Astral Field Activated</div>
               </div>
-            </GlowEffect>
+            </div>
           </motion.div>
         )}
         
