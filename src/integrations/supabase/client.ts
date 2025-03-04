@@ -33,9 +33,50 @@ export const incrementEnergyPoints = async (userId: string, pointsToAdd: number)
       
     if (updateError) throw updateError;
     
+    // Update astral level based on points (logarithmic progression)
+    const newAstralLevel = Math.floor(Math.log10(newPoints + 1) * 3) + 1;
+    
+    if (newAstralLevel > 1) {
+      await supabase
+        .from('user_profiles')
+        .update({ astral_level: newAstralLevel })
+        .eq('id', userId);
+    }
+    
     return newPoints;
   } catch (error) {
     console.error('Error incrementing energy points:', error);
     throw error;
   }
+};
+
+// Function to calculate fractal complexity based on energy points
+// This could be used in the future for more advanced visualizations
+export const calculateFractalComplexity = (energyPoints: number) => {
+  // Base complexity
+  let complexity = 1;
+  
+  // Energy thresholds for complexity increase
+  const thresholds = [
+    { points: 750, factor: 2 },    // Basic fractal patterns
+    { points: 1000, factor: 3 },   // Transcendence level
+    { points: 2000, factor: 5 },   // Infinity level
+    { points: 5000, factor: 8 },   // Beyond infinity
+    { points: 10000, factor: 13 }  // Universal consciousness (Fibonacci sequence)
+  ];
+  
+  // Apply threshold factors
+  for (const threshold of thresholds) {
+    if (energyPoints >= threshold.points) {
+      complexity = threshold.factor;
+    } else {
+      break;
+    }
+  }
+  
+  // Add logarithmic scaling for truly infinite progression
+  const logFactor = Math.log10(energyPoints + 1) / 10;
+  complexity += logFactor;
+  
+  return complexity;
 };

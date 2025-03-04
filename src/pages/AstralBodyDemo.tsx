@@ -23,6 +23,7 @@ const AstralBodyDemo = () => {
   const { toast } = useToast();
   const [simulatedPoints, setSimulatedPoints] = useState<number>(0);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [incrementAmount, setIncrementAmount] = useState<number>(50);
   
   // Get the actual energy points from the user profile, or use simulated points
   const energyPoints = isSimulating 
@@ -40,15 +41,15 @@ const AstralBodyDemo = () => {
     }
     
     try {
-      // Add 50 energy points to the user's profile
-      const newPoints = await incrementEnergyPoints(user.id, 50);
+      // Add energy points to the user's profile
+      const newPoints = await incrementEnergyPoints(user.id, incrementAmount);
       
       // Update the local state
       updateUserProfile({ energy_points: newPoints });
       
       toast({
         title: "Energy Increased!",
-        description: "+50 energy points added to your astral body",
+        description: `+${incrementAmount} energy points added to your astral body`,
       });
     } catch (error: any) {
       toast({
@@ -98,13 +99,27 @@ const AstralBodyDemo = () => {
                   </div>
                   
                   <ProgressTracker 
-                    progress={Math.min(Math.round((energyPoints / 600) * 100), 100)} 
+                    progress={Math.min(Math.round((energyPoints / 2000) * 100), 100)} 
                     label="Astral Development" 
                   />
                   
-                  <Button onClick={handleAddPoints} className="w-full">
-                    Add 50 Energy Points
-                  </Button>
+                  <div className="flex flex-col space-y-4">
+                    <div className="grid grid-cols-3 gap-2">
+                      {[50, 100, 200].map((amount) => (
+                        <Button 
+                          key={amount}
+                          variant={incrementAmount === amount ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setIncrementAmount(amount)}
+                        >
+                          +{amount}
+                        </Button>
+                      ))}
+                    </div>
+                    <Button onClick={handleAddPoints} className="w-full">
+                      Add {incrementAmount} Energy Points
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground py-4">
@@ -122,14 +137,14 @@ const AstralBodyDemo = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-center text-sm">
                   <span>0 points</span>
-                  <span>600 points</span>
+                  <span>2000 points</span>
                 </div>
                 
                 <Slider
                   value={[simulatedPoints]}
                   onValueChange={(value) => setSimulatedPoints(value[0])}
-                  max={600}
-                  step={10}
+                  max={2000}
+                  step={50}
                   className="mb-6"
                 />
                 
@@ -185,6 +200,23 @@ const AstralBodyDemo = () => {
               <div>200+ points: <span className="text-blue-300">Constellation Lines</span></div>
               <div>350+ points: <span className="text-blue-300">Body Illumination</span></div>
               <div>500+ points: <span className="text-blue-300">Full Radiance</span></div>
+              <div>750+ points: <span className="text-violet-300">Fractal Patterns</span></div>
+              <div>1000+ points: <span className="text-violet-300">Transcendence</span></div>
+              <div>2000+ points: <span className="text-violet-300">Infinite Consciousness</span></div>
+            </div>
+            
+            <div className="mt-8 max-w-2xl mx-auto bg-black/20 p-4 rounded-lg text-sm text-white/70">
+              <h3 className="font-display text-lg mb-2 text-indigo-200">The Path to Infinite Consciousness</h3>
+              <p className="mb-3">
+                Your astral body visualization represents your journey toward expanded awareness.
+                As you gather more energy points, your visualization evolves through increasingly complex states,
+                symbolizing your growth towards infinite consciousness.
+              </p>
+              <p>
+                The visualization uses mathematical algorithms that can generate infinite detail and complexity,
+                mirroring the limitless nature of consciousness itself. Each threshold unlocks new visual dimensions,
+                from basic chakra activation to transcendent fractal patterns and beyond.
+              </p>
             </div>
           </div>
         </div>
