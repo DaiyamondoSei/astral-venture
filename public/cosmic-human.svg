@@ -1,0 +1,76 @@
+
+<svg width="100%" height="100%" viewBox="0 0 800 1200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="1200" fill="#040B1A"/>
+  
+  <!-- Stars -->
+  <g id="stars">
+    <circle cx="250" cy="180" r="3" fill="#4AAEE8" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.2;0.8" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="400" cy="100" r="4" fill="#4AAEE8" opacity="0.9">
+      <animate attributeName="opacity" values="0.9;0.4;0.9" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="600" cy="250" r="3" fill="#4AAEE8" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;0.3;0.7" dur="3.5s" repeatCount="indefinite"/>
+    </circle>
+    <!-- Add more stars here -->
+  </g>
+  
+  <!-- Cosmic Circles -->
+  <g id="cosmic-circles">
+    <circle cx="400" cy="600" r="300" fill="none" stroke="#4AAEE8" stroke-width="1" opacity="0.2"/>
+    <circle cx="400" cy="600" r="200" fill="none" stroke="#4AAEE8" stroke-width="1" opacity="0.3"/>
+    <circle cx="400" cy="600" r="100" fill="none" stroke="#4AAEE8" stroke-width="1" opacity="0.4"/>
+  </g>
+  
+  <!-- Constellation Lines -->
+  <g id="constellations" stroke="#4AAEE8" stroke-width="0.5" opacity="0.2">
+    <line x1="200" y1="300" x2="300" y2="400"/>
+    <line x1="300" y1="400" x2="400" y2="350"/>
+    <line x1="400" y1="350" x2="500" y2="400"/>
+    <line x1="500" y1="400" x2="600" y2="300"/>
+    
+    <line x1="200" y1="900" x2="300" y2="800"/>
+    <line x1="300" y1="800" x2="400" y2="850"/>
+    <line x1="400" y1="850" x2="500" y2="800"/>
+    <line x1="500" y1="800" x2="600" y2="900"/>
+    
+    <line x1="400" y1="250" x2="400" y2="950"/>
+  </g>
+  
+  <!-- Human Silhouette -->
+  <g id="human-silhouette">
+    <path d="M400,400 
+             C430,400 450,380 450,350 
+             C450,320 430,300 400,300 
+             C370,300 350,320 350,350 
+             C350,380 370,400 400,400 
+             Z 
+             M370,420 L430,420 
+             L440,450 L360,450 
+             Z 
+             M360,450 L440,450 
+             L460,700 L340,700 
+             Z
+             M340,700 L380,700 L360,900 L320,900 
+             Z
+             M460,700 L420,700 L440,900 L480,900 
+             Z"
+          fill="#000000" opacity="0.8"/>
+  </g>
+  
+  <!-- Central Glow -->
+  <circle cx="400" cy="600" r="150" fill="url(#glow)" opacity="0.6">
+    <animate attributeName="r" values="150;170;150" dur="8s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.6;0.8;0.6" dur="8s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Definitions -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" stop-color="#4AAEE8" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#4AAEE8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
