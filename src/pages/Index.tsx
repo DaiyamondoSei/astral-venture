@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -18,6 +17,7 @@ import CosmicAstralBody from '@/components/entry-animation/CosmicAstralBody';
 import StreakTracker from '@/components/StreakTracker';
 import RecalibrationDialog from '@/components/RecalibrationDialog';
 import { incrementEnergyPoints } from '@/integrations/supabase/client';
+import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
 
 const Index = () => {
   const [showEntryAnimation, setShowEntryAnimation] = useState(false);
@@ -30,13 +30,11 @@ const Index = () => {
   const { toast } = useToast();
   const { userProfile, todayChallenge, isLoading: profileLoading, updateUserProfile } = useUserProfile();
 
-  // Fetch user streak data
   useEffect(() => {
     const fetchUserStreak = async () => {
       if (!user) return;
       
       try {
-        // Get streak data
         const { data: streakData, error: streakError } = await supabase
           .from('user_streaks')
           .select('*')
@@ -51,10 +49,9 @@ const Index = () => {
             longest: streakData.longest_streak || 0
           });
           
-          // Get activated chakras for this week
           const today = new Date();
           const startOfWeek = new Date(today);
-          startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
+          startOfWeek.setDate(today.getDate() - today.getDay());
           startOfWeek.setHours(0, 0, 0, 0);
           
           const { data: chakraData, error: chakraError } = await supabase
@@ -67,10 +64,9 @@ const Index = () => {
           if (chakraError) throw chakraError;
           
           if (chakraData) {
-            // Extract day of week from each completed challenge
             const activatedDays = chakraData.map(item => {
               const date = new Date(item.completed_at);
-              return date.getDay(); // 0-6 (Sunday-Saturday)
+              return date.getDay();
             });
             
             setActivatedChakras([...new Set(activatedDays)]);
@@ -122,7 +118,6 @@ const Index = () => {
     if (!user || !userProfile) return;
     
     try {
-      // Record the chakra activation
       const { error } = await supabase
         .from('user_progress')
         .insert({
@@ -134,19 +129,13 @@ const Index = () => {
         
       if (error) throw error;
       
-      // Add activated chakra to local state
-      setActivatedChakras(prev => [...prev, chakraIndex]);
-      
-      // Give energy points for the activation (different points for each chakra)
       const pointsEarned = 10 + (chakraIndex * 5);
       const newPoints = await incrementEnergyPoints(user.id, pointsEarned);
       
-      // Update user profile with new points
       updateUserProfile({
         energy_points: newPoints
       });
       
-      // Update streak
       const newStreak = userStreak.current + 1;
       const newLongest = Math.max(newStreak, userStreak.longest);
       
@@ -183,13 +172,11 @@ const Index = () => {
     if (!user || !userProfile) return;
     
     try {
-      // Get the missed days (days of week without activations)
       const today = new Date();
       const currentDay = today.getDay();
       const allDays = Array.from({ length: currentDay }, (_, i) => i);
       const missedDays = allDays.filter(day => !activatedChakras.includes(day));
       
-      // Record the recalibration
       for (const missedDay of missedDays) {
         await supabase
           .from('user_progress')
@@ -202,19 +189,15 @@ const Index = () => {
           });
       }
       
-      // Update activated chakras to include recovered days
       setActivatedChakras(prev => [...prev, ...missedDays]);
       
-      // Give some energy points for the recalibration
       const pointsEarned = Math.max(5, missedDays.length * 2);
       const newPoints = await incrementEnergyPoints(user.id, pointsEarned);
       
-      // Update user profile with new points
       updateUserProfile({
         energy_points: newPoints
       });
       
-      // Update streak - restore it to the current day
       const newStreak = currentDay + 1;
       const newLongest = Math.max(newStreak, userStreak.longest);
       
@@ -294,7 +277,6 @@ const Index = () => {
                 astralLevel={userProfile?.astral_level || 1}
               />
               
-              {/* Cosmic body visualization */}
               <div className="mb-8">
                 <CosmicAstralBody 
                   energyPoints={userProfile?.energy_points || 0}
@@ -303,7 +285,6 @@ const Index = () => {
                 />
               </div>
               
-              {/* Streak tracker */}
               <div className="mb-8">
                 <StreakTracker 
                   currentStreak={userStreak.current}

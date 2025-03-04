@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { generateEnergyColor } from './colorUtils';
 import { EnergyLevelProps } from './types';
 
-interface HumanSilhouetteProps extends Pick<EnergyLevelProps, 'showChakras' | 'showDetails' | 'showIllumination' | 'showFractal' | 'showTranscendence' | 'showInfinity' | 'baseProgressPercentage'> {
+interface HumanSilhouetteProps extends Pick<EnergyLevelProps, 'showChakras' | 'showDetails' | 'showIllumination' | 'showFractal' | 'showTranscendence' | 'showInfinity' | 'baseProgressPercentage' | 'activatedChakras'> {
   getChakraIntensity: (baseChakraLevel: number) => number;
 }
 
@@ -16,7 +16,8 @@ const HumanSilhouette: React.FC<HumanSilhouetteProps> = ({
   showTranscendence,
   showInfinity,
   baseProgressPercentage,
-  getChakraIntensity
+  getChakraIntensity,
+  activatedChakras = []
 }) => {
   return (
     <div className="absolute inset-0 flex items-center justify-center">
