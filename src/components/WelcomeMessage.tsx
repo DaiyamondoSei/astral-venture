@@ -1,8 +1,11 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const WelcomeMessage = () => {
+  const navigate = useNavigate();
+  
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -78,7 +81,7 @@ const WelcomeMessage = () => {
         
         <motion.div 
           variants={itemVariants}
-          className="flex flex-wrap justify-center gap-2 items-center"
+          className="flex flex-wrap justify-center gap-2 items-center mb-8"
         >
           {["Discover", "Connect", "Transcend"].map((word, index) => (
             <motion.span 
@@ -93,6 +96,15 @@ const WelcomeMessage = () => {
               {word}
             </motion.span>
           ))}
+        </motion.div>
+        
+        <motion.div variants={itemVariants}>
+          <Button 
+            onClick={() => navigate('/astral-body')}
+            className="bg-gradient-to-r from-quantum-500 to-astral-500 hover:from-quantum-600 hover:to-astral-600"
+          >
+            View Astral Body Demo
+          </Button>
         </motion.div>
       </motion.div>
     </div>
