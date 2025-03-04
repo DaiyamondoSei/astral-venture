@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { SilhouetteProps } from './silhouette/types';
 import Definitions from './silhouette/Definitions';
@@ -8,7 +8,16 @@ import ChakraPoint from './silhouette/ChakraPoint';
 import InfinityEssence from './silhouette/InfinityEssence';
 import CentralGlow from './silhouette/CentralGlow';
 
-const HumanSilhouette: React.FC<SilhouetteProps> = ({
+/**
+ * HumanSilhouette Component
+ * 
+ * Renders a human-like silhouette with chakra points and various visual effects
+ * based on the user's energy progress level.
+ * 
+ * The component uses memoization to prevent unnecessary re-renders of this
+ * computationally expensive visual element.
+ */
+const HumanSilhouette: React.FC<SilhouetteProps> = memo(({
   showChakras,
   showDetails,
   showIllumination,
@@ -90,6 +99,8 @@ const HumanSilhouette: React.FC<SilhouetteProps> = ({
       </motion.div>
     </div>
   );
-};
+});
+
+HumanSilhouette.displayName = 'HumanSilhouette';
 
 export default HumanSilhouette;

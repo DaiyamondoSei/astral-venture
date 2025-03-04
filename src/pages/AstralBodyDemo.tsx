@@ -1,26 +1,24 @@
 
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
-import AstralBody from '@/components/entry-animation/AstralBody';
-import CosmicAstralBody from '@/components/entry-animation/CosmicAstralBody';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
-import { Card } from "@/components/ui/card";
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { incrementEnergyPoints } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
-import EnergyAvatar from '@/components/EnergyAvatar';
-import ProgressTracker from '@/components/ProgressTracker';
+import EnergyProgressCard from '@/components/astral-body-demo/EnergyProgressCard';
+import SimulationModeCard from '@/components/astral-body-demo/SimulationModeCard';
+import VisualizationTabs from '@/components/astral-body-demo/VisualizationTabs';
+import EnergyThresholds from '@/components/astral-body-demo/EnergyThresholds';
 
+/**
+ * AstralBodyDemo Page
+ * 
+ * This page allows users to view and interact with their astral body visualization,
+ * which evolves based on the user's energy points.
+ */
 const AstralBodyDemo = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { userProfile, updateUserProfile } = useUserProfile();
-  const { toast } = useToast();
   const [simulatedPoints, setSimulatedPoints] = useState<number>(0);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [incrementAmount, setIncrementAmount] = useState<number>(50);
@@ -29,36 +27,6 @@ const AstralBodyDemo = () => {
   const energyPoints = isSimulating 
     ? simulatedPoints 
     : (userProfile?.energy_points || 0);
-  
-  const handleAddPoints = async () => {
-    if (!user) {
-      toast({
-        title: "Login Required",
-        description: "You need to be logged in to add energy points",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      // Add energy points to the user's profile
-      const newPoints = await incrementEnergyPoints(user.id, incrementAmount);
-      
-      // Update the local state
-      updateUserProfile({ energy_points: newPoints });
-      
-      toast({
-        title: "Energy Increased!",
-        description: `+${incrementAmount} energy points added to your astral body`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add energy points",
-        variant: "destructive"
-      });
-    }
-  };
   
   return (
     <Layout>
@@ -85,140 +53,25 @@ const AstralBodyDemo = () => {
           </h1>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <Card className="p-6 backdrop-blur-sm bg-black/30">
-              <h2 className="text-xl font-display mb-4 text-blue-50">Energy Progress</h2>
-              
-              {userProfile ? (
-                <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <EnergyAvatar level={Math.floor(energyPoints / 50) + 1} className="w-16 h-16" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Current Energy</div>
-                      <div className="text-2xl font-display text-primary">{energyPoints} points</div>
-                    </div>
-                  </div>
-                  
-                  <ProgressTracker 
-                    progress={Math.min(Math.round((energyPoints / 2000) * 100), 100)} 
-                    label="Astral Development" 
-                  />
-                  
-                  <div className="flex flex-col space-y-4">
-                    <div className="grid grid-cols-3 gap-2">
-                      {[50, 100, 200].map((amount) => (
-                        <Button 
-                          key={amount}
-                          variant={incrementAmount === amount ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setIncrementAmount(amount)}
-                        >
-                          +{amount}
-                        </Button>
-                      ))}
-                    </div>
-                    <Button onClick={handleAddPoints} className="w-full">
-                      Add {incrementAmount} Energy Points
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-4">
-                  <p>Sign in to track your energy progress</p>
-                </div>
-              )}
-            </Card>
+            <EnergyProgressCard
+              userProfile={userProfile}
+              updateUserProfile={updateUserProfile}
+              energyPoints={energyPoints}
+              incrementAmount={incrementAmount}
+              setIncrementAmount={setIncrementAmount}
+            />
             
-            <Card className="p-6 backdrop-blur-sm bg-black/30">
-              <h2 className="text-xl font-display mb-4 text-blue-50">Simulation Mode</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                Use the slider below to preview how your astral body will evolve with more energy points
-              </p>
-              
-              <div className="space-y-6">
-                <div className="flex justify-between items-center text-sm">
-                  <span>0 points</span>
-                  <span>2000 points</span>
-                </div>
-                
-                <Slider
-                  value={[simulatedPoints]}
-                  onValueChange={(value) => setSimulatedPoints(value[0])}
-                  max={2000}
-                  step={50}
-                  className="mb-6"
-                />
-                
-                <div className="flex justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    Simulated: <span className="text-primary font-medium">{simulatedPoints} points</span>
-                  </div>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setIsSimulating(!isSimulating)}
-                  >
-                    {isSimulating ? "Show Real Progress" : "Show Simulation"}
-                  </Button>
-                </div>
-              </div>
-            </Card>
+            <SimulationModeCard
+              simulatedPoints={simulatedPoints}
+              setSimulatedPoints={setSimulatedPoints}
+              isSimulating={isSimulating}
+              setIsSimulating={setIsSimulating}
+            />
           </div>
           
-          <Tabs defaultValue="cosmic" className="w-full">
-            <TabsList className="w-full max-w-sm mx-auto mb-6">
-              <TabsTrigger value="cosmic" className="w-1/2">Cosmic Version</TabsTrigger>
-              <TabsTrigger value="classic" className="w-1/2">Classic Version</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="cosmic" className="mt-0">
-              <div className="glass-card p-8 md:p-12 max-w-md mx-auto">
-                <CosmicAstralBody energyPoints={energyPoints} />
-              </div>
-              
-              <p className="text-center mt-8 text-white/70 max-w-md mx-auto">
-                This visualization represents your quantum energy field as it extends through the universal consciousness network
-              </p>
-            </TabsContent>
-            
-            <TabsContent value="classic" className="mt-0">
-              <div className="bg-black/30 backdrop-blur-md p-8 rounded-xl max-w-lg mx-auto">
-                <AstralBody />
-              </div>
-              
-              <p className="text-center mt-8 text-white/70">
-                This visualization represents your energy field in the quantum realm
-              </p>
-            </TabsContent>
-          </Tabs>
+          <VisualizationTabs energyPoints={energyPoints} />
           
-          <div className="mt-12 text-center">
-            <p className="text-blue-200/80 mb-2 text-sm uppercase tracking-wider">Energy Thresholds</p>
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-white/60">
-              <div>30+ points: <span className="text-blue-300">Chakra Activation</span></div>
-              <div>100+ points: <span className="text-blue-300">Aura Field</span></div>
-              <div>200+ points: <span className="text-blue-300">Constellation Lines</span></div>
-              <div>350+ points: <span className="text-blue-300">Body Illumination</span></div>
-              <div>500+ points: <span className="text-blue-300">Full Radiance</span></div>
-              <div>750+ points: <span className="text-violet-300">Fractal Patterns</span></div>
-              <div>1000+ points: <span className="text-violet-300">Transcendence</span></div>
-              <div>2000+ points: <span className="text-violet-300">Infinite Consciousness</span></div>
-            </div>
-            
-            <div className="mt-8 max-w-2xl mx-auto bg-black/20 p-4 rounded-lg text-sm text-white/70">
-              <h3 className="font-display text-lg mb-2 text-indigo-200">The Path to Infinite Consciousness</h3>
-              <p className="mb-3">
-                Your astral body visualization represents your journey toward expanded awareness.
-                As you gather more energy points, your visualization evolves through increasingly complex states,
-                symbolizing your growth towards infinite consciousness.
-              </p>
-              <p>
-                The visualization uses mathematical algorithms that can generate infinite detail and complexity,
-                mirroring the limitless nature of consciousness itself. Each threshold unlocks new visual dimensions,
-                from basic chakra activation to transcendent fractal patterns and beyond.
-              </p>
-            </div>
-          </div>
+          <EnergyThresholds />
         </div>
       </motion.div>
     </Layout>
