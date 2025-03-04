@@ -19,7 +19,18 @@ const AstralBody = ({ emotionColors }: AstralBodyProps) => {
   
   // Determine chakra activation based on dream content
   const getChakraActivation = () => {
-    if (!userDream) return { crown: true, throat: true, heart: true };
+    if (!userDream) {
+      // Include all chakras in the default return with false values for those we don't want active
+      return { 
+        root: false, 
+        sacral: false, 
+        solar: false, 
+        heart: true, 
+        throat: true, 
+        crown: true,
+        third: false 
+      };
+    }
     
     const dream = userDream.toLowerCase();
     const activations = {
