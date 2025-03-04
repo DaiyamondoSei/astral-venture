@@ -13,9 +13,15 @@ import { ENERGY_THRESHOLDS } from './cosmic/types';
 
 interface CosmicAstralBodyProps {
   energyPoints?: number;
+  streakDays?: number;
+  activatedChakras?: number[];
 }
 
-const CosmicAstralBody: React.FC<CosmicAstralBodyProps> = ({ energyPoints = 0 }) => {
+const CosmicAstralBody: React.FC<CosmicAstralBodyProps> = ({ 
+  energyPoints = 0, 
+  streakDays = 0,
+  activatedChakras = []
+}) => {
   const [stars, setStars] = useState<{x: number, y: number, size: number, delay: number, duration: number}[]>([]);
   const [fractalPoints, setFractalPoints] = useState<{x: number, y: number, size: number, rotation: number}[]>([]);
   
@@ -157,6 +163,7 @@ const CosmicAstralBody: React.FC<CosmicAstralBodyProps> = ({ energyPoints = 0 })
         showInfinity={showInfinity}
         baseProgressPercentage={baseProgressPercentage}
         getChakraIntensity={getChakraIntensity}
+        activatedChakras={activatedChakras}
       />
       
       {/* Central and pulsing effects */}
@@ -172,6 +179,8 @@ const CosmicAstralBody: React.FC<CosmicAstralBodyProps> = ({ energyPoints = 0 })
         energyPoints={energyPoints}
         showTranscendence={showTranscendence}
         showInfinity={showInfinity}
+        streakDays={streakDays}
+        activatedChakras={activatedChakras}
       />
     </div>
   );

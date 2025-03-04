@@ -12,6 +12,8 @@ export interface EnergyLevelProps {
   baseProgressPercentage: number;
   infiniteProgress: number;
   fractalComplexity: number;
+  streakDays?: number;
+  activatedChakras?: number[];
 }
 
 export const ENERGY_THRESHOLDS = {
@@ -25,3 +27,23 @@ export const ENERGY_THRESHOLDS = {
   TRANSCENDENCE: 1000, // Transcendent state
   INFINITY: 2000    // Near-infinite complexity
 };
+
+export const CHAKRA_COLORS = [
+  "#FF0000", // Root - Red
+  "#FF8000", // Sacral - Orange
+  "#FFFF00", // Solar Plexus - Yellow
+  "#00FF00", // Heart - Green
+  "#00FFFF", // Throat - Light Blue
+  "#0000FF", // Third Eye - Indigo
+  "#8000FF"  // Crown - Violet
+];
+
+export const CHAKRA_NAMES = [
+  "Root",
+  "Sacral",
+  "Solar Plexus",
+  "Heart",
+  "Throat",
+  "Third Eye",
+  "Crown"
+];
