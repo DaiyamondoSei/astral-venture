@@ -9,7 +9,144 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      challenges: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          duration_minutes: number | null
+          energy_points: number
+          id: string
+          level: number
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          duration_minutes?: number | null
+          energy_points?: number
+          id?: string
+          level?: number
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          duration_minutes?: number | null
+          energy_points?: number
+          id?: string
+          level?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      quantum_downloads: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          level: number
+          title: string
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string
+          id?: string
+          level?: number
+          title: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          level?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          astral_level: number
+          energy_points: number
+          id: string
+          joined_at: string
+          last_active_at: string | null
+          username: string | null
+        }
+        Insert: {
+          astral_level?: number
+          energy_points?: number
+          id: string
+          joined_at?: string
+          last_active_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          astral_level?: number
+          energy_points?: number
+          id?: string
+          joined_at?: string
+          last_active_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      user_progress: {
+        Row: {
+          category: string
+          challenge_id: string
+          completed_at: string
+          id: string
+          reflection: string | null
+          user_id: string
+        }
+        Insert: {
+          category: string
+          challenge_id: string
+          completed_at?: string
+          id?: string
+          reflection?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          challenge_id?: string
+          completed_at?: string
+          id?: string
+          reflection?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_streaks: {
+        Row: {
+          current_streak: number
+          id: string
+          last_activity_date: string | null
+          longest_streak: number
+          user_id: string
+        }
+        Insert: {
+          current_streak?: number
+          id?: string
+          last_activity_date?: string | null
+          longest_streak?: number
+          user_id: string
+        }
+        Update: {
+          current_streak?: number
+          id?: string
+          last_activity_date?: string | null
+          longest_streak?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
