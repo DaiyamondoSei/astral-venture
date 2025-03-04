@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -13,7 +12,8 @@ import AuthForms from '@/components/AuthForms';
 import { supabase } from '@/integrations/supabase/client';
 import GlowEffect from '@/components/GlowEffect';
 import { useToast } from '@/components/ui/use-toast';
-import { Bell, Award, Sparkles } from 'lucide-react';
+import { Bell, Award, Sparkles, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [showEntryAnimation, setShowEntryAnimation] = useState(false);
@@ -25,7 +25,6 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check if this is the first time visiting
   useEffect(() => {
     const hasVisited = localStorage.getItem('hasVisitedQuanex');
     if (!hasVisited && user) {
@@ -36,12 +35,10 @@ const Index = () => {
     }
   }, [user]);
 
-  // Fetch user profile and today's challenge when user is authenticated
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
         try {
-          // Fetch user profile
           const { data, error } = await supabase
             .from('user_profiles')
             .select('*')
@@ -51,7 +48,6 @@ const Index = () => {
           if (error) throw error;
           setUserProfile(data);
           
-          // Fetch a random challenge for today
           const { data: challengeData, error: challengeError } = await supabase
             .from('challenges')
             .select('*')
@@ -79,6 +75,25 @@ const Index = () => {
     }
   }, [user, toast]);
 
+  const handleLogout = async () => {
+    if (user) {
+      try {
+        await supabase.auth.signOut();
+        toast({
+          title: "Signed out",
+          description: "You've been successfully signed out.",
+        });
+      } catch (error: any) {
+        console.error('Error signing out:', error);
+        toast({
+          title: "Sign out failed",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   const handleEntryAnimationComplete = () => {
     setShowEntryAnimation(false);
     setFirstLoad(false);
@@ -91,7 +106,6 @@ const Index = () => {
   const handleChallengeComplete = async (pointsEarned: number) => {
     if (!userProfile) return;
     
-    // Update local state
     setUserProfile({
       ...userProfile,
       energy_points: userProfile.energy_points + pointsEarned
@@ -159,7 +173,16 @@ const Index = () => {
                   </h1>
                   <p className="text-white/70 mt-1">Continue your quantum journey</p>
                 </div>
-                <div className="mt-4 md:mt-0">
+                <div className="mt-4 md:mt-0 flex items-center gap-4">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleLogout}
+                    className="text-white/70 hover:text-white border border-white/20 hover:border-white/40"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </Button>
                   <EnergyAvatar level={userProfile?.astral_level || 1} />
                 </div>
               </div>
