@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserReflections } from '@/services/reflectionService';
@@ -89,7 +90,7 @@ export const useEmotionalAnalysis = () => {
         const combinedReflections = reflections.map(r => r.content).join(' ').toLowerCase();
         
         // Track emotional keywords frequency
-        const emotionalAnalysis = {
+        const emotionalAnalysis: {[key: string]: number} = {
           love: 0,
           joy: 0,
           peace: 0,
