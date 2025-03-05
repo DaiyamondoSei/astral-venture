@@ -65,22 +65,31 @@ export type Database = {
       }
       energy_reflections: {
         Row: {
+          chakras_activated: Json | null
           content: string
           created_at: string
+          dominant_emotion: string | null
+          emotional_depth: number | null
           id: string
           points_earned: number
           user_id: string
         }
         Insert: {
+          chakras_activated?: Json | null
           content: string
           created_at?: string
+          dominant_emotion?: string | null
+          emotional_depth?: number | null
           id?: string
           points_earned?: number
           user_id: string
         }
         Update: {
+          chakras_activated?: Json | null
           content?: string
           created_at?: string
+          dominant_emotion?: string | null
+          emotional_depth?: number | null
           id?: string
           points_earned?: number
           user_id?: string

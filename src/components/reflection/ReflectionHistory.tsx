@@ -2,53 +2,66 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ReflectionFilter from './ReflectionFilter';
-import ReflectionList from './ReflectionList';
-import { HistoricalReflection } from './types';
+import ReflectionHistoryInsights from './ReflectionHistoryInsights';
+import { fetchEmotionalJourney } from '@/services/reflection/emotionalJourney';
+import { EnergyReflection } from '@/services/reflection/types';
 
 const ReflectionHistory: React.FC = () => {
-  const [reflections, setReflections] = useState<HistoricalReflection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | number | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
+  const [journeyData, setJourneyData] = useState<any>(null);
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchReflections = async () => {
+    const fetchJourneyData = async () => {
       setLoading(true);
       
       try {
-        // Combine reflections from different sources
-        let allReflections: HistoricalReflection[] = [];
-        
-        // Get energy reflections from localStorage (until Supabase is implemented)
-        try {
-          const energyReflections = JSON.parse(localStorage.getItem('energyReflections') || '[]');
-          allReflections = [...allReflections, ...energyReflections];
-        } catch (error) {
-          console.error('Error loading energy reflections:', error);
+        if (user) {
+          const journey = await fetchEmotionalJourney(user.id);
+          if (journey) {
+            setJourneyData(journey);
+          }
         }
         
-        // Get philosophical reflections from localStorage
-        try {
-          const philosophicalReflections = JSON.parse(localStorage.getItem('philosophicalReflections') || '[]');
-          allReflections = [...allReflections, ...philosophicalReflections];
-        } catch (error) {
-          console.error('Error loading philosophical reflections:', error);
+        // Fall back to localStorage data if needed
+        if (!journeyData) {
+          // Combine reflections from different sources
+          let allReflections: any[] = [];
+          
+          // Get energy reflections from localStorage
+          try {
+            const energyReflections = JSON.parse(localStorage.getItem('energyReflections') || '[]');
+            allReflections = [...allReflections, ...energyReflections];
+          } catch (error) {
+            console.error('Error loading energy reflections:', error);
+          }
+          
+          // Get philosophical reflections from localStorage
+          try {
+            const philosophicalReflections = JSON.parse(localStorage.getItem('philosophicalReflections') || '[]');
+            allReflections = [...allReflections, ...philosophicalReflections];
+          } catch (error) {
+            console.error('Error loading philosophical reflections:', error);
+          }
+          
+          // Sort all reflections by date (newest first)
+          allReflections.sort((a, b) => {
+            const dateA = new Date(a.timestamp || a.created_at);
+            const dateB = new Date(b.timestamp || b.created_at);
+            return dateB.getTime() - dateA.getTime();
+          });
+          
+          // Apply filter if selected
+          if (filterType) {
+            allReflections = allReflections.filter(r => r.type === filterType);
+          }
+          
+          setJourneyData({
+            recentReflections: allReflections,
+            recentReflectionCount: allReflections.length
+          });
         }
-        
-        // Sort all reflections by date (newest first)
-        allReflections.sort((a, b) => {
-          const dateA = new Date(a.timestamp || a.created_at);
-          const dateB = new Date(b.timestamp || b.created_at);
-          return dateB.getTime() - dateA.getTime();
-        });
-        
-        // Apply filter if selected
-        if (filterType) {
-          allReflections = allReflections.filter(r => r.type === filterType);
-        }
-        
-        setReflections(allReflections);
       } catch (error) {
         console.error('Error fetching reflections:', error);
       } finally {
@@ -56,27 +69,11 @@ const ReflectionHistory: React.FC = () => {
       }
     };
     
-    fetchReflections();
+    fetchJourneyData();
   }, [user, filterType]);
 
-  const toggleExpand = (id: string | number) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
-
-  if (loading) {
-    return (
-      <div className="glass-card p-5 animate-pulse">
-        <div className="h-8 w-1/2 bg-white/10 rounded mb-4"></div>
-        <div className="space-y-3">
-          <div className="h-24 bg-white/5 rounded"></div>
-          <div className="h-24 bg-white/5 rounded"></div>
-          <div className="h-24 bg-white/5 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
   // Count reflections by type
+  const reflections = journeyData?.recentReflections || [];
   const energyCount = reflections.filter(r => r.type === 'energy' || !r.type).length;
   const philosophicalCount = reflections.filter(r => r.type === 'consciousness').length;
 
@@ -98,11 +95,7 @@ const ReflectionHistory: React.FC = () => {
         Review your past reflections to trace the evolution of your consciousness over time.
       </p>
       
-      <ReflectionList
-        reflections={reflections}
-        expandedId={expandedId}
-        onToggleExpand={toggleExpand}
-      />
+      <ReflectionHistoryInsights />
     </div>
   );
 };
