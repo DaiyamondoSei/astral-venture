@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { ChakraData, ChakraActivated } from '@/utils/emotion/chakraTypes';
+import { ChakraActivated, normalizeChakraData, ChakraData } from '@/utils/emotion/chakraTypes';
 import ChakraInsights from './insights/ChakraInsights';
 import EmotionInsights from './insights/EmotionInsights';
 import ChakraBalanceIndicator from './insights/ChakraBalanceIndicator';

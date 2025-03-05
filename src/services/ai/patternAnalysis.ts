@@ -1,128 +1,81 @@
-
-import { HistoricalReflection } from '@/components/reflection/types';
 import { normalizeChakraData } from '@/utils/emotion/chakraTypes';
 
-export const analyzeReflectionPatterns = (reflections: HistoricalReflection[]) => {
-  if (!reflections || reflections.length === 0) {
-    return {
-      dominantEmotions: [],
-      dominantChakras: [],
-      recentTrends: [],
-      emotionalDepthChange: 0,
-      chakraProgression: [],
-      recommendedFocus: []
-    };
-  }
-
-  // Get all unique emotions and count their occurrences
+export const analyzeEmotionPatterns = (reflections) => {
   const emotionCounts = {};
-  reflections.forEach(reflection => {
-    if (reflection.dominant_emotion) {
-      emotionCounts[reflection.dominant_emotion] = 
-        (emotionCounts[reflection.dominant_emotion] || 0) + 1;
+
+  reflections.forEach((reflection) => {
+    const emotion = reflection.dominant_emotion;
+    if (emotion) {
+      emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
     }
   });
 
-  // Sort emotions by count in descending order
-  const dominantEmotions = Object.entries(emotionCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(entry => entry[0]);
+  const totalReflections = reflections.length;
+  const emotionFrequencies = {};
 
-  // Analyze chakra activation patterns
-  const activatedChakras = new Set<number>();
-  const chakraCounts = Array(7).fill(0);
+  for (const emotion in emotionCounts) {
+    emotionFrequencies[emotion] = (emotionCounts[emotion] / totalReflections) * 100;
+  }
 
-  reflections.forEach(reflection => {
-    const normalizedChakras = normalizeChakraData(reflection.chakras_activated);
-    
-    normalizedChakras.forEach(chakra => {
-      activatedChakras.add(chakra);
-      chakraCounts[chakra] = (chakraCounts[chakra] || 0) + 1;
+  const sortedEmotions = Object.entries(emotionFrequencies)
+    .sort(([, freqA], [, freqB]) => freqB - freqA)
+    .reduce((obj, [key, value]) => {
+      obj[key] = value;
+      return obj;
+    }, {});
+
+  return sortedEmotions;
+};
+
+export const analyzeChakraPatterns = (reflections) => {
+  const chakraCounts = {};
+
+  reflections.forEach((reflection) => {
+    const chakras = normalizeChakraData(reflection.chakras_activated);
+    chakras.forEach((chakra) => {
+      const chakraIndex = Number(chakra);
+      if (!isNaN(chakraIndex)) {
+        if (!chakraCounts[chakraIndex]) {
+          chakraCounts[chakraIndex] = 0;
+        }
+        chakraCounts[chakraIndex] += 1;
+      }
     });
   });
 
-  // Get the dominant chakras
-  const dominantChakras = chakraCounts
-    .map((count, index) => ({ index, count }))
-    .filter(item => item.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 3)
-    .map(item => item.index);
+  const totalReflections = reflections.length;
+  const chakraFrequencies = {};
 
-  // Analyze recent trends based on last 3 reflections
-  const recentReflections = reflections.slice(0, 3);
-  const recentTrends = [];
-
-  if (recentReflections.length >= 2) {
-    const depthChange = recentReflections[0].emotional_depth - recentReflections[1].emotional_depth;
-    if (depthChange > 0.2) {
-      recentTrends.push("Increasing emotional depth");
-    } else if (depthChange < -0.2) {
-      recentTrends.push("Decreasing emotional depth");
-    } else {
-      recentTrends.push("Stable emotional depth");
-    }
+  for (const chakra in chakraCounts) {
+    chakraFrequencies[chakra] = (chakraCounts[chakra] / totalReflections) * 100;
   }
 
-  // Add more trend analysis based on emotions
-  if (recentReflections.length >= 2) {
-    const latestEmotion = recentReflections[0].dominant_emotion;
-    const previousEmotion = recentReflections[1].dominant_emotion;
-    
-    if (latestEmotion !== previousEmotion) {
-      recentTrends.push(`Shift from ${previousEmotion} to ${latestEmotion}`);
-    } else {
-      recentTrends.push(`Consistent ${latestEmotion} energy`);
-    }
-  }
+   const sortedChakras = Object.entries(chakraFrequencies)
+    .sort(([, freqA], [, freqB]) => freqB - freqA)
+    .reduce((obj, [key, value]) => {
+      obj[key] = value;
+      return obj;
+    }, {});
 
-  // Calculate emotional depth change over time
-  const oldestReflection = reflections[reflections.length - 1];
-  const newestReflection = reflections[0];
-  const emotionalDepthChange = newestReflection.emotional_depth - oldestReflection.emotional_depth;
-
-  // Determine chakra progression
-  const chakraProgression = Array.from(activatedChakras).sort();
-
-  // Generate recommended focus areas
-  const recommendedFocus = [];
-  
-  // Check if there's a gap in chakra progression
-  for (let i = 0; i < 7; i++) {
-    if (!chakraProgression.includes(i)) {
-      recommendedFocus.push(`Activate your ${getChakraName(i)} chakra`);
-      break;
-    }
-  }
-
-  // Add recommendation based on emotional patterns
-  if (dominantEmotions.includes('anxiety') || dominantEmotions.includes('stress')) {
-    recommendedFocus.push("Practice grounding and breathing exercises");
-  }
-
-  if (dominantEmotions.includes('confusion') || dominantEmotions.includes('uncertainty')) {
-    recommendedFocus.push("Meditation for mental clarity");
-  }
-
-  if (emotionalDepthChange < 0) {
-    recommendedFocus.push("Deepen your reflective practice");
-  }
-
-  return {
-    dominantEmotions,
-    dominantChakras,
-    recentTrends,
-    emotionalDepthChange,
-    chakraProgression,
-    recommendedFocus: recommendedFocus.slice(0, 2) // Limit to top 2 recommendations
-  };
+  return sortedChakras;
 };
 
-function getChakraName(index: number): string {
-  const names = [
-    "Root", "Sacral", "Solar Plexus", 
-    "Heart", "Throat", "Third Eye", "Crown"
-  ];
-  return names[index] || "";
-}
+export const analyzeEmotionalDepth = (reflections) => {
+  const totalDepth = reflections.reduce((sum, reflection) => sum + reflection.emotional_depth, 0);
+  const averageDepth = reflections.length > 0 ? totalDepth / reflections.length : 0;
+  return averageDepth;
+};
+
+export const detectReflectionPatterns = (reflections) => {
+  const emotionPatterns = analyzeEmotionPatterns(reflections);
+  const chakraPatterns = analyzeChakraPatterns(reflections);
+  const averageEmotionalDepth = analyzeEmotionalDepth(reflections);
+
+  const patterns = {
+    emotionPatterns,
+    chakraPatterns,
+    averageEmotionalDepth,
+  };
+
+  return patterns;
+};

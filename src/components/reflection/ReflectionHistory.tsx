@@ -1,107 +1,149 @@
+// Update the import to use the correct type and function
+import { ChakraActivated, normalizeChakraData, isChakraActivated } from '@/utils/emotion/chakraTypes';
 import React, { useState, useEffect } from 'react';
-import { HistoricalReflection } from '@/components/reflection/types';
-import ReflectionItem from './ReflectionItem';
-import ReflectionFilter from './ReflectionFilter';
-import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserReflections } from '@/services/reflectionService';
-import { isChakraActivated } from '@/utils/emotion/chakraTypes';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Button } from '@/components/ui/button';
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from 'date-fns';
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import ReflectionHistoryInsights from '@/components/reflection/ReflectionHistoryInsights';
 
-interface ReflectionHistoryProps {
-  onOpenAiAssistant?: (reflectionId?: string, reflectionContent?: string) => void;
+interface Reflection {
+  id: string;
+  content: string;
+  created_at: string;
+  dominant_emotion: string;
+  chakras_activated: ChakraActivated;
+  emotional_depth: number;
 }
 
-const ReflectionHistory: React.FC<ReflectionHistoryProps> = ({ onOpenAiAssistant }) => {
-  const [reflections, setReflections] = useState<HistoricalReflection[]>([]);
-  const [filteredReflections, setFilteredReflections] = useState<HistoricalReflection[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const { user } = useAuth();
+interface ReflectionHistoryProps {
+  reflections: Reflection[];
+}
 
-  useEffect(() => {
-    const loadReflections = async () => {
-      if (!user) {
-        setReflections([]);
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        const userReflections = await fetchUserReflections(user.id);
-        setReflections(userReflections);
-        setFilteredReflections(userReflections);
-      } catch (error) {
-        console.error('Error loading reflections:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadReflections();
-  }, [user]);
+interface ReflectionItemProps {
+  reflection: Reflection;
+  onViewInsights: (reflection: Reflection) => void;
+}
 
-  const handleFilterChange = (newFilter: string) => {
-    setFilter(newFilter);
+const ReflectionItem: React.FC<ReflectionItemProps> = ({ reflection, onViewInsights }) => {
+  return (
+    <div className="glass-card p-4">
+      <p className="text-sm text-gray-500">{reflection.created_at}</p>
+      <p className="text-md">{reflection.content.substring(0, 100)}...</p>
+      <Button variant="secondary" size="sm" onClick={() => onViewInsights(reflection)}>
+        View Insights
+      </Button>
+    </div>
+  );
+};
+
+// Fix the type in the component to ensure reflection.id is a string
+const ReflectionHistory = ({ reflections }: ReflectionHistoryProps) => {
+  const [filter, setFilter] = useState('');
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [selectedReflection, setSelectedReflection] = useState<Reflection | null>(null);
+  const [showInsights, setShowInsights] = useState(false);
+
+  const filteredReflections = reflections.filter(reflection => {
+    const searchTerm = filter.toLowerCase();
+    const contentMatch = reflection.content.toLowerCase().includes(searchTerm);
+    const emotionMatch = reflection.dominant_emotion.toLowerCase().includes(searchTerm);
     
-    if (newFilter === 'all') {
-      setFilteredReflections(reflections);
-      return;
+    let dateMatch = true;
+    if (date) {
+      const reflectionDate = new Date(reflection.created_at);
+      dateMatch = (
+        reflectionDate.getFullYear() === date.getFullYear() &&
+        reflectionDate.getMonth() === date.getMonth() &&
+        reflectionDate.getDate() === date.getDate()
+      );
     }
     
-    const filtered = reflections.filter(reflection => {
-      if (newFilter === 'high-energy' && (reflection.emotional_depth || 0) > 0.7) {
-        return true;
-      }
-      if (newFilter === 'heart' && isChakraActivated(reflection.chakras_activated, 3)) {
-        return true;
-      }
-      if (newFilter === 'third-eye' && isChakraActivated(reflection.chakras_activated, 5)) {
-        return true;
-      }
-      return false;
-    });
-    
-    setFilteredReflections(filtered);
+    return (contentMatch || emotionMatch) && dateMatch;
+  });
+
+  const handleViewInsights = (reflection: Reflection) => {
+    setSelectedReflection(reflection);
+    setShowInsights(true);
   };
 
-  // Calculate counts for filter categories
-  const totalCount = reflections.length;
-  const highEnergyCount = reflections.filter(r => (r.emotional_depth || 0) > 0.7).length;
-  const philosophicalCount = reflections.filter(r => 
-    r.dominant_emotion === 'philosophical' || 
-    r.type === 'consciousness'
-  ).length;
-
-  if (loading) {
-    return <div className="animate-pulse p-4">Loading reflection history...</div>;
-  }
-
-  if (reflections.length === 0) {
-    return (
-      <div className="p-4 text-center">
-        <p>You haven't submitted any reflections yet.</p>
-      </div>
-    );
-  }
+  const handleCloseInsights = () => {
+    setShowInsights(false);
+    setSelectedReflection(null);
+  };
 
   return (
     <div className="space-y-4">
-      <ReflectionFilter 
-        activeFilter={filter} 
-        onFilterChange={handleFilterChange}
-        total={totalCount}
-        energyCount={highEnergyCount}
-        philosophicalCount={philosophicalCount}
-      />
+      <div className="flex items-center space-x-4">
+        <Input
+          type="text"
+          placeholder="Filter reflections..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              className={cn(
+                "w-[280px] justify-start text-left font-normal",
+                !date && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date ? format(date, "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              disabled={(date) =>
+                date > new Date() || date < new Date("2023-01-01")
+              }
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
       
-      <div className="space-y-4">
-        {filteredReflections.map(reflection => (
+      <div className="space-y-3">
+        {filteredReflections.map((reflection) => (
           <ReflectionItem 
-            key={reflection.id} 
-            reflection={reflection} 
-            onAskAI={onOpenAiAssistant}
+            key={String(reflection.id)} // Ensure ID is converted to string
+            reflection={{
+              id: String(reflection.id), // Convert ID to string to fix type issues
+              content: reflection.content,
+              created_at: reflection.created_at,
+              dominant_emotion: reflection.dominant_emotion,
+              chakras_activated: reflection.chakras_activated,
+              emotional_depth: reflection.emotional_depth
+            }}
+            onViewInsights={() => handleViewInsights(reflection)}
           />
         ))}
       </div>
+      
+      {showInsights && selectedReflection && (
+        <ReflectionHistoryInsights 
+          reflection={selectedReflection}
+          onClose={handleCloseInsights}
+        />
+      )}
     </div>
   );
 };
