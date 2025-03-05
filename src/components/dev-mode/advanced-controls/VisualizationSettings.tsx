@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Eye, LayoutGrid, Settings } from 'lucide-react';
+import { Eye, LayoutGrid, Settings, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
