@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Code, 
@@ -9,9 +9,12 @@ import {
   X, 
   ChevronDown, 
   ChevronUp, 
-  Zap, 
+  Zap,
   Eye,
-  Sparkles
+  Sparkles,
+  Dices,
+  Activity,
+  Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -28,8 +31,15 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import AstralBody from '@/components/entry-animation/AstralBody';
 import CosmicAstralBody from '@/components/entry-animation/CosmicAstralBody';
-import HumanSilhouette from '@/components/entry-animation/cosmic/HumanSilhouette';
+import HumanSilhouette from '@/components/entry-animation/cosmic/silhouette/HumanSilhouette';
 import { CHAKRA_NAMES, ENERGY_THRESHOLDS } from '@/components/entry-animation/cosmic/types';
+
+// Import new advanced control components
+import ChakraCustomizer from './advanced-controls/ChakraCustomizer';
+import VisualizationSettings from './advanced-controls/VisualizationSettings';
+import AnimationControls from './advanced-controls/AnimationControls';
+import PerformanceMonitor from './advanced-controls/PerformanceMonitor';
+import ComponentIsolation from './advanced-controls/ComponentIsolation';
 
 interface DevModePanelProps {
   onClose: () => void;
@@ -46,18 +56,38 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
   const [showTranscendence, setShowTranscendence] = useState(false);
   const [showInfinity, setShowInfinity] = useState(false);
   
+  // Advanced settings states
+  const [chakraIntensities, setChakraIntensities] = useState<number[]>([1, 1, 1, 1, 1, 1, 1]);
+  const [fractalComplexity, setFractalComplexity] = useState(5);
+  const [glowIntensity, setGlowIntensity] = useState(0.7);
+  const [animationSpeed, setAnimationSpeed] = useState(1.0);
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+  const [animationPreset, setAnimationPreset] = useState('smooth');
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isolationMode, setIsolationMode] = useState(false);
+  
+  // Component isolation options
+  const [componentOptions, setComponentOptions] = useState([
+    { id: 'silhouette', name: 'Human Silhouette', description: 'Base human form', isVisible: true },
+    { id: 'chakras', name: 'Chakra Points', description: 'Energy centers', isVisible: true },
+    { id: 'aura', name: 'Aura Field', description: 'Surrounding energy', isVisible: true },
+    { id: 'rays', name: 'Energy Rays', description: 'Emanating light', isVisible: true },
+    { id: 'fractal', name: 'Fractal Patterns', description: 'Complex geometries', isVisible: true },
+    { id: 'stars', name: 'Background Stars', description: 'Cosmic backdrop', isVisible: true },
+    { id: 'glow', name: 'Central Glow', description: 'Core energy', isVisible: true },
+  ]);
+  
   // Calculate chakra intensity based on selected chakras
   const getChakraIntensity = (chakraIndex: number) => {
     if (showAllChakras) return 1;
-    return selectedChakras.includes(chakraIndex) ? 1 : 0.3;
+    return selectedChakras.includes(chakraIndex) ? chakraIntensities[chakraIndex] : 0.3;
   };
   
-  const handleChakraToggle = (index: number) => {
-    setSelectedChakras(prev => 
-      prev.includes(index) 
-        ? prev.filter(i => i !== index) 
-        : [...prev, index]
-    );
+  // Handle chakra intensity change
+  const handleIntensityChange = (index: number, value: number) => {
+    const newIntensities = [...chakraIntensities];
+    newIntensities[index] = value;
+    setChakraIntensities(newIntensities);
   };
   
   // Handle "Show All Chakras" toggle
@@ -66,6 +96,63 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
     if (show) {
       setSelectedChakras([0, 1, 2, 3, 4, 5, 6]);
     }
+  };
+  
+  // Handle component visibility toggle
+  const handleToggleComponent = (id: string) => {
+    setComponentOptions(prev => 
+      prev.map(option => 
+        option.id === id ? { ...option, isVisible: !option.isVisible } : option
+      )
+    );
+  };
+  
+  // Show all components
+  const handleShowAllComponents = () => {
+    setComponentOptions(prev => 
+      prev.map(option => ({ ...option, isVisible: true }))
+    );
+  };
+  
+  // Hide all components
+  const handleHideAllComponents = () => {
+    setComponentOptions(prev => 
+      prev.map(option => ({ ...option, isVisible: false }))
+    );
+  };
+  
+  // Reset animations
+  const handleResetAnimations = () => {
+    setAnimationSpeed(1.0);
+    setAnimationPreset('smooth');
+  };
+  
+  // Generate random configuration
+  const handleRandomize = () => {
+    // Random chakras (1-7 chakras)
+    const numChakras = Math.floor(Math.random() * 7) + 1;
+    const randomChakras = [];
+    const allChakras = [0, 1, 2, 3, 4, 5, 6];
+    
+    // Shuffle and pick
+    for (let i = 0; i < numChakras; i++) {
+      const availableIndices = allChakras.filter(idx => !randomChakras.includes(idx));
+      const randomIndex = Math.floor(Math.random() * availableIndices.length);
+      randomChakras.push(availableIndices[randomIndex]);
+    }
+    
+    setSelectedChakras(randomChakras);
+    
+    // Random energies (100-1000)
+    const randomEnergy = Math.floor(Math.random() * 900) + 100;
+    setEnergyPoints(randomEnergy);
+    
+    // Random visualization settings
+    setShowDetails(Math.random() > 0.2);
+    setShowIllumination(Math.random() > 0.3);
+    setShowFractal(Math.random() > 0.4);
+    setShowTranscendence(Math.random() > 0.7);
+    setShowInfinity(Math.random() > 0.8);
   };
   
   return (
@@ -129,6 +216,13 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
               <Sliders size={16} className="mr-2" />
               Controls
             </TabsTrigger>
+            <TabsTrigger 
+              value="advanced" 
+              className="data-[state=active]:bg-quantum-500/30 data-[state=active]:text-white rounded-md"
+            >
+              <Settings2 size={16} className="mr-2" />
+              Advanced
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="visualizations" className="p-4 space-y-6">
@@ -147,6 +241,11 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
                       <CosmicAstralBody 
                         energyPoints={energyPoints}
                         activatedChakras={selectedChakras}
+                        showDetailsOverride={showDetails}
+                        showIlluminationOverride={showIllumination}
+                        showFractalOverride={showFractal}
+                        showTranscendenceOverride={showTranscendence}
+                        showInfinityOverride={showInfinity}
                       />
                     </div>
                   </div>
@@ -186,41 +285,22 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
                       </div>
                       
                       <div className="mt-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/70 text-sm">Show Details</span>
-                          <Switch 
-                            checked={showDetails} 
-                            onCheckedChange={setShowDetails} 
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/70 text-sm">Show Illumination</span>
-                          <Switch 
-                            checked={showIllumination} 
-                            onCheckedChange={setShowIllumination} 
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/70 text-sm">Show Fractal</span>
-                          <Switch 
-                            checked={showFractal} 
-                            onCheckedChange={setShowFractal} 
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/70 text-sm">Show Transcendence</span>
-                          <Switch 
-                            checked={showTranscendence} 
-                            onCheckedChange={setShowTranscendence} 
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/70 text-sm">Show Infinity</span>
-                          <Switch 
-                            checked={showInfinity} 
-                            onCheckedChange={setShowInfinity} 
-                          />
-                        </div>
+                        <VisualizationSettings 
+                          showDetails={showDetails}
+                          setShowDetails={setShowDetails}
+                          showIllumination={showIllumination}
+                          setShowIllumination={setShowIllumination}
+                          showFractal={showFractal}
+                          setShowFractal={setShowFractal}
+                          showTranscendence={showTranscendence}
+                          setShowTranscendence={setShowTranscendence}
+                          showInfinity={showInfinity}
+                          setShowInfinity={setShowInfinity}
+                          fractalComplexity={fractalComplexity}
+                          setFractalComplexity={setFractalComplexity}
+                          glowIntensity={glowIntensity}
+                          setGlowIntensity={setGlowIntensity}
+                        />
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -230,48 +310,12 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
           </TabsContent>
           
           <TabsContent value="chakras" className="p-4 space-y-6">
-            <Card className="bg-black/50 border border-white/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white text-lg">Chakra Activation</CardTitle>
-                <CardDescription>
-                  Customize which chakras are active and their intensity
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-0">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-white/80">Activate All Chakras</span>
-                  <Switch 
-                    checked={showAllChakras} 
-                    onCheckedChange={handleShowAllChakras} 
-                  />
-                </div>
-                
-                <Separator className="bg-white/10 my-4" />
-                
-                <div className="space-y-3">
-                  {CHAKRA_NAMES.map((name, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div 
-                          className="w-3 h-3 rounded-full mr-2"
-                          style={{ 
-                            background: selectedChakras.includes(index) 
-                              ? `var(--chakra-color-${index})` 
-                              : 'rgba(255,255,255,0.2)'
-                          }}
-                        ></div>
-                        <span className="text-white/80">{name} Chakra</span>
-                      </div>
-                      <Switch 
-                        checked={selectedChakras.includes(index)}
-                        onCheckedChange={() => handleChakraToggle(index)}
-                        disabled={showAllChakras}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <ChakraCustomizer 
+              selectedChakras={selectedChakras}
+              onChakraSelect={setSelectedChakras}
+              chakraIntensities={chakraIntensities}
+              onIntensityChange={handleIntensityChange}
+            />
             
             <Card className="bg-black/50 border border-white/10">
               <CardHeader className="pb-2">
@@ -341,29 +385,68 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
                     </Button>
                   ))}
                 </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRandomize}
+                  className="w-full mt-4 border-white/10 bg-quantum-500/20 text-white"
+                >
+                  <Dices size={14} className="mr-1" />
+                  Randomize Configuration
+                </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          <TabsContent value="advanced" className="p-4 space-y-6">
+            <AnimationControls 
+              animationSpeed={animationSpeed}
+              setAnimationSpeed={setAnimationSpeed}
+              animationsEnabled={animationsEnabled}
+              setAnimationsEnabled={setAnimationsEnabled}
+              animationPreset={animationPreset}
+              setAnimationPreset={setAnimationPreset}
+              onResetAnimations={handleResetAnimations}
+            />
+            
+            <ComponentIsolation 
+              componentOptions={componentOptions}
+              onToggleComponent={handleToggleComponent}
+              isolationMode={isolationMode}
+              setIsolationMode={setIsolationMode}
+              onShowAll={handleShowAllComponents}
+              onHideAll={handleHideAllComponents}
+            />
+            
+            <PerformanceMonitor 
+              isMonitoring={isMonitoring}
+              setIsMonitoring={setIsMonitoring}
+            />
             
             <Card className="bg-black/50 border border-white/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-white text-lg">Advanced Controls</CardTitle>
+                <CardTitle className="text-white text-lg flex items-center">
+                  <Settings2 size={16} className="mr-2" />
+                  Advanced Developer Tools
+                </CardTitle>
                 <CardDescription>
-                  Test and preview more advanced features
+                  Additional tools for development and testing
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-0">
                 <div className="grid grid-cols-1 gap-2">
                   <Button variant="outline" className="border-white/10 bg-transparent text-white/80 justify-start">
-                    <Settings2 size={14} className="mr-2" />
-                    Manual Chakra Activation
+                    <Activity size={14} className="mr-2" />
+                    Export Performance Report
                   </Button>
                   <Button variant="outline" className="border-white/10 bg-transparent text-white/80 justify-start">
-                    <PanelRight size={14} className="mr-2" />
-                    Emotional Analysis Panel
+                    <Eye size={14} className="mr-2" />
+                    Visual Regression Test
                   </Button>
                   <Button variant="outline" className="border-white/10 bg-transparent text-white/80 justify-start">
-                    <Sparkles size={14} className="mr-2" />
-                    Astral Transition Demo
+                    <Layers size={14} className="mr-2" />
+                    Component Tree Explorer
                   </Button>
                 </div>
                 
@@ -377,7 +460,7 @@ const DevModePanel: React.FC<DevModePanelProps> = ({ onClose }) => {
       </div>
       
       <div className="p-4 border-t border-white/10 flex justify-between">
-        <span className="text-xs text-white/40">Developer Mode v1.0</span>
+        <span className="text-xs text-white/40">Developer Mode v1.2</span>
         <Button variant="ghost" size="sm" className="text-white/60 hover:text-white" onClick={onClose}>
           Close Panel
         </Button>
