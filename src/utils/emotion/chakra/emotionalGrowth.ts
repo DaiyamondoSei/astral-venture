@@ -6,23 +6,42 @@
 /**
  * Calculates emotional growth percentage based on various metrics
  * 
- * @param metrics - Object containing various metrics for calculation
+ * @param reflectionCount - Number of reflections or an object containing various metrics
  * @returns Growth percentage (0-100)
  */
-export function calculateEmotionalGrowth(metrics: {
-  reflectionCount?: number;
-  emotionalDepth?: number;
-  activatedChakras?: number[];
-  dominantEmotions?: string[];
-  streakDays?: number;
-}): number {
+export function calculateEmotionalGrowth(
+  reflectionCountOrMetrics: number | {
+    reflectionCount?: number;
+    emotionalDepth?: number;
+    activatedChakras?: number[];
+    dominantEmotions?: string[];
+    streakDays?: number;
+  }
+): number {
+  // Handle both simple number input and complex object input
+  if (typeof reflectionCountOrMetrics === 'number') {
+    // If just a number is provided, use it as reflectionCount
+    const reflectionCount = reflectionCountOrMetrics;
+    
+    // Base score starts at 0
+    let growthScore = 0;
+    
+    // Reflection count contribution (max 30 points)
+    // Logarithmic scale to provide diminishing returns
+    growthScore += Math.min(Math.log10(reflectionCount + 1) * 15, 30);
+    
+    // Return the growth score from simple calculation
+    return Math.min(Math.round(growthScore), 100);
+  }
+  
+  // Handle the object case (original implementation)
   const {
     reflectionCount = 0,
     emotionalDepth = 0,
     activatedChakras = [],
     dominantEmotions = [],
     streakDays = 0
-  } = metrics;
+  } = reflectionCountOrMetrics;
   
   // Base score starts at 0
   let growthScore = 0;
