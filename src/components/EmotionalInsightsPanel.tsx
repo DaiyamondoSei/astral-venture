@@ -51,6 +51,7 @@ const EmotionalInsightsPanel = () => {
             emotionalGrowth={emotionalGrowth}
             getChakraIntensity={getChakraIntensity}
             activatedChakras={activatedChakras}
+            dominantEmotions={dominantEmotions}
           />
           
           <EmotionalProgressChart historyData={emotionalHistoryData} />
