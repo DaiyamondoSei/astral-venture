@@ -1,13 +1,13 @@
-
 import React, { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateEnergyPoints, getActivatedChakrasFromThemes } from '@/utils/energyPointsCalculator';
 import { saveReflection, updateUserPoints } from '@/services/reflectionService';
-import { evaluateEmotionalDepth } from '@/utils/emotion/reflectionAnalysis';
+import { evaluateEmotionalDepth, getDepthCategory, getDepthFeedback } from '@/utils/emotion/analysis/depthEvaluator';
 import ReflectionInstructions from './reflection/ReflectionInstructions';
 import ReflectionFormInput from './reflection/ReflectionFormInput';
 import ReflectionPromptSuggestions from './reflection/ReflectionPromptSuggestions';
+import ReflectionAnalytics from './reflection/ReflectionAnalytics';
 
 interface EnergyReflectionFormProps {
   onReflectionComplete?: (pointsEarned: number, emotionalInsights?: any) => void;
@@ -17,6 +17,8 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
   const [reflection, setReflection] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [promptVisible, setPromptVisible] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [lastReflection, setLastReflection] = useState<any>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -50,8 +52,10 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
       // Determine chakras that would be activated by this reflection
       const activatedChakras = getActivatedChakrasFromThemes(emotionalAnalysis.emotionalThemes);
       
-      // Calculate emotional depth score using the new analyzer
+      // Calculate emotional depth score using the enhanced analyzer
       const emotionalDepthScore = evaluateEmotionalDepth(reflection);
+      const depthCategory = getDepthCategory(emotionalDepthScore);
+      const depthFeedback = getDepthFeedback(emotionalDepthScore);
       
       // Create comprehensive emotional insights package with expanded metrics
       const emotionalInsights = {
@@ -62,7 +66,9 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
         reflectionTimestamp: new Date().toISOString(),
         reflectionWordCount: reflection.split(/\s+/).filter(w => w.length > 0).length,
         emotionalKeywords: reflection.toLowerCase().match(/feel|emotion|heart|sense|connect|energy|aware|conscious/g) || [],
-        reflectionType: 'energy'
+        reflectionType: 'energy',
+        depthCategory,
+        depthFeedback
       };
       
       // Store emotional insights in localStorage for use across the app with enhanced structure
@@ -89,8 +95,8 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
         const existingReflectionsString = localStorage.getItem('energyReflections');
         const existingReflections = existingReflectionsString ? JSON.parse(existingReflectionsString) : [];
         
-        // Add new reflection to the array (with enhanced metadata)
-        existingReflections.unshift({
+        // Create the new reflection object with enhanced metadata
+        const newReflection = {
           id: Date.now(),
           content: reflection,
           points_earned: pointsEarned,
@@ -98,9 +104,15 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
           type: 'energy',
           dominant_emotion: emotionalAnalysis.emotionalThemes[0] || 'Growth',
           emotional_depth: emotionalDepthScore,
-          insights: emotionalAnalysis.emotionalThemes.map(theme => `Strong ${theme} energy detected`),
+          insights: [
+            depthFeedback,
+            ...emotionalAnalysis.emotionalThemes.map(theme => `Strong ${theme} energy detected`)
+          ],
           chakras_activated: activatedChakras
-        });
+        };
+        
+        // Add new reflection to the array
+        existingReflections.unshift(newReflection);
         
         // Keep only most recent 50 reflections
         if (existingReflections.length > 50) {
@@ -108,6 +120,10 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
         }
         
         localStorage.setItem('energyReflections', JSON.stringify(existingReflections));
+        
+        // Save the last reflection for immediate analytics
+        setLastReflection(newReflection);
+        setShowAnalytics(true);
       } catch (error) {
         console.error('Error storing energy reflection in history:', error);
       }
@@ -123,13 +139,9 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
       await updateUserPoints(user.id, pointsEarned);
       
       // Show success message with emotional feedback
-      const dominantEmotion = emotionalAnalysis.emotionalThemes[0] || '';
-      const emotionMessage = dominantEmotion ? 
-        ` Your reflection shows strong ${dominantEmotion} energy.` : '';
-      
       toast({
-        title: "Reflection Submitted",
-        description: `Thank you for your energy reflection! You earned ${pointsEarned} energy points.${emotionMessage}`,
+        title: `${depthCategory} Reflection Submitted`,
+        description: `${depthFeedback} You earned ${pointsEarned} energy points.`,
       });
       
       // Clear form
@@ -181,6 +193,15 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
         isSubmitting={isSubmitting}
         onSubmit={handleSubmit}
       />
+      
+      {showAnalytics && lastReflection && (
+        <div className="mt-5">
+          <ReflectionAnalytics 
+            reflections={[lastReflection]} 
+            onRefresh={() => setShowAnalytics(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };

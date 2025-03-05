@@ -22,7 +22,8 @@ export function evaluateEmotionalDepth(text: string): number {
   const emotionalTerms = [
     'feel', 'felt', 'emotion', 'heart', 'deeply', 'profound',
     'moved', 'touching', 'powerful', 'experience', 'sense',
-    'understand', 'realized', 'discovered', 'awareness'
+    'understand', 'realized', 'discovered', 'awareness',
+    'energy', 'centered', 'peaceful', 'grateful', 'authentic'
   ];
   
   let emotionalTermCount = 0;
@@ -37,7 +38,8 @@ export function evaluateEmotionalDepth(text: string): number {
   // Complex sentence structure (indicates sophisticated thinking)
   const complexSentenceIndicators = [
     'because', 'however', 'although', 'therefore', 
-    'consequently', 'despite', 'nevertheless', 'furthermore'
+    'consequently', 'despite', 'nevertheless', 'furthermore',
+    'additionally', 'moreover', 'while', 'since'
   ];
   
   let complexityScore = 0;
@@ -52,7 +54,8 @@ export function evaluateEmotionalDepth(text: string): number {
   // Contrast and comparison (indicates nuanced thinking)
   const contrastIndicators = [
     'but', 'yet', 'while', 'whereas', 'unlike', 'instead',
-    'contrast', 'difference', 'similarity', 'compared'
+    'contrast', 'difference', 'similarity', 'compared',
+    'on one hand', 'on the other hand', 'balance', 'harmony'
   ];
   
   let contrastScore = 0;
@@ -67,7 +70,9 @@ export function evaluateEmotionalDepth(text: string): number {
   // Insight and growth language
   const insightTerms = [
     'insight', 'growth', 'evolve', 'transform', 'journey',
-    'practice', 'progress', 'develop', 'change', 'shift'
+    'practice', 'progress', 'develop', 'change', 'shift',
+    'awareness', 'conscious', 'mindful', 'presence', 'connect',
+    'integrate', 'balance', 'harmony', 'alignment', 'centered'
   ];
   
   let insightScore = 0;
@@ -80,4 +85,34 @@ export function evaluateEmotionalDepth(text: string): number {
   depth += Math.min(insightScore / 5, 0.1); // Cap at 0.1 (10% of score)
   
   return Math.min(depth, 1.0); // Ensure the score is between 0 and 1
+}
+
+/**
+ * Categorizes the reflection into different depth levels based on score
+ */
+export function getDepthCategory(score: number): string {
+  if (score >= 0.8) return "Profound";
+  if (score >= 0.6) return "Deep";
+  if (score >= 0.4) return "Substantial"; 
+  if (score >= 0.2) return "Developing";
+  return "Beginning";
+}
+
+/**
+ * Provides personalized feedback based on emotional depth
+ */
+export function getDepthFeedback(score: number): string {
+  if (score >= 0.8) {
+    return "Your reflection shows exceptional emotional awareness and deep self-understanding.";
+  }
+  if (score >= 0.6) {
+    return "Your reflection demonstrates strong emotional insight and self-awareness.";
+  }
+  if (score >= 0.4) {
+    return "Your reflection shows good emotional awareness and growing self-insight.";
+  }
+  if (score >= 0.2) {
+    return "Your reflection is developing emotional depth. Consider exploring your feelings more fully.";
+  }
+  return "This is a great start to your reflection practice. Try exploring your emotions more deeply.";
 }

@@ -1,106 +1,128 @@
 
-import React, { memo } from 'react';
-import { motion } from 'framer-motion';
-import { SilhouetteProps } from './silhouette/types';
-import Definitions from './silhouette/Definitions';
+import React from 'react';
+import { CHAKRA_COLORS } from './types';
 import SilhouettePath from './silhouette/SilhouettePath';
+import CentralGlow from './silhouette/CentralGlow';
 import ChakraPoint from './silhouette/ChakraPoint';
 import InfinityEssence from './silhouette/InfinityEssence';
-import CentralGlow from './silhouette/CentralGlow';
+import Definitions from './silhouette/Definitions';
 
-/**
- * HumanSilhouette Component
- * 
- * Renders a human-like silhouette with chakra points and various visual effects
- * based on the user's energy progress level.
- * 
- * The component uses memoization to prevent unnecessary re-renders of this
- * computationally expensive visual element.
- */
-const HumanSilhouette: React.FC<SilhouetteProps> = memo(({
-  showChakras,
-  showDetails,
-  showIllumination,
-  showFractal,
-  showTranscendence,
-  showInfinity,
-  baseProgressPercentage,
-  getChakraIntensity,
+interface HumanSilhouetteProps {
+  showChakras?: boolean;
+  showDetails?: boolean;
+  showIllumination?: boolean;
+  showFractal?: boolean;
+  showTranscendence?: boolean;
+  showInfinity?: boolean;
+  baseProgressPercentage?: number;
+  getChakraIntensity?: (chakraIndex: number) => number;
+  activatedChakras?: number[];
+}
+
+const HumanSilhouette: React.FC<HumanSilhouetteProps> = ({
+  showChakras = false,
+  showDetails = false,
+  showIllumination = false,
+  showFractal = false,
+  showTranscendence = false,
+  showInfinity = false,
+  baseProgressPercentage = 0.5,
+  getChakraIntensity = () => 0.5,
   activatedChakras = []
 }) => {
-  // Define chakra positions
-  const chakraPoints = [
-    { cx: 50, cy: 16, index: 0 },  // Crown
-    { cx: 50, cy: 32, index: 1 },  // Throat
-    { cx: 50, cy: 55, index: 2 },  // Heart
-    { cx: 50, cy: 70, index: 3 },  // Solar
-    { cx: 50, cy: 85, index: 4 },  // Sacral
-    { cx: 50, cy: 100, index: 5 }, // Root
-  ];
-
   return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <motion.div
-        className="relative h-4/5"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.5, delay: 0.5 }}
-      >
-        <svg 
-          className="h-full mx-auto astral-body-silhouette"
-          viewBox="0 0 100 220" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <Definitions 
+    <svg viewBox="0 0 300 500" className="w-full h-full">
+      <Definitions />
+      
+      {/* Main Silhouette */}
+      <SilhouettePath
+        showDetails={showDetails}
+        showIllumination={showIllumination}
+      />
+      
+      {/* Central Glow */}
+      <CentralGlow 
+        baseProgressPercentage={baseProgressPercentage}
+        showIllumination={showIllumination}
+      />
+      
+      {/* Chakra energy points */}
+      {showChakras && (
+        <>
+          {/* Root Chakra */}
+          <ChakraPoint 
+            cx={150} cy={380} 
+            color={CHAKRA_COLORS[0]}
+            intensity={getChakraIntensity(0)}
+            active={activatedChakras.includes(0)}
             showDetails={showDetails}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
           />
           
-          <SilhouettePath 
-            showInfinity={showInfinity}
-            showTranscendence={showTranscendence}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
+          {/* Sacral Chakra */}
+          <ChakraPoint 
+            cx={150} cy={340} 
+            color={CHAKRA_COLORS[1]}
+            intensity={getChakraIntensity(1)}
+            active={activatedChakras.includes(1)}
             showDetails={showDetails}
-            baseProgressPercentage={baseProgressPercentage}
           />
           
-          {/* Chakra energy points */}
-          {chakraPoints.map((point) => (
-            <ChakraPoint 
-              key={`chakra-${point.index}`}
-              cx={point.cx}
-              cy={point.cy}
-              chakraIndex={point.index}
-              showChakras={showChakras}
-              showIllumination={showIllumination}
-              showInfinity={showInfinity}
-              showTranscendence={showTranscendence}
-              showFractal={showFractal}
-              baseProgressPercentage={baseProgressPercentage}
-              intensity={getChakraIntensity(point.index)}
-            />
-          ))}
+          {/* Solar Plexus Chakra */}
+          <ChakraPoint 
+            cx={150} cy={300} 
+            color={CHAKRA_COLORS[2]}
+            intensity={getChakraIntensity(2)}
+            active={activatedChakras.includes(2)}
+            showDetails={showDetails}
+          />
           
-          {/* Infinity level core essence */}
-          <InfinityEssence showInfinity={showInfinity} />
-        </svg>
-        
-        {/* Central glow behind the silhouette */}
-        <CentralGlow 
-          showInfinity={showInfinity}
-          showTranscendence={showTranscendence}
-          showIllumination={showIllumination}
+          {/* Heart Chakra */}
+          <ChakraPoint 
+            cx={150} cy={260} 
+            color={CHAKRA_COLORS[3]}
+            intensity={getChakraIntensity(3)}
+            active={activatedChakras.includes(3)}
+            showDetails={showDetails}
+          />
+          
+          {/* Throat Chakra */}
+          <ChakraPoint 
+            cx={150} cy={230} 
+            color={CHAKRA_COLORS[4]}
+            intensity={getChakraIntensity(4)}
+            active={activatedChakras.includes(4)}
+            showDetails={showDetails}
+          />
+          
+          {/* Third Eye Chakra */}
+          <ChakraPoint 
+            cx={150} cy={205} 
+            color={CHAKRA_COLORS[5]}
+            intensity={getChakraIntensity(5)}
+            active={activatedChakras.includes(5)}
+            showDetails={showDetails}
+          />
+          
+          {/* Crown Chakra */}
+          <ChakraPoint 
+            cx={150} cy={180} 
+            color={CHAKRA_COLORS[6]}
+            intensity={getChakraIntensity(6)}
+            active={activatedChakras.includes(6)}
+            showDetails={showDetails}
+          />
+        </>
+      )}
+      
+      {/* Infinity essence for transcendence level */}
+      {(showTranscendence || showInfinity) && (
+        <InfinityEssence 
           baseProgressPercentage={baseProgressPercentage}
+          showInfinity={showInfinity}
         />
-      </motion.div>
-    </div>
+      )}
+    </svg>
   );
-});
-
-HumanSilhouette.displayName = 'HumanSilhouette';
+};
 
 export default HumanSilhouette;
