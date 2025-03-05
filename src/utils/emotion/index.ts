@@ -10,5 +10,7 @@ export * from './dreamAnalysis';
 export * from './reflectionAnalysis';
 export * from './chakraUtils';
 
-// Export the new enhanced emotional depth evaluation functions
-export { evaluateEmotionalDepth, calculateEmotionalIntelligence } from './reflectionAnalysis';
+// Re-export from new files for direct access
+export { analyzeReflectionContent } from './analysis/reflectionContentAnalyzer';
+export { evaluateEmotionalDepth } from './analysis/depthEvaluator';
+export { calculateEmotionalIntelligence } from './analysis/intelligenceCalculator';
