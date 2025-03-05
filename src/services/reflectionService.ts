@@ -95,7 +95,7 @@ export const fetchReflectionStats = async (userId: string) => {
   };
 };
 
-// New function to save a full emotional analysis
+// Updated function to save a full emotional analysis with proper type handling
 export const saveEmotionalAnalysis = async (userId: string, analysisData: any) => {
   const { error } = await supabase
     .from('emotional_analysis')
@@ -103,7 +103,20 @@ export const saveEmotionalAnalysis = async (userId: string, analysisData: any) =
       user_id: userId,
       analysis_data: analysisData,
       created_at: new Date().toISOString()
-    } as any);
+    });
     
   if (error) throw error;
+};
+
+// New function to fetch emotional analysis data
+export const fetchEmotionalAnalysis = async (userId: string, limit: number = 1) => {
+  const { data, error } = await supabase
+    .from('emotional_analysis')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+    
+  if (error) throw error;
+  return data || [];
 };

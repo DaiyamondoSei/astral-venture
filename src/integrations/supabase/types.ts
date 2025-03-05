@@ -42,6 +42,27 @@ export type Database = {
         }
         Relationships: []
       }
+      emotional_analysis: {
+        Row: {
+          analysis_data: Json
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          analysis_data: Json
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          analysis_data?: Json
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       energy_reflections: {
         Row: {
           content: string
