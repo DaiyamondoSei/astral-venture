@@ -1,7 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchEmotionalJourney, getReflectionInsights, EnergyReflection } from '@/services/reflectionService';
+import { 
+  fetchEmotionalJourney, 
+  getReflectionInsights, 
+  EnergyReflection 
+} from '@/services/reflection';
 import { Sparkles, TrendingUp, BarChart3, RefreshCw } from 'lucide-react';
 
 interface ReflectionAnalyticsProps {
