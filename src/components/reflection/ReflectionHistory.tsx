@@ -13,6 +13,7 @@ const ReflectionHistory = () => {
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<string[]>([]);
   const [activatedChakras, setActivatedChakras] = useState<number[]>([]);
+  const [expandedId, setExpandedId] = useState<string | number | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -42,6 +43,10 @@ const ReflectionHistory = () => {
     loadReflections();
   }, [user]);
 
+  const handleToggleExpand = (id: string | number) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
@@ -66,16 +71,35 @@ const ReflectionHistory = () => {
     );
   }
 
+  // Prepare data for ReflectionHistoryInsights in the format it expects
+  const insightsData = {
+    activatedChakras: activatedChakras,
+    dominantEmotions: reflections
+      .filter(r => r.dominant_emotion)
+      .map(r => r.dominant_emotion as string)
+      .slice(0, 5),
+    emotionalAnalysis: {
+      // Add any additional emotional analysis metrics here
+      averageDepth: reflections
+        .filter(r => r.emotional_depth !== undefined)
+        .reduce((sum, r) => sum + (r.emotional_depth || 0), 0) / 
+        reflections.filter(r => r.emotional_depth !== undefined).length || 0,
+    }
+  };
+
   return (
     <div className="space-y-4">
       <ReflectionHistoryChart reflections={reflections} />
       
       <ReflectionHistoryInsights 
-        insights={insights} 
-        activatedChakras={activatedChakras}
+        data={insightsData}
       />
       
-      <ReflectionList reflections={reflections} />
+      <ReflectionList 
+        reflections={reflections} 
+        expandedId={expandedId}
+        onToggleExpand={handleToggleExpand}
+      />
     </div>
   );
 };
