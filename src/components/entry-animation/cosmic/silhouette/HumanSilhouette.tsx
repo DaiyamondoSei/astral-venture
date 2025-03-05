@@ -46,6 +46,9 @@ const HumanSilhouette: React.FC<HumanSilhouetteProps> = ({
       <Definitions 
         showTranscendence={showTranscendence}
         showInfinity={showInfinity}
+        showDetails={showDetails}
+        showIllumination={showIllumination}
+        showFractal={showFractal}
       />
       
       {/* Human silhouette path with glowing effect */}
@@ -85,12 +88,15 @@ const HumanSilhouette: React.FC<HumanSilhouetteProps> = ({
       <CentralGlow 
         showIllumination={showIllumination}
         showTranscendence={showTranscendence}
+        showInfinity={showInfinity}
         baseProgressPercentage={baseProgressPercentage}
       />
       
       {/* Infinity essence - highest state */}
       {showInfinity && (
-        <InfinityEssence />
+        <InfinityEssence 
+          showInfinity={showInfinity}
+        />
       )}
     </svg>
   );

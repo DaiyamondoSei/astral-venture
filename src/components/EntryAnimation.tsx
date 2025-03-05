@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import GlowEffect from '@/components/GlowEffect';
 import StarsBackground from './entry-animation/StarsBackground';
-import WelcomeStep from './entry-animation/WelcomeStep';
-import FocusStep from './entry-animation/FocusStep';
-import BreathingExercise from './entry-animation/BreathingExercise';
+import WelcomeStep from './entry-animation/steps/WelcomeStep';
+import FocusStep from './entry-animation/steps/FocusStep';
+import BreathingExercise from './entry-animation/steps/BreathingExercise';
 import AstralBody from './entry-animation/AstralBody';
-import FinalStep from './entry-animation/FinalStep';
+import FinalStep from './entry-animation/steps/FinalStep';
 
 interface EntryAnimationProps {
   onComplete?: () => void;
