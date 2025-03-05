@@ -42,6 +42,23 @@ export const getChakraIntensity = (
   // This creates a subtle uniqueness each time intensity is calculated
   intensity += (Math.sin(Date.now() / 1000 + chakraIndex * 1000) * 0.05);
   
+  // Add golden ratio influence for harmonic oscillation
+  intensity += (Math.sin(Date.now() / 1618 + chakraIndex * 618) * 0.03);
+  
+  // Create harmonic relationships between chakras based on sacred geometry principles
+  const harmonicFactor = 1 + (Math.sin(Date.now() / 2000) * 0.1);
+  if ((chakraIndex === 0 && activatedChakras.includes(6)) || 
+      (chakraIndex === 6 && activatedChakras.includes(0))) {
+    // Root-Crown connection (special harmonic)
+    intensity += 0.1 * harmonicFactor;
+  }
+  
+  if ((chakraIndex === 1 && activatedChakras.includes(5)) || 
+      (chakraIndex === 5 && activatedChakras.includes(1))) {
+    // Sacral-Third Eye connection (creative insight)
+    intensity += 0.08 * harmonicFactor;
+  }
+  
   // Ensure intensity is between 0 and 1
   return Math.min(Math.max(intensity, 0.1), 1.0);
 };
@@ -84,8 +101,25 @@ export const getChakraResonance = (
     resonance += 0.2;
   }
   
-  // Add organic variation
-  resonance += (Math.sin(Date.now() / 2000 + (chakraIndex1 + chakraIndex2) * 500) * 0.08);
+  // Add organic variation using mathematical principles
+  // Based on golden ratio (phi ≈ 1.618) for more harmonic fluctuations
+  resonance += (Math.sin(Date.now() / 1618 + (chakraIndex1 + chakraIndex2) * 618) * 0.08);
+  
+  // Add fibonacci-based pattern for more complex, natural-feeling variation
+  const fibonacciPulse = Math.sin(Date.now() / 2584) * Math.cos(Date.now() / 1597) * 0.05;
+  resonance += fibonacciPulse;
+  
+  // Create sacral-throat-crown axis resonance for creativity-expression-consciousness flow
+  if ((chakraIndex1 === 1 && chakraIndex2 === 4) || (chakraIndex1 === 4 && chakraIndex2 === 1) ||
+      (chakraIndex1 === 4 && chakraIndex2 === 6) || (chakraIndex1 === 6 && chakraIndex2 === 4)) {
+    resonance += 0.12 * (1 + Math.sin(Date.now() / 3000) * 0.2);
+  }
+  
+  // Create root-solar-third eye axis for grounding intuition
+  if ((chakraIndex1 === 0 && chakraIndex2 === 2) || (chakraIndex1 === 2 && chakraIndex2 === 0) ||
+      (chakraIndex1 === 2 && chakraIndex2 === 5) || (chakraIndex1 === 5 && chakraIndex2 === 2)) {
+    resonance += 0.1 * (1 + Math.cos(Date.now() / 3500) * 0.2);
+  }
   
   return Math.min(Math.max(resonance, 0.1), 1.0);
 };
