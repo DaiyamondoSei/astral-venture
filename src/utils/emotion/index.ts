@@ -14,3 +14,5 @@ export * from './chakraUtils';
 export { analyzeReflectionContent } from './analysis/reflectionContentAnalyzer';
 export { evaluateEmotionalDepth } from './analysis/depthEvaluator';
 export { calculateEmotionalIntelligence } from './analysis/intelligenceCalculator';
+export { addReflectionBasedChakras } from './chakra/reflectionActivation';
+export { calculateEmotionalGrowth } from './chakra/emotionalGrowth';
