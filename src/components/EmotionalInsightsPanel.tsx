@@ -30,11 +30,11 @@ const EmotionalInsightsPanel = () => {
   }
 
   return (
-    <div className="glass-card p-4">
-      <h3 className="font-display text-lg mb-3">Your Emotional Evolution</h3>
+    <div className="glass-card p-6 shadow-lg">
+      <h3 className="font-display text-xl mb-4 text-white/95 tracking-wide">Your Emotional Evolution</h3>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex flex-col space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col space-y-6">
           <EmotionalIntelligenceMeter emotionalGrowth={emotionalGrowth} />
           
           <DreamEnergyAnalysis userDream={userDream} dominantEmotions={dominantEmotions} />
@@ -46,7 +46,7 @@ const EmotionalInsightsPanel = () => {
           <ChakraBalanceRadar chakraData={chakraBalanceData} />
         </div>
         
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-6">
           <AstralSilhouetteVisualization 
             emotionalGrowth={emotionalGrowth}
             getChakraIntensity={getChakraIntensity}
@@ -62,13 +62,16 @@ const EmotionalInsightsPanel = () => {
         </div>
       </div>
       
-      <div className="mt-5 bg-black/20 rounded-lg p-4">
-        <h4 className="text-white/90 text-sm font-medium mb-2">Recommended Energy Practices</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="mt-8 bg-black/30 rounded-lg p-6 border border-white/10">
+        <h4 className="text-white/90 text-base font-medium mb-4 flex items-center">
+          <span className="inline-block w-1.5 h-1.5 bg-quantum-400 rounded-full mr-2"></span>
+          Energy Practices for Your Journey
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {emotionalRecommendations.map((rec, index) => (
-            <div key={index} className="bg-white/5 p-3 rounded border border-white/10">
-              <h5 className="text-xs font-medium text-quantum-400 mb-1">{rec.title}</h5>
-              <p className="text-xs text-white/70">{rec.description}</p>
+            <div key={index} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-quantum-400/30 transition-colors">
+              <h5 className="text-sm font-medium text-quantum-300 mb-2">{rec.title}</h5>
+              <p className="text-sm text-white/80 leading-relaxed">{rec.description}</p>
             </div>
           ))}
         </div>

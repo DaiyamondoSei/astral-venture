@@ -45,11 +45,29 @@ const ConsciousnessIndicator: React.FC<ConsciousnessIndicatorProps> = ({
     }
   };
   
+  // Get color theme based on variant
+  const getColorTheme = (variant: string) => {
+    switch (variant) {
+      case "aware":
+        return { text: "text-cyan-200", shadow: "cyan" };
+      case "illuminated":
+        return { text: "text-blue-200", shadow: "blue" };
+      case "awakened":
+        return { text: "text-violet-200", shadow: "violet" };
+      case "transcendent":
+        return { text: "text-indigo-200", shadow: "indigo" };
+      default:
+        return { text: "text-white/80", shadow: "white" };
+    }
+  };
+  
+  const colorTheme = getColorTheme(visualizationVariant);
+  
   // Fluid transition animation variants
   const containerVariants = {
     initial: { opacity: 0 },
     animate: { 
-      opacity: [0.5, 1, 0.7], 
+      opacity: [0.6, 1, 0.8], 
       transition: { 
         duration: 4, 
         repeat: Infinity,
@@ -103,13 +121,14 @@ const ConsciousnessIndicator: React.FC<ConsciousnessIndicatorProps> = ({
   
   return (
     <motion.div 
-      className="absolute bottom-4 left-0 right-0 text-center"
+      className="text-center py-1.5 px-3"
       initial="initial"
       animate="animate"
       variants={containerVariants}
       style={{
         textShadow: `0 0 ${currentGlow}px rgba(255, 255, 255, 0.7)`
       }}
+      aria-live="polite"
     >
       <AnimatePresence mode="wait">
         <motion.div
@@ -118,8 +137,9 @@ const ConsciousnessIndicator: React.FC<ConsciousnessIndicatorProps> = ({
           animate="animate"
           exit="exit"
           variants={textVariants}
-          className="text-white/80 text-sm font-medium px-4 py-2 rounded-full bg-black/10 backdrop-blur-sm inline-block"
+          className={`${colorTheme.text} font-medium text-sm px-4 py-1.5 rounded-full bg-black/20 backdrop-blur-sm border border-white/10 inline-flex items-center`}
         >
+          <span className={`inline-block w-2 h-2 rounded-full bg-${colorTheme.shadow}-400 mr-2 animate-pulse`}></span>
           {getMessage(visualizationVariant)}
         </motion.div>
       </AnimatePresence>

@@ -6,13 +6,14 @@ import { motion } from 'framer-motion';
 import ResonanceLines from './visualization/ResonanceLines';
 import BackgroundGlow from './visualization/BackgroundGlow';
 import ConsciousnessIndicator from './visualization/ConsciousnessIndicator';
+import VisualizationGuide from './VisualizationGuide';
 import { useEmotionalTransition } from '@/hooks/useEmotionalTransition';
 
 interface AstralSilhouetteVisualizationProps {
   emotionalGrowth: number;
   getChakraIntensity: (chakraIndex: number) => number;
   activatedChakras: number[];
-  dominantEmotions?: string[]; // Add dominant emotions for color variations
+  dominantEmotions?: string[];
 }
 
 // Chakra position mapping for visualization (y-coordinates)
@@ -31,7 +32,10 @@ const AstralSilhouetteVisualization = ({
   );
   
   // Smooth transitions for emotional growth
-  const transitionedGrowth = useEmotionalTransition(emotionalGrowth);
+  const transitionedGrowth = useEmotionalTransition(emotionalGrowth, {
+    duration: 2000,
+    easing: 'emotionalRise'
+  });
   
   // Generate fluid resonance lines between chakras
   const [resonanceLines, setResonanceLines] = useState<{start: number, end: number, intensity: number}[]>([]);
@@ -100,11 +104,11 @@ const AstralSilhouetteVisualization = ({
   
   return (
     <motion.div 
-      className="bg-black/20 rounded-lg relative min-h-[300px]"
+      className="bg-black/30 rounded-lg relative min-h-[320px] border border-white/5 overflow-hidden"
       initial={{ opacity: 0.8 }}
       animate={{ 
         opacity: [0.8, 0.9, 0.8],
-        background: `rgba(0, 0, 0, ${0.2 + (chakraBalance * 0.1)})`
+        background: `rgba(0, 0, 0, ${0.25 + (chakraBalance * 0.15)})`
       }}
       transition={{ 
         duration: 5, 
@@ -112,7 +116,17 @@ const AstralSilhouetteVisualization = ({
         repeatType: "reverse",
         ease: "easeInOut"
       }}
+      aria-label="Astral Silhouette Visualization"
     >
+      {/* Label for screen readers */}
+      <span className="sr-only">
+        Emotional visualization showing {activatedChakras.length} activated chakras 
+        with a growth level of {Math.round(emotionalGrowth)}%
+      </span>
+      
+      {/* Add the visualization guide component */}
+      <VisualizationGuide emotionalGrowth={emotionalGrowth} />
+      
       {/* Enhanced resonance connection visualization */}
       <ResonanceLines 
         resonanceLines={resonanceLines} 
@@ -133,16 +147,16 @@ const AstralSilhouetteVisualization = ({
           {Array.from({ length: Math.floor(transitionedGrowth / 15) }, (_, i) => (
             <motion.div
               key={`ambient-particle-${i}`}
-              className="absolute w-1 h-1 bg-white/60 rounded-full"
+              className="absolute w-1 h-1 bg-white/70 rounded-full"
               style={{
                 top: `${Math.random() * 100}%`,
                 left: `${Math.random() * 100}%`,
               }}
               animate={{
-                opacity: [0, 0.4, 0],
+                opacity: [0, 0.6, 0],
                 scale: [0, 1 + (transitionedGrowth / 100), 0],
-                x: [0, (Math.random() - 0.5) * 20],
-                y: [0, (Math.random() - 0.5) * 20],
+                x: [0, (Math.random() - 0.5) * 30],
+                y: [0, (Math.random() - 0.5) * 30],
               }}
               transition={{
                 duration: 3 + Math.random() * 2,
@@ -156,20 +170,37 @@ const AstralSilhouetteVisualization = ({
       )}
       
       {/* Human silhouette with chakras */}
-      <HumanSilhouette
-        showChakras={true}
-        showDetails={transitionedGrowth > 30}
-        showIllumination={transitionedGrowth > 50}
-        showFractal={transitionedGrowth > 70}
-        showTranscendence={transitionedGrowth > 90}
-        showInfinity={transitionedGrowth > 95}
-        baseProgressPercentage={transitionedGrowth / 100}
-        getChakraIntensity={getChakraIntensity}
-        activatedChakras={activatedChakras}
-      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <HumanSilhouette
+          showChakras={true}
+          showDetails={transitionedGrowth > 30}
+          showIllumination={transitionedGrowth > 50}
+          showFractal={transitionedGrowth > 70}
+          showTranscendence={transitionedGrowth > 90}
+          showInfinity={transitionedGrowth > 95}
+          baseProgressPercentage={transitionedGrowth / 100}
+          getChakraIntensity={getChakraIntensity}
+          activatedChakras={activatedChakras}
+        />
+      </div>
       
-      {/* Enhanced dynamic consciousness state indicator */}
-      <ConsciousnessIndicator visualizationVariant={visualizationVariant} />
+      {/* Current consciousness state indicator */}
+      <div className="absolute bottom-0 left-0 right-0 p-2">
+        <ConsciousnessIndicator visualizationVariant={visualizationVariant} />
+      </div>
+      
+      {/* Visualization level indicators for better user understanding */}
+      <div className="absolute top-3 left-3 text-xs font-medium text-white/70">
+        <span className={`px-2 py-0.5 rounded-full ${
+          visualizationVariant === "transcendent" ? "bg-indigo-500/30 text-indigo-200" :
+          visualizationVariant === "awakened" ? "bg-violet-500/30 text-violet-200" :
+          visualizationVariant === "illuminated" ? "bg-blue-500/30 text-blue-200" :
+          visualizationVariant === "aware" ? "bg-cyan-500/30 text-cyan-200" :
+          "bg-white/10 text-white/60"
+        }`}>
+          {visualizationVariant.charAt(0).toUpperCase() + visualizationVariant.slice(1)} State
+        </span>
+      </div>
     </motion.div>
   );
 };
