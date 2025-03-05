@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserReflections } from '@/services/reflectionService';
+import { fetchUserReflections } from '@/services/reflection/reflectionOperations';
 import { evaluateEmotionalDepth } from '@/utils/emotion';
 
 export const useUserReflections = () => {
