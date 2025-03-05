@@ -8,7 +8,6 @@ interface ChakraPointProps {
   isActivated: boolean;
   showDetails: boolean;
   showIllumination: boolean;
-  // Adding props that were missing
   cx?: number;
   cy?: number;
   chakraIndex?: number;
@@ -25,8 +24,8 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
   isActivated,
   showDetails,
   showIllumination,
-  cx,
-  cy
+  cx = 150,
+  cy = 200
 }) => {
   // Using CHAKRA_COLORS directly instead of relying on CHAKRA_POSITIONS
   const color = CHAKRA_COLORS[index];

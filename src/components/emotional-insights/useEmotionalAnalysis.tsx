@@ -1,11 +1,11 @@
 
 import { useState, useEffect } from 'react';
 import { useUserReflections } from '@/hooks/useUserReflections';
-import { calculateEmotionalGrowth } from '@/utils/emotion/chakra/emotionalGrowth';
 import { 
+  calculateEmotionalGrowth, 
   analyzeChakraActivation,
   getChakraIntensity
-} from '@/utils/emotion/chakraAnalysis';
+} from '@/utils/emotion';
 import {
   generateChakraBalanceData,
   generateEmotionalHistoryData,
@@ -58,19 +58,37 @@ export const useEmotionalAnalysis = () => {
     try {
       // Use journey data if available, otherwise calculate from reflections
       if (journeyData) {
-        setEmotionalGrowth(calculateEmotionalGrowth(journeyData.recentReflectionCount || 0));
+        // Use the reflectionCount or a complex metrics object based on what's available
+        const growthInput = journeyData.recentReflectionCount 
+          ? {
+              reflectionCount: journeyData.recentReflectionCount,
+              emotionalDepth: journeyData.averageEmotionalDepth,
+              activatedChakras: journeyData.activatedChakras,
+              dominantEmotions: journeyData.dominantEmotions,
+              streakDays: 0 // Default value
+            }
+          : journeyData.recentReflectionCount;
+          
+        setEmotionalGrowth(calculateEmotionalGrowth(growthInput));
         setActivatedChakras(journeyData.activatedChakras || []);
         setDominantEmotions(journeyData.dominantEmotions || []);
         setInsightMessages(journeyData.insights || []);
       } else {
-        // Calculate emotional growth based on reflection count with enhanced algorithm
-        const growth = calculateEmotionalGrowth(reflectionCount);
-        setEmotionalGrowth(growth);
-        
         // Analyze chakras and emotions
         const { chakras, emotions, insights } = analyzeChakraActivation(reflections, dominantTheme);
         
+        // Calculate emotional growth based on reflection count and activated chakras
+        const growth = calculateEmotionalGrowth({
+          reflectionCount,
+          emotionalDepth: depthScores.length > 0 
+            ? depthScores.reduce((sum, score) => sum + score, 0) / depthScores.length 
+            : 0,
+          activatedChakras: chakras,
+          dominantEmotions: emotions,
+        });
+        
         // Set the results
+        setEmotionalGrowth(growth);
         setActivatedChakras(chakras);
         setDominantEmotions(emotions);
         setInsightMessages(insights);

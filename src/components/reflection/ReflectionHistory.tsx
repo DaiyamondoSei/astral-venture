@@ -1,101 +1,81 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import ReflectionFilter from './ReflectionFilter';
+import { fetchUserReflections, EnergyReflection } from '@/services/reflection';
+import ReflectionList from './ReflectionList';
 import ReflectionHistoryInsights from './ReflectionHistoryInsights';
-import { fetchEmotionalJourney } from '@/services/reflection/emotionalJourney';
-import { EnergyReflection } from '@/services/reflection/types';
+import ReflectionHistoryChart from './ReflectionHistoryChart';
+import { getReflectionInsights } from '@/services/reflection/insightsGenerator';
+import { analyzeChakraActivation } from '@/utils/emotion';
 
-const ReflectionHistory: React.FC = () => {
+const ReflectionHistory = () => {
+  const [reflections, setReflections] = useState<EnergyReflection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<string | null>(null);
-  const [journeyData, setJourneyData] = useState<any>(null);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [activatedChakras, setActivatedChakras] = useState<number[]>([]);
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchJourneyData = async () => {
-      setLoading(true);
+    const loadReflections = async () => {
+      if (!user) return;
       
+      setLoading(true);
       try {
-        if (user) {
-          const journey = await fetchEmotionalJourney(user.id);
-          if (journey) {
-            setJourneyData(journey);
-          }
-        }
+        const userReflections = await fetchUserReflections(user.id);
+        setReflections(userReflections);
         
-        // Fall back to localStorage data if needed
-        if (!journeyData) {
-          // Combine reflections from different sources
-          let allReflections: any[] = [];
-          
-          // Get energy reflections from localStorage
-          try {
-            const energyReflections = JSON.parse(localStorage.getItem('energyReflections') || '[]');
-            allReflections = [...allReflections, ...energyReflections];
-          } catch (error) {
-            console.error('Error loading energy reflections:', error);
-          }
-          
-          // Get philosophical reflections from localStorage
-          try {
-            const philosophicalReflections = JSON.parse(localStorage.getItem('philosophicalReflections') || '[]');
-            allReflections = [...allReflections, ...philosophicalReflections];
-          } catch (error) {
-            console.error('Error loading philosophical reflections:', error);
-          }
-          
-          // Sort all reflections by date (newest first)
-          allReflections.sort((a, b) => {
-            const dateA = new Date(a.timestamp || a.created_at);
-            const dateB = new Date(b.timestamp || b.created_at);
-            return dateB.getTime() - dateA.getTime();
-          });
-          
-          // Apply filter if selected
-          if (filterType) {
-            allReflections = allReflections.filter(r => r.type === filterType);
-          }
-          
-          setJourneyData({
-            recentReflections: allReflections,
-            recentReflectionCount: allReflections.length
-          });
-        }
+        // Generate insights from reflections
+        const reflectionInsights = getReflectionInsights(userReflections);
+        setInsights(reflectionInsights);
+        
+        // Get activated chakras from reflections
+        const dominantTheme = typeof window !== 'undefined' ? localStorage.getItem('dominantDreamTheme') : null;
+        const chakraAnalysis = analyzeChakraActivation(userReflections, dominantTheme);
+        setActivatedChakras(chakraAnalysis.chakras);
       } catch (error) {
-        console.error('Error fetching reflections:', error);
+        console.error('Error loading reflections:', error);
       } finally {
         setLoading(false);
       }
     };
-    
-    fetchJourneyData();
-  }, [user, filterType]);
 
-  // Count reflections by type
-  const reflections = journeyData?.recentReflections || [];
-  const energyCount = reflections.filter(r => r.type === 'energy' || !r.type).length;
-  const philosophicalCount = reflections.filter(r => r.type === 'consciousness').length;
+    loadReflections();
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-48 bg-white/5 rounded-lg"></div>
+        <div className="h-20 bg-white/5 rounded-lg"></div>
+        <div className="space-y-2">
+          <div className="h-16 bg-white/5 rounded-lg"></div>
+          <div className="h-16 bg-white/5 rounded-lg"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (reflections.length === 0) {
+    return (
+      <div className="glass-card p-4">
+        <h3 className="font-display text-lg mb-2">Reflection History</h3>
+        <p className="text-white/70 text-sm">
+          You haven't recorded any reflections yet. Start your journey by adding your first reflection.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="glass-card p-5">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-display text-lg">Your Reflection Journey</h3>
-        
-        <ReflectionFilter
-          total={reflections.length}
-          energyCount={energyCount}
-          philosophicalCount={philosophicalCount}
-          activeFilter={filterType}
-          onFilterChange={setFilterType}
-        />
-      </div>
+    <div className="space-y-4">
+      <ReflectionHistoryChart reflections={reflections} />
       
-      <p className="text-white/70 text-sm mb-6">
-        Review your past reflections to trace the evolution of your consciousness over time.
-      </p>
+      <ReflectionHistoryInsights 
+        insights={insights} 
+        activatedChakras={activatedChakras}
+      />
       
-      <ReflectionHistoryInsights data={journeyData} />
+      <ReflectionList reflections={reflections} />
     </div>
   );
 };
