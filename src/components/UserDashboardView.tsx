@@ -5,6 +5,7 @@ import MainContent from '@/components/MainContent';
 import ChakraActivationManager from '@/components/ChakraActivationManager';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import UserStats from '@/components/dashboard/UserStats';
+import { useLogout } from '@/hooks/useLogout';
 
 interface UserDashboardViewProps {
   user: any;
@@ -12,7 +13,7 @@ interface UserDashboardViewProps {
   todayChallenge: any;
   userStreak: { current: number; longest: number };
   activatedChakras: number[];
-  onLogout: () => void;
+  onLogout?: () => void;
   updateStreak: (newStreak: number) => Promise<number | undefined>;
   updateActivatedChakras: (newActivatedChakras: number[]) => void;
   updateUserProfile: (newData: any) => void;
@@ -31,16 +32,20 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
   updateUserProfile,
   onChallengeComplete
 }) => {
+  const { handleLogout } = useLogout(user?.id);
+  
   // Derive username from user data
   const username = userProfile?.username || user.email?.split('@')[0] || 'Seeker';
   const astralLevel = userProfile?.astral_level || 1;
   const energyPoints = userProfile?.energy_points || 0;
 
+  const logoutHandler = onLogout || handleLogout;
+
   return (
     <DashboardLayout
       username={username}
       astralLevel={astralLevel}
-      onLogout={onLogout}
+      onLogout={logoutHandler}
     >
       <UserStats
         energyPoints={energyPoints}

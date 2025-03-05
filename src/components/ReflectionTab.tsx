@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs } from '@/components/ui/tabs';
 import TabsHeader from './reflection/TabsHeader';
@@ -8,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { analyzeReflectionPatterns } from '@/services/ai/patternAnalysis';
+import { analyzeEmotionPatterns } from '@/services/ai/patternAnalysis';
 import { HistoricalReflection } from '@/components/reflection/types';
 import { Json } from '@/integrations/supabase/types';
 
@@ -24,14 +23,12 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
   const [loadingInsights, setLoadingInsights] = useState(false);
   const { user } = useAuth();
 
-  // Fetch and analyze user reflection patterns
   useEffect(() => {
     const loadReflectionPatterns = async () => {
       if (!user) return;
       
       setLoadingInsights(true);
       try {
-        // Fetch user's reflections
         const { data: reflections, error } = await supabase
           .from('energy_reflections')
           .select('*')
@@ -41,7 +38,6 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
         if (error) throw error;
         
         if (reflections && reflections.length > 0) {
-          // Convert JSON chakras to proper format for analysis
           const convertedReflections: HistoricalReflection[] = reflections.map(reflection => ({
             ...reflection,
             chakras_activated: Array.isArray(reflection.chakras_activated) 
@@ -51,15 +47,14 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
                 : []
           }));
           
-          // Analyze patterns
-          const patterns = analyzeReflectionPatterns(convertedReflections);
+          const insights = analyzeEmotionPatterns(convertedReflections);
           setPatternInsights({
-            activatedChakras: patterns.dominantChakras,
-            dominantEmotions: patterns.dominantEmotions,
+            activatedChakras: insights.dominantChakras,
+            dominantEmotions: insights.dominantEmotions,
             emotionalAnalysis: {
-              recentTrends: patterns.recentTrends.join(' '),
-              recommendedFocus: patterns.recommendedFocus.join(' '),
-              chakraBalance: patterns.chakraProgression.length / 7 // Proportion of activated chakras
+              recentTrends: insights.recentTrends.join(' '),
+              recommendedFocus: insights.recommendedFocus.join(' '),
+              chakraBalance: insights.chakraProgression.length / 7 // Proportion of activated chakras
             }
           });
         }
@@ -76,12 +71,10 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
   }, [activeTab, user]);
 
   const handleReflectionComplete = (pointsEarned: number) => {
-    // Refresh pattern insights when a new reflection is submitted
     if (user) {
       setPatternInsights(null);
     }
     
-    // We can enhance this with emotional analysis in the future
     const emotionalInsights = {
       dominantEmotion: 'growth',
       emotionalBalance: 0.8,
@@ -92,7 +85,6 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
       onReflectionComplete(pointsEarned, emotionalInsights);
     }
     
-    // Switch to insights tab after submission
     setActiveTab('insights');
   };
 
