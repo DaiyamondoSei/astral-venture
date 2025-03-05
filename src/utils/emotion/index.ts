@@ -10,7 +10,8 @@ export { calculateEmotionalIntelligence } from './analysis/intelligenceCalculato
 
 // Export chakra-related utilities
 export { calculateEmotionalGrowth } from './chakra/emotionalGrowth';
-export { analyzeChakraActivation, getChakraIntensity, getActivatedChakraNames } from './chakraAnalysis';
+export { analyzeChakraActivation, getActivatedChakraNames } from './chakra/analysis';
+export { getChakraIntensity } from './chakra/intensity';
 
 // Export dream analysis utilities
 export { analyzeDreamTheme } from './dreamAnalysis';

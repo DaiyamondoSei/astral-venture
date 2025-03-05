@@ -1,12 +1,13 @@
 
 /**
- * Enhanced chakra analysis system with more sophisticated activation detection
- * and visualization capabilities
+ * Core chakra analysis functionality
  */
 
 import { EnergyReflection } from '@/services/reflection/types';
-import { chakraNames, chakraColors } from './mappings';
-import { ChakraAnalysisResult } from './types';
+import { chakraNames, chakraColors } from '../mappings';
+import { ChakraAnalysisResult } from '../types';
+import { calculateVariance } from './helpers';
+import { generateChakraRecommendations } from './recommendations';
 
 /**
  * Analyze chakra activation patterns based on reflections and dream themes
@@ -167,43 +168,6 @@ export const analyzeChakraActivation = (
 };
 
 /**
- * Get intensity level for a specific chakra
- * 
- * @param chakraIndex - Index of the chakra to check
- * @param activatedChakras - Array of activated chakra indices
- * @returns Intensity value from 0-1, or 0 if not activated
- */
-export const getChakraIntensity = (
-  chakraIndex: number,
-  activatedChakras: number[]
-): number => {
-  // If chakra is not activated, return minimal intensity
-  if (!activatedChakras.includes(chakraIndex)) {
-    return 0.1;
-  }
-  
-  // Calculate a basic intensity based on activation patterns
-  // In a real app, this would be calculated from user data
-  let intensity = 0.5;
-  
-  // Heart chakra (chakra 3) often gets higher intensity
-  if (chakraIndex === 3) {
-    intensity += 0.2;
-  }
-  
-  // More activation when adjacent chakras are also active
-  if (activatedChakras.includes(chakraIndex - 1) || activatedChakras.includes(chakraIndex + 1)) {
-    intensity += 0.15;
-  }
-  
-  // Additional calculation - more chakras = more overall energy
-  intensity += Math.min(activatedChakras.length * 0.05, 0.25);
-  
-  // Ensure intensity is between 0 and 1
-  return Math.min(Math.max(intensity, 0.1), 1.0);
-};
-
-/**
  * Get names of activated chakras
  * 
  * @param analysisResult - Result from analyzeChakraActivation
@@ -213,73 +177,4 @@ export const getActivatedChakraNames = (
   analysisResult: ChakraAnalysisResult
 ): string[] => {
   return analysisResult.chakras.map(index => chakraNames[index] || `Chakra ${index}`);
-};
-
-// Helper function to calculate variance (for balance calculation)
-const calculateVariance = (values: number[]): number => {
-  if (values.length === 0) return 0;
-  
-  const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-  const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
-  return squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
-};
-
-/**
- * Generate personalized chakra practice recommendations
- */
-const generateChakraRecommendations = (
-  activatedChakras: number[],
-  intensities: number[],
-  balanceScore: number
-): string[] => {
-  const recommendations: string[] = [];
-  
-  // Check for imbalances and provide targeted recommendations
-  if (balanceScore < 0.4) {
-    recommendations.push("Your chakra system shows significant imbalance. Consider practices that target multiple energy centers.");
-  }
-  
-  // Find lowest intensity activated chakras
-  const weakestChakras = activatedChakras
-    .map(index => ({ index, intensity: intensities[index] }))
-    .sort((a, b) => a.intensity - b.intensity)
-    .slice(0, 2);
-  
-  // Recommend practices for weakest chakras
-  weakestChakras.forEach(({ index, intensity }) => {
-    if (intensity < 0.5) {
-      recommendations.push(`${chakraNames[index]} chakra could benefit from focused energy work.`);
-    }
-  });
-  
-  // Check for inactive chakras
-  const inactiveChakras = [0, 1, 2, 3, 4, 5, 6].filter(index => !activatedChakras.includes(index));
-  
-  if (inactiveChakras.length > 3) {
-    recommendations.push("Several chakras show minimal activation. Consider a full chakra balancing practice.");
-  } else if (inactiveChakras.length > 0) {
-    const inactiveNames = inactiveChakras.map(index => chakraNames[index]).join(", ");
-    recommendations.push(`The following chakras could use activation: ${inactiveNames}`);
-  }
-  
-  // Add general recommendation based on dominant patterns
-  if (activatedChakras.includes(3) && activatedChakras.includes(6)) {
-    recommendations.push("Your heart and crown connection shows spiritual integration. Continue practices that connect love with higher consciousness.");
-  }
-  
-  if (activatedChakras.includes(5) && intensities[5] > 0.7) {
-    recommendations.push("Your strong third eye activation suggests developing intuitive practices would be beneficial.");
-  }
-  
-  if (activatedChakras.includes(0) && activatedChakras.includes(6)) {
-    recommendations.push("Your root-crown connection shows good energy flow through the central channel. Continue practices that ground spiritual energy.");
-  }
-  
-  // Ensure we have at least one recommendation
-  if (recommendations.length === 0) {
-    recommendations.push("Continue your current energy practices to maintain chakra development.");
-  }
-  
-  // Return at most 3 recommendations
-  return recommendations.slice(0, 3);
 };
