@@ -1,147 +1,144 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { Heart, Brain, Sparkles, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
-import EmotionalInsightsLoading from './EmotionalInsightsLoading';
-import EmotionalProgressChart from './EmotionalProgressChart';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EmotionalJourneyTimeline from './EmotionalJourneyTimeline';
-import EmotionalIntelligenceMeter from './EmotionalIntelligenceMeter';
-import AstralSilhouetteVisualization from './astral-visualization';
+import EmotionalGrowthInsights from './EmotionalGrowthInsights';
 import ChakraBalanceRadar from './ChakraBalanceRadar';
-import ActiveEnergyCenters from './ActiveEnergyCenters';
+import EmotionalProgressChart from './EmotionalProgressChart';
+import EmotionalIntelligenceMeter from './EmotionalIntelligenceMeter';
+import AstralSilhouetteVisualization from './astral-visualization/AstralSilhouetteVisualization';
+import { useEmotionalAnalysis } from './useEmotionalAnalysis';
 import VisualizationGuide from './VisualizationGuide';
 import DreamEnergyAnalysis from './DreamEnergyAnalysis';
-import EmotionalGrowthInsights from './EmotionalGrowthInsights';
-import { useEmotionalAnalysis } from './useEmotionalAnalysis';
+import ActiveEnergyCenters from './ActiveEnergyCenters';
+import { CHAKRA_COLORS, CHAKRA_NAMES } from '../entry-animation/cosmic/types';
 
-const EmotionalInsights: React.FC = () => {
+interface EmotionalInsightsProps {
+  reflectionData: any[];
+  emotionalData: any[];
+}
+
+interface DominantEmotions {
+  primary: { emotion: string; score: number; chakraPosition: number };
+  secondary: { emotion: string; score: number; chakraPosition: number };
+  tertiary: { emotion: string; score: number; chakraPosition: number };
+}
+
+const EmotionalInsights: React.FC<EmotionalInsightsProps> = ({ reflectionData, emotionalData }) => {
   const {
-    loading,
+    chakraActivation,
     emotionalGrowth,
-    activatedChakras,
+    emotionalJourney,
+    emotionalProgressData,
+    emotionalIntelligence,
     dominantEmotions,
-    insightMessages,
-    getChakraIntensity,
-    chakraBalanceData,
-    emotionalHistoryData,
-    emotionalRecommendations
-  } = useEmotionalAnalysis();
-
-  if (loading) {
-    return <EmotionalInsightsLoading />;
-  }
+    emotionalResonance,
+    consciousness
+  } = useEmotionalAnalysis(reflectionData, emotionalData);
+  
+  const chartData = {
+    labels: emotionalProgressData.map(item => item.date),
+    datasets: [
+      {
+        label: 'Happiness',
+        data: emotionalProgressData.map(item => item.happiness),
+        borderColor: 'rgba(75, 192, 192, 1)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        fill: true,
+      },
+      {
+        label: 'Sadness',
+        data: emotionalProgressData.map(item => item.sadness),
+        borderColor: 'rgba(255, 99, 132, 1)',
+        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        fill: true,
+      },
+      {
+        label: 'Anger',
+        data: emotionalProgressData.map(item => item.anger),
+        borderColor: 'rgba(255, 205, 86, 1)',
+        backgroundColor: 'rgba(255, 205, 86, 0.2)',
+        fill: true,
+      },
+    ],
+  };
 
   return (
-    <div className="glass-card p-5">
-      <h2 className="font-display text-xl mb-4 text-white">Your Emotional Journey</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left column - Astral visualization and dominant emotions */}
-        <div className="space-y-5">
-          <div className="bg-black/20 p-4 rounded-lg">
-            <h3 className="text-lg mb-3 flex items-center text-quantum-300">
-              <Heart className="mr-2" size={18} />
-              Emotional Essence
-            </h3>
-            
+    <div className="space-y-6">
+      <div className="flex items-start gap-8 flex-col lg:flex-row">
+        <div className="w-full lg:w-1/2 space-y-6">
+          <div className="bg-gradient-to-br from-quantum-900/80 to-quantum-950/80 rounded-lg p-4 border border-quantum-800/50">
+            <Heart className="w-5 h-5 text-quantum-400 mb-2" />
+            <h3 className="text-lg font-semibold text-white mb-3">Emotional Resonance</h3>
             <AstralSilhouetteVisualization 
-              activatedChakras={activatedChakras} 
-              emotionalGrowth={emotionalGrowth}
-              getChakraIntensity={getChakraIntensity}
+              consciousness={consciousness}
+              emotionalResonance={emotionalResonance}
+              dominantChakras={Object.keys(chakraActivation)
+                .filter(key => chakraActivation[key as keyof typeof chakraActivation] > 0.7)
+                .map(key => Number(key))}
+              dominantColors={{
+                primary: CHAKRA_COLORS[dominantEmotions.primary.chakraPosition],
+                secondary: CHAKRA_COLORS[dominantEmotions.secondary.chakraPosition],
+                accent: CHAKRA_COLORS[dominantEmotions.tertiary.chakraPosition]
+              }}
             />
-            
-            <div className="mt-4">
-              <h4 className="text-sm text-white/70 mb-2">Dominant Energies:</h4>
-              <div className="flex flex-wrap gap-2">
-                {dominantEmotions.map((emotion, idx) => (
-                  <span 
-                    key={idx}
-                    className="px-3 py-1 rounded-full text-xs"
-                    style={{ 
-                      backgroundColor: `${chakraColors[idx % chakraColors.length]}40`,
-                      color: chakraColors[idx % chakraColors.length]
-                    }}
-                  >
-                    {emotion}
-                  </span>
-                ))}
-              </div>
+            <VisualizationGuide consciousness={consciousness} />
+          </div>
+          
+          <div className="bg-gradient-to-br from-quantum-900/80 to-quantum-950/80 rounded-lg p-4 border border-quantum-800/50">
+            <Brain className="w-5 h-5 text-quantum-400 mb-2" />
+            <h3 className="text-lg font-semibold text-white mb-3">Emotional Intelligence</h3>
+            <div className="flex flex-col">
+              <EmotionalIntelligenceMeter value={emotionalIntelligence.score} />
+              <p className="text-quantum-300 text-sm mt-2">
+                <Sparkles className="w-4 h-4 inline mr-1" />
+                {emotionalIntelligence.insight}
+              </p>
             </div>
           </div>
           
-          <div className="bg-black/20 p-4 rounded-lg">
-            <h3 className="text-lg mb-3 flex items-center text-quantum-300">
-              <Brain className="mr-2" size={18} />
-              Energy Insights
-            </h3>
-            
-            <ul className="space-y-2">
-              {insightMessages.map((insight, idx) => (
-                <li key={idx} className="text-sm text-white/80 flex items-start">
-                  <Sparkles className="mr-2 text-quantum-400 shrink-0 mt-1" size={14} />
-                  <span>{insight}</span>
-                </li>
-              ))}
-            </ul>
+          <div className="bg-gradient-to-br from-quantum-900/80 to-quantum-950/80 rounded-lg p-4 border border-quantum-800/50">
+            <Activity className="w-5 h-5 text-quantum-400 mb-2" />
+            <h3 className="text-lg font-semibold text-white mb-3">Emotional Growth</h3>
+            <Tabs defaultValue="journey" className="w-full">
+              <TabsList className="bg-quantum-800/40 mb-4">
+                <TabsTrigger value="journey">Journey</TabsTrigger>
+                <TabsTrigger value="growth">Growth</TabsTrigger>
+                <TabsTrigger value="chakras">Energy</TabsTrigger>
+              </TabsList>
+              <TabsContent value="journey">
+                <EmotionalJourneyTimeline journey={emotionalJourney} />
+              </TabsContent>
+              <TabsContent value="growth">
+                <EmotionalGrowthInsights insights={emotionalGrowth} />
+              </TabsContent>
+              <TabsContent value="chakras">
+                <div className="space-y-3">
+                  <ChakraBalanceRadar 
+                    chakraActivation={chakraActivation} 
+                    chakraNames={CHAKRA_NAMES} 
+                  />
+                  <ActiveEnergyCenters 
+                    activations={chakraActivation} 
+                    primaryColor={CHAKRA_COLORS[dominantEmotions.primary.chakraPosition]} 
+                    secondaryColor={CHAKRA_COLORS[dominantEmotions.secondary.chakraPosition]} 
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
         
-        {/* Right column - Charts and recommendations */}
-        <div className="space-y-5">
-          <div className="bg-black/20 p-4 rounded-lg">
-            <h3 className="text-lg mb-3 flex items-center text-quantum-300">
-              <Activity className="mr-2" size={18} />
-              Energy Growth
-            </h3>
-            
-            <div className="mb-3">
-              <div className="text-sm text-white/70 mb-1">Emotional Growth:</div>
-              <div className="w-full bg-white/10 rounded-full h-3">
-                <div 
-                  className="bg-gradient-to-r from-quantum-400 to-quantum-600 h-3 rounded-full"
-                  style={{ width: `${Math.min(emotionalGrowth, 100)}%` }}
-                ></div>
-              </div>
-              <div className="text-xs text-white/50 mt-1 text-right">
-                {Math.round(emotionalGrowth)}% activated
-              </div>
-            </div>
-            
-            <div>
-              <div className="text-sm text-white/70 mb-1">Active Energy Centers:</div>
-              <div className="flex justify-around mb-2">
-                {chakraNames.map((name, idx) => {
-                  const isActive = activatedChakras.includes(idx);
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${isActive ? 'text-white' : 'text-white/30'}`} 
-                      style={{ 
-                        backgroundColor: isActive ? chakraColors[idx] : 'rgba(255,255,255,0.1)',
-                        boxShadow: isActive ? `0 0 10px ${chakraColors[idx]}` : 'none' 
-                      }}
-                    >
-                      {idx + 1}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="text-xs text-white/50 text-center">
-                {activatedChakras.length}/7 chakras activated
-              </div>
-            </div>
+        <div className="w-full lg:w-1/2 space-y-6">
+          <div className="bg-gradient-to-br from-quantum-900/80 to-quantum-950/80 rounded-lg p-4 border border-quantum-800/50">
+            <h3 className="text-lg font-semibold text-white mb-3">Dream Energy Analysis</h3>
+            <DreamEnergyAnalysis reflectionData={reflectionData} />
           </div>
           
-          {/* Practice recommendations */}
-          <div className="bg-black/20 p-4 rounded-lg">
-            <h3 className="text-lg mb-3 text-quantum-300">Recommended Practices</h3>
-            
-            <div className="space-y-3">
-              {emotionalRecommendations.map((rec, idx) => (
-                <div key={idx} className="border border-quantum-500/20 p-3 rounded-lg">
-                  <h4 className="text-sm font-medium text-quantum-300 mb-1">{rec.title}</h4>
-                  <p className="text-xs text-white/70">{rec.description}</p>
-                </div>
-              ))}
-            </div>
+          <div className="bg-gradient-to-br from-quantum-900/80 to-quantum-950/80 rounded-lg p-4 border border-quantum-800/50">
+            <h3 className="text-lg font-semibold text-white mb-3">Emotional Progress</h3>
+            <EmotionalProgressChart chartData={chartData} />
           </div>
         </div>
       </div>
