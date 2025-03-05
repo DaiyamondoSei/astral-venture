@@ -3,7 +3,7 @@ import React from 'react';
 import { CHAKRA_COLORS } from './types';
 import SilhouettePath from './silhouette/SilhouettePath';
 import CentralGlow from './silhouette/CentralGlow';
-import ChakraPoint from './silhouette/ChakraPoint';
+import ChakraPoint from './silhouette/chakra-point';
 import InfinityEssence from './silhouette/InfinityEssence';
 import Definitions from './silhouette/Definitions';
 
