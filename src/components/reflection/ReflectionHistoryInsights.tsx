@@ -8,10 +8,12 @@ interface ReflectionHistoryInsightsProps {
     dominantEmotions?: string[];
     emotionalAnalysis?: any;
   };
+  onOpenAiAssistant?: (reflectionId?: string, reflectionContent?: string) => void;
 }
 
 const ReflectionHistoryInsights: React.FC<ReflectionHistoryInsightsProps> = ({ 
-  data = {} 
+  data = {},
+  onOpenAiAssistant
 }) => {
   const { 
     activatedChakras = [], 

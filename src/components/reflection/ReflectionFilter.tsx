@@ -3,42 +3,49 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 
 interface ReflectionFilterProps {
-  total: number;
-  energyCount: number;
-  philosophicalCount: number;
-  activeFilter: string | null;
-  onFilterChange: (filter: string | null) => void;
+  activeFilter: string;
+  onFilterChange: (filter: string) => void;
+  total?: number;
+  energyCount?: number;
+  philosophicalCount?: number;
 }
 
 const ReflectionFilter: React.FC<ReflectionFilterProps> = ({
-  total,
-  energyCount,
-  philosophicalCount,
   activeFilter,
-  onFilterChange
+  onFilterChange,
+  total = 0,
+  energyCount = 0,
+  philosophicalCount = 0
 }) => {
   return (
     <div className="flex space-x-2">
       <Badge 
-        variant={activeFilter === null ? "default" : "outline"} 
+        variant={activeFilter === 'all' ? "default" : "outline"} 
         className="cursor-pointer hover:bg-primary/20"
-        onClick={() => onFilterChange(null)}
+        onClick={() => onFilterChange('all')}
       >
-        All ({total})
+        All {total > 0 && `(${total})`}
       </Badge>
       <Badge 
-        variant={activeFilter === 'energy' ? "default" : "outline"} 
+        variant={activeFilter === 'high-energy' ? "default" : "outline"} 
         className="cursor-pointer hover:bg-primary/20"
-        onClick={() => onFilterChange('energy')}
+        onClick={() => onFilterChange('high-energy')}
       >
-        Energy ({energyCount})
+        Energy {energyCount > 0 && `(${energyCount})`}
       </Badge>
       <Badge 
-        variant={activeFilter === 'consciousness' ? "default" : "outline"} 
+        variant={activeFilter === 'heart' ? "default" : "outline"} 
         className="cursor-pointer hover:bg-primary/20"
-        onClick={() => onFilterChange('consciousness')}
+        onClick={() => onFilterChange('heart')}
       >
-        Consciousness ({philosophicalCount})
+        Heart
+      </Badge>
+      <Badge 
+        variant={activeFilter === 'third-eye' ? "default" : "outline"} 
+        className="cursor-pointer hover:bg-primary/20"
+        onClick={() => onFilterChange('third-eye')}
+      >
+        Third Eye
       </Badge>
     </div>
   );

@@ -63,6 +63,14 @@ const ReflectionHistory: React.FC<ReflectionHistoryProps> = ({ onOpenAiAssistant
     setFilteredReflections(filtered);
   };
 
+  // Calculate counts for filter categories
+  const totalCount = reflections.length;
+  const highEnergyCount = reflections.filter(r => (r.emotional_depth || 0) > 0.7).length;
+  const philosophicalCount = reflections.filter(r => 
+    r.dominant_emotion === 'philosophical' || 
+    r.type === 'consciousness'
+  ).length;
+
   if (loading) {
     return <div className="animate-pulse p-4">Loading reflection history...</div>;
   }
@@ -77,7 +85,13 @@ const ReflectionHistory: React.FC<ReflectionHistoryProps> = ({ onOpenAiAssistant
 
   return (
     <div className="space-y-4">
-      <ReflectionFilter activeFilter={filter} onFilterChange={handleFilterChange} />
+      <ReflectionFilter 
+        activeFilter={filter} 
+        onFilterChange={handleFilterChange}
+        total={totalCount}
+        energyCount={highEnergyCount}
+        philosophicalCount={philosophicalCount}
+      />
       
       <div className="space-y-4">
         {filteredReflections.map(reflection => (
