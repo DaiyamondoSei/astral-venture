@@ -74,7 +74,7 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
     }
   };
   
-  // Pulse variants for active chakras
+  // Pulse variants for active chakras - FIXED: repeatType is now explicitly typed as "loop"
   const pulseVariants = {
     initial: { 
       scale: 1, 
@@ -86,7 +86,7 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
       transition: { 
         duration: pulseDuration, 
         repeat: Infinity,
-        repeatType: "loop"
+        repeatType: "loop" as const  // Fixed: Using 'as const' to specify literal type
       }
     }
   };
@@ -121,6 +121,7 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
             requestAnimationFrame(rotate);
           }
         };
+        
         requestAnimationFrame(rotate);
       };
       
@@ -144,7 +145,7 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
             transition: { 
               duration: 3, 
               repeat: Infinity,
-              repeatType: "reverse",
+              repeatType: "reverse" as const,  // Fixed: Using 'as const' to specify literal type
               ease: "easeInOut"
             }
           }}
@@ -165,7 +166,7 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
             transition: { 
               duration: 2, 
               repeat: Infinity,
-              repeatType: "reverse",
+              repeatType: "reverse" as const,  // Fixed: Using 'as const' to specify literal type
               ease: "easeInOut"
             }
           }}
@@ -256,7 +257,7 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
               scale: { 
                 duration: 4, 
                 repeat: Infinity,
-                repeatType: "reverse"
+                repeatType: "reverse" as const  // Fixed: Using 'as const' to specify literal type
               },
               rotate: { 
                 duration: 20, 
