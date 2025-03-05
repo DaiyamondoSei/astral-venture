@@ -6,7 +6,7 @@ import EmotionalIntelligenceMeter from './emotional-insights/EmotionalIntelligen
 import DreamEnergyAnalysis from './emotional-insights/DreamEnergyAnalysis';
 import EmotionalGrowthInsights from './emotional-insights/EmotionalGrowthInsights';
 import ActiveEnergyCenters from './emotional-insights/ActiveEnergyCenters';
-import AstralSilhouetteVisualization from './emotional-insights/AstralSilhouetteVisualization';
+import AstralSilhouetteVisualization from './emotional-insights/astral-visualization/AstralSilhouetteVisualization';
 import EmotionalProgressChart from './emotional-insights/EmotionalProgressChart';
 import EmotionalJourneyTimeline from './emotional-insights/EmotionalJourneyTimeline';
 import ChakraBalanceRadar from './emotional-insights/ChakraBalanceRadar';
