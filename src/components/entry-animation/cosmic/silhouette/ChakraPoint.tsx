@@ -30,18 +30,22 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
   // Using CHAKRA_COLORS directly instead of relying on CHAKRA_POSITIONS
   const color = CHAKRA_COLORS[index];
   
-  // Scale size and opacity based on activation and details level
+  // Scale size and opacity based on activation, details level, and intensity
   const baseSize = isActivated ? 4 : 2;
-  const size = showDetails ? baseSize + 1 : baseSize;
+  const intensityBonus = isActivated ? intensity * 2 : 0;
+  const size = showDetails ? baseSize + 1 + intensityBonus : baseSize + intensityBonus;
   
-  // Adjust opacity based on activation and illumination
+  // Adjust opacity based on activation, illumination and intensity
   const baseOpacity = isActivated ? 0.8 : 0.3;
-  const opacity = showIllumination ? 
-    Math.min(baseOpacity + 0.2, 1.0) : 
-    baseOpacity;
+  const opacityBoost = showIllumination ? 0.2 : 0;
+  const opacity = Math.min(baseOpacity + opacityBoost, 1.0) * (0.5 + intensity * 0.5);
   
   // Determine if we should show the glow effect
   const showGlow = showIllumination && isActivated;
+  
+  // Calculate pulse animation parameters based on intensity
+  const pulseScale = 1 + (intensity * 0.3);
+  const pulseDuration = 3 - (intensity * 1); // Faster pulse for higher intensity
   
   return (
     <g className="chakra-point">
@@ -50,9 +54,28 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
         <circle
           cx={cx}
           cy={cy}
-          r={size + 3}
+          r={size + 3 + (intensity * 2)}
           fill={`url(#chakraGlow${index})`}
           opacity={intensity * 0.6}
+          className={isActivated ? "animate-pulse-slow" : ""}
+        />
+      )}
+      
+      {/* Outer pulse effect for highly active chakras */}
+      {isActivated && intensity > 0.7 && (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={size + 6}
+          fill="none"
+          stroke={color}
+          strokeWidth="0.5"
+          opacity={0.4}
+          style={{
+            animation: `pulse ${pulseDuration}s infinite ease-in-out`,
+            transformOrigin: `${cx}px ${cy}px`,
+            transform: `scale(${pulseScale})`,
+          }}
         />
       )}
       
@@ -62,8 +85,8 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
         cy={cy}
         r={size}
         fill={color}
-        opacity={opacity * intensity}
-        className="chakra-circle"
+        opacity={opacity}
+        className={isActivated && intensity > 0.5 ? "chakra-circle-active" : "chakra-circle"}
       />
       
       {/* Inner detail for activated chakras */}
@@ -76,6 +99,24 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
           opacity={intensity * 0.7}
           className="chakra-inner"
         />
+      )}
+      
+      {/* Energy rays for highly activated chakras with illumination */}
+      {isActivated && showIllumination && intensity > 0.8 && (
+        <>
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
+            <line
+              key={`ray-${index}-${i}`}
+              x1={cx}
+              y1={cy}
+              x2={cx + Math.cos(angle * Math.PI / 180) * (size + 8 + intensity * 4)}
+              y2={cy + Math.sin(angle * Math.PI / 180) * (size + 8 + intensity * 4)}
+              stroke={color}
+              strokeWidth="0.5"
+              opacity={0.5 * intensity}
+            />
+          ))}
+        </>
       )}
       
       {/* Define the glow gradient for each chakra */}
