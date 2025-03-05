@@ -24,6 +24,7 @@ const ChakraInfinity: React.FC<ChakraInfinityProps> = ({
   intensity,
   isActivated,
   showInfinity,
+  index,
 }) => {
   if (!(showInfinity && isActivated && intensity > 0.8)) return null;
 

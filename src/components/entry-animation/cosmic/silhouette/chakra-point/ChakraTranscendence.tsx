@@ -26,6 +26,7 @@ const ChakraTranscendence: React.FC<ChakraTranscendenceProps> = ({
   isActivated,
   showTranscendence,
   baseProgressPercentage,
+  index,
 }) => {
   if (!(showTranscendence && isActivated)) return null;
 
