@@ -1,10 +1,16 @@
-
-import React from 'react';
-import { useEmotionalAnalysis } from './useEmotionalAnalysis';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import EmotionalInsightsLoading from './EmotionalInsightsLoading';
-import { Sparkles, Activity, Heart, Brain } from 'lucide-react';
-import { chakraNames, chakraColors } from '@/utils/emotion/mappings';
-import AstralSilhouetteVisualization from './AstralSilhouetteVisualization';
+import EmotionalProgressChart from './EmotionalProgressChart';
+import EmotionalJourneyTimeline from './EmotionalJourneyTimeline';
+import EmotionalIntelligenceMeter from './EmotionalIntelligenceMeter';
+import AstralSilhouetteVisualization from './astral-visualization';
+import ChakraBalanceRadar from './ChakraBalanceRadar';
+import ActiveEnergyCenters from './ActiveEnergyCenters';
+import VisualizationGuide from './VisualizationGuide';
+import DreamEnergyAnalysis from './DreamEnergyAnalysis';
+import EmotionalGrowthInsights from './EmotionalGrowthInsights';
+import { useEmotionalAnalysis } from './useEmotionalAnalysis';
 
 const EmotionalInsights: React.FC = () => {
   const {
