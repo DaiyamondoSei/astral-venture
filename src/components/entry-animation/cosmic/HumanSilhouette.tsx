@@ -63,93 +63,72 @@ const HumanSilhouette: React.FC<HumanSilhouetteProps> = ({
         <>
           {/* Root Chakra */}
           <ChakraPoint 
+            index={0}
             cx={150} cy={380} 
-            chakraIndex={0}
-            showChakras={showChakras}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
-            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(0)}
+            isActivated={activatedChakras.includes(0)}
+            showDetails={showDetails}
+            showIllumination={showIllumination}
           />
           
           {/* Sacral Chakra */}
           <ChakraPoint 
+            index={1}
             cx={150} cy={340} 
-            chakraIndex={1}
-            showChakras={showChakras}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
-            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(1)}
+            isActivated={activatedChakras.includes(1)}
+            showDetails={showDetails}
+            showIllumination={showIllumination}
           />
           
           {/* Solar Plexus Chakra */}
           <ChakraPoint 
+            index={2}
             cx={150} cy={300} 
-            chakraIndex={2}
-            showChakras={showChakras}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
-            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(2)}
+            isActivated={activatedChakras.includes(2)}
+            showDetails={showDetails}
+            showIllumination={showIllumination}
           />
           
           {/* Heart Chakra */}
           <ChakraPoint 
+            index={3}
             cx={150} cy={260} 
-            chakraIndex={3}
-            showChakras={showChakras}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
-            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(3)}
+            isActivated={activatedChakras.includes(3)}
+            showDetails={showDetails}
+            showIllumination={showIllumination}
           />
           
           {/* Throat Chakra */}
           <ChakraPoint 
+            index={4}
             cx={150} cy={230} 
-            chakraIndex={4}
-            showChakras={showChakras}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
-            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(4)}
+            isActivated={activatedChakras.includes(4)}
+            showDetails={showDetails}
+            showIllumination={showIllumination}
           />
           
           {/* Third Eye Chakra */}
           <ChakraPoint 
+            index={5}
             cx={150} cy={205} 
-            chakraIndex={5}
-            showChakras={showChakras}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
-            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(5)}
+            isActivated={activatedChakras.includes(5)}
+            showDetails={showDetails}
+            showIllumination={showIllumination}
           />
           
           {/* Crown Chakra */}
           <ChakraPoint 
+            index={6}
             cx={150} cy={180} 
-            chakraIndex={6}
-            showChakras={showChakras}
-            showIllumination={showIllumination}
-            showFractal={showFractal}
-            showTranscendence={showTranscendence}
-            showInfinity={showInfinity}
-            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(6)}
+            isActivated={activatedChakras.includes(6)}
+            showDetails={showDetails}
+            showIllumination={showIllumination}
           />
         </>
       )}

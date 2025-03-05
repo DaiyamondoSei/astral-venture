@@ -6,6 +6,8 @@
 // Export all utilities from the analysis directory
 export * from './analysis/reflectionContentAnalyzer';
 export * from './analysis/depthEvaluator';
+export * from './chakra/emotionalGrowth';
+export * from './chakra/reflectionActivation';
 
 /**
  * Analyzes dream theme to extract emotional insights

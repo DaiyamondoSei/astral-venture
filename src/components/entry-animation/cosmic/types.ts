@@ -47,3 +47,14 @@ export const CHAKRA_NAMES = [
   "Third Eye",
   "Crown"
 ];
+
+// Adding CHAKRA_POSITIONS needed by ChakraPoint
+export const CHAKRA_POSITIONS = [
+  { x: 150, y: 380 }, // Root
+  { x: 150, y: 340 }, // Sacral
+  { x: 150, y: 300 }, // Solar Plexus
+  { x: 150, y: 260 }, // Heart
+  { x: 150, y: 230 }, // Throat
+  { x: 150, y: 205 }, // Third Eye
+  { x: 150, y: 180 }  // Crown
+];

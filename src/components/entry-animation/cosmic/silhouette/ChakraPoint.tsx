@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CHAKRA_POSITIONS, CHAKRA_COLORS } from '../types';
+import { CHAKRA_COLORS } from '../types';
 
 interface ChakraPointProps {
   index: number;
@@ -8,6 +8,15 @@ interface ChakraPointProps {
   isActivated: boolean;
   showDetails: boolean;
   showIllumination: boolean;
+  // Adding props that were missing
+  cx?: number;
+  cy?: number;
+  chakraIndex?: number;
+  showChakras?: boolean;
+  showFractal?: boolean;
+  showTranscendence?: boolean; 
+  showInfinity?: boolean;
+  baseProgressPercentage?: number;
 }
 
 const ChakraPoint: React.FC<ChakraPointProps> = ({
@@ -15,9 +24,11 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
   intensity,
   isActivated,
   showDetails,
-  showIllumination
+  showIllumination,
+  cx,
+  cy
 }) => {
-  const position = CHAKRA_POSITIONS[index];
+  // Using CHAKRA_COLORS directly instead of relying on CHAKRA_POSITIONS
   const color = CHAKRA_COLORS[index];
   
   // Scale size and opacity based on activation and details level
@@ -38,8 +49,8 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
       {/* Outer glow for activated chakras */}
       {showGlow && (
         <circle
-          cx={position.x}
-          cy={position.y}
+          cx={cx}
+          cy={cy}
           r={size + 3}
           fill={`url(#chakraGlow${index})`}
           opacity={intensity * 0.6}
@@ -48,8 +59,8 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
       
       {/* Main chakra circle */}
       <circle
-        cx={position.x}
-        cy={position.y}
+        cx={cx}
+        cy={cy}
         r={size}
         fill={color}
         opacity={opacity * intensity}
@@ -59,8 +70,8 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
       {/* Inner detail for activated chakras */}
       {isActivated && showDetails && (
         <circle
-          cx={position.x}
-          cy={position.y}
+          cx={cx}
+          cy={cy}
           r={size / 2}
           fill="white"
           opacity={intensity * 0.7}

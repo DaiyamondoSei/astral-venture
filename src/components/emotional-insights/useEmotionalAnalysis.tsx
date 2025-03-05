@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useUserReflections } from '@/hooks/useUserReflections';
-import { calculateEmotionalGrowth } from '@/utils/emotion';
+import { calculateEmotionalGrowth } from '@/utils/emotion/chakra/emotionalGrowth';
 import { 
   analyzeChakraActivation,
   getChakraIntensity
