@@ -40,11 +40,19 @@ export const useAIAssistant = ({
     setError(null);
     
     try {
+      console.log('Submitting question:', question);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
+      
       const aiResponse = await askAIAssistant({
         question,
         context: reflectionContext,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : undefined
       }, user.id);
+      
+      clearTimeout(timeoutId);
+      
+      console.log('Received response:', aiResponse);
       
       // Validate that we have a properly structured response before setting state
       if (!aiResponse || typeof aiResponse.answer !== 'string') {
@@ -52,14 +60,20 @@ export const useAIAssistant = ({
       }
       
       // Ensure suggestedPractices is an array
-      if (aiResponse.suggestedPractices && !Array.isArray(aiResponse.suggestedPractices)) {
+      if (!aiResponse.suggestedPractices || !Array.isArray(aiResponse.suggestedPractices)) {
         aiResponse.suggestedPractices = [];
       }
       
       setResponse(aiResponse);
     } catch (error) {
       console.error('Error submitting question:', error);
-      setError('Failed to connect to AI assistant');
+      
+      // Determine if it's a timeout error
+      const errorMessage = error.name === 'AbortError' 
+        ? 'Request timed out. Please try again.'
+        : 'Failed to connect to AI assistant';
+      
+      setError(errorMessage);
       toast({
         title: "Couldn't connect to AI assistant",
         description: "Please try again later.",

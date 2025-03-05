@@ -17,12 +17,28 @@ const AIResponse: React.FC<AIResponseProps> = ({ response, onReset, loading }) =
     ? response.suggestedPractices 
     : [];
 
+  // Determine if response looks repetitive/stuck by checking for certain patterns
+  const isRepetitive = answer === "Sorry, I couldn't generate a response at this time." || 
+                       answer.includes("I'm sorry, I couldn't process your question");
+
   return (
     <div className="space-y-4">
       <div className="bg-black/20 p-4 rounded-lg border border-white/10">
         <div className="flex items-start gap-3">
-          <MessageCircle className="text-quantum-400 mt-1" size={18} />
-          <div className="text-white/90">{answer}</div>
+          {isRepetitive ? (
+            <AlertTriangle className="text-amber-400 mt-1" size={18} />
+          ) : (
+            <MessageCircle className="text-quantum-400 mt-1" size={18} />
+          )}
+          <div className="text-white/90">
+            {answer}
+            
+            {isRepetitive && (
+              <div className="mt-4 text-amber-300 text-sm">
+                It seems we're having trouble generating a response. Try asking a different question.
+              </div>
+            )}
+          </div>
         </div>
       </div>
       

@@ -29,6 +29,8 @@ export async function generateOpenAIResponse(
   }
 
   try {
+    console.log("Starting OpenAI request preparation");
+    
     // Build the system prompt with available context
     let systemPrompt = `You are Quantum Guide, an AI assistant for a spiritual and energy practice app.
 Your role is to provide thoughtful, insightful responses about energy practices, chakras, meditation,
@@ -37,7 +39,10 @@ and spiritual experiences. Be supportive, wise, and helpful.
 Keep responses concise but meaningful, around 2-3 paragraphs.
 
 Always respond with unique, varied content that directly addresses the user's question.
-Avoid generic or repetitive answers.`;
+Avoid generic or repetitive answers.
+
+IMPORTANT: Always provide a fresh, unique response even for similar questions.
+Never return the exact same response twice, even for similar questions.`;
 
     // Add user context if available
     if (userContext) {
@@ -61,13 +66,10 @@ Avoid generic or repetitive answers.`;
       }
     ];
 
-    // Create timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("OpenAI API request timed out")), RESPONSE_TIMEOUT);
-    });
-
+    console.log("Making request to OpenAI API");
+    
     // Make request to OpenAI API with timeout
-    const fetchPromise = fetch(OPENAI_API_URL, {
+    const response = await fetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -76,13 +78,11 @@ Avoid generic or repetitive answers.`;
       body: JSON.stringify({
         model: OPENAI_MODEL,
         messages: messages,
-        temperature: 0.7, // Balanced between creativity and consistency
+        temperature: 0.8, // Slightly higher for more variety
         max_tokens: 500   // Reasonable limit for concise responses
-      })
+      }),
+      signal: AbortSignal.timeout(RESPONSE_TIMEOUT)
     });
-
-    // Race between fetch and timeout
-    const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
 
     // Parse API response
     const data = await response.json();
@@ -98,6 +98,8 @@ Avoid generic or repetitive answers.`;
       throw new Error("No response content from OpenAI");
     }
 
+    console.log("Successfully received OpenAI response");
+    
     // Generate some suggested practices based on the question topic
     const suggestedPractices = generateSuggestedPractices(question, aiResponse);
 

@@ -24,7 +24,32 @@ export async function handleRequest(req: Request, corsHeaders: HeadersInit) {
     
     // Generate a response
     try {
-      const response = await generateResponse(question, context, userContext);
+      console.log(`Generating response for question: ${question.substring(0, 30)}...`);
+      
+      // Set a timeout for the response generation
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+      
+      let response;
+      try {
+        response = await Promise.race([
+          generateResponse(question, context, userContext),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Response generation timed out')), 20000);
+          })
+        ]);
+        clearTimeout(timeout);
+      } catch (timeoutError) {
+        console.error("Response generation timed out:", timeoutError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Response generation timed out",
+            answer: "I'm sorry, it's taking me longer than expected to process your question. Please try again with a simpler question.",
+            suggestedPractices: ["Try asking a more focused question", "Break your question into smaller parts", "Try again in a moment"]
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       
       // Validate response format to ensure consistent structure
       if (!response || typeof response.answer !== 'string') {
@@ -35,6 +60,8 @@ export async function handleRequest(req: Request, corsHeaders: HeadersInit) {
       if (!response.suggestedPractices || !Array.isArray(response.suggestedPractices)) {
         response.suggestedPractices = [];
       }
+      
+      console.log(`Successfully generated response, length: ${response.answer.length}`);
       
       return new Response(
         JSON.stringify(response),
