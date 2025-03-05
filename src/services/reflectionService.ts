@@ -1,4 +1,6 @@
+
 import { supabase } from '@/lib/supabaseClient';
+import { Json } from '@/integrations/supabase/types';
 
 export interface EnergyReflection {
   id: string;
@@ -145,7 +147,7 @@ export const updateUserPoints = async (userId: string, pointsToAdd: number) => {
 };
 
 // Function to save emotional analysis for a user
-export const saveEmotionalAnalysis = async (userId: string, analysisData: object) => {
+export const saveEmotionalAnalysis = async (userId: string, analysisData: Json) => {
   try {
     const { data, error } = await supabase
       .from('emotional_analysis')
@@ -228,7 +230,7 @@ export const fetchEmotionalJourney = async (userId: string) => {
       dominantEmotions,
       lastReflectionDate: recentReflections[0]?.created_at || null,
       emotionalAnalysis,
-      recentReflections: recentReflections // Add this to make it available for the ReflectionAnalytics component
+      recentReflections // Add this to make it available for the ReflectionAnalytics component
     };
   } catch (error) {
     console.error('Error fetching emotional journey:', error);
