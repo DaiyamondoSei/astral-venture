@@ -29,11 +29,9 @@ const ReflectionHistoryInsights: React.FC<ReflectionHistoryInsightsProps> = ({
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   
-  // Get chakra names from indices
   const chakraNames = getChakraNames(activatedChakras);
   const chakraColors = getChakraColors(activatedChakras);
   
-  // Calculate chakra balance
   const balancePercentage = calculateChakraBalance(activatedChakras);
   const balanceText = 
     balancePercentage >= 0.8 ? "Excellent" :
@@ -41,33 +39,27 @@ const ReflectionHistoryInsights: React.FC<ReflectionHistoryInsightsProps> = ({
     balancePercentage >= 0.4 ? "Moderate" :
     balancePercentage >= 0.2 ? "Developing" : "Beginning";
   
-  // Fetch personalized recommendations and insights
   useEffect(() => {
     const fetchPersonalizedContent = async () => {
       if (!user) return;
       
       setLoading(true);
       try {
-        // Get practice recommendations for this user
         const recommendations = await aiService.getPersonalizedRecommendations(user.id);
         setPracticeRecommendations(recommendations.slice(0, 3));
         
-        // Generate insights based on dominant emotions and chakras
         const aiInsights = [];
         
-        // Add chakra-specific insight
         if (chakraNames.length > 0) {
           const dominantChakra = chakraNames[0];
           aiInsights.push(`Your ${dominantChakra} chakra is currently the most active, suggesting a focus on ${getChakraFocus(dominantChakra)}.`);
         }
         
-        // Add emotion-specific insights
         if (dominantEmotions.length > 0) {
           const topEmotion = dominantEmotions[0];
           aiInsights.push(`Your reflections show a strong ${topEmotion.toLowerCase()} energy signature.`);
         }
         
-        // Add pattern insight
         if (chakraNames.length >= 2) {
           aiInsights.push(`The connection between your ${chakraNames[0]} and ${chakraNames[1]} chakras indicates ${getChakraConnectionInsight(chakraNames[0], chakraNames[1])}.`);
         }
@@ -238,7 +230,6 @@ function getChakraFocus(chakra: string): string {
 }
 
 function getChakraConnectionInsight(chakra1: string, chakra2: string): string {
-  // Specific combinations
   if ((chakra1 === 'Heart' && chakra2 === 'Throat') || 
       (chakra1 === 'Throat' && chakra2 === 'Heart')) {
     return 'a deepening connection between love and authentic expression';
@@ -254,7 +245,6 @@ function getChakraConnectionInsight(chakra1: string, chakra2: string): string {
     return 'a grounding of your personal power';
   }
   
-  // Generic response
   return 'a meaningful pattern in your energy system';
 }
 

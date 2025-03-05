@@ -1,4 +1,6 @@
 
+import { Json } from '@/integrations/supabase/types';
+
 export interface HistoricalReflection {
   id: string | number;
   content: string;
@@ -9,6 +11,6 @@ export interface HistoricalReflection {
   timestamp?: string;
   type?: string;
   dominant_emotion?: string;
-  chakras_activated?: number[];
+  chakras_activated?: number[] | Json;
   emotional_depth?: number;
 }

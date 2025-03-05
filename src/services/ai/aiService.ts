@@ -117,3 +117,10 @@ export async function getPersonalizedRecommendations(
     ];
   }
 }
+
+// Export all functions as an object for easier imports
+export const aiService = {
+  generateInsightsFromReflections,
+  askAIAssistant,
+  getPersonalizedRecommendations
+};

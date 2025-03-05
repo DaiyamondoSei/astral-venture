@@ -9,6 +9,8 @@ import { Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { analyzeReflectionPatterns } from '@/services/ai/patternAnalysis';
+import { HistoricalReflection } from '@/components/reflection/types';
+import { Json } from '@/integrations/supabase/types';
 
 interface ReflectionTabProps {
   onReflectionComplete?: (pointsEarned: number, emotionalInsights?: any) => void;
@@ -39,8 +41,18 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
         if (error) throw error;
         
         if (reflections && reflections.length > 0) {
+          // Convert JSON chakras to proper format for analysis
+          const convertedReflections: HistoricalReflection[] = reflections.map(reflection => ({
+            ...reflection,
+            chakras_activated: Array.isArray(reflection.chakras_activated) 
+              ? reflection.chakras_activated 
+              : typeof reflection.chakras_activated === 'string'
+                ? JSON.parse(reflection.chakras_activated as string)
+                : []
+          }));
+          
           // Analyze patterns
-          const patterns = analyzeReflectionPatterns(reflections);
+          const patterns = analyzeReflectionPatterns(convertedReflections);
           setPatternInsights({
             activatedChakras: patterns.dominantChakras,
             dominantEmotions: patterns.dominantEmotions,

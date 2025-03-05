@@ -10,6 +10,7 @@ interface StreakTrackerProps {
   currentStreak: number;
   longestStreak: number;
   activatedChakras: number[];
+  userId?: string; // Add userId as an optional prop
   onChakraActivation?: (chakraIndex: number) => void;
   onRecalibration?: () => void;
 }
@@ -18,6 +19,7 @@ const StreakTracker = ({
   currentStreak = 0,
   longestStreak = 0,
   activatedChakras = [],
+  userId, // Add userId parameter
   onChakraActivation,
   onRecalibration
 }: StreakTrackerProps) => {
