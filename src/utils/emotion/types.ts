@@ -16,10 +16,14 @@ export interface EmotionalDepthResult {
 }
 
 export interface ChakraAnalysisResult {
-  activatedChakras: number[];
-  chakraBalance: number;
-  chakraNames: string[];
-  chakraColors: string[];
+  chakras: number[];          // Indices of activated chakras
+  intensity: number[];        // Intensity values for each chakra (0-1)
+  dominantChakra: number;     // Index of the most strongly activated chakra
+  balanceScore: number;       // Overall chakra balance score (0-1)
+  recommendations: string[];  // Practice recommendations based on analysis
+  dominantThemes: string[];   // Dominant emotional themes detected
+  emotions?: string[];        // For compatibility with existing code
+  insights?: string[];        // For compatibility with existing code
 }
 
 export interface EmotionalGrowthMetrics {

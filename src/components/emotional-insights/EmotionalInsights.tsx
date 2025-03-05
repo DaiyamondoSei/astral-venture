@@ -5,7 +5,6 @@ import EmotionalInsightsLoading from './EmotionalInsightsLoading';
 import { Sparkles, Activity, Heart, Brain } from 'lucide-react';
 import { chakraNames, chakraColors } from '@/utils/emotion/mappings';
 import AstralSilhouetteVisualization from './AstralSilhouetteVisualization';
-import { getChakraIntensity } from '@/utils/emotion/chakraAnalysis';
 
 const EmotionalInsights: React.FC = () => {
   const {
@@ -14,6 +13,7 @@ const EmotionalInsights: React.FC = () => {
     activatedChakras,
     dominantEmotions,
     insightMessages,
+    getChakraIntensity,
     chakraBalanceData,
     emotionalHistoryData,
     emotionalRecommendations
@@ -22,11 +22,6 @@ const EmotionalInsights: React.FC = () => {
   if (loading) {
     return <EmotionalInsightsLoading />;
   }
-
-  // Wrapper function to provide chakra intensity
-  const getChakraIntensityWrapper = (chakraIndex: number) => {
-    return getChakraIntensity(chakraIndex, activatedChakras, emotionalGrowth);
-  };
 
   return (
     <div className="glass-card p-5">
@@ -44,7 +39,7 @@ const EmotionalInsights: React.FC = () => {
             <AstralSilhouetteVisualization 
               activatedChakras={activatedChakras} 
               emotionalGrowth={emotionalGrowth}
-              getChakraIntensity={getChakraIntensityWrapper}
+              getChakraIntensity={getChakraIntensity}
             />
             
             <div className="mt-4">

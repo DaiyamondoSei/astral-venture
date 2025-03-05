@@ -75,7 +75,12 @@ export const useEmotionalAnalysis = () => {
         setInsightMessages(journeyData.insights || []);
       } else {
         // Analyze chakras and emotions
-        const { chakras, emotions, insights } = analyzeChakraActivation(reflections, dominantTheme);
+        const analysisResult = analyzeChakraActivation(reflections, dominantTheme);
+        
+        // Extract data from the result, using dominantThemes as emotions for compatibility
+        const chakras = analysisResult.chakras;
+        const emotions = analysisResult.dominantThemes || [];
+        const insights = analysisResult.recommendations || [];
         
         // Calculate emotional growth based on reflection count and activated chakras
         const growth = calculateEmotionalGrowth({
@@ -118,7 +123,7 @@ export const useEmotionalAnalysis = () => {
 
   // Create a wrapper for the chakra intensity function to pass to components
   const getChakraIntensityWrapper = (chakraIndex: number) => {
-    return getChakraIntensity(chakraIndex, activatedChakras, emotionalGrowth);
+    return getChakraIntensity(chakraIndex, activatedChakras);
   };
 
   return {
