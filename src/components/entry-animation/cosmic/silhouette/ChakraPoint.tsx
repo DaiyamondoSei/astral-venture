@@ -131,46 +131,92 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
   
   return (
     <g className="chakra-point" aria-label={`${chakraName} chakra${isActivated ? ' active' : ' inactive'}`}>
-      {/* Chakra glows for higher consciousness states */}
+      {/* Enhanced chakra glows with layered effects for higher consciousness states */}
       {showTranscendence && isActivated && (
-        <motion.circle
-          cx={cx}
-          cy={cy}
-          r={size * 3}
-          fill={`url(#chakraGlow${index})`}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ 
-            opacity: intensity * 0.3 * baseProgressPercentage, 
-            scale: 1.2,
-            transition: { 
-              duration: 3, 
-              repeat: Infinity,
-              repeatType: "reverse" as const,  // Fixed: Using 'as const' to specify literal type
-              ease: "easeInOut"
-            }
-          }}
-        />
+        <>
+          <motion.circle
+            cx={cx}
+            cy={cy}
+            r={size * 3}
+            fill={`url(#chakraGlow${index})`}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ 
+              opacity: intensity * 0.3 * baseProgressPercentage, 
+              scale: 1.2,
+              transition: { 
+                duration: 3, 
+                repeat: Infinity,
+                repeatType: "reverse" as const,  // Fixed: Using 'as const' to specify literal type
+                ease: "easeInOut"
+              }
+            }}
+          />
+          {/* Additional ethereal glow layer for transcendence state */}
+          <motion.circle
+            cx={cx}
+            cy={cy}
+            r={size * 4}
+            fill="none"
+            stroke={`${color}40`}
+            strokeWidth={0.8}
+            initial={{ opacity: 0 }}
+            animate={{ 
+              opacity: intensity * 0.2 * baseProgressPercentage,
+              scale: [1, 1.1, 1],
+              transition: { 
+                duration: 4, 
+                repeat: Infinity,
+                repeatType: "reverse" as const,  // Fixed: Using 'as const' to specify literal type
+                ease: "easeInOut"
+              }
+            }}
+          />
+        </>
       )}
       
-      {/* Outer glow for activated chakras */}
+      {/* Enhanced outer glow for activated chakras */}
       {showGlow && (
-        <motion.circle
-          cx={cx}
-          cy={cy}
-          r={size + 5 + (intensity * 3)}
-          fill={`url(#chakraGlow${index})`}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ 
-            opacity: intensity * 0.5 * baseProgressPercentage, 
-            scale: 1,
-            transition: { 
-              duration: 2, 
-              repeat: Infinity,
-              repeatType: "reverse" as const,  // Fixed: Using 'as const' to specify literal type
-              ease: "easeInOut"
-            }
-          }}
-        />
+        <>
+          <motion.circle
+            cx={cx}
+            cy={cy}
+            r={size + 5 + (intensity * 3)}
+            fill={`url(#chakraGlow${index})`}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ 
+              opacity: intensity * 0.5 * baseProgressPercentage, 
+              scale: 1,
+              transition: { 
+                duration: 2, 
+                repeat: Infinity,
+                repeatType: "reverse" as const,  // Fixed: Using 'as const' to specify literal type
+                ease: "easeInOut"
+              }
+            }}
+          />
+          
+          {/* Additional soft glow layer for more depth */}
+          <motion.circle
+            cx={cx}
+            cy={cy}
+            r={size + 8}
+            fill="none"
+            stroke={color}
+            strokeWidth={0.3}
+            strokeOpacity={0.6}
+            initial={{ opacity: 0 }}
+            animate={{ 
+              opacity: intensity * 0.3,
+              scale: [1, 1.2, 1],
+              transition: { 
+                duration: 3, 
+                repeat: Infinity,
+                repeatType: "reverse" as const,
+                ease: "easeInOut"
+              }
+            }}
+          />
+        </>
       )}
       
       {/* Outer pulse effect for highly active chakras */}
@@ -216,10 +262,11 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
         />
       )}
       
-      {/* Energy rays for highly activated chakras with illumination */}
+      {/* Enhanced energy rays for highly activated chakras with illumination */}
       {isActivated && showIllumination && intensity > 0.7 && (
         <g ref={rayRef}>
-          {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
+          {/* More rays for a fuller effect */}
+          {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle, i) => (
             <motion.line
               key={`ray-${index}-${i}`}
               x1={cx}
@@ -237,36 +284,77 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
         </g>
       )}
       
-      {/* Add extra effects for infinity level chakras */}
+      {/* Add enhanced effects for infinity level chakras */}
       {showInfinity && isActivated && intensity > 0.8 && (
-        <motion.circle
-          cx={cx}
-          cy={cy}
-          r={size * 2.5}
-          fill="none"
-          stroke={`${color}80`}
-          strokeWidth="0.8"
-          strokeDasharray="2 3"
-          initial={{ opacity: 0, scale: 0.5, rotate: 0 }}
-          animate={{ 
-            opacity: 0.7, 
-            scale: [1, 1.2, 1],
-            rotate: 360,
-            transition: { 
-              opacity: { duration: 1 },
-              scale: { 
-                duration: 4, 
-                repeat: Infinity,
-                repeatType: "reverse" as const  // Fixed: Using 'as const' to specify literal type
-              },
-              rotate: { 
-                duration: 20, 
-                repeat: Infinity,
-                ease: "linear"
+        <>
+          <motion.circle
+            cx={cx}
+            cy={cy}
+            r={size * 2.5}
+            fill="none"
+            stroke={`${color}80`}
+            strokeWidth="0.8"
+            strokeDasharray="2 3"
+            initial={{ opacity: 0, scale: 0.5, rotate: 0 }}
+            animate={{ 
+              opacity: 0.7, 
+              scale: [1, 1.2, 1],
+              rotate: 360,
+              transition: { 
+                opacity: { duration: 1 },
+                scale: { 
+                  duration: 4, 
+                  repeat: Infinity,
+                  repeatType: "reverse" as const  // Fixed: Using 'as const' to specify literal type
+                },
+                rotate: { 
+                  duration: 20, 
+                  repeat: Infinity,
+                  ease: "linear"
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
+          
+          {/* Cosmic particles orbiting the chakra */}
+          {[1, 2, 3, 4, 5].map((_, i) => {
+            const radius = size * 2 + i * 3;
+            const speed = 10 + (i * 2);
+            const delay = i * 0.5;
+            const particleSize = 0.8 - (i * 0.1);
+            
+            return (
+              <motion.circle
+                key={`particle-${index}-${i}`}
+                cx={cx + radius}
+                cy={cy}
+                r={particleSize}
+                fill="white"
+                initial={{ opacity: 0 }}
+                animate={{ 
+                  opacity: [0.5, 0.9, 0.5],
+                  rotate: 360,
+                  transition: { 
+                    opacity: {
+                      duration: 2,
+                      repeat: Infinity,
+                      repeatType: "reverse" as const
+                    },
+                    rotate: {
+                      duration: speed,
+                      repeat: Infinity,
+                      ease: "linear",
+                      delay: delay
+                    }
+                  }
+                }}
+                style={{
+                  transformOrigin: `${cx}px ${cy}px`
+                }}
+              />
+            );
+          })}
+        </>
       )}
     </g>
   );
