@@ -10,6 +10,7 @@ import AstralSilhouetteVisualization from './emotional-insights/AstralSilhouette
 import EmotionalProgressChart from './emotional-insights/EmotionalProgressChart';
 import EmotionalJourneyTimeline from './emotional-insights/EmotionalJourneyTimeline';
 import ChakraBalanceRadar from './emotional-insights/ChakraBalanceRadar';
+import { Sparkles } from 'lucide-react';
 
 const EmotionalInsightsPanel = () => {
   const {
@@ -30,11 +31,13 @@ const EmotionalInsightsPanel = () => {
   }
 
   return (
-    <div className="glass-card p-6 shadow-lg">
-      <h3 className="font-display text-xl mb-4 text-white/95 tracking-wide">Your Emotional Evolution</h3>
+    <div className="glass-card p-6 lg:p-8 shadow-xl border border-white/10 rounded-xl">
+      <h2 className="font-display text-2xl mb-6 text-white/95 tracking-wide">
+        Your Emotional Evolution
+      </h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="flex flex-col space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="flex flex-col space-y-8">
           <EmotionalIntelligenceMeter emotionalGrowth={emotionalGrowth} />
           
           <DreamEnergyAnalysis userDream={userDream} dominantEmotions={dominantEmotions} />
@@ -46,7 +49,7 @@ const EmotionalInsightsPanel = () => {
           <ChakraBalanceRadar chakraData={chakraBalanceData} />
         </div>
         
-        <div className="flex flex-col space-y-6">
+        <div className="flex flex-col space-y-8">
           <AstralSilhouetteVisualization 
             emotionalGrowth={emotionalGrowth}
             getChakraIntensity={getChakraIntensity}
@@ -62,20 +65,36 @@ const EmotionalInsightsPanel = () => {
         </div>
       </div>
       
-      <div className="mt-8 bg-black/30 rounded-lg p-6 border border-white/10">
-        <h4 className="text-white/90 text-base font-medium mb-4 flex items-center">
-          <span className="inline-block w-1.5 h-1.5 bg-quantum-400 rounded-full mr-2"></span>
+      <section 
+        className="mt-10 bg-black/40 backdrop-blur-sm rounded-lg p-6 border border-white/10 shadow-lg"
+        aria-labelledby="practices-heading"
+      >
+        <h3 
+          id="practices-heading" 
+          className="text-white/95 text-lg font-display mb-5 flex items-center"
+        >
+          <Sparkles size={20} className="inline-block text-quantum-400 mr-3" />
           Energy Practices for Your Journey
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {emotionalRecommendations.map((rec, index) => (
-            <div key={index} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-quantum-400/30 transition-colors">
-              <h5 className="text-sm font-medium text-quantum-300 mb-2">{rec.title}</h5>
-              <p className="text-sm text-white/80 leading-relaxed">{rec.description}</p>
+            <div 
+              key={index} 
+              className="bg-white/5 p-5 rounded-lg border border-white/10 hover:border-quantum-400/40 transition-colors group"
+              tabIndex={0}
+              role="article"
+            >
+              <h4 className="text-base font-medium text-quantum-300 mb-3 group-hover:text-quantum-200 transition-colors">
+                {rec.title}
+              </h4>
+              <p className="text-white/80 leading-relaxed">
+                {rec.description}
+              </p>
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 };

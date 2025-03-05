@@ -1,5 +1,6 @@
 
-import React from 'react';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { cn } from "@/lib/utils";
 
 interface GlowEffectProps {
@@ -7,9 +8,10 @@ interface GlowEffectProps {
   children?: React.ReactNode;
   color?: string;
   intensity?: 'low' | 'medium' | 'high';
-  animation?: 'none' | 'pulse' | 'breathe';
+  animation?: 'none' | 'pulse' | 'breathe' | 'ripple' | 'shimmer';
   style?: React.CSSProperties;
   onClick?: () => void;
+  interactive?: boolean;
   ariaLabel?: string;
 }
 
@@ -21,8 +23,11 @@ const GlowEffect = ({
   animation = 'none',
   style,
   onClick,
+  interactive = false,
   ariaLabel
 }: GlowEffectProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
   const intensityMap = {
     low: '10px',
     medium: '20px',
@@ -31,12 +36,20 @@ const GlowEffect = ({
 
   const animationMap = {
     none: '',
-    pulse: 'animate-pulse-glow',
-    breathe: 'animate-breathe'
+    pulse: 'animate-pulse',
+    breathe: 'animate-breathe',
+    ripple: 'animate-ripple',
+    shimmer: 'animate-shimmer'
   };
+  
+  // Determine the glow intensity based on interaction state
+  const glowRadius = interactive && isHovered 
+    ? `${parseInt(intensityMap[intensity]) + 8}px` 
+    : intensityMap[intensity];
 
   const glowStyle = {
-    boxShadow: `0 0 ${intensityMap[intensity]} ${color}`,
+    boxShadow: `0 0 ${glowRadius} ${color}`,
+    transition: 'box-shadow 0.3s ease-out',
     ...style
   };
 
@@ -47,6 +60,12 @@ const GlowEffect = ({
       onClick();
     }
   } : undefined;
+  
+  // Handle interaction events
+  const handleMouseEnter = interactive ? () => setIsHovered(true) : undefined;
+  const handleMouseLeave = interactive ? () => setIsHovered(false) : undefined;
+  const handleFocus = interactive ? () => setIsHovered(true) : undefined;
+  const handleBlur = interactive ? () => setIsHovered(false) : undefined;
 
   // Add interactive attributes if component is clickable
   const interactiveProps = onClick ? {
@@ -54,23 +73,47 @@ const GlowEffect = ({
     tabIndex: 0,
     onKeyDown: handleKeyDown,
     "aria-label": ariaLabel,
+    onMouseEnter: handleMouseEnter,
+    onMouseLeave: handleMouseLeave,
+    onFocus: handleFocus,
+    onBlur: handleBlur
   } : {};
+  
+  // Animation variants for when component mounts
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { duration: 0.5 }
+    }
+  };
 
   return (
-    <div 
+    <motion.div 
       className={cn(
-        "relative",
+        "relative overflow-hidden",
         animationMap[animation],
         onClick ? "cursor-pointer" : "",
         className
       )}
       style={glowStyle}
       onClick={onClick}
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
       {...interactiveProps}
       data-prefers-reduced-motion="respect"
     >
+      {/* Ripple effect for interactive elements when clicked */}
+      {interactive && onClick && (
+        <span className="absolute inset-0 pointer-events-none overflow-hidden rounded-[inherit]">
+          <span className="absolute inset-0 rounded-[inherit] -z-10 bg-[radial-gradient(var(--ripple-color,rgba(255,255,255,0.12))_30%,transparent_70%)]
+             opacity-0 data-[active]:opacity-100 data-[active]:duration-500 data-[active]:animate-ripple transition-opacity" />
+        </span>
+      )}
+      
       {children}
-    </div>
+    </motion.div>
   );
 };
 

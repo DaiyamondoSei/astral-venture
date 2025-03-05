@@ -26,6 +26,25 @@ const easingFunctions = {
   emotionalFall: (t: number) => {
     // Custom easing that starts fast and then gently slows down
     return 1 - Math.pow(1 - t, 3);
+  },
+  
+  // New emotional easings for more nuanced transitions
+  emotionalPulse: (t: number) => {
+    // Creates a slight pulse effect in the middle of the transition
+    const p = t * 2 - 1;
+    return 0.5 * (p * p * p + 1) + 0.1 * Math.sin(t * Math.PI * 2);
+  },
+  
+  emotionalBreath: (t: number) => {
+    // Mimics the natural rhythm of breathing for a calming effect
+    return t < 0.5 
+      ? 0.5 * Math.pow(2 * t, 2) 
+      : 0.5 * (1 - Math.pow(-2 * t + 2, 2) + 1);
+  },
+  
+  emotionalResonance: (t: number) => {
+    // Creates a resonant wave pattern for spiritual transitions
+    return t + 0.05 * Math.sin(t * Math.PI * 4);
   }
 };
 
@@ -44,13 +63,15 @@ export const useEmotionalTransition = (
     delay?: number;
     easing?: keyof typeof easingFunctions | EasingFunction;
     immediate?: boolean;
+    onComplete?: () => void;
   } = {}
 ): number => {
   const { 
     duration = 1500,
     delay = 0,
     easing = "emotionalRise",
-    immediate = false
+    immediate = false,
+    onComplete
   } = options;
   
   const [currentValue, setCurrentValue] = useState(immediate ? targetValue : 0);
@@ -59,6 +80,12 @@ export const useEmotionalTransition = (
   
   // Store the animation frame request ID for cleanup
   const animationRef = useRef<number | null>(null);
+  
+  // Store onComplete callback in ref to avoid dependency changes
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
   
   // Get easing function
   const getEasingFunction = (easing: keyof typeof easingFunctions | EasingFunction): EasingFunction => {
@@ -102,6 +129,11 @@ export const useEmotionalTransition = (
             // Ensure we land exactly on target value
             setCurrentValue(targetValue);
             animationRef.current = null;
+            
+            // Execute completion callback if provided
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+            }
           }
         };
         
@@ -117,6 +149,35 @@ export const useEmotionalTransition = (
       };
     }
   }, [targetValue, previousValue, currentValue, duration, delay, easing]);
+  
+  // Detect and handle reduced motion preference
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    
+    const handleReducedMotionChange = () => {
+      if (mediaQuery.matches && animationRef.current !== null) {
+        // If reduced motion is preferred, cancel the animation and jump to the end
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+        setCurrentValue(targetValue);
+        
+        // Execute completion callback if provided
+        if (onCompleteRef.current) {
+          onCompleteRef.current();
+        }
+      }
+    };
+    
+    // Check initially
+    handleReducedMotionChange();
+    
+    // Listen for changes
+    mediaQuery.addEventListener('change', handleReducedMotionChange);
+    
+    return () => {
+      mediaQuery.removeEventListener('change', handleReducedMotionChange);
+    };
+  }, [targetValue]);
   
   return currentValue;
 };
