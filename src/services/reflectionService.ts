@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 
 export interface EnergyReflection {
@@ -123,9 +122,10 @@ export const fetchEmotionalAnalysis = async (userId: string) => {
       
     if (error) throw error;
     
-    // Handle the potential undefined analysis_data with proper type checking
-    if (data && data.length > 0 && 'analysis_data' in data[0]) {
-      return data[0].analysis_data;
+    // Safely access the data by checking both existence and shape
+    if (data && Array.isArray(data) && data.length > 0) {
+      // Use optional chaining and type assertion for additional safety
+      return (data[0] as any)?.analysis_data || null;
     }
     return null;
   } catch (error) {
