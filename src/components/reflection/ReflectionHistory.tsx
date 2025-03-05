@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { HistoricalReflection } from '@/components/reflection/types';
 import ReflectionItem from './ReflectionItem';
 import ReflectionFilter from './ReflectionFilter';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserReflections } from '@/services/reflectionService';
+import { isChakraActivated } from '@/utils/emotion/chakraTypes';
 
 interface ReflectionHistoryProps {
   onOpenAiAssistant?: (reflectionId?: string, reflectionContent?: string) => void;
@@ -51,10 +51,10 @@ const ReflectionHistory: React.FC<ReflectionHistoryProps> = ({ onOpenAiAssistant
       if (newFilter === 'high-energy' && (reflection.emotional_depth || 0) > 0.7) {
         return true;
       }
-      if (newFilter === 'heart' && reflection.chakras_activated?.includes(3)) {
+      if (newFilter === 'heart' && isChakraActivated(reflection.chakras_activated, 3)) {
         return true;
       }
-      if (newFilter === 'third-eye' && reflection.chakras_activated?.includes(5)) {
+      if (newFilter === 'third-eye' && isChakraActivated(reflection.chakras_activated, 5)) {
         return true;
       }
       return false;

@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { HistoricalReflection } from '@/components/reflection/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
+import { normalizeChakraData } from '@/utils/emotion/chakraTypes';
 
 interface ReflectionItemProps {
   reflection: HistoricalReflection;

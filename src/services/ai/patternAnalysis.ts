@@ -1,7 +1,7 @@
-
 import { HistoricalReflection } from '@/components/reflection/types';
 import { EmotionAnalysisResult } from '@/utils/emotion/types';
 import { analyzeReflectionContent } from '@/utils/emotion/reflectionAnalysis';
+import { normalizeChakraData } from '@/utils/emotion/chakraTypes';
 
 export interface PatternAnalysisResult {
   dominantChakras: number[];
