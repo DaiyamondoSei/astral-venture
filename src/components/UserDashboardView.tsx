@@ -1,10 +1,10 @@
 
 import React from 'react';
-import UserWelcome from '@/components/UserWelcome';
-import CosmicAstralBody from '@/components/entry-animation/CosmicAstralBody';
 import UserDashboardCards from '@/components/UserDashboardCards';
 import MainContent from '@/components/MainContent';
 import ChakraActivationManager from '@/components/ChakraActivationManager';
+import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import UserStats from '@/components/dashboard/UserStats';
 
 interface UserDashboardViewProps {
   user: any;
@@ -31,21 +31,22 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
   updateUserProfile,
   onChallengeComplete
 }) => {
+  // Derive username from user data
+  const username = userProfile?.username || user.email?.split('@')[0] || 'Seeker';
+  const astralLevel = userProfile?.astral_level || 1;
+  const energyPoints = userProfile?.energy_points || 0;
+
   return (
-    <>
-      <UserWelcome 
-        username={userProfile?.username || user.email?.split('@')[0] || 'Seeker'} 
-        onLogout={onLogout}
-        astralLevel={userProfile?.astral_level || 1}
+    <DashboardLayout
+      username={username}
+      astralLevel={astralLevel}
+      onLogout={onLogout}
+    >
+      <UserStats
+        energyPoints={energyPoints}
+        streakDays={userStreak.current}
+        activatedChakras={activatedChakras}
       />
-      
-      <div className="mb-8">
-        <CosmicAstralBody 
-          energyPoints={userProfile?.energy_points || 0}
-          streakDays={userStreak.current}
-          activatedChakras={activatedChakras}
-        />
-      </div>
       
       <ChakraActivationManager 
         userId={user.id}
@@ -57,8 +58,8 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
       />
       
       <UserDashboardCards 
-        energyPoints={userProfile?.energy_points || 0}
-        astralLevel={userProfile?.astral_level || 1}
+        energyPoints={energyPoints}
+        astralLevel={astralLevel}
         todayChallenge={todayChallenge}
       />
       
@@ -66,7 +67,7 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
         userProfile={userProfile}
         onChallengeComplete={onChallengeComplete}
       />
-    </>
+    </DashboardLayout>
   );
 };
 

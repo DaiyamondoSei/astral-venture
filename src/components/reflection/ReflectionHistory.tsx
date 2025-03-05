@@ -1,3 +1,4 @@
+
 // Update the import to use the correct type and function
 import { ChakraActivated, normalizeChakraData, isChakraActivated } from '@/utils/emotion/chakraTypes';
 import React, { useState, useEffect } from 'react';
@@ -29,7 +30,8 @@ interface Reflection {
 }
 
 interface ReflectionHistoryProps {
-  reflections: Reflection[];
+  reflections?: Reflection[];
+  onOpenAiAssistant?: (reflectionId?: string, reflectionContent?: string) => void;
 }
 
 interface ReflectionItemProps {
@@ -50,7 +52,10 @@ const ReflectionItem: React.FC<ReflectionItemProps> = ({ reflection, onViewInsig
 };
 
 // Fix the type in the component to ensure reflection.id is a string
-const ReflectionHistory = ({ reflections }: ReflectionHistoryProps) => {
+const ReflectionHistory: React.FC<ReflectionHistoryProps> = ({ 
+  reflections = [],
+  onOpenAiAssistant 
+}) => {
   const [filter, setFilter] = useState('');
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [selectedReflection, setSelectedReflection] = useState<Reflection | null>(null);
@@ -142,6 +147,7 @@ const ReflectionHistory = ({ reflections }: ReflectionHistoryProps) => {
         <ReflectionHistoryInsights 
           reflection={selectedReflection}
           onClose={handleCloseInsights}
+          onOpenAiAssistant={onOpenAiAssistant}
         />
       )}
     </div>

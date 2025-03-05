@@ -8,6 +8,9 @@ export type ChakraData = {
   name: string;
   color: string;
   activated: boolean;
+  activatedChakras?: number[];
+  dominantEmotions?: string[];
+  emotionalAnalysis?: Record<string, any>;
 }
 
 export function normalizeChakraData(chakras: ChakraActivated): number[] {

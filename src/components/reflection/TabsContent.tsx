@@ -25,7 +25,10 @@ const TabsContent: React.FC<TabsContentProps> = ({
         <EnergyReflectionForm onReflectionComplete={onReflectionComplete} />
       )}
       {activeTab === 'history' && (
-        <ReflectionHistory onOpenAiAssistant={onOpenAiAssistant} />
+        <ReflectionHistory 
+          onOpenAiAssistant={onOpenAiAssistant} 
+          reflections={[]} // We'll need to pass real reflections here
+        />
       )}
       {activeTab === 'insights' && (
         <div>
