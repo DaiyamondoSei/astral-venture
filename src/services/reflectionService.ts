@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabaseClient';
 
 export interface EnergyReflection {
@@ -29,13 +30,18 @@ export const fetchUserReflections = async (userId: string, limit: number = 50): 
   }
 };
 
-export const addReflection = async (userId: string, content: string, points_earned: number): Promise<EnergyReflection | null> => {
+export const addReflection = async (userId: string, content: string, points_earned: number, metadata?: any): Promise<EnergyReflection | null> => {
   try {
+    const insertData = {
+      user_id: userId,
+      content: content,
+      points_earned: points_earned,
+      ...metadata
+    };
+    
     const { data, error } = await supabase
       .from('energy_reflections')
-      .insert([
-        { user_id: userId, content: content, points_earned: points_earned }
-      ])
+      .insert([insertData])
       .select('*')
       .single();
 
@@ -51,10 +57,42 @@ export const addReflection = async (userId: string, content: string, points_earn
   }
 };
 
+// Function to save reflection (for backward compatibility)
+export const saveReflection = addReflection;
+
+// Function to update user points
+export const updateUserPoints = async (userId: string, pointsToAdd: number) => {
+  try {
+    // First, get the current points
+    const { data: profileData, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('energy_points')
+      .eq('id', userId)
+      .single();
+      
+    if (profileError) throw profileError;
+    
+    const currentPoints = profileData?.energy_points || 0;
+    const newPoints = currentPoints + pointsToAdd;
+    
+    // Update the user's points
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({ energy_points: newPoints })
+      .eq('id', userId);
+      
+    if (error) throw error;
+    return newPoints;
+  } catch (error) {
+    console.error('Error updating user points:', error);
+    throw error;
+  }
+};
+
 // Function to save emotional analysis for a user
 export const saveEmotionalAnalysis = async (userId: string, analysisData: object) => {
   try {
-    // Cast as any to bypass TypeScript errors until Supabase types are updated
+    // Fix the type issue by using a type assertion to any
     const { data, error } = await supabase
       .from('emotional_analysis' as any)
       .insert([
@@ -75,7 +113,7 @@ export const saveEmotionalAnalysis = async (userId: string, analysisData: object
 // Function to fetch emotional analysis for a user
 export const fetchEmotionalAnalysis = async (userId: string) => {
   try {
-    // Cast as any to bypass TypeScript errors until Supabase types are updated
+    // Fix the type issue by using a type assertion to any
     const { data, error } = await supabase
       .from('emotional_analysis' as any)
       .select('*')
