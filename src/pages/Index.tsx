@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -14,6 +13,8 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useUserStreak } from '@/hooks/useUserStreak';
 import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
 import OrbToAstralTransition from '@/components/OrbToAstralTransition';
+import DevModePanel from '@/components/dev-mode/DevModePanel';
+import DevModeToggle from '@/components/dev-mode/DevModeToggle';
 
 const Index = () => {
   const [showEntryAnimation, setShowEntryAnimation] = useState(false);
@@ -23,21 +24,19 @@ const Index = () => {
   const { toast } = useToast();
   const { userProfile, todayChallenge, isLoading: profileLoading, updateUserProfile } = useUserProfile();
   const { userStreak, activatedChakras, updateStreak, updateActivatedChakras } = useUserStreak(user?.id);
+  
   const [isDeveloperMode, setIsDeveloperMode] = useState(() => {
     return localStorage.getItem('developerMode') === 'true';
   });
+  const [showDevPanel, setShowDevPanel] = useState(false);
 
   useEffect(() => {
-    // Check if user just logged in and hasn't seen the entry animation yet
     if (user && !localStorage.getItem(`entry-animation-shown-${user.id}`)) {
-      // Check if dream capture is completed already
       const dreamCaptureCompleted = localStorage.getItem('dreamCaptureCompleted');
       
       if (!dreamCaptureCompleted) {
-        // Redirect to dream capture first
         navigate('/dream-capture');
       } else {
-        // If dream capture is done, show regular entry animation
         setShowEntryAnimation(true);
       }
     }
@@ -49,7 +48,6 @@ const Index = () => {
       localStorage.setItem(`entry-animation-shown-${user.id}`, 'true');
     }
 
-    // Wait a bit before showing the main dashboard
     setTimeout(() => {
       setShowEntryAnimation(false);
     }, 1000);
@@ -63,7 +61,6 @@ const Index = () => {
           title: "Signed out",
           description: "You've been successfully signed out.",
         });
-        // Clear local storage entry animation flag
         localStorage.removeItem(`entry-animation-shown-${user.id}`);
       } catch (error: any) {
         console.error('Error signing out:', error);
@@ -83,9 +80,7 @@ const Index = () => {
       energy_points: userProfile.energy_points + pointsEarned
     });
     
-    // If emotional insights are provided, update activated chakras
     if (emotionalInsights && emotionalInsights.chakrasActivated && emotionalInsights.chakrasActivated.length > 0) {
-      // Merge with existing chakras (avoiding duplicates)
       const newChakras = [...activatedChakras];
       emotionalInsights.chakrasActivated.forEach((chakraIndex: number) => {
         if (!newChakras.includes(chakraIndex)) {
@@ -95,7 +90,6 @@ const Index = () => {
       
       updateActivatedChakras(newChakras);
       
-      // Customize message based on newly activated chakras
       const newlyActivated = emotionalInsights.chakrasActivated.filter(
         (chakra: number) => !activatedChakras.includes(chakra)
       );
@@ -124,8 +118,22 @@ const Index = () => {
     
     toast({
       title: newMode ? "Developer Mode Enabled" : "Developer Mode Disabled",
-      description: newMode ? "You can now access testing features" : "Testing features are now hidden",
+      description: newMode ? "You can now access advanced testing features" : "Developer features are now hidden",
     });
+    
+    if (newMode) {
+      setShowDevPanel(true);
+    } else {
+      setShowDevPanel(false);
+    }
+  };
+
+  const openDevPanel = () => {
+    setShowDevPanel(true);
+  };
+
+  const closeDevPanel = () => {
+    setShowDevPanel(false);
   };
 
   if (isLoading || profileLoading) {
@@ -169,16 +177,11 @@ const Index = () => {
           <WelcomeMessage />
           <AuthForms className="mt-8" />
           
-          {/* Developer Mode Toggle */}
-          <div className="fixed bottom-4 left-4 opacity-30 hover:opacity-100 transition-opacity">
-            <button 
-              onClick={toggleDeveloperMode}
-              className="text-xs text-white/50 hover:text-white/80 flex items-center"
-            >
-              <span className="sr-only">Developer Mode</span>
-              <span className={`w-3 h-3 rounded-full mr-1 ${isDeveloperMode ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-            </button>
-          </div>
+          <DevModeToggle
+            isDeveloperMode={isDeveloperMode}
+            toggleDeveloperMode={toggleDeveloperMode}
+            openDevPanel={openDevPanel}
+          />
         </>
       ) : (
         <>
@@ -195,18 +198,17 @@ const Index = () => {
             onChallengeComplete={handleChallengeComplete}
           />
           
-          {/* Developer Mode Toggle (also show for logged in users) */}
-          <div className="fixed bottom-4 left-4 opacity-30 hover:opacity-100 transition-opacity">
-            <button 
-              onClick={toggleDeveloperMode}
-              className="text-xs text-white/50 hover:text-white/80 flex items-center"
-            >
-              <span className="sr-only">Developer Mode</span>
-              <span className={`w-3 h-3 rounded-full mr-1 ${isDeveloperMode ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-            </button>
-          </div>
+          <DevModeToggle
+            isDeveloperMode={isDeveloperMode}
+            toggleDeveloperMode={toggleDeveloperMode}
+            openDevPanel={openDevPanel}
+          />
         </>
       ))}
+      
+      {showDevPanel && isDeveloperMode && (
+        <DevModePanel onClose={closeDevPanel} />
+      )}
     </Layout>
   );
 };

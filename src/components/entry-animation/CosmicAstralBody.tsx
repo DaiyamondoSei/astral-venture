@@ -15,12 +15,23 @@ interface CosmicAstralBodyProps {
   energyPoints?: number;
   streakDays?: number;
   activatedChakras?: number[];
+  // Add dev mode overrides
+  showDetailsOverride?: boolean;
+  showIlluminationOverride?: boolean;
+  showFractalOverride?: boolean;
+  showTranscendenceOverride?: boolean;
+  showInfinityOverride?: boolean;
 }
 
 const CosmicAstralBody: React.FC<CosmicAstralBodyProps> = ({ 
   energyPoints = 0, 
   streakDays = 0,
-  activatedChakras = []
+  activatedChakras = [],
+  showDetailsOverride,
+  showIlluminationOverride,
+  showFractalOverride,
+  showTranscendenceOverride,
+  showInfinityOverride
 }) => {
   const [stars, setStars] = useState<{x: number, y: number, size: number, delay: number, duration: number}[]>([]);
   const [fractalPoints, setFractalPoints] = useState<{x: number, y: number, size: number, rotation: number}[]>([]);
@@ -35,21 +46,47 @@ const CosmicAstralBody: React.FC<CosmicAstralBodyProps> = ({
   const fractalComplexity = Math.min(Math.log10(energyPoints + 1) * 2, 10);
   
   // Determine which visual elements should be active
-  const showChakras = energyPoints >= ENERGY_THRESHOLDS.CHAKRAS;
-  const showAura = energyPoints >= ENERGY_THRESHOLDS.AURA;
-  const showConstellation = energyPoints >= ENERGY_THRESHOLDS.CONSTELLATION;
-  const showDetails = energyPoints >= ENERGY_THRESHOLDS.DETAILS;
-  const showIllumination = energyPoints >= ENERGY_THRESHOLDS.ILLUMINATION;
-  const showFractal = energyPoints >= ENERGY_THRESHOLDS.FRACTAL;
-  const showTranscendence = energyPoints >= ENERGY_THRESHOLDS.TRANSCENDENCE;
-  const showInfinity = energyPoints >= ENERGY_THRESHOLDS.INFINITY;
+  // Allow dev mode to override the normal thresholds if override values are provided
+  const showChakras = typeof showDetailsOverride !== 'undefined' ? showDetailsOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.CHAKRAS;
+    
+  const showAura = typeof showDetailsOverride !== 'undefined' ? showDetailsOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.AURA;
+    
+  const showConstellation = typeof showDetailsOverride !== 'undefined' ? showDetailsOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.CONSTELLATION;
+    
+  const showDetails = typeof showDetailsOverride !== 'undefined' 
+    ? showDetailsOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.DETAILS;
+    
+  const showIllumination = typeof showIlluminationOverride !== 'undefined' 
+    ? showIlluminationOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.ILLUMINATION;
+    
+  const showFractal = typeof showFractalOverride !== 'undefined' 
+    ? showFractalOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.FRACTAL;
+    
+  const showTranscendence = typeof showTranscendenceOverride !== 'undefined' 
+    ? showTranscendenceOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.TRANSCENDENCE;
+    
+  const showInfinity = typeof showInfinityOverride !== 'undefined' 
+    ? showInfinityOverride 
+    : energyPoints >= ENERGY_THRESHOLDS.INFINITY;
   
   // Calculate chakra intensity based on progress
-  const getChakraIntensity = (baseChakraLevel: number) => {
+  const getChakraIntensity = (chakraIndex: number) => {
     if (energyPoints < ENERGY_THRESHOLDS.CHAKRAS) return 0;
     
+    // If chakra is in the activated list, show it at full intensity
+    if (activatedChakras.includes(chakraIndex)) {
+      return 1;
+    }
+    
     const chakraActivationPoints = 
-      ENERGY_THRESHOLDS.CHAKRAS + (baseChakraLevel * 15);
+      ENERGY_THRESHOLDS.CHAKRAS + (chakraIndex * 15);
       
     if (energyPoints < chakraActivationPoints) return 0.3;
     if (energyPoints < chakraActivationPoints + 50) return 0.6;
