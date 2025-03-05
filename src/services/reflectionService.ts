@@ -97,8 +97,9 @@ export const fetchReflectionStats = async (userId: string) => {
 
 // Updated function to save a full emotional analysis with proper type handling
 export const saveEmotionalAnalysis = async (userId: string, analysisData: any) => {
+  // Using "as any" since the TypeScript types aren't aware of this table yet
   const { error } = await supabase
-    .from('emotional_analysis')
+    .from('emotional_analysis' as any)
     .insert({
       user_id: userId,
       analysis_data: analysisData,
@@ -110,8 +111,9 @@ export const saveEmotionalAnalysis = async (userId: string, analysisData: any) =
 
 // New function to fetch emotional analysis data
 export const fetchEmotionalAnalysis = async (userId: string, limit: number = 1) => {
+  // Using "as any" since the TypeScript types aren't aware of this table yet
   const { data, error } = await supabase
-    .from('emotional_analysis')
+    .from('emotional_analysis' as any)
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
