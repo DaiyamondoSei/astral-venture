@@ -1,147 +1,110 @@
 
 import React from 'react';
+import { HistoricalReflection } from '@/components/reflection/types';
 import { formatDistanceToNow } from 'date-fns';
-import { Calendar, Star, Lightbulb, ChevronDown, ChevronUp, Heart, Droplets } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import GlowEffect from '@/components/GlowEffect';
-import { chakraColors } from '@/utils/emotion/mappings';
-import { HistoricalReflection } from './types';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
 
 interface ReflectionItemProps {
   reflection: HistoricalReflection;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
+  showDetails?: boolean;
+  onAskAI?: (reflectionId?: string | number, content?: string) => void;
 }
 
 const ReflectionItem: React.FC<ReflectionItemProps> = ({ 
   reflection, 
-  isExpanded, 
-  onToggleExpand 
+  showDetails: initialShowDetails = false,
+  onAskAI
 }) => {
-  // Determine if this is a philosophical or energy reflection
-  const isPhilosophical = reflection.hasOwnProperty('prompt') || reflection.type === 'consciousness';
-  const glowColor = isPhilosophical ? 'rgba(138, 43, 226, 0.3)' : 'rgba(64, 125, 247, 0.3)';
-  const typeLabel = isPhilosophical ? 'Consciousness' : 'Energy';
+  const [showDetails, setShowDetails] = React.useState(initialShowDetails);
   
-  // Chakra indicators
-  const chakrasActivated = reflection.chakras_activated || [];
+  const toggleDetails = () => {
+    setShowDetails(!showDetails);
+  };
   
+  const formatDate = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch (e) {
+      return 'unknown time ago';
+    }
+  };
+  
+  const getChakraNames = (chakraIndices?: number[]) => {
+    if (!chakraIndices || chakraIndices.length === 0) return 'None';
+    
+    return chakraIndices
+      .map(index => CHAKRA_NAMES[index])
+      .join(', ');
+  };
+
   return (
-    <GlowEffect 
-      className="p-4 border border-quantum-500/20 rounded-lg bg-black/20"
-      color={glowColor}
-      intensity="low"
-    >
-      <div className="mb-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-quantum-400 text-sm font-medium flex items-center">
-            {isPhilosophical ? <Lightbulb size={14} className="mr-1" /> : <Star size={14} className="mr-1" />}
-            {typeLabel} Reflection
+    <div className="border border-white/10 rounded-lg overflow-hidden bg-black/30 hover:bg-black/40 transition-colors">
+      <div className="p-4">
+        <div className="flex justify-between items-start">
+          <div className="space-y-1">
+            <div className="text-xs text-white/50">{formatDate(reflection.created_at)}</div>
+            <div className="text-sm text-white/80 line-clamp-2">{reflection.content}</div>
+          </div>
+          
+          <button 
+            onClick={toggleDetails}
+            className="text-white/60 hover:text-white/90 transition-colors"
+          >
+            {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
+        
+        {showDetails && (
+          <div className="mt-4 space-y-3 pt-3 border-t border-white/10">
+            <div className="flex justify-between text-xs">
+              <span className="text-white/60">Points Earned:</span>
+              <span className="text-quantum-400">{reflection.points_earned || 0}</span>
+            </div>
             
             {reflection.dominant_emotion && (
-              <Badge variant="outline" className="ml-2 bg-white/5 text-xs">
-                {reflection.dominant_emotion}
-              </Badge>
+              <div className="flex justify-between text-xs">
+                <span className="text-white/60">Dominant Emotion:</span>
+                <span className="text-white/80">{reflection.dominant_emotion}</span>
+              </div>
             )}
-          </span>
-          <div className="flex items-center text-white/40 text-xs">
-            <Calendar size={12} className="mr-1" />
-            <span>
-              {formatDistanceToNow(new Date(reflection.timestamp || reflection.created_at), { addSuffix: true })}
-            </span>
-          </div>
-        </div>
-        {reflection.prompt && (
-          <div className="mb-2 text-xs text-white/50 italic">
-            Prompt: "{reflection.prompt}"
+            
+            {reflection.chakras_activated && (
+              <div className="flex justify-between text-xs">
+                <span className="text-white/60">Activated Chakras:</span>
+                <span className="text-white/80">{getChakraNames(reflection.chakras_activated)}</span>
+              </div>
+            )}
+            
+            {reflection.insights && reflection.insights.length > 0 && (
+              <div className="text-xs mt-2">
+                <div className="text-white/60 mb-1">Insights:</div>
+                <ul className="space-y-1">
+                  {reflection.insights.map((insight, index) => (
+                    <li key={index} className="text-white/80 pl-3 border-l border-quantum-400/30">
+                      {insight}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {onAskAI && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2 text-xs border-white/10 bg-white/5 hover:bg-quantum-400/20 text-white/80 hover:text-white"
+                onClick={() => onAskAI(reflection.id, reflection.content)}
+              >
+                <Sparkles size={12} className="mr-1 text-quantum-400" />
+                Ask AI Guide about this reflection
+              </Button>
+            )}
           </div>
         )}
       </div>
-      
-      <p className={`text-white/80 mb-3 ${isExpanded ? '' : 'line-clamp-3'}`}>
-        {reflection.content}
-      </p>
-      
-      {isExpanded && (
-        <div className="mt-4 mb-3 space-y-3">
-          {/* Chakra visualization for this reflection */}
-          {chakrasActivated.length > 0 && (
-            <div className="bg-black/30 p-3 rounded-lg">
-              <h4 className="text-xs text-white/70 mb-2 flex items-center">
-                <Droplets size={12} className="mr-1 text-quantum-400" />
-                Activated Energy Centers
-              </h4>
-              <div className="flex justify-center space-x-2">
-                {[0, 1, 2, 3, 4, 5, 6].map((chakraIndex) => {
-                  const isActive = chakrasActivated.includes(chakraIndex);
-                  return (
-                    <Avatar key={chakraIndex} className={`h-5 w-5 ${isActive ? 'opacity-100' : 'opacity-30'}`}>
-                      <AvatarFallback 
-                        style={{ 
-                          backgroundColor: isActive ? chakraColors[chakraIndex] : '#333',
-                          fontSize: '8px',
-                          color: '#fff'
-                        }}
-                      >
-                        {chakraIndex + 1}
-                      </AvatarFallback>
-                    </Avatar>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          
-          {/* Emotional insights */}
-          {reflection.insights && reflection.insights.length > 0 && (
-            <div className="bg-black/30 p-3 rounded-lg">
-              <h4 className="text-xs text-white/70 mb-2 flex items-center">
-                <Heart size={12} className="mr-1 text-quantum-400" />
-                Emotional Insights
-              </h4>
-              <ul className="text-xs text-white/60 space-y-1">
-                {reflection.insights.map((insight, i) => (
-                  <li key={i}>{insight}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-      
-      <div className="flex justify-between items-center text-sm">
-        <div className="flex items-center">
-          <Star size={14} className="text-quantum-400 mr-1" />
-          <span className="text-white/60">
-            {reflection.points_earned || 0} points earned
-          </span>
-          
-          {reflection.emotional_depth !== undefined && (
-            <span className="ml-3 text-xs text-white/40">
-              Depth: {Math.round(reflection.emotional_depth * 100)}%
-            </span>
-          )}
-        </div>
-        
-        <button 
-          onClick={onToggleExpand}
-          className="text-quantum-400 text-xs flex items-center hover:underline"
-        >
-          {isExpanded ? (
-            <>
-              <span>Less Details</span>
-              <ChevronUp size={14} className="ml-1" />
-            </>
-          ) : (
-            <>
-              <span>More Details</span>
-              <ChevronDown size={14} className="ml-1" />
-            </>
-          )}
-        </button>
-      </div>
-    </GlowEffect>
+    </div>
   );
 };
 
