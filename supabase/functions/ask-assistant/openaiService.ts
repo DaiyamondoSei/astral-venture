@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js';
 // OpenAI API related constants
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = "gpt-4o-mini"; // Using a cost-effective but powerful model
+const RESPONSE_TIMEOUT = 15000; // 15 seconds timeout
 
 /**
  * Generates an AI response using OpenAI's API
@@ -33,7 +34,10 @@ export async function generateOpenAIResponse(
 Your role is to provide thoughtful, insightful responses about energy practices, chakras, meditation,
 and spiritual experiences. Be supportive, wise, and helpful.
 
-Keep responses concise but meaningful, around 2-3 paragraphs.`;
+Keep responses concise but meaningful, around 2-3 paragraphs.
+
+Always respond with unique, varied content that directly addresses the user's question.
+Avoid generic or repetitive answers.`;
 
     // Add user context if available
     if (userContext) {
@@ -57,8 +61,13 @@ Keep responses concise but meaningful, around 2-3 paragraphs.`;
       }
     ];
 
-    // Make request to OpenAI API
-    const response = await fetch(OPENAI_API_URL, {
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("OpenAI API request timed out")), RESPONSE_TIMEOUT);
+    });
+
+    // Make request to OpenAI API with timeout
+    const fetchPromise = fetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -71,6 +80,9 @@ Keep responses concise but meaningful, around 2-3 paragraphs.`;
         max_tokens: 500   // Reasonable limit for concise responses
       })
     });
+
+    // Race between fetch and timeout
+    const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
 
     // Parse API response
     const data = await response.json();

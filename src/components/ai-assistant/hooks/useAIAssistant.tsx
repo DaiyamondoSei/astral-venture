@@ -46,6 +46,16 @@ export const useAIAssistant = ({
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : undefined
       }, user.id);
       
+      // Validate that we have a properly structured response before setting state
+      if (!aiResponse || typeof aiResponse.answer !== 'string') {
+        throw new Error('Invalid response format from AI assistant');
+      }
+      
+      // Ensure suggestedPractices is an array
+      if (aiResponse.suggestedPractices && !Array.isArray(aiResponse.suggestedPractices)) {
+        aiResponse.suggestedPractices = [];
+      }
+      
       setResponse(aiResponse);
     } catch (error) {
       console.error('Error submitting question:', error);
