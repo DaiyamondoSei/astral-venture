@@ -18,12 +18,17 @@ export async function handleRequest(req: Request, corsHeaders: HeadersInit) {
   const userContext = userId ? await fetchUserContext(userId) : "";
   
   // Generate a response
-  const response = generateResponse(question, context, userContext);
-  
-  return new Response(
-    JSON.stringify(response),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  try {
+    const response = await generateResponse(question, context, userContext);
+    
+    return new Response(
+      JSON.stringify(response),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Error generating response:", error);
+    return handleError(error, corsHeaders);
+  }
 }
 
 // Error handler function

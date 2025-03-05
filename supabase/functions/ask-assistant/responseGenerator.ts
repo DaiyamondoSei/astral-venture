@@ -1,5 +1,7 @@
 
-// Functions for generating responses to user questions
+import { generateOpenAIResponse } from './openaiService.ts';
+
+// Fall back to basic response if OpenAI is unavailable
 export function generateBasicResponse(question: string, context?: string, userContext?: string) {
   // Normalize the question
   const lowerQuestion = question.toLowerCase();
@@ -95,7 +97,21 @@ export function generateBasicResponse(question: string, context?: string, userCo
   };
 }
 
-// Simplified function that wraps the response generation
-export function generateResponse(question: string, context?: string, userContext?: string) {
+// Main response generation function
+export async function generateResponse(question: string, context?: string, userContext?: string) {
+  const openAiKey = Deno.env.get('OPENAI_API_KEY');
+  
+  // Try to use OpenAI if API key is available
+  if (openAiKey) {
+    try {
+      return await generateOpenAIResponse(question, context, userContext, openAiKey);
+    } catch (error) {
+      console.error("OpenAI request failed, falling back to basic response:", error);
+      return generateBasicResponse(question, context, userContext);
+    }
+  }
+  
+  // Fall back to basic response if no API key
+  console.log("No OpenAI API key found, using basic response generator");
   return generateBasicResponse(question, context, userContext);
 }
