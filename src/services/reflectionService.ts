@@ -122,6 +122,7 @@ export const fetchEmotionalAnalysis = async (userId: string) => {
       .limit(1);
       
     if (error) throw error;
+    // Handle the potential undefined analysis_data with proper type checking
     return data && data.length > 0 ? data[0].analysis_data : null;
   } catch (error) {
     console.error('Error fetching emotional analysis:', error);
