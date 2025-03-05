@@ -95,7 +95,7 @@ const ReflectionHistory: React.FC = () => {
         Review your past reflections to trace the evolution of your consciousness over time.
       </p>
       
-      <ReflectionHistoryInsights />
+      <ReflectionHistoryInsights data={journeyData} />
     </div>
   );
 };
