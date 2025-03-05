@@ -87,16 +87,36 @@ export const addReflection = async (userId: string, content: string, points_earn
     }
 
     // Parse chakras_activated back to an array if it was stored as a string
-    if (data && typeof data.chakras_activated === 'string') {
+    const reflection: EnergyReflection = {
+      id: data.id,
+      created_at: data.created_at,
+      user_id: data.user_id,
+      content: data.content,
+      points_earned: data.points_earned,
+    };
+    
+    if (data.dominant_emotion) {
+      reflection.dominant_emotion = data.dominant_emotion;
+    }
+    
+    if (data.emotional_depth !== undefined) {
+      reflection.emotional_depth = data.emotional_depth;
+    }
+    
+    if (data.chakras_activated) {
       try {
-        data.chakras_activated = JSON.parse(data.chakras_activated);
+        reflection.chakras_activated = typeof data.chakras_activated === 'string'
+          ? JSON.parse(data.chakras_activated)
+          : Array.isArray(data.chakras_activated)
+            ? data.chakras_activated
+            : [];
       } catch (e) {
         console.error('Error parsing chakras_activated:', e);
-        data.chakras_activated = [];
+        reflection.chakras_activated = [];
       }
     }
 
-    return data;
+    return reflection;
   } catch (error) {
     console.error('Error adding reflection:', error);
     return null;
