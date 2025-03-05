@@ -28,7 +28,7 @@ export const generateChakraRecommendations = (
   recommendations = recommendations.concat(
     generateBalanceRecommendations(activatedChakras, balanceScore),
     generatePatternRecommendations(activatedChakras, intensities),
-    generateIntensityRecommendations(activatedChakras, intensities)
+    generateIntensityRecommendations(activatedChakras, intensities, balanceScore)
   );
   
   // Ensure we have at least one recommendation
