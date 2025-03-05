@@ -3,6 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import HumanSilhouette from '@/components/entry-animation/cosmic/HumanSilhouette';
 import { getChakraResonance, calculateChakraBalance } from '@/utils/emotion/chakra/intensity';
 import { motion } from 'framer-motion';
+import ResonanceLines from './visualization/ResonanceLines';
+import BackgroundGlow from './visualization/BackgroundGlow';
+import ConsciousnessIndicator from './visualization/ConsciousnessIndicator';
 
 interface AstralSilhouetteVisualizationProps {
   emotionalGrowth: number;
@@ -95,97 +98,15 @@ const AstralSilhouetteVisualization = ({
       }}
     >
       {/* Resonance connection visualization */}
-      {resonanceLines.length > 0 && (
-        <div className="absolute inset-0 pointer-events-none z-10">
-          <svg className="w-full h-full">
-            <defs>
-              <linearGradient id="resonanceGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="rgba(138, 43, 226, 0.7)" />
-                <stop offset="50%" stopColor="rgba(173, 216, 230, 0.7)" />
-                <stop offset="100%" stopColor="rgba(138, 43, 226, 0.7)" />
-              </linearGradient>
-              
-              {/* Create filters for glow effects */}
-              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="6" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-            </defs>
-            
-            {resonanceLines.map((line, index) => {
-              // Get chakra positions
-              const y1 = CHAKRA_Y_POSITIONS[line.start];
-              const y2 = CHAKRA_Y_POSITIONS[line.end];
-              const x = 150; // Center x-coordinate
-              
-              // Calculate control points for curved paths
-              const midY = (y1 + y2) / 2;
-              const distance = Math.abs(y1 - y2);
-              const curveOffset = 20 + (distance * 0.3) * (index % 2 === 0 ? 1 : -1);
-              
-              return (
-                <g key={`line-${line.start}-${line.end}`}>
-                  {/* Animated flowing path */}
-                  <motion.path
-                    d={`M ${x} ${y1} Q ${x + curveOffset} ${midY}, ${x} ${y2}`}
-                    stroke="url(#resonanceGradient)"
-                    strokeWidth={(line.intensity * 3)}
-                    fill="none"
-                    strokeLinecap="round"
-                    filter="url(#glow)"
-                    initial={{ pathLength: 0, opacity: 0 }}
-                    animate={{ 
-                      pathLength: line.intensity, 
-                      opacity: line.intensity,
-                      strokeWidth: [(line.intensity * 3), (line.intensity * 4), (line.intensity * 3)]
-                    }}
-                    transition={{ 
-                      duration: 3 + (1 - line.intensity) * 2, 
-                      repeat: Infinity, 
-                      repeatType: "reverse",
-                      ease: "easeInOut" 
-                    }}
-                  />
-                  
-                  {/* Energy particles flowing along the path */}
-                  {[...Array(Math.ceil(line.intensity * 3))].map((_, i) => (
-                    <motion.circle
-                      key={`particle-${line.start}-${line.end}-${i}`}
-                      r={1 + (line.intensity * 2)}
-                      fill="white"
-                      filter="url(#glow)"
-                      initial={{ opacity: 0.7 }}
-                      animate={{
-                        opacity: [0, 0.8, 0],
-                        scale: [0.8, 1.2, 0.8]
-                      }}
-                      transition={{
-                        duration: 2 + (i * 0.5),
-                        repeat: Infinity,
-                        delay: i * 0.7
-                      }}
-                    >
-                      <animateMotion
-                        path={`M ${x} ${y1} Q ${x + curveOffset} ${midY}, ${x} ${y2}`}
-                        dur={`${3 + i}s`}
-                        repeatCount="indefinite"
-                      />
-                    </motion.circle>
-                  ))}
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-      )}
+      <ResonanceLines 
+        resonanceLines={resonanceLines} 
+        chakraYPositions={CHAKRA_Y_POSITIONS}
+      />
       
       {/* Background glow effect */}
-      <motion.div 
-        className="absolute inset-0 rounded-lg"
-        animate={{
-          boxShadow: `inset 0 0 ${20 + (emotionalGrowth / 10)}px rgba(138, 92, 246, ${glowIntensity})`
-        }}
-        transition={{ duration: 3, repeat: Infinity, repeatType: "reverse" }}
+      <BackgroundGlow 
+        emotionalGrowth={emotionalGrowth} 
+        glowIntensity={glowIntensity}
       />
       
       {/* Human silhouette with chakras */}
@@ -202,19 +123,7 @@ const AstralSilhouetteVisualization = ({
       />
       
       {/* Dynamic consciousness state indicator */}
-      {visualizationVariant !== "beginning" && (
-        <motion.div 
-          className="absolute bottom-4 left-0 right-0 text-center text-white/70 text-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0.7, 1, 0.7] }}
-          transition={{ duration: 4, repeat: Infinity }}
-        >
-          {visualizationVariant === "aware" && "Conscious Awareness Awakening"}
-          {visualizationVariant === "illuminated" && "Energy Field Illuminating"}
-          {visualizationVariant === "awakened" && "Consciousness Expansion Unfolding"}
-          {visualizationVariant === "transcendent" && "Transcendent Connection Activating"}
-        </motion.div>
-      )}
+      <ConsciousnessIndicator visualizationVariant={visualizationVariant} />
     </motion.div>
   );
 };
