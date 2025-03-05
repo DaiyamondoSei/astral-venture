@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { askAIAssistant, AIResponse } from '@/services/ai/aiService';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sparkles, MessageCircle, Loader2 } from 'lucide-react';
+import { Sparkles, MessageCircle, Loader2, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 interface AIAssistantDialogProps {
@@ -31,13 +31,27 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
   const [question, setQuestion] = useState('');
   const [response, setResponse] = useState<AIResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Reset the dialog state when the dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      // Small delay to ensure smooth animation
+      const timeout = setTimeout(() => {
+        reset();
+      }, 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [open]);
 
   const handleSubmitQuestion = async () => {
     if (!question.trim() || !user) return;
     
     setLoading(true);
+    setError(null);
+    
     try {
       const aiResponse = await askAIAssistant({
         question,
@@ -48,6 +62,7 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
       setResponse(aiResponse);
     } catch (error) {
       console.error('Error submitting question:', error);
+      setError('Failed to connect to AI assistant');
       toast({
         title: "Couldn't connect to AI assistant",
         description: "Please try again later.",
@@ -61,22 +76,43 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
   const reset = () => {
     setQuestion('');
     setResponse(null);
+    setError(null);
+  };
+
+  const handleClose = () => {
+    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(newOpen) => {
-      if (!newOpen) reset();
-      onOpenChange(newOpen);
-    }}>
+    <Dialog 
+      open={open} 
+      onOpenChange={(newOpen) => {
+        if (!newOpen && !loading) {
+          handleClose();
+        }
+      }}
+    >
       <DialogContent className="glass-card-dark max-w-md sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-display flex items-center gap-2">
-            <Sparkles size={18} className="text-quantum-400" />
-            Quantum AI Guide
-          </DialogTitle>
-          <DialogDescription>
-            Ask questions about your experiences or seek guidance for your practice
-          </DialogDescription>
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle className="text-xl font-display flex items-center gap-2">
+              <Sparkles size={18} className="text-quantum-400" />
+              Quantum AI Guide
+            </DialogTitle>
+            <DialogDescription>
+              Ask questions about your experiences or seek guidance for your practice
+            </DialogDescription>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleClose}
+            disabled={loading}
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </Button>
         </DialogHeader>
         
         <div className="space-y-4 py-2">
@@ -91,11 +127,18 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="E.g., What might be causing the tingling sensation during meditation? or What practices would help balance my throat chakra?"
                 className="bg-black/20 border-white/10 min-h-[100px]"
+                disabled={loading}
               />
               
               {reflectionContext && (
                 <div className="text-xs text-white/60 italic">
                   Your question will be analyzed in the context of the selected reflection.
+                </div>
+              )}
+              
+              {error && (
+                <div className="text-sm text-red-400">
+                  {error}. Please try again.
                 </div>
               )}
             </div>
@@ -126,6 +169,7 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
                 variant="outline" 
                 className="w-full border-white/10"
                 onClick={reset}
+                disabled={loading}
               >
                 Ask Another Question
               </Button>

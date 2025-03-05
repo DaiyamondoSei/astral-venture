@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs } from '@/components/ui/tabs';
 import TabsHeader from './reflection/TabsHeader';
@@ -9,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { analyzeEmotionPatterns } from '@/services/ai/patternAnalysis';
 import { HistoricalReflection } from '@/components/reflection/types';
-import { Json } from '@/integrations/supabase/types';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ReflectionTabProps {
   onReflectionComplete?: (pointsEarned: number, emotionalInsights?: any) => void;
@@ -22,6 +23,7 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
   const [patternInsights, setPatternInsights] = useState<any>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadReflectionPatterns = async () => {
@@ -60,6 +62,11 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
         }
       } catch (error) {
         console.error('Error loading reflection patterns:', error);
+        toast({
+          title: "Couldn't load insights",
+          description: "There was an error loading your reflection patterns.",
+          variant: "destructive"
+        });
       } finally {
         setLoadingInsights(false);
       }
@@ -68,7 +75,7 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
     if (activeTab === 'insights') {
       loadReflectionPatterns();
     }
-  }, [activeTab, user]);
+  }, [activeTab, user, toast]);
 
   const handleReflectionComplete = (pointsEarned: number) => {
     if (user) {
@@ -91,6 +98,14 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
   const handleOpenAiAssistant = (reflectionId?: string, reflectionContent?: string) => {
     setSelectedReflection({ id: reflectionId, content: reflectionContent });
     setAiDialogOpen(true);
+  };
+
+  const handleCloseAiAssistant = () => {
+    setAiDialogOpen(false);
+    // Reset selected reflection after dialog closes
+    setTimeout(() => {
+      setSelectedReflection(null);
+    }, 300);
   };
 
   return (
@@ -121,7 +136,7 @@ const ReflectionTab = ({ onReflectionComplete }: ReflectionTabProps) => {
       
       <AIAssistantDialog 
         open={aiDialogOpen}
-        onOpenChange={setAiDialogOpen}
+        onOpenChange={handleCloseAiAssistant}
         selectedReflectionId={selectedReflection?.id}
         reflectionContext={selectedReflection?.content}
       />

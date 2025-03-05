@@ -30,62 +30,66 @@ serve(async (req) => {
     // Fetch user data and reflections for context if we have userId
     let userContext = "";
     if (userId) {
-      // Initialize Supabase client
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { 
-          auth: { persistSession: false }
-        }
-      );
-      
-      // Fetch user profile
-      const { data: profileData } = await supabaseClient
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (profileData) {
-        userContext += `User has ${profileData.energy_points} energy points and is at astral level ${profileData.astral_level}. `;
-      }
-      
-      // Fetch recent reflections
-      const { data: reflectionsData } = await supabaseClient
-        .from('energy_reflections')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (reflectionsData && reflectionsData.length > 0) {
-        userContext += `Recent reflection themes: ${reflectionsData.map(r => r.dominant_emotion).filter(Boolean).join(', ')}. `;
+      try {
+        // Initialize Supabase client
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { 
+            auth: { persistSession: false }
+          }
+        );
         
-        // Get activated chakras
-        const allChakras = reflectionsData
-          .flatMap(r => r.chakras_activated || [])
-          .filter(Boolean);
+        // Fetch user profile
+        const { data: profileData } = await supabaseClient
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
         
-        if (allChakras.length > 0) {
-          // Count frequency of each chakra
-          const chakraCounts = allChakras.reduce((acc, chakra) => {
-            acc[chakra] = (acc[chakra] || 0) + 1;
-            return acc;
-          }, {});
-          
-          // Get the most active chakras
-          const mostActiveChakras = Object.entries(chakraCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 2)
-            .map(([chakra]) => getChakraName(parseInt(chakra)));
-          
-          userContext += `Most active chakras: ${mostActiveChakras.join(', ')}. `;
+        if (profileData) {
+          userContext += `User has ${profileData.energy_points} energy points and is at astral level ${profileData.astral_level}. `;
         }
+        
+        // Fetch recent reflections
+        const { data: reflectionsData } = await supabaseClient
+          .from('energy_reflections')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        if (reflectionsData && reflectionsData.length > 0) {
+          userContext += `Recent reflection themes: ${reflectionsData.map(r => r.dominant_emotion).filter(Boolean).join(', ')}. `;
+          
+          // Get activated chakras
+          const allChakras = reflectionsData
+            .flatMap(r => r.chakras_activated || [])
+            .filter(Boolean);
+          
+          if (allChakras.length > 0) {
+            // Count frequency of each chakra
+            const chakraCounts = allChakras.reduce((acc, chakra) => {
+              acc[chakra] = (acc[chakra] || 0) + 1;
+              return acc;
+            }, {});
+            
+            // Get the most active chakras
+            const mostActiveChakras = Object.entries(chakraCounts)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 2)
+              .map(([chakra]) => getChakraName(parseInt(chakra)));
+            
+            userContext += `Most active chakras: ${mostActiveChakras.join(', ')}. `;
+          }
+        }
+      } catch (supabaseError) {
+        // Just log the error and continue - don't fail the entire request
+        console.error("Error fetching user context:", supabaseError);
       }
     }
     
-    // For now, we'll generate a simple response without AI
-    // In a real implementation, you would call an AI service like OpenAI here
+    // Generate a response
     const response = generateBasicResponse(question, context, userContext);
     
     return new Response(
@@ -96,7 +100,12 @@ serve(async (req) => {
     console.error("Error in ask-assistant function:", error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        answer: "I'm sorry, I couldn't process your question at this time. Please try again later.",
+        relatedInsights: [],
+        suggestedPractices: ["Try refreshing the page", "Try again in a few moments"]
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

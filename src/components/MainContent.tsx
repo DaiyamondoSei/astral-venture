@@ -29,6 +29,14 @@ const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => 
     setAiDialogOpen(true);
   };
 
+  const handleCloseAiAssistant = () => {
+    setAiDialogOpen(false);
+    // Reset selected reflection after dialog closes
+    setTimeout(() => {
+      setSelectedReflection(null);
+    }, 300);
+  };
+
   return (
     <div className="space-y-6">
       {activeTab === 'dashboard' && (
@@ -57,7 +65,7 @@ const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => 
       {/* Add AI Assistant Dialog */}
       <AIAssistantDialog 
         open={aiDialogOpen}
-        onOpenChange={setAiDialogOpen}
+        onOpenChange={handleCloseAiAssistant}
         selectedReflectionId={selectedReflection?.id}
         reflectionContext={selectedReflection?.content}
       />
