@@ -74,6 +74,31 @@ const EnergyReflectionForm = ({ onReflectionComplete }: EnergyReflectionFormProp
         // Non-critical, so continue even if storing fails
       }
       
+      // Also store the entire reflection in localStorage for history view
+      try {
+        const existingReflectionsString = localStorage.getItem('energyReflections');
+        const existingReflections = existingReflectionsString ? JSON.parse(existingReflectionsString) : [];
+        
+        // Add new reflection to the array (with metadata)
+        existingReflections.unshift({
+          id: Date.now(),
+          content: reflection,
+          points_earned: pointsEarned,
+          created_at: new Date().toISOString(),
+          type: 'energy',
+          insights: emotionalAnalysis.emotionalThemes.map(theme => `Strong ${theme} energy detected`)
+        });
+        
+        // Keep only most recent 50 reflections
+        if (existingReflections.length > 50) {
+          existingReflections.length = 50;
+        }
+        
+        localStorage.setItem('energyReflections', JSON.stringify(existingReflections));
+      } catch (error) {
+        console.error('Error storing energy reflection in history:', error);
+      }
+      
       // Save reflection to database
       await saveReflection(user.id, reflection, pointsEarned);
       

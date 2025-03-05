@@ -3,16 +3,22 @@ import React from 'react';
 
 const ReflectionInstructions = () => {
   return (
-    <div className="mb-4">
-      <h3 className="text-xl font-display mb-2">Energy Integration Journal</h3>
-      <p className="text-white/80 mb-3">
-        Reflect on your energy practices, insights, and awareness expansion. Your authentic 
-        reflections contribute directly to your astral body development and consciousness evolution.
+    <div className="mb-5">
+      <h3 className="text-xl font-display mb-3">Quantum Consciousness Journal</h3>
+      <p className="text-white/80 mb-4">
+        Document your journey through multidimensional awareness expansion. Each reflection 
+        creates ripples in your consciousness field, activating dormant aspects of your astral body.
       </p>
-      <p className="text-white/60 text-sm italic">
-        Consider: How does your consciousness interact with the patterns of energy around you? 
-        Your reflections here are more than words—they're vibrations that ripple through the fabric of your being 
-        and connect you to the universal consciousness field.
+      <div className="p-3 border border-quantum-500/30 rounded-lg bg-black/20 mb-3">
+        <p className="text-white/70 text-sm italic">
+          Consider: How does your consciousness interact with the universal energy field today? 
+          What patterns have you observed in your emotional landscape? How are your energy practices 
+          opening new dimensions of awareness?
+        </p>
+      </div>
+      <p className="text-white/60 text-xs">
+        Your authentic reflections contribute directly to your astral body development and 
+        accelerate your evolution across all 13 levels of consciousness expansion.
       </p>
     </div>
   );
