@@ -16,7 +16,7 @@ export const fetchUserReflections = async (userId: string, limit: number = 50): 
       return [];
     }
 
-    // Process the data to ensure chakras_activated is properly parsed
+    // Process the data to ensure all fields are properly handled
     return (data || []).map(reflection => {
       // Create a base reflection object with guaranteed properties
       const baseReflection: EnergyReflection = {
@@ -28,7 +28,7 @@ export const fetchUserReflections = async (userId: string, limit: number = 50): 
       };
       
       // Add optional properties if they exist in the original data
-      if (reflection.dominant_emotion) {
+      if (reflection.dominant_emotion !== undefined) {
         baseReflection.dominant_emotion = reflection.dominant_emotion;
       }
       
@@ -49,8 +49,6 @@ export const fetchUserReflections = async (userId: string, limit: number = 50): 
           console.error('Error parsing chakras_activated:', e);
           baseReflection.chakras_activated = [];
         }
-      } else {
-        baseReflection.chakras_activated = [];
       }
       
       return baseReflection;
@@ -63,16 +61,28 @@ export const fetchUserReflections = async (userId: string, limit: number = 50): 
 
 export const addReflection = async (userId: string, content: string, points_earned: number, metadata?: any): Promise<EnergyReflection | null> => {
   try {
-    const insertData = {
+    const insertData: any = {
       user_id: userId,
       content: content,
       points_earned: points_earned,
-      ...metadata
     };
     
-    // Make sure chakras_activated is stored as a string if it's an array
-    if (metadata?.chakras_activated && Array.isArray(metadata.chakras_activated)) {
-      insertData.chakras_activated = JSON.stringify(metadata.chakras_activated);
+    // Add optional metadata fields if provided
+    if (metadata) {
+      if (metadata.dominant_emotion) {
+        insertData.dominant_emotion = metadata.dominant_emotion;
+      }
+      
+      if (metadata.emotional_depth !== undefined) {
+        insertData.emotional_depth = metadata.emotional_depth;
+      }
+      
+      // Make sure chakras_activated is stored as a string if it's an array
+      if (metadata.chakras_activated) {
+        insertData.chakras_activated = Array.isArray(metadata.chakras_activated) 
+          ? JSON.stringify(metadata.chakras_activated)
+          : metadata.chakras_activated;
+      }
     }
     
     const { data, error } = await supabase
@@ -86,7 +96,7 @@ export const addReflection = async (userId: string, content: string, points_earn
       return null;
     }
 
-    // Parse chakras_activated back to an array if it was stored as a string
+    // Parse the response into our EnergyReflection type
     const reflection: EnergyReflection = {
       id: data.id,
       created_at: data.created_at,
@@ -95,7 +105,7 @@ export const addReflection = async (userId: string, content: string, points_earn
       points_earned: data.points_earned,
     };
     
-    if (data.dominant_emotion) {
+    if (data.dominant_emotion !== undefined) {
       reflection.dominant_emotion = data.dominant_emotion;
     }
     
@@ -103,7 +113,7 @@ export const addReflection = async (userId: string, content: string, points_earn
       reflection.emotional_depth = data.emotional_depth;
     }
     
-    if (data.chakras_activated) {
+    if (data.chakras_activated !== undefined) {
       try {
         reflection.chakras_activated = typeof data.chakras_activated === 'string'
           ? JSON.parse(data.chakras_activated)
