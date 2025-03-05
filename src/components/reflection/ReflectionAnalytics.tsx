@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchEmotionalJourney, getReflectionInsights, EnergyReflection } from '@/services/reflectionService';
@@ -36,7 +35,12 @@ const ReflectionAnalytics: React.FC<ReflectionAnalyticsProps> = ({
         const journey = await fetchEmotionalJourney(user.id);
         if (journey) {
           setJourneyData(journey);
-          setInsights(getReflectionInsights(journey.recentReflections || []));
+          if (journey.recentReflections) {
+            setReflections(journey.recentReflections);
+            setInsights(getReflectionInsights(journey.recentReflections));
+          } else {
+            setInsights([]); // No reflections available
+          }
         }
       } catch (error) {
         console.error('Error loading reflection analytics:', error);

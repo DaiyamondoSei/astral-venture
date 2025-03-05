@@ -1,7 +1,14 @@
 
 import React from 'react';
-import { SilhouettePartProps } from './types';
-import { getFillForSilhouette, getFilterForLevel, getStrokeClassForLevel } from './utils';
+
+interface SilhouettePartProps {
+  showInfinity: boolean;
+  showTranscendence: boolean;
+  showIllumination: boolean;
+  showFractal: boolean;
+  showDetails: boolean;
+  baseProgressPercentage: number;
+}
 
 const SilhouettePath: React.FC<SilhouettePartProps> = ({
   showInfinity,
@@ -11,6 +18,23 @@ const SilhouettePath: React.FC<SilhouettePartProps> = ({
   showDetails,
   baseProgressPercentage
 }) => {
+  const getFillForSilhouette = () => {
+    return showFractal ? "url(#fractalPattern)" : "url(#silhouetteGradient)";
+  };
+  
+  const getStrokeClassForLevel = () => {
+    if (showInfinity) return "stroke-[0.5px] stroke-blue-200/60";
+    if (showTranscendence) return "stroke-[0.5px] stroke-blue-300/50";
+    if (showIllumination) return "stroke-[0.5px] stroke-blue-400/40";
+    return "stroke-[0.5px] stroke-blue-500/30";
+  };
+  
+  const getFilterForLevel = () => {
+    if (showInfinity) return "url(#cosmicRays)";
+    if (showTranscendence) return "url(#etherealGlow)";
+    return undefined;
+  };
+
   return (
     <>
       {/* Full silhouette */}
@@ -35,9 +59,9 @@ const SilhouettePath: React.FC<SilhouettePartProps> = ({
           Z
           M64,140 L72,140 L70,170 L62,170 
           Z"
-        fill={getFillForSilhouette(showFractal)}
-        className={`astral-body-silhouette ${getStrokeClassForLevel(showInfinity, showTranscendence, showIllumination)}`}
-        filter={getFilterForLevel(showInfinity, showTranscendence)}
+        fill={getFillForSilhouette()}
+        className={`astral-body-silhouette ${getStrokeClassForLevel()}`}
+        filter={getFilterForLevel()}
       />
       
       {/* Illuminated body segments that appear at higher levels */}

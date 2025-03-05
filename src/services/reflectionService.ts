@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabaseClient';
 
 export interface EnergyReflection {
@@ -27,15 +26,44 @@ export const fetchUserReflections = async (userId: string, limit: number = 50): 
     }
 
     // Process the data to ensure chakras_activated is properly parsed
-    return (data || []).map(reflection => ({
-      ...reflection,
-      // Parse chakras_activated if it's a string
-      chakras_activated: reflection.chakras_activated 
-        ? (typeof reflection.chakras_activated === 'string' 
+    return (data || []).map(reflection => {
+      // Create a base reflection object with guaranteed properties
+      const baseReflection: EnergyReflection = {
+        id: reflection.id,
+        created_at: reflection.created_at,
+        user_id: reflection.user_id,
+        content: reflection.content,
+        points_earned: reflection.points_earned,
+      };
+      
+      // Add optional properties if they exist in the original data
+      if (reflection.dominant_emotion) {
+        baseReflection.dominant_emotion = reflection.dominant_emotion;
+      }
+      
+      if (reflection.emotional_depth !== undefined) {
+        baseReflection.emotional_depth = reflection.emotional_depth;
+      }
+      
+      // Handle chakras_activated specially
+      if (reflection.chakras_activated !== undefined) {
+        try {
+          // Parse if it's a string, otherwise use as is if it's already an array
+          baseReflection.chakras_activated = typeof reflection.chakras_activated === 'string' 
             ? JSON.parse(reflection.chakras_activated) 
-            : reflection.chakras_activated)
-        : []
-    }));
+            : Array.isArray(reflection.chakras_activated) 
+              ? reflection.chakras_activated 
+              : [];
+        } catch (e) {
+          console.error('Error parsing chakras_activated:', e);
+          baseReflection.chakras_activated = [];
+        }
+      } else {
+        baseReflection.chakras_activated = [];
+      }
+      
+      return baseReflection;
+    });
   } catch (error) {
     console.error('Error fetching reflections:', error);
     return [];
@@ -121,12 +149,10 @@ export const saveEmotionalAnalysis = async (userId: string, analysisData: object
   try {
     const { data, error } = await supabase
       .from('emotional_analysis')
-      .insert([
-        {
-          user_id: userId,
-          analysis_data: analysisData
-        }
-      ]);
+      .insert({
+        user_id: userId,
+        analysis_data: analysisData
+      });
       
     if (error) throw error;
     return data;
@@ -201,7 +227,8 @@ export const fetchEmotionalJourney = async (userId: string) => {
       activatedChakras: allActivatedChakras,
       dominantEmotions,
       lastReflectionDate: recentReflections[0]?.created_at || null,
-      emotionalAnalysis
+      emotionalAnalysis,
+      recentReflections: recentReflections // Add this to make it available for the ReflectionAnalytics component
     };
   } catch (error) {
     console.error('Error fetching emotional journey:', error);

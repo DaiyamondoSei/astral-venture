@@ -32,18 +32,30 @@ const HumanSilhouette: React.FC<HumanSilhouetteProps> = ({
 }) => {
   return (
     <svg viewBox="0 0 300 500" className="w-full h-full">
-      <Definitions />
+      <Definitions 
+        showDetails={showDetails}
+        showIllumination={showIllumination}
+        showFractal={showFractal}
+        showTranscendence={showTranscendence}
+        showInfinity={showInfinity}
+      />
       
       {/* Main Silhouette */}
       <SilhouettePath
         showDetails={showDetails}
         showIllumination={showIllumination}
+        showFractal={showFractal}
+        showTranscendence={showTranscendence}
+        showInfinity={showInfinity}
+        baseProgressPercentage={baseProgressPercentage}
       />
       
       {/* Central Glow */}
       <CentralGlow 
         baseProgressPercentage={baseProgressPercentage}
         showIllumination={showIllumination}
+        showTranscendence={showTranscendence}
+        showInfinity={showInfinity}
       />
       
       {/* Chakra energy points */}
@@ -52,74 +64,99 @@ const HumanSilhouette: React.FC<HumanSilhouetteProps> = ({
           {/* Root Chakra */}
           <ChakraPoint 
             cx={150} cy={380} 
-            color={CHAKRA_COLORS[0]}
+            chakraIndex={0}
+            showChakras={showChakras}
+            showIllumination={showIllumination}
+            showFractal={showFractal}
+            showTranscendence={showTranscendence}
+            showInfinity={showInfinity}
+            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(0)}
-            active={activatedChakras.includes(0)}
-            showDetails={showDetails}
           />
           
           {/* Sacral Chakra */}
           <ChakraPoint 
             cx={150} cy={340} 
-            color={CHAKRA_COLORS[1]}
+            chakraIndex={1}
+            showChakras={showChakras}
+            showIllumination={showIllumination}
+            showFractal={showFractal}
+            showTranscendence={showTranscendence}
+            showInfinity={showInfinity}
+            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(1)}
-            active={activatedChakras.includes(1)}
-            showDetails={showDetails}
           />
           
           {/* Solar Plexus Chakra */}
           <ChakraPoint 
             cx={150} cy={300} 
-            color={CHAKRA_COLORS[2]}
+            chakraIndex={2}
+            showChakras={showChakras}
+            showIllumination={showIllumination}
+            showFractal={showFractal}
+            showTranscendence={showTranscendence}
+            showInfinity={showInfinity}
+            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(2)}
-            active={activatedChakras.includes(2)}
-            showDetails={showDetails}
           />
           
           {/* Heart Chakra */}
           <ChakraPoint 
             cx={150} cy={260} 
-            color={CHAKRA_COLORS[3]}
+            chakraIndex={3}
+            showChakras={showChakras}
+            showIllumination={showIllumination}
+            showFractal={showFractal}
+            showTranscendence={showTranscendence}
+            showInfinity={showInfinity}
+            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(3)}
-            active={activatedChakras.includes(3)}
-            showDetails={showDetails}
           />
           
           {/* Throat Chakra */}
           <ChakraPoint 
             cx={150} cy={230} 
-            color={CHAKRA_COLORS[4]}
+            chakraIndex={4}
+            showChakras={showChakras}
+            showIllumination={showIllumination}
+            showFractal={showFractal}
+            showTranscendence={showTranscendence}
+            showInfinity={showInfinity}
+            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(4)}
-            active={activatedChakras.includes(4)}
-            showDetails={showDetails}
           />
           
           {/* Third Eye Chakra */}
           <ChakraPoint 
             cx={150} cy={205} 
-            color={CHAKRA_COLORS[5]}
+            chakraIndex={5}
+            showChakras={showChakras}
+            showIllumination={showIllumination}
+            showFractal={showFractal}
+            showTranscendence={showTranscendence}
+            showInfinity={showInfinity}
+            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(5)}
-            active={activatedChakras.includes(5)}
-            showDetails={showDetails}
           />
           
           {/* Crown Chakra */}
           <ChakraPoint 
             cx={150} cy={180} 
-            color={CHAKRA_COLORS[6]}
+            chakraIndex={6}
+            showChakras={showChakras}
+            showIllumination={showIllumination}
+            showFractal={showFractal}
+            showTranscendence={showTranscendence}
+            showInfinity={showInfinity}
+            baseProgressPercentage={baseProgressPercentage}
             intensity={getChakraIntensity(6)}
-            active={activatedChakras.includes(6)}
-            showDetails={showDetails}
           />
         </>
       )}
       
       {/* Infinity essence for transcendence level */}
       {(showTranscendence || showInfinity) && (
-        <InfinityEssence 
-          baseProgressPercentage={baseProgressPercentage}
-          showInfinity={showInfinity}
-        />
+        <InfinityEssence showInfinity={showInfinity} />
       )}
     </svg>
   );

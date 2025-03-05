@@ -1,7 +1,18 @@
 
 import React from 'react';
-import { ChakraPointProps } from './types';
-import { getChakraColor } from './utils';
+
+interface ChakraPointProps {
+  cx: number;
+  cy: number;
+  chakraIndex: number;
+  showChakras: boolean;
+  showIllumination: boolean;
+  showInfinity: boolean;
+  showTranscendence: boolean;
+  showFractal: boolean;
+  baseProgressPercentage: number;
+  intensity: number;
+}
 
 const ChakraPoint: React.FC<ChakraPointProps> = ({
   cx,
@@ -18,6 +29,20 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
   const baseRadius = chakraIndex === 2 || chakraIndex === 5 ? 2.5 : 2;
   const animatedRadius = chakraIndex === 2 || chakraIndex === 5 ? 3 : 2.5;
   
+  const getChakraColor = () => {
+    const chakraColors = [
+      "#FF0000", // Root - Red
+      "#FF7F00", // Sacral - Orange
+      "#FFFF00", // Solar Plexus - Yellow
+      "#00FF00", // Heart - Green
+      "#0000FF", // Throat - Blue
+      "#4B0082", // Third Eye - Indigo
+      "#9400D3"  // Crown - Violet
+    ];
+    
+    return chakraColors[chakraIndex] || "#FFFFFF";
+  };
+  
   const chakraClasses = `energy-point ${
     chakraIndex === 0 ? 'crown-chakra' :
     chakraIndex === 1 ? 'throat-chakra' :
@@ -31,7 +56,7 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
     <circle 
       cx={cx} cy={cy} r={showChakras ? animatedRadius : baseRadius} 
       className={chakraClasses} 
-      fill={getChakraColor(showIllumination, showInfinity, showTranscendence, showFractal)}
+      fill={getChakraColor()}
       opacity={intensity}
       filter={showInfinity ? "url(#cosmicRays)" : undefined}
     >
