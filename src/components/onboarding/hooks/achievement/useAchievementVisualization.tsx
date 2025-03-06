@@ -1,86 +1,106 @@
 
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { AchievementData } from '../../data/types';
-
-export type VisualizationStyle = 'minimal' | 'standard' | 'detailed' | 'animated';
+import { achievementService } from '@/services/achievements';
 
 interface VisualizationOptions {
-  style?: VisualizationStyle;
-  showProgress?: boolean;
-  showPoints?: boolean;
   animate?: boolean;
-  colorful?: boolean;
+  duration?: number;
+  ease?: string;
 }
 
+interface UseAchievementVisualizationResult {
+  visualProgress: number;
+  visualPoints: number;
+  totalPointsWithAnimation: number;
+  isAnimating: boolean;
+  startAnimation: () => void;
+  stopAnimation: () => void;
+}
+
+/**
+ * Hook for handling achievement visualization effects and animations
+ */
 export function useAchievementVisualization(
-  achievements: AchievementData[],
-  getAchievementProgress: (achievementId: string) => number,
+  achievement: AchievementData,
+  currentProgress: number = 0,
+  totalPoints: number = 0,
   options: VisualizationOptions = {}
-) {
-  const {
-    style = 'standard',
-    showProgress = true,
-    showPoints = true,
-    animate = true,
-    colorful = true
-  } = options;
+): UseAchievementVisualizationResult {
+  const [visualProgress, setVisualProgress] = useState(0);
+  const [visualPoints, setVisualPoints] = useState(0);
+  const [totalPointsWithAnimation, setTotalPointsWithAnimation] = useState(totalPoints);
+  const [isAnimating, setIsAnimating] = useState(false);
   
-  const achievementsByCategory = useMemo(() => {
-    return achievements.reduce((acc, achievement) => {
-      const category = achievement.type || 'other';
-      if (!acc[category]) {
-        acc[category] = [];
+  const defaultOptions = {
+    animate: true,
+    duration: 1000,
+    ease: 'easeOut',
+    ...options
+  };
+  
+  // Start the animation
+  const startAnimation = () => {
+    if (!defaultOptions.animate) {
+      // If animation is disabled, just set the final values
+      setVisualProgress(currentProgress);
+      setVisualPoints(achievement.points);
+      setTotalPointsWithAnimation(totalPoints + achievement.points);
+      return;
+    }
+    
+    setIsAnimating(true);
+    
+    // Animate progress value
+    const startTime = Date.now();
+    const startProgress = visualProgress;
+    const startPoints = visualPoints;
+    const startTotalPoints = totalPointsWithAnimation;
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / defaultOptions.duration, 1);
+      
+      // Apply easing (simple easeOut)
+      const easedProgress = 1 - Math.pow(1 - progress, 2);
+      
+      // Update values
+      setVisualProgress(startProgress + (currentProgress - startProgress) * easedProgress);
+      setVisualPoints(startPoints + (achievement.points - startPoints) * easedProgress);
+      setTotalPointsWithAnimation(startTotalPoints + (totalPoints + achievement.points - startTotalPoints) * easedProgress);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
       }
-      acc[category].push(achievement);
-      return acc;
-    }, {} as Record<string, AchievementData[]>);
-  }, [achievements]);
-  
-  const totalProgress = useMemo(() => {
-    if (achievements.length === 0) return 0;
-    
-    const totalPercentage = achievements.reduce((sum, achievement) => {
-      return sum + getAchievementProgress(achievement.id);
-    }, 0);
-    
-    return totalPercentage / achievements.length;
-  }, [achievements, getAchievementProgress]);
-  
-  const getColorForCategory = (category: string): string => {
-    if (!colorful) return 'bg-primary';
-    
-    const colorMap: Record<string, string> = {
-      'discovery': 'bg-blue-500',
-      'completion': 'bg-green-500',
-      'interaction': 'bg-purple-500',
-      'streak': 'bg-red-500',
-      'progressive': 'bg-amber-500',
-      'milestone': 'bg-teal-500'
     };
     
-    return colorMap[category] || 'bg-gray-500';
+    animate();
   };
   
-  const getAnimationForStyle = (achievementStyle: VisualizationStyle): string => {
-    if (!animate) return '';
+  // Stop the animation
+  const stopAnimation = () => {
+    setIsAnimating(false);
     
-    const animationMap: Record<VisualizationStyle, string> = {
-      'minimal': 'animate-fade-in',
-      'standard': 'animate-slide-in-bottom',
-      'detailed': 'animate-scale-in',
-      'animated': 'animate-pulse'
-    };
-    
-    return animationMap[achievementStyle] || '';
+    // Set final values
+    setVisualProgress(currentProgress);
+    setVisualPoints(achievement.points);
+    setTotalPointsWithAnimation(totalPoints + achievement.points);
   };
+  
+  // Reset animation when achievement changes
+  useEffect(() => {
+    setVisualProgress(0);
+    setVisualPoints(0);
+  }, [achievement.id]);
   
   return {
-    achievementsByCategory,
-    totalProgress,
-    getColorForCategory,
-    getAnimationForStyle,
-    style,
-    showProgress,
-    showPoints
+    visualProgress,
+    visualPoints,
+    totalPointsWithAnimation,
+    isAnimating,
+    startAnimation,
+    stopAnimation
   };
 }

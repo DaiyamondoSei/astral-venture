@@ -4,7 +4,9 @@ export { useAchievementTracker } from './useAchievementTracker';
 export { useAchievementState } from './useAchievementState';
 export { useAchievementProgress } from './useAchievementProgress';
 export { useAchievementDetection } from './useAchievementDetection';
+export { useAchievementVisualization } from './useAchievementVisualization';
 export { useProgressTracking } from './useProgressTracking';
+export { useAchievementNotification } from './useAchievementNotification';
 
 // Re-export types
 export * from './types';

@@ -1,117 +1,94 @@
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { AchievementData } from '../data/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Award, Star, TrendingUp } from 'lucide-react';
-import { getAchievementIcon, getProgressColor } from '../hooks/achievement';
+import { AchievementData } from '../data/types';
+import { motion } from 'framer-motion';
+import { formatAchievementPoints, getAchievementIcon, getProgressColor } from '../hooks/achievement';
+import { 
+  Trophy, 
+  Star, 
+  Sparkles, 
+  MousePointer, 
+  Flame, 
+  TrendingUp, 
+  Award,
+  Check 
+} from 'lucide-react';
 
 interface AchievementSummaryProps {
-  achievements: AchievementData[];
-  recentlyEarned?: AchievementData[];
-  getProgress: (achievementId: string) => number;
-  onSelectAchievement?: (achievement: AchievementData) => void;
-  className?: string;
+  achievement: AchievementData;
+  progress?: number;
+  onDismiss?: () => void;
+  showDetails?: boolean;
 }
 
 const AchievementSummary: React.FC<AchievementSummaryProps> = ({
-  achievements,
-  recentlyEarned = [],
-  getProgress,
-  onSelectAchievement,
-  className
+  achievement,
+  progress = 0,
+  onDismiss,
+  showDetails = true
 }) => {
-  // Group achievements by type
-  const achievementGroups = achievements.reduce((groups, achievement) => {
-    const type = achievement.type || 'other';
-    if (!groups[type]) groups[type] = [];
-    groups[type].push(achievement);
-    return groups;
-  }, {} as Record<string, AchievementData[]>);
-
-  const totalAchievements = achievements.length;
-  const earnedAchievements = achievements.filter(a => getProgress(a.id) === 100).length;
-  const completionPercentage = totalAchievements > 0 
-    ? Math.round((earnedAchievements / totalAchievements) * 100) 
-    : 0;
+  const renderAchievementIcon = () => {
+    switch (achievement.type) {
+      case 'discovery':
+        return <Sparkles className="h-5 w-5 text-cyan-400" />;
+      case 'completion':
+        return <Check className="h-5 w-5 text-green-400" />;
+      case 'interaction':
+        return <MousePointer className="h-5 w-5 text-indigo-400" />;
+      case 'streak':
+        return <Flame className="h-5 w-5 text-orange-400" />;
+      case 'progressive':
+        return <TrendingUp className="h-5 w-5 text-blue-400" />;
+      case 'milestone':
+        return <Award className="h-5 w-5 text-purple-400" />;
+      default:
+        return <Star className="h-5 w-5 text-yellow-400" />;
+    }
+  };
 
   return (
-    <div className={className}>
-      <Card className="bg-black/50 border border-white/10">
-        <CardHeader>
-          <CardTitle className="flex items-center text-xl">
-            <Award className="mr-2 h-5 w-5 text-primary" />
-            Achievement Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Overall Progress</span>
-            <span className="text-sm font-medium">{completionPercentage}%</span>
-          </div>
-          <Progress value={completionPercentage} className="h-2" />
+    <motion.div
+      className="bg-black/40 border border-quantum-500/30 rounded-lg p-4 shadow-lg backdrop-blur-sm"
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="flex items-start">
+        <div className="p-2 bg-quantum-900/60 rounded-lg mr-3">
+          {renderAchievementIcon()}
+        </div>
+        
+        <div className="flex-1">
+          <h4 className="text-lg font-medium text-white">{achievement.title}</h4>
+          <p className="text-sm text-white/70 mb-2">{achievement.description}</p>
           
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <div className="bg-black/30 rounded-md p-3 text-center">
-              <div className="text-2xl font-bold">{earnedAchievements}</div>
-              <div className="text-xs text-muted-foreground">Achievements Earned</div>
-            </div>
-            <div className="bg-black/30 rounded-md p-3 text-center">
-              <div className="text-2xl font-bold">{totalAchievements - earnedAchievements}</div>
-              <div className="text-xs text-muted-foreground">Remaining</div>
-            </div>
-          </div>
-          
-          {recentlyEarned.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-sm font-medium mb-2 flex items-center">
-                <Star className="h-4 w-4 mr-1 text-yellow-500" />
-                Recently Earned
-              </h3>
-              <div className="space-y-2">
-                {recentlyEarned.slice(0, 3).map(achievement => (
-                  <motion.div
-                    key={achievement.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-primary/10 border border-primary/20 rounded-md p-2 cursor-pointer"
-                    onClick={() => onSelectAchievement?.(achievement)}
-                  >
-                    <div className="flex items-center">
-                      <div className="bg-primary/20 p-1 rounded mr-2">
-                        {React.createElement(
-                          getAchievementIcon(achievement.type) === 'star' 
-                            ? Star 
-                            : achievement.type === 'trending-up' 
-                              ? TrendingUp 
-                              : Award, 
-                          { size: 14, className: "text-primary" }
-                        )}
-                      </div>
-                      <div className="text-sm font-medium">{achievement.title}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+          {showDetails && (
+            <div className="flex items-center justify-between mt-3">
+              <Badge variant="outline" className="bg-black/30 border-quantum-400/40">
+                {formatAchievementPoints(achievement.points)}
+              </Badge>
+              
+              <Badge variant="outline" className={`bg-black/30 border-quantum-400/40 ${getProgressColor(progress)}`}>
+                {achievement.type === 'streak' ? `${achievement.streakDays} days` : ''}
+                {achievement.type === 'progressive' ? `Tier ${achievement.tier || 1}` : ''}
+              </Badge>
             </div>
           )}
-          
-          <div className="flex flex-wrap gap-1 mt-4">
-            {Object.entries(achievementGroups).map(([type, items]) => (
-              <Badge 
-                key={type}
-                variant="outline" 
-                className="bg-black/30 hover:bg-black/50 transition-colors"
-              >
-                {type} ({items.length})
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+        
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            className="ml-2 text-white/50 hover:text-white"
+            aria-label="Dismiss achievement"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    </motion.div>
   );
 };
 

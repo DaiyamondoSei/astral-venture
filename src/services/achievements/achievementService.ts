@@ -1,137 +1,81 @@
 
 import { AchievementData } from '@/components/onboarding/data/types';
-import { 
-  onboardingAchievements,
-  progressiveAchievements,
-  milestoneAchievements
-} from '@/components/onboarding/data';
 
-export interface AchievementHistory {
-  awarded: boolean;
-  timestamp: string;
-  tier?: number;
-}
-
-export interface UserAchievements {
-  userId: string;
-  history: Record<string, AchievementHistory>;
-  progressTracking: Record<string, number>;
-}
-
-/**
- * Gets all available achievements
- */
-export function getAllAchievements(): AchievementData[] {
-  return [...onboardingAchievements, ...progressiveAchievements, ...milestoneAchievements];
-}
-
-/**
- * Gets achievements by their type
- */
-export function getAchievementsByType(type: string): AchievementData[] {
-  return getAllAchievements().filter(achievement => achievement.type === type);
-}
-
-/**
- * Gets a specific achievement by ID
- */
-export function getAchievementById(id: string): AchievementData | undefined {
-  return getAllAchievements().find(achievement => achievement.id === id);
-}
-
-/**
- * Loads user achievement data from local storage
- */
-export function loadUserAchievements(userId: string): UserAchievements {
-  const achievementHistory = JSON.parse(
-    localStorage.getItem(`achievements-${userId}`) || '{}'
-  );
+// Create a single source of truth for achievement-related operations
+export const achievementService = {
+  /**
+   * Calculate achievement progress percentage
+   * @param achievement The achievement to calculate progress for
+   * @param currentValue The current progress value
+   * @returns Progress percentage (0-100)
+   */
+  calculateProgress: (achievement: AchievementData, currentValue: number): number => {
+    if (!achievement.progressThreshold || achievement.progressThreshold <= 0) {
+      return 100; // If no threshold is defined, achievement is complete
+    }
+    
+    const progress = Math.min(100, Math.floor((currentValue / achievement.progressThreshold) * 100));
+    return progress;
+  },
   
-  const progressTracking = JSON.parse(
-    localStorage.getItem(`achievement-progress-${userId}`) || '{}'
-  );
+  /**
+   * Determine if an achievement should be awarded
+   * @param achievement The achievement to check
+   * @param currentValue The current value to check against
+   * @param previouslyAwarded Whether this achievement was previously awarded
+   * @returns Boolean indicating if achievement should be awarded
+   */
+  shouldAwardAchievement: (
+    achievement: AchievementData, 
+    currentValue: number,
+    previouslyAwarded: boolean = false
+  ): boolean => {
+    // Don't award if already awarded (unless it's a progressive achievement)
+    if (previouslyAwarded && achievement.type !== 'progressive') {
+      return false;
+    }
+    
+    // Handle different achievement types
+    switch (achievement.type) {
+      case 'streak':
+        return currentValue >= (achievement.streakDays || 1);
+        
+      case 'progressive':
+        // For tiered achievements, check if we've reached a new tier
+        if (achievement.tieredLevels && achievement.tieredLevels.length > 0) {
+          const nextTierIndex = achievement.tier ? achievement.tier : 0;
+          const nextTierThreshold = achievement.tieredLevels[nextTierIndex];
+          return nextTierThreshold && currentValue >= nextTierThreshold;
+        }
+        return currentValue >= (achievement.progressThreshold || 1);
+        
+      case 'milestone':
+        return currentValue >= (achievement.progressThreshold || 1);
+        
+      default:
+        return true; // For discovery, completion, and interaction types
+    }
+  },
   
-  return {
-    userId,
-    history: achievementHistory,
-    progressTracking
-  };
-}
-
-/**
- * Saves user achievement data to local storage
- */
-export function saveUserAchievements(data: UserAchievements): void {
-  localStorage.setItem(
-    `achievements-${data.userId}`, 
-    JSON.stringify(data.history)
-  );
-  
-  localStorage.setItem(
-    `achievement-progress-${data.userId}`, 
-    JSON.stringify(data.progressTracking)
-  );
-}
-
-/**
- * Awards an achievement to a user
- */
-export function awardAchievement(
-  userId: string, 
-  achievementId: string,
-  tier?: number
-): void {
-  const userData = loadUserAchievements(userId);
-  
-  userData.history[achievementId] = {
-    awarded: true,
-    timestamp: new Date().toISOString(),
-    ...(tier !== undefined && { tier })
-  };
-  
-  saveUserAchievements(userData);
-}
-
-/**
- * Updates achievement progress for a user
- */
-export function updateAchievementProgress(
-  userId: string,
-  key: string,
-  value: number
-): void {
-  const userData = loadUserAchievements(userId);
-  
-  userData.progressTracking[key] = value;
-  
-  saveUserAchievements(userData);
-}
-
-/**
- * Gets earned achievements for a user
- */
-export function getEarnedAchievements(userId: string): AchievementData[] {
-  const userData = loadUserAchievements(userId);
-  const earnedIds = Object.entries(userData.history)
-    .filter(([_, data]) => data.awarded)
-    .map(([id]) => id);
-  
-  return getAllAchievements()
-    .filter(achievement => earnedIds.includes(achievement.id))
-    .map(achievement => {
-      const historyEntry = userData.history[achievement.id];
+  /**
+   * Calculate points earned for an achievement
+   * @param achievement The achievement to calculate points for
+   * @param currentTier For tiered achievements, the current tier
+   * @returns Number of points earned
+   */
+  calculatePoints: (achievement: AchievementData, currentTier?: number): number => {
+    // For progressive achievements with tier-based points
+    if (achievement.type === 'progressive' && 
+        achievement.pointsPerTier && 
+        achievement.pointsPerTier.length > 0 &&
+        typeof currentTier === 'number') {
       
-      // For progressive achievements, update the title and points based on tier
-      if (achievement.type === 'progressive' && historyEntry.tier !== undefined) {
-        return {
-          ...achievement,
-          title: `${achievement.title} (Tier ${historyEntry.tier})`,
-          points: (achievement.pointsPerTier && historyEntry.tier > 0) 
-            ? achievement.pointsPerTier[historyEntry.tier - 1] 
-            : achievement.points
-        };
-      }
-      
-      return achievement;
-    });
-}
+      // Get points for the current tier, or use the last defined tier
+      const tierIndex = Math.min(currentTier, achievement.pointsPerTier.length - 1);
+      return achievement.pointsPerTier[tierIndex] || achievement.points;
+    }
+    
+    // Default to the achievement's base points
+    return achievement.points;
+  }
+};
