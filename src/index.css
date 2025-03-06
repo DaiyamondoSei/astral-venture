@@ -43,6 +43,37 @@
     --chakra-color-4: #00bfff;  /* Throat */
     --chakra-color-5: #0000ff;  /* Third Eye */
     --chakra-color-6: #8a2be2;  /* Crown */
+    
+    /* Sacred Geometry Theme Colors */
+    --quantum-color-100: #e0d7f7;
+    --quantum-color-200: #c2aff0;
+    --quantum-color-300: #a487e8;
+    --quantum-color-400: #865fe1;
+    --quantum-color-500: #6837d9;
+    --quantum-color-600: #532cae;
+    --quantum-color-700: #3e2182;
+    --quantum-color-800: #291657;
+    --quantum-color-900: #150b2b;
+    
+    --astral-color-100: #d6e0f5;
+    --astral-color-200: #adc2eb;
+    --astral-color-300: #84a3e1;
+    --astral-color-400: #5b85d7;
+    --astral-color-500: #3266cd;
+    --astral-color-600: #2852a4;
+    --astral-color-700: #1e3d7b;
+    --astral-color-800: #142952;
+    --astral-color-900: #0a1429;
+    
+    --ethereal-color-100: #d7f9f3;
+    --ethereal-color-200: #aff3e7;
+    --ethereal-color-300: #87eddb;
+    --ethereal-color-400: #5fe7cf;
+    --ethereal-color-500: #37e1c3;
+    --ethereal-color-600: #2cb49c;
+    --ethereal-color-700: #218775;
+    --ethereal-color-800: #165a4e;
+    --ethereal-color-900: #0b2d27;
   }
 
   .dark {
@@ -91,37 +122,98 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+/* Glassmorphism Cards and UI Components */
 .glass-card {
-  @apply bg-white/5 backdrop-blur-md rounded-xl;
+  @apply bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-lg;
 }
 
-/* Chakra visualization styles for the silhouette */
-.astral-body-part {
-  fill: url(#silhouetteGradient);
-  stroke: rgba(255, 255, 255, 0.5);
-  stroke-width: 0.5;
+.glass-button {
+  @apply bg-white/10 backdrop-blur-md hover:bg-white/20 transition-all duration-300;
 }
 
-.astral-body-silhouette {
-  filter: drop-shadow(0 0 8px rgba(138, 92, 246, 0.4));
+.glass-input {
+  @apply bg-black/20 backdrop-blur-md border border-white/20 focus:border-white/30 transition-all;
 }
 
-/* Animations */
-@keyframes pulse {
+/* Animated Backgrounds */
+.orb {
+  @apply absolute rounded-full bg-gradient-to-br opacity-40 blur-3xl animate-pulse;
+  animation-duration: 15s;
+}
+
+.wave-container {
+  @apply absolute bottom-0 left-0 right-0 h-60 overflow-hidden opacity-60;
+}
+
+.wave {
+  @apply absolute bottom-0 left-0 w-full h-24 min-w-[1000px];
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 88.7'%3E%3Cpath d='M800 56.9c-155.5 0-204.9-50-405.5-49.9-200 0-250 49.9-394.5 49.9v31.8h800v-31.8z' fill='%23330867' opacity='0.3'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: repeat-x;
+}
+
+.wave-1 {
+  animation: wave 30s -3s linear infinite;
+  opacity: 0.3;
+  bottom: 0;
+}
+
+.wave-2 {
+  animation: wave 25s linear reverse infinite;
+  opacity: 0.2;
+  bottom: 5px;
+}
+
+.wave-3 {
+  animation: wave 20s -1s linear infinite;
+  opacity: 0.1;
+  bottom: 10px;
+}
+
+@keyframes wave {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-25%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Sacred Geometry Animations */
+@keyframes pulse-slow {
   0%, 100% {
-    opacity: 1;
+    opacity: 0.7;
     transform: scale(1);
   }
   50% {
-    opacity: 0.8;
-    transform: scale(0.98);
+    opacity: 1;
+    transform: scale(1.05);
   }
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.animate-pulse-slow {
+  animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+@keyframes draw {
+  0% {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+  }
+  100% {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw {
+  animation: draw 8s ease forwards;
+}
+
+/* Other animations */
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -135,4 +227,15 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Chakra visualization styles for the silhouette */
+.astral-body-part {
+  fill: url(#silhouetteGradient);
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 0.5;
+}
+
+.astral-body-silhouette {
+  filter: drop-shadow(0 0 8px rgba(138, 92, 246, 0.4));
 }
