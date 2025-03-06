@@ -62,7 +62,6 @@ const ReflectionFormInput = ({
           loading={isSubmitting}
           variant="quantum"
           className="transition-all duration-200"
-          size="default"
         >
           <Send size={16} className="mr-2" />
           Submit Reflection
