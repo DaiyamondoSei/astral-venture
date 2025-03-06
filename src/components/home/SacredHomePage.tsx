@@ -12,6 +12,7 @@ import WelcomeHeader from '@/components/home/widgets/WelcomeHeader';
 import LeftSidebar from '@/components/home/widgets/LeftSidebar';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
 import DetailSection from '@/components/home/widgets/DetailSection';
+import MetatronsBackground from '@/components/sacred-geometry/components/MetatronsBackground';
 
 interface SacredHomePageProps {
   user: any;
@@ -33,6 +34,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [selectedNodeMaterials, setSelectedNodeMaterials] = useState<DownloadableMaterial[] | null>(null);
   const [pageLoaded, setPageLoaded] = useState(false);
+  const [consciousnessLevel, setConsciousnessLevel] = useState(1);
   
   // Add loading effect
   useEffect(() => {
@@ -61,6 +63,28 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     return () => clearTimeout(timer);
   }, [user, userProfile, userStreak, activatedChakras, selectedNode]);
   
+  // Calculate consciousness level based on user stats
+  useEffect(() => {
+    // Base calculation on energy points and activated chakras
+    const energyPoints = userProfile?.energy_points || 0;
+    const baseLevel = Math.max(1, Math.floor(energyPoints / 200));
+    
+    // Bonus for activated chakras
+    const chakraBonus = Math.min(activatedChakras.length / 2, 1.5);
+    
+    // Bonus for streak
+    const streakBonus = Math.min(userStreak.current / 10, 1);
+    
+    // Calculate total consciousness level (capped at 7)
+    const calculatedLevel = Math.min(Math.floor(baseLevel + chakraBonus + streakBonus), 7);
+    
+    setConsciousnessLevel(calculatedLevel);
+    
+    console.log("Consciousness level calculated:", calculatedLevel, { 
+      baseLevel, chakraBonus, streakBonus 
+    });
+  }, [userProfile, activatedChakras, userStreak]);
+  
   // Derive username from user data
   const username = userProfile?.username || user?.email?.split('@')[0] || 'Seeker';
   const astralLevel = userProfile?.astral_level || 1;
@@ -72,9 +96,15 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     setSelectedNodeMaterials(downloadables || null);
     
     // Add visual feedback
+    const nodeDisplayName = nodeId === 'portal-center' 
+      ? 'Dimensional Portal' 
+      : nodeId.charAt(0).toUpperCase() + nodeId.slice(1);
+    
     toast({
-      title: `${nodeId.charAt(0).toUpperCase() + nodeId.slice(1)} node activated`,
-      description: "Quantum resonance established.",
+      title: `${nodeDisplayName} activated`,
+      description: nodeId === 'portal-center' 
+        ? "Consciousness alignment in progress..." 
+        : "Quantum resonance established.",
     });
     
     if (onNodeSelect) {
@@ -120,11 +150,21 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       variants={pageVariants}
       className="min-h-screen px-4 py-8 relative"
     >
-      {/* Background effects */}
-      <QuantumParticles count={20} interactive={true} className="z-0" />
+      {/* Enhanced background effects */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-quantum-950/50 to-black/90 z-0"></div>
+        <MetatronsBackground 
+          energyPoints={energyPoints} 
+          enableAnimation={true}
+          interactivity="advanced"
+          consciousnessLevel={consciousnessLevel}
+          opacity={0.2}
+        />
+        <QuantumParticles count={20} interactive={true} className="z-0" />
+      </div>
       
       {/* Welcome Header */}
-      <motion.div variants={fadeInUpVariants}>
+      <motion.div variants={fadeInUpVariants} className="relative z-10">
         <WelcomeHeader 
           username={username}
           onLogout={onLogout}
@@ -144,6 +184,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
               activatedChakras={activatedChakras}
               selectedNode={selectedNode}
               selectedNodeMaterials={selectedNodeMaterials}
+              consciousnessLevel={consciousnessLevel}
             />
           </GlassCard>
         </motion.div>
@@ -187,6 +228,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
               selectedNode={selectedNode}
               energyPoints={energyPoints}
               selectedNodeMaterials={selectedNodeMaterials}
+              consciousnessLevel={consciousnessLevel}
             />
           </GlassCard>
         </motion.div>
