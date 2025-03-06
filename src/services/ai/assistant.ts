@@ -34,7 +34,7 @@ export async function askAIAssistant(
     }
     
     // Prepare request data
-    const requestData = { 
+    const requestData: any = { 
       message: questionData.question,
       context: questionData.context,
       reflectionIds: questionData.reflectionIds,

@@ -43,6 +43,10 @@ export {
   FALLBACK_RESPONSES
 } from './fallback';
 
+// Import all the functionality we're exporting in the aiService object
+import { generateInsightsFromReflections, getPersonalizedRecommendations } from './insights';
+import { askAIAssistant } from './assistant';
+
 // Export the service as a consolidated object for easier imports
 export const aiService = {
   generateInsightsFromReflections,
