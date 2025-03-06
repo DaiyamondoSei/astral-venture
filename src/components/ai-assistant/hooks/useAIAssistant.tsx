@@ -47,35 +47,69 @@ export const useAIAssistant = ({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 40000); // 40-second timeout
       
-      const aiResponse = await askAIAssistant({
-        question,
-        context: reflectionContext,
-        reflectionIds: selectedReflectionId ? [selectedReflectionId] : undefined
-      }, user.id);
+      // Determine if we should use streaming based on question length and complexity
+      const shouldStream = question.length > 50;
+      
+      if (shouldStream) {
+        // For streaming responses, we'll start collecting chunks
+        try {
+          // Start with an empty streaming response
+          setStreamingResponse('');
+          
+          const aiResponse = await askAIAssistant({
+            question,
+            context: reflectionContext,
+            reflectionIds: selectedReflectionId ? [selectedReflectionId] : undefined,
+            stream: shouldStream
+          }, user.id);
+          
+          // When streaming is complete, we'll have the full response
+          setResponse(aiResponse);
+          setStreamingResponse(null);
+          
+          // Set model info if available in the response
+          if (aiResponse.meta && aiResponse.meta.model) {
+            setModelInfo({
+              model: aiResponse.meta.model,
+              tokens: aiResponse.meta.tokenUsage || 0
+            });
+          }
+        } catch (streamError) {
+          console.error('Error during streaming:', streamError);
+          setError('Failed to stream response');
+        }
+      } else {
+        // For non-streaming responses, we'll just wait for the complete response
+        const aiResponse = await askAIAssistant({
+          question,
+          context: reflectionContext,
+          reflectionIds: selectedReflectionId ? [selectedReflectionId] : undefined
+        }, user.id);
+        
+        console.log('Received response:', aiResponse);
+        
+        // Validate that we have a properly structured response before setting state
+        if (!aiResponse || typeof aiResponse.answer !== 'string') {
+          throw new Error('Invalid response format from AI assistant');
+        }
+        
+        // Ensure suggestedPractices is an array
+        if (!aiResponse.suggestedPractices || !Array.isArray(aiResponse.suggestedPractices)) {
+          aiResponse.suggestedPractices = [];
+        }
+        
+        // Set model info if available in the response
+        if (aiResponse.meta && aiResponse.meta.model) {
+          setModelInfo({
+            model: aiResponse.meta.model,
+            tokens: aiResponse.meta.tokenUsage || 0
+          });
+        }
+        
+        setResponse(aiResponse);
+      }
       
       clearTimeout(timeoutId);
-      
-      console.log('Received response:', aiResponse);
-      
-      // Validate that we have a properly structured response before setting state
-      if (!aiResponse || typeof aiResponse.answer !== 'string') {
-        throw new Error('Invalid response format from AI assistant');
-      }
-      
-      // Ensure suggestedPractices is an array
-      if (!aiResponse.suggestedPractices || !Array.isArray(aiResponse.suggestedPractices)) {
-        aiResponse.suggestedPractices = [];
-      }
-      
-      // Set model info if available in the response
-      if (aiResponse.meta && aiResponse.meta.model) {
-        setModelInfo({
-          model: aiResponse.meta.model,
-          tokens: aiResponse.meta.tokenUsage || 0
-        });
-      }
-      
-      setResponse(aiResponse);
     } catch (error) {
       console.error('Error submitting question:', error);
       

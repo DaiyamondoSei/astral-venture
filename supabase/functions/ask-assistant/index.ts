@@ -144,13 +144,40 @@ async function handleStreamingRequest(
   systemPrompt: string, 
   model: AIModel
 ): Promise<Response> {
-  // We'll implement streaming in the next phase
-  // For now, return an error to indicate it's not implemented yet
-  return createErrorResponse(
-    ErrorCode.NOT_IMPLEMENTED,
-    "Streaming responses not implemented yet",
-    { feature: "streaming" }
-  );
+  try {
+    // For now, we'll just return a non-streaming response
+    // This will be updated to support actual streaming in the next phase
+    const { content: aiResponse, metrics } = await generateChatResponse(
+      prompt, 
+      systemPrompt,
+      { 
+        model,
+        stream: false // We'll change this to true when streaming is implemented 
+      }
+    );
+    
+    const suggestedPractices = extractSuggestedPractices(aiResponse);
+    
+    return createSuccessResponse(
+      {
+        answer: aiResponse,
+        suggestedPractices,
+        relatedInsights: []
+      },
+      {
+        tokenUsage: metrics.totalTokens,
+        model: metrics.model,
+        note: "Streaming not fully implemented yet"
+      }
+    );
+  } catch (error) {
+    console.error("Error in streaming request:", error);
+    return createErrorResponse(
+      ErrorCode.INTERNAL_ERROR,
+      "Failed to process streaming request",
+      { errorMessage: error.message }
+    );
+  }
 }
 
 // Extract suggested practices from AI response

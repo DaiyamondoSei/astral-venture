@@ -1,111 +1,124 @@
 
-import React from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 /**
- * Custom equality check for React.memo() to efficiently check props equality.
- * This is useful for complex components with deeply nested props objects.
+ * A collection of utilities to optimize component performance.
+ * These utilities help with rendering optimization, memoization strategies,
+ * and performance monitoring for React components.
  */
-export function arePropsEqual<T>(
-  prevProps: Readonly<T>, 
-  nextProps: Readonly<T>, 
-  propsToIgnore: string[] = []
-): boolean {
-  if (prevProps === nextProps) {
-    return true;
-  }
+
+/**
+ * Monitors component render frequency and logs potential performance issues.
+ * 
+ * @param componentName Name of the component being monitored
+ * @returns Object with render count and performance metrics
+ */
+export function useRenderMonitor(componentName: string) {
+  const renderCount = useRef(0);
+  const lastRenderTime = useRef(Date.now());
   
-  const prevKeys = Object.keys(prevProps) as Array<keyof T>;
-  const nextKeys = Object.keys(nextProps) as Array<keyof T>;
-  
-  // Check if the number of keys is different
-  if (prevKeys.length !== nextKeys.length) {
-    return false;
-  }
-  
-  // Check each key
-  return prevKeys.every(key => {
-    const keyString = key as string;
-    // Skip keys that should be ignored
-    if (propsToIgnore.includes(keyString)) {
-      return true;
+  useEffect(() => {
+    renderCount.current += 1;
+    const now = Date.now();
+    const timeSinceLastRender = now - lastRenderTime.current;
+    
+    // Log if renders are happening too frequently
+    if (timeSinceLastRender < 100 && renderCount.current > 3) {
+      console.warn(
+        `[RenderMonitor] ${componentName} rendered ${renderCount.current} times. ` +
+        `Last render was only ${timeSinceLastRender}ms ago. Consider optimizing.`
+      );
     }
     
-    const prevValue = prevProps[key];
-    const nextValue = nextProps[key];
+    lastRenderTime.current = now;
     
-    // Check for functions - compare by reference
-    if (typeof prevValue === 'function' && typeof nextValue === 'function') {
-      return true; // Always return true for functions to avoid unnecessary re-renders
-    }
-    
-    // Special case for event handlers (functions that start with 'on')
-    if (typeof keyString === 'string' && keyString.startsWith('on') && 
-        typeof prevValue === 'function' && typeof nextValue === 'function') {
-      return true;
-    }
-    
-    // Handle arrays
-    if (Array.isArray(prevValue) && Array.isArray(nextValue)) {
-      if (prevValue.length !== nextValue.length) {
-        return false;
-      }
-      
-      // For simple arrays of primitives
-      if (prevValue.every(item => 
-        typeof item === 'string' || 
-        typeof item === 'number' || 
-        typeof item === 'boolean'
-      )) {
-        return prevValue.every((val, index) => val === nextValue[index]);
-      }
-      
-      // For complex arrays, just check reference
-      return prevValue === nextValue;
-    }
-    
-    // Handle objects
-    if (
-      typeof prevValue === 'object' && 
-      prevValue !== null && 
-      typeof nextValue === 'object' && 
-      nextValue !== null
-    ) {
-      return prevValue === nextValue; // Compare by reference for objects
-    }
-    
-    // For all other values, do a strict equality check
-    return prevValue === nextValue;
+    return () => {
+      // Final log when component unmounts
+      console.debug(
+        `[RenderMonitor] ${componentName} rendered ${renderCount.current} times in total.`
+      );
+    };
   });
-}
-
-/**
- * Creates a memoized component with custom equality check
- * @param Component The component to memoize
- * @param propsToIgnore Array of prop names to ignore in equality check
- */
-export function createMemoizedComponent<P>(
-  Component: React.ComponentType<P>,
-  propsToIgnore: string[] = []
-): React.MemoExoticComponent<React.ComponentType<P>> {
-  return React.memo(Component, (prevProps, nextProps) => 
-    arePropsEqual(prevProps, nextProps, propsToIgnore)
-  );
-}
-
-/**
- * Creates a lazy-loaded component that only loads when needed
- * @param importFn Function that imports the component
- * @param fallback Optional fallback component to show during loading
- */
-export function createLazyComponent<P>(
-  importFn: () => Promise<{ default: React.ComponentType<P> }>,
-  fallback: React.ReactNode = null
-): React.FC<P> {
-  const LazyComponent = React.lazy(importFn);
   
-  return (props: P) => (
-    <React.Suspense fallback={fallback}>
-      <LazyComponent {...props} />
-    </React.Suspense>
-  );
+  return {
+    renderCount: renderCount.current,
+    timeSinceMount: Date.now() - lastRenderTime.current
+  };
+}
+
+/**
+ * Calculates and logs component render performance metrics
+ * 
+ * @param componentName Name of the component
+ * @returns Performance tracking methods
+ */
+export function useComponentPerformance(componentName: string) {
+  const renderStartTime = useRef(0);
+  const renderTimes = useRef<number[]>([]);
+  
+  const startRenderTimer = () => {
+    renderStartTime.current = performance.now();
+  };
+  
+  const endRenderTimer = () => {
+    const renderTime = performance.now() - renderStartTime.current;
+    renderTimes.current.push(renderTime);
+    
+    // Log if render time is too high
+    if (renderTime > 50) {
+      console.warn(
+        `[Performance] ${componentName} took ${renderTime.toFixed(2)}ms to render. ` +
+        `This is above the recommended threshold of 50ms.`
+      );
+    }
+    
+    return renderTime;
+  };
+  
+  useEffect(() => {
+    startRenderTimer();
+    
+    return () => {
+      const totalRenderTime = renderTimes.current.reduce((sum, time) => sum + time, 0);
+      const averageRenderTime = totalRenderTime / Math.max(renderTimes.current.length, 1);
+      
+      console.debug(
+        `[Performance] ${componentName} average render time: ` +
+        `${averageRenderTime.toFixed(2)}ms over ${renderTimes.current.length} renders.`
+      );
+    };
+  }, [componentName]);
+  
+  return {
+    startRenderTimer,
+    endRenderTimer,
+    getRenderMetrics: () => ({
+      averageRenderTime: renderTimes.current.reduce((sum, time) => sum + time, 0) / 
+        Math.max(renderTimes.current.length, 1),
+      renderCount: renderTimes.current.length,
+      maxRenderTime: Math.max(...renderTimes.current, 0)
+    })
+  };
+}
+
+/**
+ * Optimizes expensive calculations by memoizing results
+ * 
+ * @param calculationFn Function to memoize
+ * @returns Memoized function with the same signature
+ */
+export function memoizeCalculation<T extends (...args: any[]) => any>(calculationFn: T) {
+  const cache = new Map<string, ReturnType<T>>();
+  
+  return ((...args: Parameters<T>): ReturnType<T> => {
+    const key = JSON.stringify(args);
+    
+    if (cache.has(key)) {
+      return cache.get(key) as ReturnType<T>;
+    }
+    
+    const result = calculationFn(...args);
+    cache.set(key, result);
+    return result;
+  }) as T;
 }

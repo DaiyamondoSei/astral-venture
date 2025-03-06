@@ -63,8 +63,36 @@ const FALLBACK_RESPONSES = [
       "Practice grounding by connecting with nature",
       "Use salt baths to clear your energy field"
     ]
+  },
+  {
+    question_type: "consciousness",
+    answer: "Consciousness is the awareness of your existence and the world around you. Expanding your consciousness involves becoming more aware of your thoughts, emotions, and the interconnectedness of all things.",
+    practices: [
+      "Practice mindful awareness throughout your daily activities",
+      "Explore different states of consciousness through meditation",
+      "Keep a consciousness journal to track your insights"
+    ]
+  },
+  {
+    question_type: "intuition",
+    answer: "Intuition is your inner guidance system, a form of knowing that transcends logical reasoning. Developing your intuition helps you make decisions aligned with your higher self and true purpose.",
+    practices: [
+      "Take a few minutes each day to sit quietly and listen to your inner voice",
+      "Practice intuitive decision-making on small daily choices",
+      "Notice and record intuitive insights that prove accurate"
+    ]
   }
 ];
+
+// Common questions and their cached responses to avoid repeated API calls
+const CACHED_RESPONSES = new Map<string, {
+  answer: string;
+  suggestedPractices: string[];
+  timestamp: number;
+}>();
+
+// Maximum age for cached responses in milliseconds (1 day)
+const MAX_CACHE_AGE = 24 * 60 * 60 * 1000;
 
 /**
  * Find the best fallback response based on the question content
@@ -76,7 +104,9 @@ function findFallbackResponse(question: string): {answer: string; practices: str
   const keywordMap = {
     meditation: ["meditate", "meditation", "breathe", "breathing", "mindful", "focus", "calm"],
     chakra: ["chakra", "energy center", "root", "sacral", "solar plexus", "heart", "throat", "third eye", "crown"],
-    energy: ["energy", "vibration", "frequency", "aura", "field", "spiritual", "practice"]
+    energy: ["energy", "vibration", "frequency", "aura", "field", "spiritual", "practice"],
+    consciousness: ["conscious", "awareness", "awaken", "perception", "mindful", "presence"],
+    intuition: ["intuition", "gut feeling", "inner voice", "insight", "knowing", "guidance"]
   };
   
   // Score each response type based on keyword matches
@@ -107,6 +137,100 @@ function findFallbackResponse(question: string): {answer: string; practices: str
     answer: bestMatch.response.answer, 
     practices: bestMatch.response.practices 
   };
+}
+
+/**
+ * Check if there's a cached response for the question
+ * @param question User's question
+ * @returns Cached response if available, null otherwise
+ */
+function getCachedResponse(question: string): {
+  answer: string;
+  suggestedPractices: string[];
+} | null {
+  // Normalize the question to improve cache hits
+  const normalizedQuestion = question.toLowerCase().trim();
+  
+  // Common prefixes to remove for better matching
+  const prefixes = [
+    "can you tell me about", "what is", "how do i", "explain", 
+    "tell me about", "i want to know about", "please explain"
+  ];
+  
+  // Try to match any cached response
+  for (const [cachedQuestion, cachedResponse] of CACHED_RESPONSES.entries()) {
+    // Skip expired cache entries
+    if (Date.now() - cachedResponse.timestamp > MAX_CACHE_AGE) {
+      CACHED_RESPONSES.delete(cachedQuestion);
+      continue;
+    }
+    
+    let normalizedCached = cachedQuestion.toLowerCase().trim();
+    
+    // If the questions are very similar, return the cached response
+    if (normalizedQuestion === normalizedCached) {
+      return {
+        answer: cachedResponse.answer,
+        suggestedPractices: cachedResponse.suggestedPractices
+      };
+    }
+    
+    // Try matching without common prefixes
+    for (const prefix of prefixes) {
+      const questionWithoutPrefix = normalizedQuestion.startsWith(prefix) 
+        ? normalizedQuestion.substring(prefix.length).trim() 
+        : normalizedQuestion;
+        
+      const cachedWithoutPrefix = normalizedCached.startsWith(prefix)
+        ? normalizedCached.substring(prefix.length).trim()
+        : normalizedCached;
+        
+      if (questionWithoutPrefix === cachedWithoutPrefix) {
+        return {
+          answer: cachedResponse.answer,
+          suggestedPractices: cachedResponse.suggestedPractices
+        };
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Cache a response for future reference
+ * @param question User's question
+ * @param response AI response to cache
+ */
+function cacheResponse(question: string, response: AIResponse): void {
+  // Don't cache very short responses or if caching is disabled
+  if (response.answer.length < 50 || !response.meta || response.meta.model === "fallback") {
+    return;
+  }
+  
+  // Store in cache with timestamp
+  CACHED_RESPONSES.set(question, {
+    answer: response.answer,
+    suggestedPractices: response.suggestedPractices || [],
+    timestamp: Date.now()
+  });
+  
+  // Limit cache size to 50 entries by removing oldest if needed
+  if (CACHED_RESPONSES.size > 50) {
+    let oldestKey = null;
+    let oldestTime = Date.now();
+    
+    for (const [key, value] of CACHED_RESPONSES.entries()) {
+      if (value.timestamp < oldestTime) {
+        oldestTime = value.timestamp;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      CACHED_RESPONSES.delete(oldestKey);
+    }
+  }
 }
 
 /**
@@ -155,7 +279,23 @@ export async function askAIAssistant(
   userId: string
 ): Promise<AIResponse> {
   try {
-    // Call our Supabase Edge Function
+    // Check for cached response first
+    const cachedResponse = getCachedResponse(questionData.question);
+    if (cachedResponse) {
+      console.log("Using cached response for question");
+      return {
+        answer: cachedResponse.answer,
+        relatedInsights: [],
+        suggestedPractices: cachedResponse.suggestedPractices,
+        meta: {
+          model: "cached",
+          tokenUsage: 0,
+          processingTime: 0
+        }
+      };
+    }
+    
+    // Prepare request data
     const requestData = { 
       message: questionData.question,
       context: questionData.context,
@@ -166,6 +306,7 @@ export async function askAIAssistant(
     
     console.log("Sending request to AI assistant:", requestData);
     
+    // Call the Supabase Edge Function
     const { data, error } = await supabase.functions.invoke('ask-assistant', {
       body: requestData
     });
@@ -189,12 +330,17 @@ export async function askAIAssistant(
     };
     
     // Structure the response
-    return {
+    const response = {
       answer: data.response || data.answer,
       relatedInsights: data.insights || [],
       suggestedPractices: data.suggestedPractices || [],
       meta
     };
+    
+    // Cache the response for future use
+    cacheResponse(questionData.question, response);
+    
+    return response;
   } catch (error) {
     console.error('Error asking AI assistant:', error);
     

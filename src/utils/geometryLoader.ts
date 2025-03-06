@@ -1,78 +1,114 @@
 
-import React, { lazy, Suspense } from 'react';
+/**
+ * Utility for loading and managing sacred geometry resources
+ * Handles loading, caching, and optimization of geometry assets
+ */
+
+import { SacredGeometryType, GeometryResourceType } from './emotion/types';
+
+// Cache for loaded geometry resources
+const geometryCache = new Map<string, GeometryResourceType>();
 
 /**
- * Creates an optimized lazy-loaded sacred geometry component
- * @param importFn Import function that loads the component
- * @param LoadingComponent Optional component to show while loading
+ * Loads a sacred geometry resource with caching
+ * @param geometryType Type of sacred geometry to load
+ * @returns Promise resolving to the loaded geometry resource
  */
-export function createLazyGeometryComponent<P = {}>(
-  importFn: () => Promise<{ default: React.ComponentType<P> }>,
-  LoadingComponent: React.ComponentType | null = null
-): React.FC<P> {
-  // Create the lazy component
-  const LazyComponent = lazy(importFn);
+export async function loadGeometryResource(
+  geometryType: SacredGeometryType
+): Promise<GeometryResourceType> {
+  // Check if geometry is already cached
+  const cacheKey = `geometry-${geometryType}`;
   
-  // Create a simple loading placeholder if none provided
-  const DefaultLoadingComponent = () => (
-    <div className="flex items-center justify-center w-full h-full min-h-[200px]">
-      <div className="relative w-16 h-16">
-        <div className="absolute inset-0 rounded-full border-2 border-quantum-500/30 animate-ping"></div>
-        <div className="absolute inset-0 rounded-full border border-quantum-400/60"></div>
-      </div>
-    </div>
-  );
+  if (geometryCache.has(cacheKey)) {
+    return geometryCache.get(cacheKey) as GeometryResourceType;
+  }
   
-  const Fallback = LoadingComponent || DefaultLoadingComponent;
+  // Determine path based on geometry type
+  let resourcePath = '';
   
-  // Return a component that handles loading state
-  return (props: P) => (
-    <Suspense fallback={<Fallback />}>
-      <LazyComponent {...props} />
-    </Suspense>
-  );
-}
-
-/**
- * Pre-loads a component in the background without rendering it
- * Call this for routes/components that will likely be needed soon
- */
-export function preloadGeometryComponent(
-  importFn: () => Promise<{ default: React.ComponentType<any> }>
-): void {
-  // Use requestIdleCallback to load during idle time if available
-  if (window.requestIdleCallback) {
-    window.requestIdleCallback(() => {
-      importFn().catch(e => console.warn('Failed to preload component:', e));
-    });
-  } else {
-    // Fallback to setTimeout
-    setTimeout(() => {
-      importFn().catch(e => console.warn('Failed to preload component:', e));
-    }, 1000);
+  switch (geometryType) {
+    case 'flower-of-life':
+      resourcePath = '/assets/geometries/flower-of-life.svg';
+      break;
+    case 'metatrons-cube':
+      resourcePath = '/assets/geometries/metatrons-cube.svg';
+      break;
+    case 'seed-of-life':
+      resourcePath = '/assets/geometries/seed-of-life.svg';
+      break;
+    case 'tree-of-life':
+      resourcePath = '/assets/geometries/tree-of-life.svg';
+      break;
+    default:
+      resourcePath = '/assets/geometries/merkaba.svg';
+  }
+  
+  try {
+    // Load the geometry resource
+    const response = await fetch(resourcePath);
+    const svgContent = await response.text();
+    
+    const geometryResource: GeometryResourceType = {
+      type: geometryType,
+      svgContent,
+      loaded: true,
+      path: resourcePath
+    };
+    
+    // Cache the resource
+    geometryCache.set(cacheKey, geometryResource);
+    
+    return geometryResource;
+  } catch (error) {
+    console.error(`Failed to load geometry resource for ${geometryType}:`, error);
+    
+    // Return a fallback resource
+    return {
+      type: geometryType,
+      svgContent: '',
+      loaded: false,
+      path: resourcePath,
+      error: `Failed to load: ${error}`
+    };
   }
 }
 
 /**
- * Create optimized lazy-loaded versions of sacred geometry components
+ * Preloads commonly used geometry resources
+ * @returns Promise that resolves when preloading is complete
  */
-export const LazyMetatronsCube = createLazyGeometryComponent(() => 
-  import('../components/sacred-geometry/MetatronsCube')
-);
+export async function preloadCommonGeometries(): Promise<void> {
+  const commonGeometries: SacredGeometryType[] = [
+    'flower-of-life',
+    'seed-of-life',
+    'metatrons-cube'
+  ];
+  
+  await Promise.all(
+    commonGeometries.map(geometry => loadGeometryResource(geometry))
+  );
+  
+  console.log('Preloaded common sacred geometries');
+}
 
-export const LazyMetatronsBackground = createLazyGeometryComponent(() => 
-  import('../components/sacred-geometry/components/MetatronsBackground')
-);
+/**
+ * Clears the geometry cache to free memory
+ */
+export function clearGeometryCache(): void {
+  geometryCache.clear();
+}
 
-// Preload key geometry components during app initialization
-export const preloadKeyGeometryComponents = (): void => {
-  if (window.requestIdleCallback) {
-    window.requestIdleCallback(() => {
-      // Preload in sequence to avoid overwhelming network
-      import('../components/sacred-geometry/MetatronsCube')
-        .then(() => import('../components/sacred-geometry/components/MetatronsBackground'))
-        .then(() => import('../components/sacred-geometry/components/GeometryNode'))
-        .catch(e => console.warn('Failed to preload geometry components:', e));
-    }, { timeout: 5000 });
-  }
-};
+/**
+ * Gets information about cached geometry resources
+ * @returns Information about the cache status
+ */
+export function getGeometryCacheInfo(): {
+  cacheSize: number;
+  cachedGeometries: string[];
+} {
+  return {
+    cacheSize: geometryCache.size,
+    cachedGeometries: Array.from(geometryCache.keys())
+  };
+}
