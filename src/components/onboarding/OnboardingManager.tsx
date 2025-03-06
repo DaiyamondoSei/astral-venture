@@ -1,10 +1,16 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import OnboardingOverlay from './OnboardingOverlay';
 import FeatureTooltip from './FeatureTooltip';
 import GuidedTour from './GuidedTour';
-import { featureTooltips, guidedTours } from './onboardingData';
+import AchievementNotification from './AchievementNotification';
+import { 
+  featureTooltips, 
+  guidedTours, 
+  onboardingAchievements, 
+  AchievementData 
+} from './onboardingData';
 
 interface OnboardingManagerProps {
   userId: string;
@@ -12,16 +18,26 @@ interface OnboardingManagerProps {
 }
 
 const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children }) => {
-  const { isActive, hasCompletedOnboarding } = useOnboarding();
+  const { 
+    isActive, 
+    hasCompletedOnboarding,
+    completedSteps,
+    currentStep
+  } = useOnboarding();
 
   // We'll track which tooltips have been seen
-  const [seenTooltips, setSeenTooltips] = React.useState<Record<string, boolean>>({});
-  const [completedTours, setCompletedTours] = React.useState<Record<string, boolean>>({});
+  const [seenTooltips, setSeenTooltips] = useState<Record<string, boolean>>({});
+  const [completedTours, setCompletedTours] = useState<Record<string, boolean>>({});
   
   // Feature discovery state
-  const [showFeatureTooltips, setShowFeatureTooltips] = React.useState(false);
-  const [activeTour, setActiveTour] = React.useState<string | null>(null);
+  const [showFeatureTooltips, setShowFeatureTooltips] = useState(false);
+  const [activeTour, setActiveTour] = useState<string | null>(null);
+  
+  // Achievement notification state
+  const [pendingAchievements, setPendingAchievements] = useState<AchievementData[]>([]);
+  const [currentAchievement, setCurrentAchievement] = useState<AchievementData | null>(null);
 
+  // Load saved state from localStorage
   useEffect(() => {
     // Only show feature tooltips after onboarding is complete
     if (hasCompletedOnboarding && !showFeatureTooltips) {
@@ -33,6 +49,7 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
     }
   }, [hasCompletedOnboarding, showFeatureTooltips]);
 
+  // Load saved progress from localStorage
   useEffect(() => {
     // Load seen tooltips and completed tours from localStorage
     const storedSeenTooltips = JSON.parse(localStorage.getItem('seen-tooltips') || '{}');
@@ -50,18 +67,65 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
     }
   }, [hasCompletedOnboarding]);
 
+  // Check for achievements based on completed steps
+  useEffect(() => {
+    const storedAchievements = JSON.parse(localStorage.getItem(`achievements-${userId}`) || '{}');
+    
+    // Find achievements that should be awarded
+    const newAchievements = onboardingAchievements.filter(achievement => {
+      // If it requires a specific step and that step is completed
+      return achievement.requiredStep && 
+             completedSteps[achievement.requiredStep] && 
+             !storedAchievements[achievement.id];
+    });
+    
+    if (newAchievements.length > 0) {
+      // Update local state with new achievements
+      setPendingAchievements(prevAchievements => [...prevAchievements, ...newAchievements]);
+      
+      // Store as awarded in localStorage
+      const updatedAchievements = { ...storedAchievements };
+      newAchievements.forEach(achievement => {
+        updatedAchievements[achievement.id] = {
+          awarded: true,
+          timestamp: new Date().toISOString()
+        };
+      });
+      
+      localStorage.setItem(`achievements-${userId}`, JSON.stringify(updatedAchievements));
+    }
+  }, [completedSteps, userId]);
+
+  // Display achievements one at a time
+  useEffect(() => {
+    if (pendingAchievements.length > 0 && !currentAchievement) {
+      // Take the first pending achievement and show it
+      const nextAchievement = pendingAchievements[0];
+      setCurrentAchievement(nextAchievement);
+      
+      // Remove it from the pending list
+      setPendingAchievements(prevAchievements => prevAchievements.slice(1));
+    }
+  }, [pendingAchievements, currentAchievement]);
+
   const handleTooltipDismiss = (tooltipId: string) => {
-    setSeenTooltips(prev => ({
-      ...prev,
+    const updatedSeenTooltips = {
+      ...seenTooltips,
       [tooltipId]: true
-    }));
+    };
+    
+    setSeenTooltips(updatedSeenTooltips);
+    localStorage.setItem('seen-tooltips', JSON.stringify(updatedSeenTooltips));
   };
 
   const handleTourComplete = (tourId: string) => {
-    setCompletedTours(prev => ({
-      ...prev,
+    const updatedCompletedTours = {
+      ...completedTours,
       [tourId]: true
-    }));
+    };
+    
+    setCompletedTours(updatedCompletedTours);
+    localStorage.setItem('completed-tours', JSON.stringify(updatedCompletedTours));
     
     setActiveTour(null);
     
@@ -73,6 +137,10 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
         setActiveTour(guidedTours[nextTourIndex].id);
       }, 5000);
     }
+  };
+
+  const handleAchievementDismiss = () => {
+    setCurrentAchievement(null);
   };
 
   return (
@@ -105,6 +173,14 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
           onComplete={() => handleTourComplete(tour.id)}
         />
       ))}
+      
+      {/* Achievement notification */}
+      {currentAchievement && (
+        <AchievementNotification 
+          achievement={currentAchievement}
+          onDismiss={handleAchievementDismiss}
+        />
+      )}
       
       {children}
     </>

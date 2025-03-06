@@ -1,7 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, CheckCircle2, MessageCircleQuestion } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface FeatureTooltipProps {
   id: string;
@@ -10,8 +12,8 @@ interface FeatureTooltipProps {
   description: string;
   position?: 'top' | 'right' | 'bottom' | 'left';
   order?: number;
-  isActive?: boolean;
-  onDismiss?: (id: string) => void;
+  isActive: boolean;
+  onDismiss: (id: string) => void;
 }
 
 const FeatureTooltip: React.FC<FeatureTooltipProps> = ({
@@ -21,45 +23,66 @@ const FeatureTooltip: React.FC<FeatureTooltipProps> = ({
   description,
   position = 'bottom',
   order = 1,
-  isActive = true,
+  isActive,
   onDismiss
 }) => {
-  const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
   const [isVisible, setIsVisible] = useState(false);
-  const [hasBeenSeen, setHasBeenSeen] = useState(false);
+  const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [hasTargetElement, setHasTargetElement] = useState(false);
 
+  // Handle window resize
   useEffect(() => {
-    // Check if this tooltip has been seen before
-    const seenTooltips = JSON.parse(localStorage.getItem('seen-tooltips') || '{}');
-    if (seenTooltips[id]) {
-      setHasBeenSeen(true);
-      return;
-    }
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
 
-    // Only position and show if active and not seen before
-    if (isActive && !hasBeenSeen) {
-      positionTooltip();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Show tooltip with delay to ensure elements are rendered
+  useEffect(() => {
+    if (isActive) {
       const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 500 + order * 300); // Stagger showing tooltips
+        const targetElement = document.querySelector(targetSelector);
+        
+        if (targetElement) {
+          setHasTargetElement(true);
+          calculatePosition(targetElement as HTMLElement);
+          
+          // Add highlight effect to target element
+          targetElement.classList.add('ring', 'ring-quantum-500', 'ring-opacity-70', 'ring-offset-2', 'z-10', 'transition-all');
+          
+          // Show tooltip after position is calculated
+          setTimeout(() => setShowTooltip(true), 100);
+        } else {
+          console.warn(`Target element not found for tooltip: ${targetSelector}`);
+          setHasTargetElement(false);
+        }
+      }, 300 + (order * 200)); // Stagger tooltips by order
 
-      window.addEventListener('resize', positionTooltip);
-      
       return () => {
         clearTimeout(timer);
-        window.removeEventListener('resize', positionTooltip);
+        
+        // Clean up highlights
+        const targetElement = document.querySelector(targetSelector);
+        if (targetElement) {
+          targetElement.classList.remove('ring', 'ring-quantum-500', 'ring-opacity-70', 'ring-offset-2', 'z-10');
+        }
       };
+    } else {
+      setShowTooltip(false);
     }
-  }, [id, targetSelector, isActive, order, hasBeenSeen]);
+  }, [isActive, targetSelector, order, windowSize]);
 
-  const positionTooltip = () => {
-    const targetElement = document.querySelector(targetSelector);
-    if (!targetElement) return;
-
-    const rect = targetElement.getBoundingClientRect();
-    
-    // Calculate position based on specified direction
+  const calculatePosition = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
     let x = 0, y = 0;
+    
+    // Base positioning
     switch (position) {
       case 'top':
         x = rect.left + rect.width / 2;
@@ -83,81 +106,107 @@ const FeatureTooltip: React.FC<FeatureTooltipProps> = ({
   };
 
   const handleDismiss = () => {
-    setIsVisible(false);
+    // Start exit animation
+    setShowTooltip(false);
     
-    // Mark this tooltip as seen
-    const seenTooltips = JSON.parse(localStorage.getItem('seen-tooltips') || '{}');
-    seenTooltips[id] = true;
-    localStorage.setItem('seen-tooltips', JSON.stringify(seenTooltips));
-    
-    if (onDismiss) {
-      onDismiss(id);
+    // Remove highlight from target
+    const targetElement = document.querySelector(targetSelector);
+    if (targetElement) {
+      targetElement.classList.remove('ring', 'ring-quantum-500', 'ring-opacity-70', 'ring-offset-2', 'z-10');
     }
+    
+    // Notify parent after animation
+    setTimeout(() => onDismiss(id), 300);
   };
 
-  // Don't render if not active or already seen
-  if (!isActive || hasBeenSeen) return null;
+  // Don't render anything if no target element found
+  if (!hasTargetElement) return null;
 
-  // Calculate positioning and arrow styles based on position
-  const getPositionStyles = () => {
-    switch (position) {
-      case 'top':
-        return {
-          container: 'translate(-50%, -100%) mb-2',
-          arrow: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45'
-        };
-      case 'right':
-        return {
-          container: 'translate(0, -50%) ml-2',
-          arrow: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
-        };
-      case 'bottom':
-        return {
-          container: 'translate(-50%, 0) mt-2',
-          arrow: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
-        };
-      case 'left':
-        return {
-          container: 'translate(-100%, -50%) mr-2',
-          arrow: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2 rotate-45'
-        };
-    }
+  // Get positioning classes based on position
+  const getPositioningClasses = () => {
+    const positionClasses = {
+      top: '-translate-x-1/2 -translate-y-full -mt-2',
+      right: 'translate-y-[-50%] ml-2',
+      bottom: '-translate-x-1/2 mt-2',
+      left: 'translate-y-[-50%] -translate-x-full -ml-2'
+    };
+    
+    const arrowClasses = {
+      top: 'bottom-[-6px] left-1/2 -translate-x-1/2 rotate-45',
+      right: 'left-[-6px] top-1/2 -translate-y-1/2 rotate-45',
+      bottom: 'top-[-6px] left-1/2 -translate-x-1/2 rotate-45',
+      left: 'right-[-6px] top-1/2 -translate-y-1/2 rotate-45'
+    };
+    
+    return {
+      container: positionClasses[position],
+      arrow: arrowClasses[position]
+    };
   };
 
-  const positionStyles = getPositionStyles();
+  const positionClasses = getPositioningClasses();
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <div 
-          className="fixed z-50 pointer-events-none"
-          style={{ 
-            left: coordinates.x, 
-            top: coordinates.y 
-          }}
-        >
+    <div 
+      className="fixed z-[1000] pointer-events-none"
+      style={{ 
+        left: coordinates.x, 
+        top: coordinates.y
+      }}
+      ref={tooltipRef}
+      role="tooltip"
+      aria-labelledby={`tooltip-title-${id}`}
+      aria-describedby={`tooltip-desc-${id}`}
+    >
+      <AnimatePresence>
+        {showTooltip && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className={`pointer-events-auto w-64 bg-gradient-to-br from-quantum-900/95 to-astral-900/95 backdrop-blur-sm text-white p-3 rounded-lg shadow-lg ${positionStyles.container}`}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className={cn(
+              "pointer-events-auto w-64 bg-gradient-to-br from-quantum-900/95 to-astral-900/95 backdrop-blur-sm text-white p-4 rounded-lg shadow-xl",
+              positionClasses.container
+            )}
           >
-            <button 
-              onClick={handleDismiss}
-              className="absolute top-2 right-2 text-white/70 hover:text-white"
-            >
-              <X size={14} />
-            </button>
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MessageCircleQuestion size={18} className="text-quantum-400" />
+                <h3 id={`tooltip-title-${id}`} className="font-medium text-quantum-100">{title}</h3>
+              </div>
+              
+              <button 
+                onClick={handleDismiss} 
+                className="text-white/70 hover:text-white -mt-1 -mr-1 p-1 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Dismiss tooltip"
+              >
+                <X size={14} />
+              </button>
+            </div>
             
-            <div className="mb-1 font-semibold">{title}</div>
-            <p className="text-sm text-white/80">{description}</p>
+            <p id={`tooltip-desc-${id}`} className="text-sm text-white/80 mb-3">{description}</p>
             
-            {/* Arrow pointing to the target */}
-            <div className={`absolute w-3 h-3 bg-quantum-900 ${positionStyles.arrow}`}></div>
+            <div className="flex justify-end">
+              <Button 
+                size="sm" 
+                onClick={handleDismiss}
+                className="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1 h-7 rounded-full"
+              >
+                <CheckCircle2 size={12} className="mr-1" />
+                Got it
+              </Button>
+            </div>
+            
+            {/* Arrow pointing to target */}
+            <div className={cn(
+              "absolute w-3 h-3 bg-quantum-900", 
+              positionClasses.arrow
+            )}></div>
           </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

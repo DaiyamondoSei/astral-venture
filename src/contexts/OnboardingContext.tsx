@@ -16,13 +16,16 @@ interface OnboardingState {
   currentStep: OnboardingStep;
   isActive: boolean;
   hasCompletedOnboarding: boolean;
+  hasCompletedAnyStep: boolean;
   progress: number;
+  completedSteps: Record<string, boolean>;
   startOnboarding: () => void;
   skipOnboarding: () => void;
   nextStep: () => void;
   previousStep: () => void;
   goToStep: (step: OnboardingStep) => void;
   completeOnboarding: () => void;
+  restartOnboarding: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingState | undefined>(undefined);
@@ -43,6 +46,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [isActive, setIsActive] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
+  const [hasCompletedAnyStep, setHasCompletedAnyStep] = useState(false);
 
   // Load onboarding state from localStorage on mount
   useEffect(() => {
@@ -61,6 +66,18 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (dreamCaptureCompleted && entryAnimationCompleted) {
             setIsActive(true);
           }
+        }
+      }
+
+      // Load completed steps
+      const savedCompletedSteps = localStorage.getItem(`onboarding-steps-${user.id}`);
+      if (savedCompletedSteps) {
+        const parsedSteps = JSON.parse(savedCompletedSteps);
+        setCompletedSteps(parsedSteps);
+        
+        // Check if any steps have been completed
+        if (Object.keys(parsedSteps).length > 0) {
+          setHasCompletedAnyStep(true);
         }
       }
     }
@@ -92,10 +109,30 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   };
 
+  const saveCompletedStep = (step: OnboardingStep) => {
+    if (user && step !== 'welcome') {
+      const updatedSteps = { ...completedSteps, [step]: true };
+      setCompletedSteps(updatedSteps);
+      localStorage.setItem(`onboarding-steps-${user.id}`, JSON.stringify(updatedSteps));
+      setHasCompletedAnyStep(true);
+    }
+  };
+
   const nextStep = () => {
     const currentIndex = ONBOARDING_STEPS.indexOf(currentStep);
     if (currentIndex < ONBOARDING_STEPS.length - 1) {
-      setCurrentStep(ONBOARDING_STEPS[currentIndex + 1]);
+      // Mark the current step as completed before moving to the next
+      saveCompletedStep(currentStep);
+      
+      // Move to next step
+      const nextStep = ONBOARDING_STEPS[currentIndex + 1];
+      setCurrentStep(nextStep);
+      
+      // Announce for screen readers
+      const announcer = document.getElementById('a11y-announcer');
+      if (announcer) {
+        announcer.textContent = `Moved to step ${currentIndex + 2} of ${ONBOARDING_STEPS.length}: ${nextStep.replace('-', ' ')}`;
+      }
     } else {
       completeOnboarding();
     }
@@ -105,6 +142,12 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const currentIndex = ONBOARDING_STEPS.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(ONBOARDING_STEPS[currentIndex - 1]);
+      
+      // Announce for screen readers
+      const announcer = document.getElementById('a11y-announcer');
+      if (announcer) {
+        announcer.textContent = `Moved to step ${currentIndex} of ${ONBOARDING_STEPS.length}: ${ONBOARDING_STEPS[currentIndex - 1].replace('-', ' ')}`;
+      }
     }
   };
 
@@ -114,34 +157,69 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const completeOnboarding = () => {
     if (user) {
+      // Save all steps as completed
+      const allSteps = ONBOARDING_STEPS.reduce((acc, step) => {
+        if (step !== 'complete') {
+          acc[step] = true;
+        }
+        return acc;
+      }, {} as Record<string, boolean>);
+      
+      setCompletedSteps(allSteps);
+      localStorage.setItem(`onboarding-steps-${user.id}`, JSON.stringify(allSteps));
       localStorage.setItem(`onboarding-completed-${user.id}`, 'completed');
     }
+    
     setIsActive(false);
     setHasCompletedOnboarding(true);
     
     toast({
       title: "Onboarding complete!",
       description: "Your sacred geometry journey has begun. Explore and grow.",
+      variant: "default"
+    });
+  };
+
+  const restartOnboarding = () => {
+    setCurrentStep('welcome');
+    setIsActive(true);
+    
+    toast({
+      title: "Restarting your sacred journey",
+      description: "Let's revisit the cosmic wisdom together.",
     });
   };
 
   return (
-    <OnboardingContext.Provider
-      value={{
-        currentStep,
-        isActive,
-        hasCompletedOnboarding,
-        progress,
-        startOnboarding,
-        skipOnboarding,
-        nextStep,
-        previousStep,
-        goToStep,
-        completeOnboarding
-      }}
-    >
-      {children}
-    </OnboardingContext.Provider>
+    <>
+      {/* Accessibility announcer for screen readers */}
+      <div 
+        id="a11y-announcer" 
+        className="sr-only" 
+        aria-live="polite" 
+        aria-atomic="true"
+      ></div>
+      
+      <OnboardingContext.Provider
+        value={{
+          currentStep,
+          isActive,
+          hasCompletedOnboarding,
+          hasCompletedAnyStep,
+          progress,
+          completedSteps,
+          startOnboarding,
+          skipOnboarding,
+          nextStep,
+          previousStep,
+          goToStep,
+          completeOnboarding,
+          restartOnboarding
+        }}
+      >
+        {children}
+      </OnboardingContext.Provider>
+    </>
   );
 };
 

@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, X } from 'lucide-react';
+import { ArrowRight, X, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface TourStep {
   id: string;
@@ -10,6 +10,8 @@ interface TourStep {
   title: string;
   description: string;
   position?: 'top' | 'right' | 'bottom' | 'left';
+  accentColor?: string;
+  imageUrl?: string;
 }
 
 interface GuidedTourProps {
@@ -29,16 +31,49 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
   const [hasCompletedTour, setHasCompletedTour] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Check if tour has been completed
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isVisible) return;
+      
+      switch (e.key) {
+        case 'Escape':
+          completeTour();
+          break;
+        case 'ArrowRight':
+        case 'Enter':
+          handleNext();
+          break;
+        case 'ArrowLeft':
+          if (currentStepIndex > 0) {
+            setCurrentStepIndex(prev => prev - 1);
+          }
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isVisible, currentStepIndex]);
+
+  useEffect(() => {
+    if (isVisible && focusRef.current) {
+      setTimeout(() => {
+        focusRef.current?.focus();
+      }, 100);
+    }
+  }, [isVisible, currentStepIndex]);
+
+  useEffect(() => {
     const completedTours = JSON.parse(localStorage.getItem('completed-tours') || '{}');
     if (completedTours[tourId]) {
       setHasCompletedTour(true);
       return;
     }
 
-    // Only continue if active and not completed
     if (isActive && !hasCompletedTour) {
       const timer = setTimeout(() => {
         positionTooltip();
@@ -46,10 +81,12 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
       }, 500);
 
       window.addEventListener('resize', positionTooltip);
+      window.addEventListener('scroll', handleScroll, true);
       
       return () => {
         clearTimeout(timer);
         window.removeEventListener('resize', positionTooltip);
+        window.removeEventListener('scroll', handleScroll, true);
       };
     }
   }, [isActive, tourId, hasCompletedTour]);
@@ -59,6 +96,16 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
       positionTooltip();
     }
   }, [currentStepIndex, isVisible]);
+
+  const handleScroll = () => {
+    setIsScrolling(true);
+    clearTimeout(window.onscrollend);
+    
+    window.onscrollend = setTimeout(() => {
+      setIsScrolling(false);
+      positionTooltip();
+    }, 100) as unknown as number;
+  };
 
   const positionTooltip = () => {
     if (steps.length === 0 || currentStepIndex >= steps.length) return;
@@ -73,10 +120,30 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
 
     const rect = targetElement.getBoundingClientRect();
     
-    // Add a highlight effect to the target element
-    targetElement.classList.add('ring-2', 'ring-quantum-500', 'ring-offset-2', 'transition-all');
+    if (
+      rect.bottom < 0 || 
+      rect.top > window.innerHeight || 
+      rect.right < 0 || 
+      rect.left > window.innerWidth
+    ) {
+      targetElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+      
+      setTimeout(positionTooltip, 500);
+      return;
+    }
     
-    // Calculate position based on specified direction
+    targetElement.classList.add('ring-2', 'ring-offset-2', 'transition-all', 'duration-300');
+    
+    if (currentStep.accentColor) {
+      targetElement.classList.add('ring-[color:var(--accent-color)]');
+      targetElement.style.setProperty('--accent-color', currentStep.accentColor);
+    } else {
+      targetElement.classList.add('ring-quantum-500');
+    }
+    
     let x = 0, y = 0;
     const position = currentStep.position || 'bottom';
     
@@ -101,13 +168,37 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
 
     setCoordinates({ x, y });
     
-    // Remove highlight from previous elements
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting && isVisible) {
+        positionTooltip();
+      }
+    }, { threshold: 0.5 });
+    
+    observer.observe(targetElement);
+    
     return () => {
-      targetElement.classList.remove('ring-2', 'ring-quantum-500', 'ring-offset-2');
+      targetElement.classList.remove(
+        'ring-2', 
+        'ring-quantum-500', 
+        'ring-offset-2',
+        'ring-[color:var(--accent-color)]'
+      );
+      observer.disconnect();
     };
   };
 
   const handleNext = () => {
+    const currentStep = steps[currentStepIndex];
+    const currentTarget = document.querySelector(currentStep.targetSelector);
+    if (currentTarget) {
+      currentTarget.classList.remove(
+        'ring-2', 
+        'ring-quantum-500', 
+        'ring-offset-2',
+        'ring-[color:var(--accent-color)]'
+      );
+    }
+    
     if (currentStepIndex < steps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
@@ -118,7 +209,19 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
   const completeTour = () => {
     setIsVisible(false);
     
-    // Mark this tour as completed
+    if (steps.length > 0) {
+      const finalStep = steps[currentStepIndex];
+      const finalTarget = document.querySelector(finalStep.targetSelector);
+      if (finalTarget) {
+        finalTarget.classList.remove(
+          'ring-2', 
+          'ring-quantum-500', 
+          'ring-offset-2',
+          'ring-[color:var(--accent-color)]'
+        );
+      }
+    }
+    
     const completedTours = JSON.parse(localStorage.getItem('completed-tours') || '{}');
     completedTours[tourId] = true;
     localStorage.setItem('completed-tours', JSON.stringify(completedTours));
@@ -126,17 +229,17 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
     setHasCompletedTour(true);
     
     if (onComplete) {
-      onComplete();
+      setTimeout(() => {
+        onComplete();
+      }, 300);
     }
   };
 
-  // Don't render if not active or already completed
   if (!isActive || hasCompletedTour || steps.length === 0) return null;
 
   const currentStep = steps[currentStepIndex];
   if (!currentStep) return null;
 
-  // Calculate positioning and arrow styles based on position
   const getPositionStyles = () => {
     const position = currentStep.position || 'bottom';
     switch (position) {
@@ -164,56 +267,126 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
   };
 
   const positionStyles = getPositionStyles();
+  
+  if (isScrolling) return null;
 
   return (
     <AnimatePresence>
       {isVisible && (
-        <div 
-          className="fixed z-50 pointer-events-none"
-          style={{ 
-            left: coordinates.x, 
-            top: coordinates.y 
-          }}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className={`pointer-events-auto w-72 bg-gradient-to-br from-quantum-900/95 to-astral-900/95 backdrop-blur-sm text-white p-4 rounded-lg shadow-xl ${positionStyles.container}`}
+        <>
+          <div 
+            className="sr-only" 
+            role="status" 
+            aria-live="polite"
           >
-            <button 
-              onClick={completeTour}
-              className="absolute top-2 right-2 text-white/70 hover:text-white"
-              aria-label="Close tour"
+            Step {currentStepIndex + 1} of {steps.length}: {currentStep.title}
+          </div>
+        
+          <div 
+            className="fixed z-50 pointer-events-none"
+            style={{ 
+              left: coordinates.x, 
+              top: coordinates.y 
+            }}
+            ref={tooltipRef}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={cn(
+                "pointer-events-auto w-80 bg-gradient-to-br from-quantum-900/95 to-astral-900/95 backdrop-blur-sm text-white p-4 rounded-lg shadow-xl",
+                positionStyles.container
+              )}
+              style={currentStep.accentColor ? {
+                backgroundImage: `linear-gradient(to bottom right, rgba(30, 30, 45, 0.95), rgba(20, 20, 35, 0.95))`,
+                borderLeft: `3px solid ${currentStep.accentColor}`
+              } : undefined}
             >
-              <X size={16} />
-            </button>
-            
-            <div className="mb-1 font-semibold text-lg">{currentStep.title}</div>
-            <p className="text-sm text-white/80 mb-4">{currentStep.description}</p>
-            
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">
-                Step {currentStepIndex + 1} of {steps.length}
+              <button 
+                onClick={completeTour}
+                className="absolute top-2 right-2 text-white/70 hover:text-white p-1 rounded-full hover:bg-white/10"
+                aria-label="Close tour"
+              >
+                <X size={16} />
+              </button>
+              
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">
+                  <Info 
+                    size={18} 
+                    className="text-quantum-400" 
+                    style={currentStep.accentColor ? { color: currentStep.accentColor } : undefined} 
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 font-semibold text-lg">{currentStep.title}</div>
+                  <p className="text-sm text-white/80 mb-4">{currentStep.description}</p>
+                </div>
               </div>
               
-              <Button 
-                size="sm" 
-                onClick={handleNext}
-                className="bg-gradient-to-r from-quantum-500 to-astral-500 hover:from-quantum-600 hover:to-astral-600 text-xs px-3 py-1 h-8"
-              >
-                {currentStepIndex < steps.length - 1 ? (
-                  <>Next <ArrowRight size={12} className="ml-1" /></>
-                ) : (
-                  'Finish'
-                )}
-              </Button>
-            </div>
-            
-            {/* Arrow pointing to the target */}
-            <div className={`absolute w-3 h-3 bg-quantum-900 ${positionStyles.arrow}`}></div>
-          </motion.div>
-        </div>
+              {currentStep.imageUrl && (
+                <div className="mt-2 mb-4 rounded-md overflow-hidden">
+                  <img 
+                    src={currentStep.imageUrl} 
+                    alt={`Visual aid for ${currentStep.title}`} 
+                    className="w-full h-auto"
+                  />
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between">
+                <div className="flex gap-1">
+                  {steps.map((_, index) => (
+                    <div 
+                      key={index}
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full transition-all duration-200",
+                        index === currentStepIndex 
+                          ? "bg-white" 
+                          : "bg-white/30"
+                      )}
+                      style={
+                        index === currentStepIndex && currentStep.accentColor 
+                          ? { backgroundColor: currentStep.accentColor } 
+                          : undefined
+                      }
+                      aria-hidden="true"
+                    ></div>
+                  ))}
+                </div>
+                
+                <Button 
+                  size="sm" 
+                  onClick={handleNext}
+                  className={cn(
+                    "bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1 h-8"
+                  )}
+                  style={currentStep.accentColor ? {
+                    backgroundColor: `${currentStep.accentColor}40`,
+                    color: 'white'
+                  } : undefined}
+                  ref={focusRef}
+                >
+                  {currentStepIndex < steps.length - 1 ? (
+                    <>Next <ArrowRight size={12} className="ml-1" /></>
+                  ) : (
+                    'Finish'
+                  )}
+                </Button>
+              </div>
+              
+              <div className={cn(
+                "absolute w-3 h-3", 
+                positionStyles.arrow
+              )} 
+              style={{
+                backgroundColor: currentStep.accentColor || '#1f1f2f',
+                boxShadow: '0 0 0 1px rgba(0,0,0,0.05)'
+              }}></div>
+            </motion.div>
+          </div>
+        </>
       )}
     </AnimatePresence>
   );
