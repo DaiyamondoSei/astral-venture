@@ -25,6 +25,8 @@ export interface EmotionAnalysisResult {
   chakrasActivated: number[];
   emotionBreakdown: Record<string, number>;
   recommendations?: string[];
+  chakras?: number[]; // Adding this for backward compatibility
+  dominantThemes?: string[]; // Adding this for backward compatibility
 }
 
 // Chakra analysis result interface
@@ -33,4 +35,6 @@ export interface ChakraAnalysisResult {
   dominantChakra?: number;
   chakraBalance: Record<number, number>;
   recommendations?: string[];
+  chakras?: number[]; // Adding this for backward compatibility
+  dominantThemes?: string[]; // Adding this for backward compatibility
 }

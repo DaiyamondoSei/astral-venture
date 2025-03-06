@@ -12,6 +12,7 @@ interface AuthContextProps {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  updateSession: (newSession: Session) => void; // Added this method
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -22,6 +23,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Add the updateSession method implementation
+  const updateSession = (newSession: Session) => {
+    setSession(newSession);
+    setUser(newSession?.user || null);
+  };
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -141,7 +148,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, isLoading, authError, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      session, 
+      user, 
+      isLoading, 
+      authError, 
+      signIn, 
+      signUp, 
+      signOut,
+      updateSession 
+    }}>
       {children}
     </AuthContext.Provider>
   );

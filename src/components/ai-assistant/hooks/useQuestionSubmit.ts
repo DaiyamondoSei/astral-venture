@@ -1,4 +1,3 @@
-
 import { askAIAssistant, AIResponse } from '@/services/ai/aiService';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -48,8 +47,8 @@ export function useQuestionSubmit({
         try {
           // Append text as it comes in for streaming UI
           const appendToStream = (text: string) => {
-            // Fix: Use functional update to properly append to streaming response
-            state.setStreamingResponse((prev) => {
+            // Fixed: Use type assertion to ensure TypeScript knows we're passing a function
+            state.setStreamingResponse((prev: string | null): string => {
               return prev ? prev + text : text;
             });
           };
