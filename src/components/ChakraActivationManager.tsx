@@ -27,9 +27,42 @@ const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
   const { toast } = useToast();
 
   const handleChakraActivation = async (chakraIndex: number) => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('No user ID provided for chakra activation');
+      return;
+    }
     
     try {
+      console.log('Activating chakra:', chakraIndex, 'for user:', userId);
+      
+      // Check if this chakra was already activated today to prevent duplicates
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      
+      const { data: existingActivations, error: checkError } = await supabase
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('challenge_id', `chakra_${chakraIndex}`)
+        .gte('completed_at', startOfDay)
+        .lte('completed_at', endOfDay);
+      
+      if (checkError) {
+        console.error('Error checking existing activations:', checkError);
+        throw checkError;
+      }
+      
+      if (existingActivations && existingActivations.length > 0) {
+        console.log('Chakra already activated today:', existingActivations);
+        toast({
+          title: `${CHAKRA_NAMES[chakraIndex]} Chakra Already Active`,
+          description: "You've already activated this chakra today.",
+        });
+        return;
+      }
+      
+      // Insert new activation
       const { error } = await supabase
         .from('user_progress')
         .insert({
@@ -39,19 +72,29 @@ const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
           completed_at: new Date().toISOString()
         });
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting chakra activation:', error);
+        throw error;
+      }
       
       const pointsEarned = 10 + (chakraIndex * 5);
       const newPoints = await incrementEnergyPoints(userId, pointsEarned);
       
-      updateUserProfile({
-        energy_points: newPoints
-      });
+      if (newPoints !== undefined) {
+        updateUserProfile({
+          energy_points: newPoints
+        });
+      }
       
+      // Update streak and activated chakras
       const newStreak = userStreak.current + 1;
       await updateStreak(newStreak);
       
-      updateActivatedChakras([chakraIndex]);
+      const newActivatedChakras = [...activatedChakras];
+      if (!newActivatedChakras.includes(chakraIndex)) {
+        newActivatedChakras.push(chakraIndex);
+      }
+      updateActivatedChakras(newActivatedChakras);
       
       toast({
         title: `${CHAKRA_NAMES[chakraIndex]} Chakra Activated!`,
@@ -62,7 +105,7 @@ const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
       console.error('Error activating chakra:', error);
       toast({
         title: "Activation failed",
-        description: error.message,
+        description: error.message || "An unknown error occurred",
         variant: "destructive"
       });
     }
@@ -74,10 +117,36 @@ const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
     try {
       const today = new Date();
       const currentDay = today.getDay();
-      const allDays = Array.from({ length: currentDay }, (_, i) => i);
+      const allDays = Array.from({ length: currentDay + 1 }, (_, i) => i);
       const missedDays = allDays.filter(day => !activatedChakras.includes(day));
       
+      if (missedDays.length === 0) {
+        toast({
+          title: "No Recalibration Needed",
+          description: "You haven't missed any chakra activations.",
+        });
+        setShowRecalibration(false);
+        return;
+      }
+      
+      // Process each missed day
       for (const missedDay of missedDays) {
+        // Check if this chakra was already recalibrated today
+        const { data: existingRecalibrations, error: checkError } = await supabase
+          .from('user_progress')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('challenge_id', `chakra_${missedDay}`)
+          .eq('category', 'chakra_recalibration');
+        
+        if (checkError) throw checkError;
+        
+        // Skip if already recalibrated
+        if (existingRecalibrations && existingRecalibrations.length > 0) {
+          console.log('Chakra already recalibrated:', missedDay);
+          continue;
+        }
+        
         await supabase
           .from('user_progress')
           .insert({
@@ -89,16 +158,26 @@ const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
           });
       }
       
-      updateActivatedChakras(missedDays);
+      // Update activated chakras with newly recalibrated ones
+      const newActivatedChakras = [...activatedChakras];
+      missedDays.forEach(day => {
+        if (!newActivatedChakras.includes(day)) {
+          newActivatedChakras.push(day);
+        }
+      });
+      updateActivatedChakras(newActivatedChakras);
       
+      // Award points and update streak
       const pointsEarned = Math.max(5, missedDays.length * 2);
       const newPoints = await incrementEnergyPoints(userId, pointsEarned);
       
-      updateUserProfile({
-        energy_points: newPoints
-      });
+      if (newPoints !== undefined) {
+        updateUserProfile({
+          energy_points: newPoints
+        });
+      }
       
-      const newStreak = currentDay + 1;
+      const newStreak = Math.max(currentDay + 1, userStreak.current);
       await updateStreak(newStreak);
       
       setShowRecalibration(false);
@@ -112,7 +191,7 @@ const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
       console.error('Error completing recalibration:', error);
       toast({
         title: "Recalibration failed",
-        description: error.message,
+        description: error.message || "An unknown error occurred",
         variant: "destructive"
       });
     }
@@ -125,6 +204,7 @@ const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
           currentStreak={userStreak.current}
           longestStreak={userStreak.longest}
           activatedChakras={activatedChakras}
+          userId={userId}
           onChakraActivation={handleChakraActivation}
           onRecalibration={() => setShowRecalibration(true)}
         />

@@ -13,13 +13,17 @@ interface AIResponseProps {
 const AIResponse: React.FC<AIResponseProps> = ({ response, onReset, loading }) => {
   // Safely extract content from response with fallbacks
   const answer = response?.answer || "Sorry, I couldn't generate a response at this time.";
+  
+  // Ensure suggestedPractices is an array
   const suggestedPractices = Array.isArray(response?.suggestedPractices) 
-    ? response.suggestedPractices 
+    ? response.suggestedPractices.filter(practice => practice) // Filter out empty values
     : [];
 
   // Determine if response looks repetitive/stuck by checking for certain patterns
-  const isRepetitive = answer === "Sorry, I couldn't generate a response at this time." || 
-                       answer.includes("I'm sorry, I couldn't process your question");
+  const isRepetitive = 
+    answer === "Sorry, I couldn't generate a response at this time." || 
+    answer.includes("I'm sorry, I couldn't process your question") ||
+    answer.includes("That's an interesting question about your energy practice");
 
   return (
     <div className="space-y-4">
