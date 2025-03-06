@@ -13,7 +13,7 @@ import TodaysChallenge from './TodaysChallenge';
 const DashboardCards: React.FC = () => {
   const { latestPractice, loading: practiceLoading } = useLatestPractice();
   const { latestReflection, loading: reflectionLoading } = useReflections();
-  const { challenge, loading: challengeLoading } = useTodaysChallenge();
+  const { todayChallenge, loading: challengeLoading, handleChallengeComplete } = useTodaysChallenge();
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -23,8 +23,11 @@ const DashboardCards: React.FC = () => {
       />
       
       <TodaysChallenge 
-        challenge={challenge} 
+        challenge={todayChallenge} 
         isLoading={challengeLoading} 
+        onComplete={(challengeId) => handleChallengeComplete(challengeId, (points) => {
+          console.log(`Earned ${points} points from challenge completion`);
+        })}
       />
       
       <LatestReflectionCard 
