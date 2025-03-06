@@ -4,7 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 
 interface AssistantState {
   setLoading: (isLoading: boolean) => void;
-  setStreamingResponse: (response: string | null) => void;
+  setStreamingResponse: (response: string | null | ((prev: string | null) => string | null)) => void;
   setResponse: (response: AIResponse | null) => void;
   setError: (error: string | null) => void;
   setModelInfo: (info: {model: string; tokens: number} | null) => void;

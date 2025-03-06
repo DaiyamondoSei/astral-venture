@@ -38,4 +38,3 @@ export interface AIResponse {
 export type AIModel = 
   | "gpt-4o"         // High quality, higher cost, slower
   | "gpt-4o-mini";   // Good quality, lower cost, faster
-

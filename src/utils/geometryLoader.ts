@@ -28,16 +28,16 @@ export async function loadGeometryResource(
   let resourcePath = '';
   
   switch (geometryType) {
-    case 'flower-of-life':
+    case 'flowerOfLife':
       resourcePath = '/assets/geometries/flower-of-life.svg';
       break;
-    case 'metatrons-cube':
+    case 'metatronsCube':
       resourcePath = '/assets/geometries/metatrons-cube.svg';
       break;
-    case 'seed-of-life':
+    case 'seedOfLife':
       resourcePath = '/assets/geometries/seed-of-life.svg';
       break;
-    case 'tree-of-life':
+    case 'treeOfLife':
       resourcePath = '/assets/geometries/tree-of-life.svg';
       break;
     default:
@@ -80,9 +80,9 @@ export async function loadGeometryResource(
  */
 export async function preloadCommonGeometries(): Promise<void> {
   const commonGeometries: SacredGeometryType[] = [
-    'flower-of-life',
-    'seed-of-life',
-    'metatrons-cube'
+    'flowerOfLife',
+    'seedOfLife',
+    'metatronsCube'
   ];
   
   await Promise.all(
