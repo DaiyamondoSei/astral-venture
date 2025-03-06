@@ -6,6 +6,9 @@ export * from './recommendationEngine';
 export * from './activityTracking';
 export * from './personalizationMetrics';
 
+// Export recommendation related types 
+export * from './recommendations/types';
+
 // Import all services for the combined export
 import { preferencesService } from './preferencesService';
 import { recommendationEngine } from './recommendationEngine';
