@@ -6,7 +6,7 @@ import { StepInteraction } from '@/contexts/onboarding/types';
 export { useAchievementTracker };
 
 // Re-export the main hook with the original parameter signature
-export const useAchievementTracker as any = (
+export const useAchievementTrackerLegacy = (
   userId: string, 
   completedSteps: Record<string, boolean>,
   stepInteractions: StepInteraction[],
