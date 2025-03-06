@@ -15,7 +15,7 @@ interface DashboardContentProps {
   userProfile: any;
   onChallengeComplete: (pointsEarned: number) => void;
   onCategorySelect: (category: string) => void;
-  onOpenAiAssistant: (reflectionId?: string, reflectionContent?: string) => void;
+  onOpenAiAssistant: () => void;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
@@ -31,7 +31,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const { latestPractice, isLoading: loadingPractice, error: practiceError } = useLatestPractice(user?.id);
 
   const handleOpenAiAssistant = () => {
-    onOpenAiAssistant(); // Removing the argument as it's not expected
+    onOpenAiAssistant();
   };
 
   return (
