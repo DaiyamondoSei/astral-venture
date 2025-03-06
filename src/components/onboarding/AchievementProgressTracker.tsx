@@ -2,17 +2,22 @@
 import React, { useEffect, useState } from 'react';
 import ProgressTracker from '@/components/ProgressTracker';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Trophy, Zap, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { AchievementData } from './data/types';
 
 interface AchievementProgressTrackerProps {
   progressPercentage: number;
   totalPoints: number;
+  nextAchievement?: AchievementData;
+  streakDays?: number;
 }
 
 const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
   progressPercentage,
-  totalPoints
+  totalPoints,
+  nextAchievement,
+  streakDays = 0
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   
@@ -51,13 +56,39 @@ const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
         size="md"
       />
       
-      <div className="mt-2 text-xs text-muted-foreground">
+      <div className="mt-2 text-xs text-muted-foreground flex justify-between">
         {progressPercentage >= 100 ? (
           <span>Level milestone reached! ✨</span>
         ) : (
           <span>{100 - progressPercentage}% until next level</span>
         )}
       </div>
+
+      {streakDays > 0 && (
+        <div className="mt-3 border-t border-quantum-500/20 pt-2">
+          <div className="flex items-center gap-1 text-xs mb-1">
+            <Calendar size={12} className="text-quantum-400" />
+            <span className="font-medium">Current streak: {streakDays} day{streakDays === 1 ? '' : 's'}</span>
+          </div>
+        </div>
+      )}
+      
+      {nextAchievement && (
+        <div className="mt-3 border-t border-quantum-500/20 pt-2">
+          <div className="flex items-center gap-1 text-xs mb-1">
+            <Trophy size={12} className="text-quantum-400" />
+            <span className="font-medium">Next achievement:</span>
+          </div>
+          <div className="text-xs text-muted-foreground">{nextAchievement.title}</div>
+          <div className="mt-1">
+            <ProgressTracker 
+              progress={0} // This would be populated from getAchievementProgress
+              size="sm"
+              colorScheme="from-quantum-300 to-quantum-600"
+            />
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };

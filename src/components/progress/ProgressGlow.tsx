@@ -1,53 +1,59 @@
 
 import React from 'react';
-import { cn } from "@/lib/utils";
-import { AnimationStyle } from './types';
-import { getAnimationClass } from './utils';
-import GlowEffect from '../GlowEffect';
+import { motion } from 'framer-motion';
+import { GlowIntensity, AnimationStyle } from '../onboarding/data/types';
+import { getGlowClasses } from './utils';
 
 interface ProgressGlowProps {
   progress: number;
-  colorScheme: string;
+  intensity: GlowIntensity;
   animation: AnimationStyle;
-  className?: string;
 }
 
-const ProgressGlow: React.FC<ProgressGlowProps> = ({
-  progress,
-  colorScheme,
-  animation,
-  className
+const ProgressGlow: React.FC<ProgressGlowProps> = ({ 
+  progress, 
+  intensity, 
+  animation 
 }) => {
-  const animationClass = getAnimationClass(animation);
-  
-  // Map AnimationStyle to GlowEffect animation prop
-  // This ensures type compatibility by converting our animation types
-  // to those expected by the GlowEffect component
-  const mapAnimationToGlowEffect = (animation: AnimationStyle): "pulse" | "shimmer" | "none" => {
-    switch (animation) {
-      case 'pulse':
-        return 'pulse';
-      case 'slide':
-      case 'ripple':
-        return 'shimmer';
-      case 'none':
-      default:
-        return 'none';
-    }
+  // Animation variants
+  const glowVariants = {
+    pulse: {
+      opacity: [0.5, 0.8, 0.5],
+      transition: {
+        repeat: Infinity,
+        duration: 2,
+        ease: "easeInOut",
+      },
+    },
+    slide: {
+      x: ["0%", "100%"],
+      transition: {
+        repeat: Infinity,
+        duration: 2,
+        ease: "easeInOut",
+      },
+    },
+    ripple: {
+      scale: [1, 1.2, 1],
+      opacity: [0.7, 1, 0.7],
+      transition: {
+        repeat: Infinity,
+        duration: 1.5,
+        ease: "easeInOut",
+      },
+    },
+    none: {}
   };
-  
-  const glowAnimation = mapAnimationToGlowEffect(animation);
-  
+
+  if (animation === 'none' || progress === 0) {
+    return null;
+  }
+
   return (
-    <GlowEffect 
-      className={cn(
-        "absolute h-full left-0 rounded-full bg-gradient-to-r transition-all duration-1000 ease-out",
-        colorScheme,
-        animationClass,
-        className
-      )}
-      animation={glowAnimation}
+    <motion.div
+      className={`absolute inset-0 rounded-full ${getGlowClasses(intensity)}`}
       style={{ width: `${progress}%` }}
+      animate={animation === 'none' ? undefined : glowVariants[animation]}
     />
   );
 };
