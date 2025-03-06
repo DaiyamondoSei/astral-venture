@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Activity, BarChart, Cpu, Zap, Play, Pause, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -12,7 +12,8 @@ interface PerformanceMonitorProps {
   setIsMonitoring: (value: boolean) => void;
 }
 
-const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
+// Use memo to prevent unnecessary re-renders
+const PerformanceMonitor: React.FC<PerformanceMonitorProps> = memo(({
   isMonitoring,
   setIsMonitoring
 }) => {
@@ -96,19 +97,26 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
               </div>
             )}
             
+            {/* Optimized FPS history visualization */}
             <div className="h-20 flex items-end gap-1 mt-4 pb-1 border-b border-white/10">
-              {history.map((metric, i) => (
-                <div 
-                  key={i}
-                  style={{ 
-                    height: `${Math.min(metric.fps / 60 * 100, 100)}%`,
-                    backgroundColor: metric.fps > 50 ? '#22c55e' : 
-                                    metric.fps > 30 ? '#eab308' : 
-                                    '#ef4444'
-                  }}
-                  className="flex-1 rounded-t-sm"
-                />
-              ))}
+              {history.map((metric, i) => {
+                // Calculate color based on FPS
+                const barColor = metric.fps > 50 ? '#22c55e' : 
+                                 metric.fps > 30 ? '#eab308' : 
+                                 '#ef4444';
+                
+                return (
+                  <div 
+                    key={i}
+                    style={{ 
+                      height: `${Math.min(metric.fps / 60 * 100, 100)}%`,
+                      backgroundColor: barColor
+                    }}
+                    className="flex-1 rounded-t-sm"
+                    title={`${metric.fps} FPS, ${metric.renderTime}ms`}
+                  />
+                );
+              })}
             </div>
             <div className="flex justify-between text-xs text-white/40 px-1">
               <span>Earlier</span>
@@ -128,6 +136,8 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       </CardContent>
     </Card>
   );
-};
+});
+
+PerformanceMonitor.displayName = 'PerformanceMonitor';
 
 export default PerformanceMonitor;
