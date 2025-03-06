@@ -15,11 +15,11 @@ interface MainContentProps {
 
 const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [selectedReflection, setSelectedReflection] = useState<{ id?: string, content?: string } | null>(null);
 
-  const handleCategorySelect = (category) => {
+  const handleCategorySelect = (category: string) => {
     setSelectedCategory(category);
     setActiveTab('category-experience');
   };
@@ -56,7 +56,7 @@ const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => 
         <PhilosophicalTab onReflectionComplete={onChallengeComplete} />
       )}
 
-      {activeTab === 'category-experience' && (
+      {activeTab === 'category-experience' && selectedCategory && (
         <CategoryExperienceTab 
           category={selectedCategory}
         />

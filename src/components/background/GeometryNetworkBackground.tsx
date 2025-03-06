@@ -4,15 +4,21 @@ import { motion } from 'framer-motion';
 
 interface GeometryNetworkBackgroundProps {
   className?: string;
+  density?: number;
+  speed?: number;
 }
 
-const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({ className }) => {
+const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({ 
+  className,
+  density = 15,
+  speed = 1
+}) => {
   const [nodes, setNodes] = useState<{ x: number; y: number; id: number }[]>([]);
   const [connections, setConnections] = useState<{ from: number; to: number; id: string }[]>([]);
 
   useEffect(() => {
-    // Generate random nodes
-    const nodeCount = 15;
+    // Generate random nodes - use density prop to control number of nodes
+    const nodeCount = density;
     const newNodes = Array.from({ length: nodeCount }, (_, i) => ({
       x: Math.random() * 100,
       y: Math.random() * 100,
@@ -47,7 +53,12 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({ c
     });
     
     setConnections(newConnections);
-  }, []);
+  }, [density]);
+
+  // Animation duration is affected by speed prop
+  const getAnimationDuration = () => {
+    return 2 / (speed || 1);
+  };
 
   return (
     <div className={`absolute inset-0 overflow-hidden ${className || ''}`}>
@@ -84,7 +95,7 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({ c
               opacity: [0, 0.8, 0.5]
             }}
             transition={{ 
-              duration: 2,
+              duration: getAnimationDuration(),
               delay: node.id * 0.1,
               repeat: Infinity,
               repeatType: "reverse",

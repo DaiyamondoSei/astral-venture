@@ -41,25 +41,33 @@ export const useLatestPractice = (userId: string | undefined) => {
         
         let title = '';
         if (isValidUuid) {
-          // Only query the challenges table if we have a valid UUID
-          const { data: challengeData, error: challengeError } = await supabase
-            .from('challenges')
-            .select('title')
-            .eq('id', progressData.challenge_id)
-            .single();
-            
-          if (challengeError && !challengeError.message.includes('No rows found')) {
-            throw challengeError;
+          try {
+            // Only query the challenges table if we have a valid UUID
+            const { data: challengeData, error: challengeError } = await supabase
+              .from('challenges')
+              .select('title')
+              .eq('id', progressData.challenge_id)
+              .single();
+              
+            if (challengeError && !challengeError.message.includes('No rows found')) {
+              console.error('Challenge lookup error:', challengeError);
+              // Don't throw here, just continue with a fallback title
+            } else if (challengeData) {
+              title = challengeData.title || '';
+            }
+          } catch (err) {
+            console.error('Error in challenge lookup:', err);
+            // Continue with empty title, don't abort the whole operation
           }
-          
-          title = challengeData?.title || '';
-        } else {
-          // Handle non-UUID challenge IDs (like "chakra_5")
+        }
+        
+        // Handle non-UUID challenge IDs (like "chakra_5") or fallback if the UUID lookup failed
+        if (!title) {
           if (progressData.challenge_id.startsWith('chakra_')) {
             const chakraNumber = progressData.challenge_id.split('_')[1];
             title = `Chakra ${chakraNumber} Activation`;
           } else {
-            title = progressData.challenge_id;
+            title = progressData.challenge_id || 'Unknown Practice';
           }
         }
 
@@ -71,6 +79,12 @@ export const useLatestPractice = (userId: string | undefined) => {
       } catch (error) {
         console.error('Error fetching latest practice:', error);
         setError(error as Error);
+        // Set a fallback latest practice object so the UI can still render
+        setLatestPractice({
+          title: 'Recent practice',
+          completedAt: new Date().toISOString(),
+          category: 'practice'
+        });
       } finally {
         setIsLoading(false);
       }

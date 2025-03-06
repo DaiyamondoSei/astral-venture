@@ -42,10 +42,12 @@ export const useUserStreak = (userId: string | undefined) => {
               setUserStreak({ current: 0, longest: 0 });
             } catch (insertError) {
               console.error('Error creating user streak record:', insertError);
+              // Don't throw, just continue with default streak values
             }
           } else {
             console.error('Error fetching user streak:', streakError);
             setError(streakError);
+            // Continue with default values
           }
         } else if (streakData) {
           setUserStreak({
@@ -71,6 +73,7 @@ export const useUserStreak = (userId: string | undefined) => {
           if (chakraError) {
             console.error('Error fetching chakra data:', chakraError);
             setError(chakraError);
+            // Continue with default values
           } else if (chakraData && chakraData.length > 0) {
             const activatedDays = chakraData.map(item => {
               const date = new Date(item.completed_at);
@@ -82,6 +85,7 @@ export const useUserStreak = (userId: string | undefined) => {
         } catch (chakraError) {
           console.error('Error processing chakra data:', chakraError);
           setError(chakraError as Error);
+          // Continue with default values
         }
       } catch (error) {
         console.error('Error in fetchUserStreak:', error);
@@ -149,3 +153,5 @@ export const useUserStreak = (userId: string | undefined) => {
     error
   };
 };
+
+export default useUserStreak;

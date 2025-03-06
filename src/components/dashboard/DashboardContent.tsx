@@ -9,6 +9,7 @@ import AIGuidedPracticeCard from './presentation/AIGuidedPracticeCard';
 import LatestPracticeCard from './presentation/LatestPracticeCard';
 import CategoryGrid from './CategoryGrid';
 import StreakTracker from '@/components/StreakTracker';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardContentProps {
   userProfile: any;
@@ -23,10 +24,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   onCategorySelect,
   onOpenAiAssistant
 }) => {
+  const { user } = useAuth();
   // Custom hooks for data fetching
   const { todayChallenge, loading: loadingChallenge, handleChallengeComplete } = useTodaysChallenge();
-  const { latestReflection } = useReflections();
-  const { latestPractice } = useLatestPractice();
+  const { latestReflection } = useReflections(user?.id);
+  const { latestPractice, isLoading: loadingPractice, error: practiceError } = useLatestPractice(user?.id);
 
   return (
     <div className="space-y-6">
@@ -59,7 +61,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         
         {/* Latest Practice Card */}
         <div className="col-span-1">
-          <LatestPracticeCard latestPractice={latestPractice} />
+          <LatestPracticeCard 
+            latestPractice={latestPractice} 
+            isLoading={loadingPractice}
+            error={practiceError}
+          />
         </div>
       </div>
       
