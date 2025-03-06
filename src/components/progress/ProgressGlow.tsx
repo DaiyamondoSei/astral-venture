@@ -40,7 +40,8 @@ const ProgressGlow: React.FC<ProgressGlowProps> = ({
     none: {}
   };
 
-  if (animation === 'none' || progress === 0) {
+  // Fix for the type comparison issue
+  if (progress === 0 || animation === 'none') {
     return null;
   }
 
