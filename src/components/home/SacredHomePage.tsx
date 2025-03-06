@@ -1,17 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import { motion, Variants } from 'framer-motion';
 import { toast } from '@/components/ui/use-toast';
-import { GlassCard } from '@/components/ui/glass-card';
-import QuantumParticles from '@/components/effects/QuantumParticles';
-import InteractiveEnergyField from '@/components/effects/InteractiveEnergyField';
 
-// Import our components
+// Import our refactored components
 import WelcomeHeader from '@/components/home/widgets/WelcomeHeader';
-import LeftSidebar from '@/components/home/widgets/LeftSidebar';
-import CubeWrapper from '@/components/home/widgets/CubeWrapper';
-import DetailSection from '@/components/home/widgets/DetailSection';
-import MetatronsBackground from '@/components/sacred-geometry/components/MetatronsBackground';
+import LeftSidebarContainer from '@/components/home/widgets/LeftSidebarContainer';
+import MainContent from '@/components/home/widgets/MainContent';
+import NodeDetailSection from '@/components/home/widgets/NodeDetailSection';
+import PageBackground from '@/components/home/widgets/PageBackground';
 
 interface SacredHomePageProps {
   user: any;
@@ -121,15 +119,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     }
   };
 
-  const fadeInUpVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { duration: 0.6, ease: "easeOut" }
-    }
-  };
-
   return (
     <motion.div 
       initial="hidden"
@@ -137,17 +126,10 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       variants={pageVariants}
       className="min-h-screen px-4 py-8 relative"
     >
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-quantum-950/50 to-black/90 z-0"></div>
-        <MetatronsBackground 
-          energyPoints={energyPoints} 
-          enableAnimation={true}
-          interactivity="advanced"
-          consciousnessLevel={consciousnessLevel}
-          opacity={0.2}
-        />
-        <QuantumParticles count={20} interactive={true} className="z-0" />
-      </div>
+      <PageBackground 
+        energyPoints={energyPoints} 
+        consciousnessLevel={consciousnessLevel} 
+      />
       
       <motion.div variants={fadeInUpVariants} className="relative z-10">
         <WelcomeHeader 
@@ -158,64 +140,42 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       </motion.div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative z-10">
-        <motion.div variants={fadeInUpVariants}>
-          <GlassCard animate variant="purple" className="p-6">
-            <LeftSidebar 
-              energyPoints={energyPoints}
-              astralLevel={astralLevel}
-              streakDays={userStreak.current}
-              progressPercentage={getProgressPercentage()}
-              activatedChakras={activatedChakras}
-              selectedNode={selectedNode}
-              selectedNodeMaterials={selectedNodeMaterials}
-              consciousnessLevel={consciousnessLevel}
-            />
-          </GlassCard>
-        </motion.div>
+        <LeftSidebarContainer 
+          energyPoints={energyPoints}
+          astralLevel={astralLevel}
+          userStreak={userStreak}
+          progressPercentage={getProgressPercentage()}
+          activatedChakras={activatedChakras}
+          selectedNode={selectedNode}
+          selectedNodeMaterials={selectedNodeMaterials}
+          consciousnessLevel={consciousnessLevel}
+        />
         
-        <motion.div 
-          className="lg:col-span-2"
-          variants={fadeInUpVariants}
-        >
-          <GlassCard animate variant="default" className="p-4 relative overflow-hidden">
-            <div className="absolute inset-0 opacity-50">
-              <InteractiveEnergyField 
-                energyPoints={energyPoints} 
-                particleDensity={0.5}
-                className="w-full h-full"
-              />
-            </div>
-            
-            <div className="relative z-10">
-              <CubeWrapper 
-                userId={user?.id}
-                energyPoints={energyPoints}
-                onSelectNode={handleNodeSelect}
-              />
-            </div>
-          </GlassCard>
-        </motion.div>
+        <MainContent 
+          userId={user?.id}
+          energyPoints={energyPoints}
+          onNodeSelect={handleNodeSelect}
+        />
       </div>
       
-      {selectedNode && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mt-8"
-        >
-          <GlassCard animate variant="dark" className="p-6">
-            <DetailSection 
-              selectedNode={selectedNode}
-              energyPoints={energyPoints}
-              selectedNodeMaterials={selectedNodeMaterials}
-              consciousnessLevel={consciousnessLevel}
-            />
-          </GlassCard>
-        </motion.div>
-      )}
+      <NodeDetailSection 
+        selectedNode={selectedNode}
+        energyPoints={energyPoints}
+        selectedNodeMaterials={selectedNodeMaterials}
+        consciousnessLevel={consciousnessLevel}
+      />
     </motion.div>
   );
+};
+
+// Define fadeInUpVariants in the same file to avoid circular dependencies
+const fadeInUpVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.6, ease: "easeOut" }
+  }
 };
 
 export default SacredHomePage;
