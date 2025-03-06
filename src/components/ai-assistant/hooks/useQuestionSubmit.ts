@@ -41,11 +41,33 @@ export function useQuestionSubmit({
       const shouldStream = question.length > 50;
       
       if (shouldStream) {
-        // For streaming responses, we'll start collecting chunks
+        // Start with an empty streaming response
+        state.setStreamingResponse('');
+        
+        // Process streaming response
         try {
-          // Start with an empty streaming response
-          state.setStreamingResponse('');
+          // Append text as it comes in for streaming UI
+          const appendToStream = (text: string) => {
+            state.setStreamingResponse(prev => {
+              return prev ? prev + text : text;
+            });
+          };
           
+          // Set up interval to simulate streaming (until real streaming is implemented)
+          let progress = '';
+          const chunks = question.length > 100 ? 
+            ['I\'m analyzing your question...', 
+             '\n\nProcessing spiritual context...',
+             '\n\nFormulating a response based on energy principles...'] : 
+            ['Thinking...'];
+          
+          // Simulate streaming response with chunks
+          for (const chunk of chunks) {
+            await new Promise(resolve => setTimeout(resolve, 700));
+            appendToStream(chunk);
+          }
+          
+          // Now make the actual request
           const aiResponse = await askAIAssistant({
             question,
             context: reflectionContext,
@@ -103,7 +125,7 @@ export function useQuestionSubmit({
     } catch (error) {
       console.error('Error submitting question:', error);
       
-      // Enhanced error handling
+      // Enhanced error handling with more specific error types
       let errorMessage = 'Failed to connect to AI assistant';
       
       // Determine specific error types
@@ -113,6 +135,11 @@ export function useQuestionSubmit({
         errorMessage = 'AI service quota exceeded. Please try again later.';
       } else if (error.message?.includes('rate limit')) {
         errorMessage = 'Rate limit reached. Please wait a moment and try again.';
+      } else if (error.message?.includes('offline') || !navigator.onLine) {
+        errorMessage = 'You appear to be offline. Please check your connection.';
+        // Also load offline fallback response
+        const offlineFallback = createOfflineFallback(question);
+        state.setResponse(offlineFallback);
       }
       
       state.setError(errorMessage);
@@ -127,4 +154,22 @@ export function useQuestionSubmit({
   };
   
   return { submitQuestion };
+}
+
+// Generate a simple offline fallback when completely offline
+function createOfflineFallback(question: string): AIResponse {
+  return {
+    answer: "You appear to be offline. Here's a general response based on common spiritual questions. Please try again when your connection is restored for a more personalized answer.",
+    relatedInsights: [],
+    suggestedPractices: [
+      "Practice mindful breathing for 5-10 minutes",
+      "Journal about your thoughts and feelings",
+      "Connect with nature when possible"
+    ],
+    meta: {
+      model: "offline",
+      tokenUsage: 0,
+      processingTime: 0
+    }
+  };
 }

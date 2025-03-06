@@ -11,6 +11,66 @@ const CACHED_RESPONSES = new Map<string, {
 // Maximum age for cached responses in milliseconds (1 day)
 const MAX_CACHE_AGE = 24 * 60 * 60 * 1000;
 
+// localStorage key for persistent cache
+const LOCAL_STORAGE_CACHE_KEY = 'quantum_ai_response_cache';
+
+/**
+ * Initialize cache from localStorage on app start
+ */
+export function initializeCache(): void {
+  try {
+    const savedCache = localStorage.getItem(LOCAL_STORAGE_CACHE_KEY);
+    if (savedCache) {
+      const parsed = JSON.parse(savedCache);
+      
+      // Convert the parsed object back to a Map
+      Object.entries(parsed).forEach(([question, responseData]) => {
+        CACHED_RESPONSES.set(question, responseData as any);
+      });
+      
+      console.log(`Loaded ${CACHED_RESPONSES.size} cached responses from storage`);
+      
+      // Clean expired items
+      cleanExpiredCache();
+    }
+  } catch (e) {
+    console.error('Failed to load cache from localStorage:', e);
+  }
+}
+
+/**
+ * Save the current cache to localStorage
+ */
+function persistCache(): void {
+  try {
+    // Convert Map to a plain object for serialization
+    const cacheObject = Object.fromEntries(CACHED_RESPONSES.entries());
+    localStorage.setItem(LOCAL_STORAGE_CACHE_KEY, JSON.stringify(cacheObject));
+  } catch (e) {
+    console.error('Failed to persist cache to localStorage:', e);
+  }
+}
+
+/**
+ * Remove expired items from cache
+ */
+function cleanExpiredCache(): void {
+  const now = Date.now();
+  let expiredCount = 0;
+  
+  for (const [key, value] of CACHED_RESPONSES.entries()) {
+    if (now - value.timestamp > MAX_CACHE_AGE) {
+      CACHED_RESPONSES.delete(key);
+      expiredCount++;
+    }
+  }
+  
+  if (expiredCount > 0) {
+    console.log(`Removed ${expiredCount} expired items from cache`);
+    persistCache();
+  }
+}
+
 /**
  * Check if there's a cached response for the question
  * @param question User's question
@@ -20,6 +80,11 @@ export function getCachedResponse(question: string): {
   answer: string;
   suggestedPractices: string[];
 } | null {
+  // Initialize cache from localStorage if not done already
+  if (CACHED_RESPONSES.size === 0) {
+    initializeCache();
+  }
+  
   // Normalize the question to improve cache hits
   const normalizedQuestion = question.toLowerCase().trim();
   
@@ -103,4 +168,16 @@ export function cacheResponse(question: string, response: AIResponse): void {
       CACHED_RESPONSES.delete(oldestKey);
     }
   }
+  
+  // Save updated cache to localStorage
+  persistCache();
+}
+
+/**
+ * Clear the entire cache
+ */
+export function clearCache(): void {
+  CACHED_RESPONSES.clear();
+  localStorage.removeItem(LOCAL_STORAGE_CACHE_KEY);
+  console.log('AI response cache cleared');
 }
