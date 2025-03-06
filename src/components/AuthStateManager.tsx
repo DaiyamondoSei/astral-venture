@@ -60,50 +60,58 @@ const AuthStateManager: React.FC<AuthStateManagerProps> = ({ onLoadingComplete }
 
   // Handle errors with loading state - fix for infinite loop
   useEffect(() => {
-    // Only proceed if we haven't already completed loading and all data is ready
-    if (!hasCompletedLoading && !isLoading && !profileLoading) {
-      if (user && !userProfile && loadAttempts < 3) {
-        // If profile is missing but we have a user, retry loading
-        setLoadAttempts(prev => prev + 1);
-        
-        // Add a delay before retry
-        toast({
-          title: "Loading profile data",
-          description: "Retrying to load your profile...",
-          duration: 1500
-        });
-        
-        // Use setTimeout to delay the reload
-        const timer = setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-        
-        return () => clearTimeout(timer);
-      }
+    // Only proceed if we haven't already completed loading
+    if (hasCompletedLoading) return;
+    
+    // Wait until both auth and profile loading are complete
+    if (isLoading || profileLoading) return;
+    
+    // If we have a user but no profile, and we haven't retried too many times
+    if (user && !userProfile && loadAttempts < 3) {
+      setLoadAttempts(prev => prev + 1);
       
-      // Mark as completed to prevent further calls
-      setHasCompletedLoading(true);
-      
-      // Call the completion handler only once
-      onLoadingComplete({
-        user,
-        userProfile: userProfile || {
-          // Provide fallback profile if missing
-          username: user?.email?.split('@')[0] || 'Seeker',
-          astral_level: 1,
-          energy_points: 0
-        },
-        todayChallenge,
-        userStreak,
-        activatedChakras,
-        isLoading,
-        profileLoading,
-        handleLogout,
-        updateStreak,
-        updateActivatedChakras,
-        updateUserProfile
+      toast({
+        title: "Loading profile data",
+        description: "Retrying to load your profile...",
+        duration: 1500
       });
+      
+      // Use setTimeout to delay the reload
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+      return () => clearTimeout(timer);
     }
+    
+    // Mark as completed to prevent further calls
+    setHasCompletedLoading(true);
+    
+    // Ensure we have default values for everything
+    const safeUserStreak = userStreak || { current: 0, longest: 0 };
+    const safeActivatedChakras = activatedChakras || [];
+    
+    // Create fallback profile if missing
+    const safeUserProfile = userProfile || (user ? {
+      username: user.email?.split('@')[0] || 'Seeker',
+      astral_level: 1,
+      energy_points: 0
+    } : null);
+    
+    // Call the completion handler only once
+    onLoadingComplete({
+      user,
+      userProfile: safeUserProfile,
+      todayChallenge,
+      userStreak: safeUserStreak,
+      activatedChakras: safeActivatedChakras,
+      isLoading,
+      profileLoading,
+      handleLogout,
+      updateStreak,
+      updateActivatedChakras,
+      updateUserProfile
+    });
   }, [
     isLoading, 
     profileLoading, 

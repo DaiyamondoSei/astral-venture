@@ -26,6 +26,11 @@ const Index = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Debug logging
+  useEffect(() => {
+    console.log("Index component - auth state:", { user: !!user, authState: !!authState });
+  }, [user, authState]);
+
   useEffect(() => {
     if (user && !localStorage.getItem(`entry-animation-shown-${user.id}`)) {
       const dreamCaptureCompleted = localStorage.getItem('dreamCaptureCompleted');
@@ -69,7 +74,7 @@ const Index = () => {
               <OnboardingManager userId={authState.user.id}>
                 <ChallengeManager
                   userProfile={authState.userProfile}
-                  activatedChakras={authState.activatedChakras}
+                  activatedChakras={authState.activatedChakras || []}
                   updateUserProfile={authState.updateUserProfile}
                   updateActivatedChakras={authState.updateActivatedChakras}
                 >
@@ -78,8 +83,8 @@ const Index = () => {
                       user={authState.user}
                       userProfile={authState.userProfile}
                       todayChallenge={authState.todayChallenge}
-                      userStreak={authState.userStreak}
-                      activatedChakras={authState.activatedChakras}
+                      userStreak={authState.userStreak || { current: 0, longest: 0 }}
+                      activatedChakras={authState.activatedChakras || []}
                       onLogout={authState.handleLogout}
                       updateStreak={authState.updateStreak}
                       updateActivatedChakras={authState.updateActivatedChakras}

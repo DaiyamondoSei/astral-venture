@@ -19,7 +19,10 @@ export const useUserStreak = (userId: string | undefined) => {
           .eq('user_id', userId)
           .single();
           
-        if (streakError) throw streakError;
+        if (streakError) {
+          console.error('Error fetching user streak:', streakError);
+          return;
+        }
         
         if (streakData) {
           setUserStreak({
@@ -39,9 +42,12 @@ export const useUserStreak = (userId: string | undefined) => {
             .gte('completed_at', startOfWeek.toISOString())
             .order('completed_at', { ascending: false });
             
-          if (chakraError) throw chakraError;
+          if (chakraError) {
+            console.error('Error fetching chakra data:', chakraError);
+            return;
+          }
           
-          if (chakraData) {
+          if (chakraData && chakraData.length > 0) {
             const activatedDays = chakraData.map(item => {
               const date = new Date(item.completed_at);
               return date.getDay();
@@ -51,7 +57,7 @@ export const useUserStreak = (userId: string | undefined) => {
           }
         }
       } catch (error) {
-        console.error('Error fetching user streak:', error);
+        console.error('Error in fetchUserStreak:', error);
       }
     };
     
