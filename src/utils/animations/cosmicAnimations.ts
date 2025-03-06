@@ -1,65 +1,132 @@
 
-import { keyframes } from '@emotion/react';
+import { AnimationProps } from 'framer-motion';
 
-// Cosmic pulsation effect for energy points and auras
-export const cosmicPulse = keyframes`
-  0% { transform: scale(1); opacity: 0.7; }
-  50% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); opacity: 0.7; }
-`;
+/**
+ * Common animation presets for cosmic-themed animations
+ */
 
-// Ethereal glow animation for transcendent elements
-export const etherealGlow = keyframes`
-  0% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5)); }
-  50% { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)); }
-  100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5)); }
-`;
+// Fade in animations with different directions
+export const fadeInUp: AnimationProps = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6, ease: "easeOut" }
+};
 
-// Chakra activation animation
-export const chakraActivate = keyframes`
-  0% { transform: scale(0.8); opacity: 0.3; }
-  20% { transform: scale(1.5); opacity: 1; }
-  40% { transform: scale(1.2); opacity: 0.8; }
-  100% { transform: scale(1); opacity: 0.7; }
-`;
+export const fadeInDown: AnimationProps = {
+  initial: { opacity: 0, y: -20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6, ease: "easeOut" }
+};
 
-// Quantum particle movement animation
-export const quantumFloat = keyframes`
-  0% { transform: translateY(0) translateX(0); }
-  25% { transform: translateY(5px) translateX(3px); }
-  50% { transform: translateY(0) translateX(7px); }
-  75% { transform: translateY(-5px) translateX(3px); }
-  100% { transform: translateY(0) translateX(0); }
-`;
+export const fadeInLeft: AnimationProps = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0 },
+  transition: { duration: 0.6, ease: "easeOut" }
+};
 
-// Sacred geometry rotation animation
-export const sacredRotate = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-`;
+export const fadeInRight: AnimationProps = {
+  initial: { opacity: 0, x: 20 },
+  animate: { opacity: 1, x: 0 },
+  transition: { duration: 0.6, ease: "easeOut" }
+};
 
-// Starfield twinkling animation
-export const starTwinkle = keyframes`
-  0% { opacity: 0.1; }
-  50% { opacity: 1; }
-  100% { opacity: 0.1; }
-`;
+// Scale animations
+export const scaleIn: AnimationProps = {
+  initial: { opacity: 0, scale: 0.9 },
+  animate: { opacity: 1, scale: 1 },
+  transition: { duration: 0.5, ease: "easeOut" }
+};
 
-// Energy flow animation for trails and connections
-export const energyFlow = keyframes`
-  0% { stroke-dashoffset: 1000; opacity: 0.3; }
-  50% { opacity: 0.8; }
-  100% { stroke-dashoffset: 0; opacity: 0.3; }
-`;
+// Quantum particle effect animations
+export const quantumParticleFloat = {
+  y: [0, -10, 0, 10, 0],
+  opacity: [0.5, 0.8, 0.5, 0.8, 0.5],
+  scale: [1, 1.05, 1, 1.05, 1],
+  transition: {
+    duration: 8,
+    repeat: Infinity,
+    ease: "easeInOut"
+  }
+};
 
-// Animation durations and timing functions
-export const animationTimings = {
-  slow: '8s',
-  medium: '5s',
-  fast: '3s',
-  veryFast: '1.5s',
-  easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
-  easeOut: 'cubic-bezier(0, 0, 0.2, 1)',
-  easeIn: 'cubic-bezier(0.4, 0, 1, 1)',
-  bounce: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+// Cosmic pulse animation
+export const cosmicPulse = {
+  scale: [1, 1.02, 1, 0.98, 1],
+  opacity: [0.8, 1, 0.8, 0.6, 0.8],
+  transition: {
+    duration: 5,
+    repeat: Infinity,
+    ease: "easeInOut"
+  }
+};
+
+// Energy flow animation
+export const energyFlow = {
+  rotate: [0, 360],
+  transition: {
+    duration: 30,
+    repeat: Infinity,
+    ease: "linear"
+  }
+};
+
+// Chakra activation animation variants
+export const chakraActivationVariants = {
+  inactive: { 
+    scale: 1, 
+    opacity: 0.5,
+    filter: "brightness(0.8)"
+  },
+  active: { 
+    scale: [1, 1.15, 1.1],
+    opacity: 1,
+    filter: "brightness(1.2)",
+    transition: {
+      scale: {
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
+  }
+};
+
+// Page transition variants
+export const pageTransitionVariants = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1,
+    transition: {
+      duration: 0.5,
+      when: "beforeChildren",
+      staggerChildren: 0.2
+    }
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: 0.3 }
+  }
+};
+
+// Staggered children animation for menus and lists
+export const staggeredChildrenVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: "easeOut"
+    }
+  }
+};
+
+// Sacred geometry animation
+export const sacredGeometryRotation = {
+  rotate: [0, 360],
+  transition: {
+    duration: 60,
+    repeat: Infinity,
+    ease: "linear"
+  }
 };

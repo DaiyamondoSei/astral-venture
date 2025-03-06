@@ -1,13 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
+import { motion } from 'framer-motion';
 import { toast } from '@/components/ui/use-toast';
+import { fadeInUp } from '@/utils/animations/cosmicAnimations';
 
-// Import our new components
+// Import our components
 import WelcomeHeader from '@/components/home/widgets/WelcomeHeader';
 import LeftSidebar from '@/components/home/widgets/LeftSidebar';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
 import DetailSection from '@/components/home/widgets/DetailSection';
+import QuantumParticles from '@/components/effects/QuantumParticles';
+import InteractiveEnergyField from '@/components/effects/InteractiveEnergyField';
+import { GlassCard } from '@/components/ui/glass-card';
 
 interface SacredHomePageProps {
   user: any;
@@ -28,9 +33,20 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
 }) => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [selectedNodeMaterials, setSelectedNodeMaterials] = useState<DownloadableMaterial[] | null>(null);
+  const [pageLoaded, setPageLoaded] = useState(false);
   
-  // Add logging to debug component mounting and props
+  // Add loading effect
   useEffect(() => {
+    // Simulate loading
+    const timer = setTimeout(() => {
+      setPageLoaded(true);
+      toast({
+        title: "Connection established",
+        description: "Quantum field synchronization complete.",
+      });
+    }, 800);
+    
+    // Add logging to debug component mounting and props
     console.log("SacredHomePage mounted with:", {
       user: !!user,
       userProfile: !!userProfile,
@@ -42,6 +58,8 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     if (!userProfile) {
       console.warn("User profile is missing in SacredHomePage");
     }
+    
+    return () => clearTimeout(timer);
   }, [user, userProfile, userStreak, activatedChakras, selectedNode]);
   
   // Derive username from user data
@@ -53,6 +71,12 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     console.log("Node selected in SacredHomePage:", nodeId, downloadables);
     setSelectedNode(nodeId);
     setSelectedNodeMaterials(downloadables || null);
+    
+    // Add visual feedback
+    toast({
+      title: `${nodeId.charAt(0).toUpperCase() + nodeId.slice(1)} node activated`,
+      description: "Quantum resonance established.",
+    });
     
     if (onNodeSelect) {
       onNodeSelect(nodeId);
@@ -69,42 +93,96 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     return Math.min(Math.round((pointsInCurrentLevel / pointsNeededForNextLevel) * 100), 100);
   };
 
+  const pageVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        when: "beforeChildren"
+      }
+    }
+  };
+
   return (
-    <div className="min-h-screen px-4 py-8">
-      {/* Welcome Header */}
-      <WelcomeHeader 
-        username={username}
-        onLogout={onLogout}
-        astralLevel={astralLevel}
-      />
+    <motion.div 
+      initial="hidden"
+      animate={pageLoaded ? "visible" : "hidden"}
+      variants={pageVariants}
+      className="min-h-screen px-4 py-8 relative"
+    >
+      {/* Background effects */}
+      <QuantumParticles count={20} interactive={true} className="z-0" />
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-        {/* Left column with energy information */}
-        <LeftSidebar 
-          energyPoints={energyPoints}
+      {/* Welcome Header */}
+      <motion.div variants={fadeInUp}>
+        <WelcomeHeader 
+          username={username}
+          onLogout={onLogout}
           astralLevel={astralLevel}
-          streakDays={userStreak.current}
-          progressPercentage={getProgressPercentage()}
-          activatedChakras={activatedChakras}
-          selectedNode={selectedNode}
-          selectedNodeMaterials={selectedNodeMaterials}
         />
+      </motion.div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative z-10">
+        {/* Left column with energy information */}
+        <motion.div variants={fadeInUp}>
+          <GlassCard animate variant="purple" className="p-6">
+            <LeftSidebar 
+              energyPoints={energyPoints}
+              astralLevel={astralLevel}
+              streakDays={userStreak.current}
+              progressPercentage={getProgressPercentage()}
+              activatedChakras={activatedChakras}
+              selectedNode={selectedNode}
+              selectedNodeMaterials={selectedNodeMaterials}
+            />
+          </GlassCard>
+        </motion.div>
         
         {/* Center column with Metatron's Cube */}
-        <CubeWrapper 
-          userId={user?.id}
-          energyPoints={energyPoints}
-          onSelectNode={handleNodeSelect}
-        />
+        <motion.div 
+          className="lg:col-span-2"
+          variants={fadeInUp}
+        >
+          <GlassCard animate variant="default" className="p-4 relative overflow-hidden">
+            {/* Energy field background effect */}
+            <div className="absolute inset-0 opacity-50">
+              <InteractiveEnergyField 
+                energyPoints={energyPoints} 
+                particleDensity={0.5}
+                className="w-full h-full"
+              />
+            </div>
+            
+            <div className="relative z-10">
+              <CubeWrapper 
+                userId={user?.id}
+                energyPoints={energyPoints}
+                onSelectNode={handleNodeSelect}
+              />
+            </div>
+          </GlassCard>
+        </motion.div>
       </div>
       
-      {/* Selected node detail panel (desktop only) */}
-      <DetailSection 
-        selectedNode={selectedNode}
-        energyPoints={energyPoints}
-        selectedNodeMaterials={selectedNodeMaterials}
-      />
-    </div>
+      {/* Selected node detail panel */}
+      {selectedNode && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mt-8"
+        >
+          <GlassCard animate variant="dark" className="p-6">
+            <DetailSection 
+              selectedNode={selectedNode}
+              energyPoints={energyPoints}
+              selectedNodeMaterials={selectedNodeMaterials}
+            />
+          </GlassCard>
+        </motion.div>
+      )}
+    </motion.div>
   );
 };
 

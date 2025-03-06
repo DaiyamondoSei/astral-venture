@@ -29,7 +29,7 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   const [particles, setParticles] = useState<QuantumParticle[]>([]);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   
-  // Generate random particles
+  // Generate random particles only once on mount
   useEffect(() => {
     const newParticles: QuantumParticle[] = [];
     
