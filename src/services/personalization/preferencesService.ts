@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { UserPreferences, PrivacySettings } from './types';
 import { toast } from '@/components/ui/use-toast';
+import { Json } from '@/integrations/supabase/types';
 
 /**
  * Service for managing user preferences
@@ -32,7 +33,15 @@ export const preferencesService = {
         return defaultPrefs;
       }
       
-      return data.preferences as UserPreferences;
+      // Safely cast the JSON data to UserPreferences type
+      const userPrefs = data.preferences as unknown;
+      // Validate that it has the expected structure
+      if (typeof userPrefs === 'object' && userPrefs !== null) {
+        return userPrefs as UserPreferences;
+      }
+      
+      // If data is invalid, return default preferences
+      return getDefaultPreferences();
     } catch (error) {
       console.error('Error fetching user preferences:', error);
       toast({
@@ -67,7 +76,13 @@ export const preferencesService = {
         if (error) {
           currentPrefs = getDefaultPreferences();
         } else {
-          currentPrefs = data.preferences as UserPreferences;
+          // Safely cast the JSON data
+          const userPrefs = data.preferences as unknown;
+          if (typeof userPrefs === 'object' && userPrefs !== null) {
+            currentPrefs = userPrefs as UserPreferences;
+          } else {
+            currentPrefs = getDefaultPreferences();
+          }
         }
       } catch (e) {
         currentPrefs = getDefaultPreferences();

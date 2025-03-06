@@ -17,14 +17,27 @@ export function normalizeChakraData(chakras: ChakraActivated): number[] {
   if (!chakras) return [];
   
   if (Array.isArray(chakras)) {
-    return chakras as number[];
+    // If it's already an array, filter for numbers only
+    return chakras.filter(item => typeof item === 'number') as number[];
   }
   
   if (typeof chakras === 'string') {
     try {
       const parsed = JSON.parse(chakras);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) 
+        ? parsed.filter(item => typeof item === 'number')
+        : [];
     } catch (e) {
+      return [];
+    }
+  }
+  
+  // Handle object format that might come from the database
+  if (typeof chakras === 'object' && chakras !== null) {
+    try {
+      const values = Object.values(chakras);
+      return values.filter(item => typeof item === 'number') as number[];
+    } catch {
       return [];
     }
   }

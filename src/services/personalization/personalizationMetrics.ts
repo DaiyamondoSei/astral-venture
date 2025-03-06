@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { PersonalizationMetrics } from './types';
+import { Json } from '@/integrations/supabase/types';
 
 /**
  * Service for calculating and retrieving personalization impact metrics
@@ -84,15 +85,17 @@ export const personalizationMetricsService = {
         
         // Chakra balance improvement based on chakra activations
         const chakraActivities = activities.filter(activity => 
-          activity.chakras_activated && Array.isArray(activity.chakras_activated) && activity.chakras_activated.length > 0
+          activity.chakras_activated && 
+          typeof activity.chakras_activated === 'object' &&
+          Array.isArray(activity.chakras_activated)
         );
         
         if (chakraActivities.length > 0) {
           // Check if user is activating multiple chakras
           const uniqueChakras = new Set();
           chakraActivities.forEach(activity => {
-            if (activity.chakras_activated) {
-              activity.chakras_activated.forEach(chakra => uniqueChakras.add(chakra));
+            if (activity.chakras_activated && Array.isArray(activity.chakras_activated)) {
+              (activity.chakras_activated as number[]).forEach(chakra => uniqueChakras.add(chakra));
             }
           });
           
@@ -103,7 +106,11 @@ export const personalizationMetricsService = {
         // Emotional growth rate based on reflection activities
         const reflectionActivities = activities.filter(activity => 
           activity.activity_type === 'reflection' || 
-          (activity.metadata && activity.metadata.type === 'reflection')
+          (activity.metadata && 
+           typeof activity.metadata === 'object' && 
+           activity.metadata !== null &&
+           'type' in activity.metadata && 
+           activity.metadata.type === 'reflection')
         );
         
         if (reflectionActivities.length > 0) {

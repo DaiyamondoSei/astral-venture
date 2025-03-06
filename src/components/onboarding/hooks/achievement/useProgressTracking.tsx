@@ -9,10 +9,11 @@ export function useProgressTracking(
   // Track progress for a specific type
   const trackProgress = useCallback((type: string, amount: number) => {
     setProgressTracking((prev) => {
-      // Create a new object with the updated value to avoid TypeScript errors
-      const updated = { ...prev };
-      updated[type] = (prev[type] || 0) + amount;
-      return updated;
+      // Create a new object with the updated value
+      return {
+        ...prev,
+        [type]: (prev[type] || 0) + amount
+      };
     });
   }, [setProgressTracking]);
 

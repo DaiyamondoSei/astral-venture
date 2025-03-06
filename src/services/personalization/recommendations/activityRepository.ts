@@ -1,6 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { UserActivity } from '../types';
+import { Json } from '@/integrations/supabase/types';
+import { normalizeChakraData } from '@/utils/emotion/chakraTypes';
 
 /**
  * Repository for user activity data
@@ -57,17 +59,22 @@ export const activityRepository = {
         throw error;
       }
       
-      // Map database records to UserActivity type
+      // Map database records to UserActivity type with proper type conversion
       return data.map(item => ({
         id: item.id,
         userId: item.user_id,
         activityType: item.activity_type,
         timestamp: item.timestamp,
         duration: item.duration,
-        chakrasActivated: item.chakras_activated,
+        // Convert JSON data to proper types
+        chakrasActivated: normalizeChakraData(item.chakras_activated),
         completionRate: item.completion_rate,
-        emotionalResponse: item.emotional_response,
-        metadata: item.metadata
+        emotionalResponse: Array.isArray(item.emotional_response) 
+          ? item.emotional_response 
+          : (typeof item.emotional_response === 'string' 
+              ? [item.emotional_response] 
+              : []),
+        metadata: item.metadata as Record<string, any> || {}
       }));
     } catch (error) {
       console.error('Error fetching user activities:', error);

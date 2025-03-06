@@ -1,6 +1,40 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ContentRecommendation } from '../types';
+import { Json } from '@/integrations/supabase/types';
+import { normalizeChakraData } from '@/utils/emotion/chakraTypes';
+
+// Convert database content type to the enum type used in the app
+function normalizeContentType(type: string): "practice" | "meditation" | "lesson" | "reflection" {
+  const validTypes = ["practice", "meditation", "lesson", "reflection"];
+  return validTypes.includes(type) 
+    ? type as "practice" | "meditation" | "lesson" | "reflection" 
+    : "lesson"; // Default fallback
+}
+
+// Convert JSON to string array
+function normalizeEmotionalResonance(resonance: Json | null): string[] {
+  if (!resonance) return [];
+  
+  if (Array.isArray(resonance)) {
+    // If it's already an array, filter only string values
+    return resonance.filter(item => typeof item === 'string') as string[];
+  }
+  
+  if (typeof resonance === 'string') {
+    try {
+      const parsed = JSON.parse(resonance);
+      return Array.isArray(parsed) 
+        ? parsed.filter(item => typeof item === 'string') 
+        : [];
+    } catch {
+      // If not valid JSON but a string, return it as a single-item array
+      return [resonance];
+    }
+  }
+  
+  return [];
+}
 
 // Sample mock content items to seed the database if empty
 const mockContentItems: Partial<ContentRecommendation>[] = [
@@ -111,15 +145,15 @@ export const contentRepository = {
         throw error;
       }
       
-      // Map database records to ContentRecommendation type
+      // Map database records to ContentRecommendation type with proper type conversion
       return data.map(item => ({
         id: item.id,
         title: item.title,
-        type: item.type,
+        type: normalizeContentType(item.type),
         category: item.category,
         relevanceScore: item.relevance_score,
-        chakraAlignment: item.chakra_alignment,
-        emotionalResonance: item.emotional_resonance,
+        chakraAlignment: normalizeChakraData(item.chakra_alignment),
+        emotionalResonance: normalizeEmotionalResonance(item.emotional_resonance),
         recommendationReason: item.recommendation_reason
       }));
     } catch (error) {
@@ -148,11 +182,11 @@ export const contentRepository = {
       return {
         id: data.id,
         title: data.title,
-        type: data.type,
+        type: normalizeContentType(data.type),
         category: data.category,
         relevanceScore: data.relevance_score,
-        chakraAlignment: data.chakra_alignment,
-        emotionalResonance: data.emotional_resonance,
+        chakraAlignment: normalizeChakraData(data.chakra_alignment),
+        emotionalResonance: normalizeEmotionalResonance(data.emotional_resonance),
         recommendationReason: data.recommendation_reason
       };
     } catch (error) {
@@ -180,15 +214,15 @@ export const contentRepository = {
         throw error;
       }
       
-      // Map database records to ContentRecommendation type
+      // Map database records to ContentRecommendation type with proper type conversion
       return data.map(item => ({
         id: item.id,
         title: item.title,
-        type: item.type,
+        type: normalizeContentType(item.type),
         category: item.category,
         relevanceScore: item.relevance_score,
-        chakraAlignment: item.chakra_alignment,
-        emotionalResonance: item.emotional_resonance,
+        chakraAlignment: normalizeChakraData(item.chakra_alignment),
+        emotionalResonance: normalizeEmotionalResonance(item.emotional_resonance),
         recommendationReason: item.recommendation_reason
       }));
     } catch (error) {
