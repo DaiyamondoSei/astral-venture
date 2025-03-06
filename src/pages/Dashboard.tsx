@@ -1,15 +1,20 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import SeedOfLife from '@/components/SeedOfLife';
 import EnergyAvatar from '@/components/EnergyAvatar';
 import ProgressTracker from '@/components/ProgressTracker';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Book, Trophy, Settings } from 'lucide-react';
+import AchievementProgressTracker from '@/components/onboarding/AchievementProgressTracker';
+import { useAuth } from '@/contexts/AuthContext';
+import { calculateEmotionalGrowth } from '@/utils/emotion/chakra/emotionalGrowth';
 
 const Dashboard = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [userLevel] = useState(1);
+  const [showProgressTracker, setShowProgressTracker] = useState(false);
+  const { user } = useAuth();
   
   // Mock user data
   const userData = {
@@ -21,6 +26,26 @@ const Dashboard = () => {
       astral: 8,
       dreams: 0
     }
+  };
+
+  useEffect(() => {
+    // Show progress tracker after a short delay
+    const timer = setTimeout(() => {
+      setShowProgressTracker(true);
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Calculate emotional growth percentage for progress tracking
+  const getEmotionalGrowthPercentage = () => {
+    return calculateEmotionalGrowth({
+      reflectionCount: 5,
+      emotionalDepth: 0.7,
+      activatedChakras: [0, 1, 3],
+      dominantEmotions: ['calm', 'hopeful'],
+      streakDays: 3
+    });
   };
   
   return (
@@ -53,6 +78,8 @@ const Dashboard = () => {
             progress={userData.progress.overall} 
             label="Overall Progress"
             className="max-w-xs"
+            animation="pulse"
+            glowIntensity="medium"
           />
         </div>
         
@@ -80,6 +107,14 @@ const Dashboard = () => {
           </Button>
         </div>
       </div>
+      
+      {/* Achievement Progress Tracker */}
+      {showProgressTracker && (
+        <AchievementProgressTracker 
+          progressPercentage={getEmotionalGrowthPercentage()} 
+          totalPoints={115}
+        />
+      )}
     </Layout>
   );
 };

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAchievementTracker } from './hooks/useAchievementTracker';
 import { useAchievementNotification } from './hooks/useAchievementNotification';
 import AchievementNotification from './AchievementNotification';
@@ -33,8 +33,18 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
   const {
     currentNotification,
     showProgressTracker,
-    handleDismiss
+    handleDismiss,
+    showProgress
   } = useAchievementNotification(earnedAchievements, dismissAchievement);
+  
+  // Show progress tracker briefly on component mount
+  useEffect(() => {
+    // Wait for earnedAchievements to load before deciding to show progress
+    if (earnedAchievements.length > 0 || Object.keys(completedSteps).length > 0) {
+      const cleanup = showProgress(7000);
+      return cleanup;
+    }
+  }, [earnedAchievements.length, completedSteps, showProgress]);
 
   return (
     <>
@@ -46,7 +56,7 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
         />
       )}
       
-      {/* Show progress tracker after earning achievements */}
+      {/* Show progress tracker after earning achievements or when specified */}
       {showProgressTracker && (
         <AchievementProgressTracker
           progressPercentage={getProgressPercentage()}
