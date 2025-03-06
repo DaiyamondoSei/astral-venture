@@ -1,13 +1,13 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { AchievementData } from '../../data/types';
-import { AchievementTrackerProps, AchievementState } from './types';
+import { AchievementTrackerProps, AchievementState, AchievementTrackerResult } from './types';
 import { useAchievementState } from './useAchievementState';
 import { useAchievementDetection } from './useAchievementDetection';
 import { useAchievementProgress } from './useAchievementProgress';
 import { useProgressTracking } from './useProgressTracking';
 
-export function useAchievementTracker(props: AchievementTrackerProps) {
+export function useAchievementTracker(props: AchievementTrackerProps): AchievementTrackerResult {
   const [earnedAchievements, setEarnedAchievements] = useState<AchievementData[]>([]);
   
   // Initialize state with proper defaults

@@ -7,19 +7,26 @@ export interface ProgressValueProps {
   prefix?: string;
   suffix?: string;
   className?: string;
+  showPercentSign?: boolean;
+  format?: (value: number) => string;
 }
 
 const ProgressValue: React.FC<ProgressValueProps> = ({ 
   value, 
   prefix = '', 
-  suffix = '%',
+  suffix = '',
+  showPercentSign = true,
+  format,
   className 
 }) => {
+  const displayValue = format ? format(value) : Math.round(value);
+  const percentSign = showPercentSign ? '%' : '';
+  
   return (
     <div className={cn("text-sm font-medium text-right mt-1", className)}>
       <span className="text-muted-foreground">{prefix}</span>
-      <span>{Math.round(value)}</span>
-      <span className="text-muted-foreground">{suffix}</span>
+      <span>{displayValue}</span>
+      <span className="text-muted-foreground">{suffix}{percentSign}</span>
     </div>
   );
 };
