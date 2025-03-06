@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import StepContent from './StepContent';
+import StepContent from './step-content/StepContent';
 
 interface OnboardingContentProps {
   step: string;

@@ -1,36 +1,40 @@
 
-import React from 'react';
-import AchievementNotification from './AchievementNotification';
+import React, { useEffect, useState } from 'react';
 import { useAchievementTracker } from './hooks/useAchievementTracker';
+import AchievementNotification from './AchievementNotification';
+import { StepInteraction } from '@/contexts/OnboardingContext';
+import { AchievementData } from './onboardingData';
 
 interface AchievementLayerProps {
   userId: string;
   completedSteps: Record<string, boolean>;
-  stepInteractions: any[];
+  stepInteractions: StepInteraction[];
 }
 
-const AchievementLayer: React.FC<AchievementLayerProps> = ({ 
-  userId, 
+const AchievementLayer: React.FC<AchievementLayerProps> = ({
+  userId,
   completedSteps,
   stepInteractions
 }) => {
-  const {
-    currentAchievement,
-    handleAchievementDismiss,
-    getUserInteractions
-  } = useAchievementTracker(userId, completedSteps);
+  const [currentAchievement, setCurrentAchievement] = useState<AchievementData | null>(null);
+  const { earnedAchievements, dismissAchievement } = useAchievementTracker(userId, completedSteps, stepInteractions);
+
+  // Show the most recent achievement that hasn't been dismissed
+  useEffect(() => {
+    if (earnedAchievements.length > 0) {
+      setCurrentAchievement(earnedAchievements[0]);
+    } else {
+      setCurrentAchievement(null);
+    }
+  }, [earnedAchievements]);
+
+  if (!currentAchievement) return null;
 
   return (
-    <>
-      {/* Achievement notification */}
-      {currentAchievement && (
-        <AchievementNotification 
-          achievement={currentAchievement}
-          userInteractions={getUserInteractions(stepInteractions)}
-          onDismiss={handleAchievementDismiss}
-        />
-      )}
-    </>
+    <AchievementNotification
+      achievement={currentAchievement}
+      onDismiss={() => dismissAchievement(currentAchievement.id)}
+    />
   );
 };
 
