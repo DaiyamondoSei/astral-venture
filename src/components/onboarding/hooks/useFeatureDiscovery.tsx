@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { featureTooltips, guidedTours, FeatureTooltipData, GuidedTourData } from '../onboardingData';
+import { featureTooltips, guidedTours, FeatureTooltipData, GuidedTourData } from '../data';
 import { useToast } from '@/components/ui/use-toast';
 
 export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {

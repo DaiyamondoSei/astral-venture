@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { FeatureTooltipData } from './onboardingData';
+import { FeatureTooltipData } from './data/types';
 
 interface FeatureTooltipProps {
   tooltipData: FeatureTooltipData;

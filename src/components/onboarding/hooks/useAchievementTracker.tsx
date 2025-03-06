@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { onboardingAchievements, AchievementData } from '../onboardingData';
+import { onboardingAchievements, AchievementData } from '../data';
 import { StepInteraction } from '@/contexts/onboarding/types';
 import { useToast } from '@/components/ui/use-toast';
 

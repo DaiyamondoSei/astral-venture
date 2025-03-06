@@ -1,25 +1,13 @@
 
-import { ReactNode } from 'react';
+// This file defines types used by the progress components
 
-export type GlowIntensity = 'none' | 'low' | 'medium' | 'high';
-export type AnimationStyle = 'none' | 'pulse' | 'breathe' | 'slide';
-export type ProgressSize = 'xs' | 'sm' | 'md' | 'lg';
-export type LabelPosition = 'top' | 'bottom' | 'left' | 'right';
-export type ProgressColorScheme = 'quantum' | 'astral' | 'ethereal' | 'default';
+export type ProgressSize = 'sm' | 'md' | 'lg';
+export type ProgressColorScheme = 
+  | 'primary' 
+  | 'secondary' 
+  | 'accent' 
+  | 'quantum'
+  | `from-quantum-${number} to-quantum-${number}`;
 
-export interface ProgressTrackerProps {
-  progress: number; // 0-100
-  className?: string;
-  label?: string | ReactNode;
-  showPercentage?: boolean;
-  glowIntensity?: GlowIntensity;
-  size?: ProgressSize;
-  labelPosition?: LabelPosition;
-  animation?: AnimationStyle;
-  colorScheme?: ProgressColorScheme;
-  showValue?: boolean;
-  labelClassName?: string;
-  valueClassName?: string;
-  valuePrefix?: string;
-  valueSuffix?: string;
-}
+export type GlowIntensity = 'low' | 'medium' | 'high';
+export type AnimationStyle = 'none' | 'pulse' | 'slide' | 'ripple';
