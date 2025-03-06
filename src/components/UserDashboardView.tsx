@@ -8,6 +8,7 @@ import UserStats from '@/components/dashboard/UserStats';
 import { useLogout } from '@/hooks/useLogout';
 import SacredHomePage from '@/components/home/SacredHomePage';
 import { toast } from '@/components/ui/use-toast';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 interface UserDashboardViewProps {
   user: any;
@@ -59,11 +60,6 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
     }
   }, [user, userProfile, activatedChakras, userStreak, activeView]);
   
-  // Derive username from user data
-  const username = userProfile?.username || user?.email?.split('@')[0] || 'Seeker';
-  const astralLevel = userProfile?.astral_level || 1;
-  const energyPoints = userProfile?.energy_points || 0;
-
   const logoutHandler = onLogout || handleLogout;
   
   const handleNodeSelect = (nodeId: string) => {
@@ -95,7 +91,7 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
   }
 
   return (
-    <>
+    <ErrorBoundary>
       {activeView === 'sacred-home' ? (
         <SacredHomePage
           user={user}
@@ -107,12 +103,12 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
         />
       ) : (
         <DashboardLayout
-          username={username}
-          astralLevel={astralLevel}
+          username={userProfile?.username || user?.email?.split('@')[0] || 'Seeker'}
+          astralLevel={userProfile?.astral_level || 1}
           onLogout={logoutHandler}
         >
           <UserStats
-            energyPoints={energyPoints}
+            energyPoints={userProfile?.energy_points || 0}
             streakDays={userStreak.current}
             activatedChakras={activatedChakras}
           />
@@ -127,8 +123,8 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
           />
           
           <UserDashboardCards 
-            energyPoints={energyPoints}
-            astralLevel={astralLevel}
+            energyPoints={userProfile?.energy_points || 0}
+            astralLevel={userProfile?.astral_level || 1}
             todayChallenge={todayChallenge}
           />
           
@@ -138,7 +134,7 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
           />
         </DashboardLayout>
       )}
-    </>
+    </ErrorBoundary>
   );
 };
 

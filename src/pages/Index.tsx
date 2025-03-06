@@ -10,7 +10,6 @@ import OnboardingManager from '@/components/onboarding/OnboardingManager';
 const UserDashboardView = lazy(() => import('@/components/UserDashboardView'));
 const LandingView = lazy(() => import('@/components/LandingView'));
 const EntryAnimationView = lazy(() => import('@/components/EntryAnimationView'));
-const DevModeManager = lazy(() => import('@/components/dev-mode/DevModeManager'));
 const ChallengeManager = lazy(() => import('@/components/ChallengeManager'));
 
 // Loading fallback components
@@ -52,41 +51,39 @@ const Index = () => {
       
       {authState && (
         <Suspense fallback={<LoadingFallback />}>
-          <DevModeManager>
-            {showEntryAnimation ? (
-              <EntryAnimationView 
-                user={authState.user}
-                onComplete={handleEntryAnimationComplete}
-                showTestButton={false}
-              />
-            ) : (!authState.user ? (
-              <LandingView />
-            ) : (
-              <OnboardingManager userId={authState.user.id}>
-                <ChallengeManager
-                  userProfile={authState.userProfile}
-                  activatedChakras={authState.activatedChakras}
-                  updateUserProfile={authState.updateUserProfile}
-                  updateActivatedChakras={authState.updateActivatedChakras}
-                >
-                  {(handleChallengeComplete) => (
-                    <UserDashboardView
-                      user={authState.user}
-                      userProfile={authState.userProfile}
-                      todayChallenge={authState.todayChallenge}
-                      userStreak={authState.userStreak}
-                      activatedChakras={authState.activatedChakras}
-                      onLogout={authState.handleLogout}
-                      updateStreak={authState.updateStreak}
-                      updateActivatedChakras={authState.updateActivatedChakras}
-                      updateUserProfile={authState.updateUserProfile}
-                      onChallengeComplete={handleChallengeComplete}
-                    />
-                  )}
-                </ChallengeManager>
-              </OnboardingManager>
-            ))}
-          </DevModeManager>
+          {showEntryAnimation ? (
+            <EntryAnimationView 
+              user={authState.user}
+              onComplete={handleEntryAnimationComplete}
+              showTestButton={false}
+            />
+          ) : (!authState.user ? (
+            <LandingView />
+          ) : (
+            <OnboardingManager userId={authState.user.id}>
+              <ChallengeManager
+                userProfile={authState.userProfile}
+                activatedChakras={authState.activatedChakras}
+                updateUserProfile={authState.updateUserProfile}
+                updateActivatedChakras={authState.updateActivatedChakras}
+              >
+                {(handleChallengeComplete) => (
+                  <UserDashboardView
+                    user={authState.user}
+                    userProfile={authState.userProfile}
+                    todayChallenge={authState.todayChallenge}
+                    userStreak={authState.userStreak}
+                    activatedChakras={authState.activatedChakras}
+                    onLogout={authState.handleLogout}
+                    updateStreak={authState.updateStreak}
+                    updateActivatedChakras={authState.updateActivatedChakras}
+                    updateUserProfile={authState.updateUserProfile}
+                    onChallengeComplete={handleChallengeComplete}
+                  />
+                )}
+              </ChallengeManager>
+            </OnboardingManager>
+          ))}
         </Suspense>
       )}
     </Layout>

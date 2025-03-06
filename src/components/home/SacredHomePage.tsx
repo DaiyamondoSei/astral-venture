@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import { motion, Variants } from 'framer-motion';
 import { toast } from '@/components/ui/use-toast';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Import our refactored components
 import WelcomeHeader from '@/components/home/widgets/WelcomeHeader';
@@ -120,51 +121,53 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
   };
 
   return (
-    <motion.div 
-      initial="hidden"
-      animate={pageLoaded ? "visible" : "hidden"}
-      variants={pageVariants}
-      className="min-h-screen px-4 py-8 relative"
-    >
-      <PageBackground 
-        energyPoints={energyPoints} 
-        consciousnessLevel={consciousnessLevel} 
-      />
-      
-      <motion.div variants={fadeInUpVariants} className="relative z-10">
-        <WelcomeHeader 
-          username={username}
-          onLogout={onLogout}
-          astralLevel={astralLevel}
+    <ErrorBoundary>
+      <motion.div 
+        initial="hidden"
+        animate={pageLoaded ? "visible" : "hidden"}
+        variants={pageVariants}
+        className="min-h-screen px-4 py-8 relative"
+      >
+        <PageBackground 
+          energyPoints={energyPoints} 
+          consciousnessLevel={consciousnessLevel} 
         />
-      </motion.div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative z-10">
-        <LeftSidebarContainer 
-          energyPoints={energyPoints}
-          astralLevel={astralLevel}
-          userStreak={userStreak}
-          progressPercentage={getProgressPercentage()}
-          activatedChakras={activatedChakras}
+        
+        <motion.div variants={fadeInUpVariants} className="relative z-10">
+          <WelcomeHeader 
+            username={username}
+            onLogout={onLogout}
+            astralLevel={astralLevel}
+          />
+        </motion.div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative z-10">
+          <LeftSidebarContainer 
+            energyPoints={energyPoints}
+            astralLevel={astralLevel}
+            userStreak={userStreak}
+            progressPercentage={getProgressPercentage()}
+            activatedChakras={activatedChakras}
+            selectedNode={selectedNode}
+            selectedNodeMaterials={selectedNodeMaterials}
+            consciousnessLevel={consciousnessLevel}
+          />
+          
+          <MainContent 
+            userId={user?.id}
+            energyPoints={energyPoints}
+            onNodeSelect={handleNodeSelect}
+          />
+        </div>
+        
+        <NodeDetailSection 
           selectedNode={selectedNode}
+          energyPoints={energyPoints}
           selectedNodeMaterials={selectedNodeMaterials}
           consciousnessLevel={consciousnessLevel}
         />
-        
-        <MainContent 
-          userId={user?.id}
-          energyPoints={energyPoints}
-          onNodeSelect={handleNodeSelect}
-        />
-      </div>
-      
-      <NodeDetailSection 
-        selectedNode={selectedNode}
-        energyPoints={energyPoints}
-        selectedNodeMaterials={selectedNodeMaterials}
-        consciousnessLevel={consciousnessLevel}
-      />
-    </motion.div>
+      </motion.div>
+    </ErrorBoundary>
   );
 };
 
