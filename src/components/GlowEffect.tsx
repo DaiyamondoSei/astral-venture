@@ -13,6 +13,10 @@ interface GlowEffectProps {
   onClick?: () => void;
   interactive?: boolean;
   ariaLabel?: string;
+  onMouseEnter?: () => void;  // Added missing prop
+  onMouseLeave?: () => void;  // Added missing prop
+  onFocus?: () => void;       // Added for completeness
+  onBlur?: () => void;        // Added for completeness
 }
 
 const GlowEffect = ({
@@ -24,7 +28,11 @@ const GlowEffect = ({
   style,
   onClick,
   interactive = false,
-  ariaLabel
+  ariaLabel,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur
 }: GlowEffectProps) => {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -62,10 +70,41 @@ const GlowEffect = ({
   } : undefined;
   
   // Handle interaction events
-  const handleMouseEnter = interactive ? () => setIsHovered(true) : undefined;
-  const handleMouseLeave = interactive ? () => setIsHovered(false) : undefined;
-  const handleFocus = interactive ? () => setIsHovered(true) : undefined;
-  const handleBlur = interactive ? () => setIsHovered(false) : undefined;
+  const handleMouseEnter = () => {
+    if (interactive) {
+      setIsHovered(true);
+    }
+    if (onMouseEnter) {
+      onMouseEnter();
+    }
+  };
+  
+  const handleMouseLeave = () => {
+    if (interactive) {
+      setIsHovered(false);
+    }
+    if (onMouseLeave) {
+      onMouseLeave();
+    }
+  };
+  
+  const handleFocus = () => {
+    if (interactive) {
+      setIsHovered(true);
+    }
+    if (onFocus) {
+      onFocus();
+    }
+  };
+  
+  const handleBlur = () => {
+    if (interactive) {
+      setIsHovered(false);
+    }
+    if (onBlur) {
+      onBlur();
+    }
+  };
 
   // Add interactive attributes if component is clickable
   const interactiveProps = onClick ? {
@@ -73,10 +112,6 @@ const GlowEffect = ({
     tabIndex: 0,
     onKeyDown: handleKeyDown,
     "aria-label": ariaLabel,
-    onMouseEnter: handleMouseEnter,
-    onMouseLeave: handleMouseLeave,
-    onFocus: handleFocus,
-    onBlur: handleBlur
   } : {};
   
   // Animation variants for when component mounts
@@ -102,6 +137,10 @@ const GlowEffect = ({
       animate="visible"
       variants={containerVariants}
       {...interactiveProps}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
       data-prefers-reduced-motion="respect"
     >
       {/* Ripple effect for interactive elements when clicked */}
