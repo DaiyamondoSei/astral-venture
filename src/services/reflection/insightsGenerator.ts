@@ -1,4 +1,5 @@
 
+// Updated to fix the issue with missing imports
 import { api, ApiError } from '@/utils/apiClient';
 import { toast } from '@/components/ui/use-toast';
 
@@ -58,3 +59,6 @@ export const getAIAssistantResponse = async (
     return null;
   }
 };
+
+// Export the getReflectionInsights function to fix imports
+export const getReflectionInsights = getAIAssistantResponse;
