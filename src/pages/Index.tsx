@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthStateManager from '@/components/AuthStateManager';
+import OnboardingManager from '@/components/onboarding/OnboardingManager';
 
 // Lazy load components that aren't needed for initial render
 const UserDashboardView = lazy(() => import('@/components/UserDashboardView'));
@@ -61,27 +62,29 @@ const Index = () => {
             ) : (!authState.user ? (
               <LandingView />
             ) : (
-              <ChallengeManager
-                userProfile={authState.userProfile}
-                activatedChakras={authState.activatedChakras}
-                updateUserProfile={authState.updateUserProfile}
-                updateActivatedChakras={authState.updateActivatedChakras}
-              >
-                {(handleChallengeComplete) => (
-                  <UserDashboardView
-                    user={authState.user}
-                    userProfile={authState.userProfile}
-                    todayChallenge={authState.todayChallenge}
-                    userStreak={authState.userStreak}
-                    activatedChakras={authState.activatedChakras}
-                    onLogout={authState.handleLogout}
-                    updateStreak={authState.updateStreak}
-                    updateActivatedChakras={authState.updateActivatedChakras}
-                    updateUserProfile={authState.updateUserProfile}
-                    onChallengeComplete={handleChallengeComplete}
-                  />
-                )}
-              </ChallengeManager>
+              <OnboardingManager userId={authState.user.id}>
+                <ChallengeManager
+                  userProfile={authState.userProfile}
+                  activatedChakras={authState.activatedChakras}
+                  updateUserProfile={authState.updateUserProfile}
+                  updateActivatedChakras={authState.updateActivatedChakras}
+                >
+                  {(handleChallengeComplete) => (
+                    <UserDashboardView
+                      user={authState.user}
+                      userProfile={authState.userProfile}
+                      todayChallenge={authState.todayChallenge}
+                      userStreak={authState.userStreak}
+                      activatedChakras={authState.activatedChakras}
+                      onLogout={authState.handleLogout}
+                      updateStreak={authState.updateStreak}
+                      updateActivatedChakras={authState.updateActivatedChakras}
+                      updateUserProfile={authState.updateUserProfile}
+                      onChallengeComplete={handleChallengeComplete}
+                    />
+                  )}
+                </ChallengeManager>
+              </OnboardingManager>
             ))}
           </DevModeManager>
         </Suspense>
