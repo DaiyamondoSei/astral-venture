@@ -1,5 +1,5 @@
 
-import { moderateContent, ContentModerationType } from "./openaiService.ts";
+import { moderateContent, ContentModerationType } from "./openai/index.ts";
 
 // Content moderation check
 export async function checkMessageModeration(message: string): Promise<{
