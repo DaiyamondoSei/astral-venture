@@ -62,6 +62,7 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({
           progress={progress}
           colorScheme={colorScheme}
           animation={animationStyle}
+          intensity={glowIntensity}
         />
       </div>
       

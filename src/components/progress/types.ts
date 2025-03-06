@@ -11,3 +11,29 @@ export type ProgressColorScheme =
 
 export type GlowIntensity = 'low' | 'medium' | 'high';
 export type AnimationStyle = 'none' | 'pulse' | 'slide' | 'ripple';
+
+export type LabelPosition = 'top' | 'bottom' | 'left' | 'right' | 'inside';
+
+export interface ProgressTrackerProps {
+  progress: number;
+  label?: string;
+  labelPosition?: LabelPosition;
+  showValue?: boolean;
+  colorScheme?: ProgressColorScheme;
+  size?: ProgressSize;
+  glowIntensity?: GlowIntensity;
+  animation?: AnimationStyle;
+  className?: string;
+  showPercentage?: boolean;
+  labelClassName?: string;
+  valueClassName?: string;
+  valuePrefix?: string;
+  valueSuffix?: string;
+}
+
+export interface ProgressGlowProps {
+  progress: number;
+  intensity?: GlowIntensity;
+  animation?: AnimationStyle;
+  colorScheme?: ProgressColorScheme;
+}

@@ -1,19 +1,14 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { GlowIntensity, AnimationStyle } from '../onboarding/data/types';
-import { getGlowClasses } from './utils';
-
-interface ProgressGlowProps {
-  progress: number;
-  intensity: GlowIntensity;
-  animation: AnimationStyle;
-}
+import { GlowIntensity, AnimationStyle, ProgressColorScheme, ProgressGlowProps } from './types';
+import { getGlowClasses, getProgressColorClasses } from './utils';
 
 const ProgressGlow: React.FC<ProgressGlowProps> = ({ 
   progress, 
-  intensity, 
-  animation 
+  intensity = 'medium',
+  animation = 'none',
+  colorScheme = 'primary'
 }) => {
   // Animation variants
   const glowVariants = {
@@ -51,7 +46,7 @@ const ProgressGlow: React.FC<ProgressGlowProps> = ({
 
   return (
     <motion.div
-      className={`absolute inset-0 rounded-full ${getGlowClasses(intensity)}`}
+      className={`absolute inset-0 rounded-full ${getGlowClasses(intensity)} ${getProgressColorClasses(colorScheme)}`}
       style={{ width: `${progress}%` }}
       animate={animation === 'none' ? undefined : glowVariants[animation]}
     />

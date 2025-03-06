@@ -18,6 +18,7 @@ export interface AchievementData {
   pointsPerTier?: number[]; // Points awarded at each tier level
   basePoints?: number; // Starting point value for tiered achievements
   trackedValue?: string; // What value is being tracked (reflections, meditations, etc.)
+  tier?: number; // Current tier level for progressive achievements
 }
 
 export interface FeatureTooltipData {
