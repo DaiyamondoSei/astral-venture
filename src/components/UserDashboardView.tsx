@@ -72,6 +72,15 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
     }
   };
 
+  // Ensure all required props have fallback values
+  const safeUserStreak = userStreak || { current: 0, longest: 0 };
+  const safeActivatedChakras = activatedChakras || [];
+  const safeUserProfile = userProfile || (user ? {
+    username: user.email?.split('@')[0] || 'Seeker',
+    astral_level: 1,
+    energy_points: 0
+  } : null);
+
   // Failsafe rendering to ensure something always shows
   if (!user) {
     return (
@@ -95,41 +104,41 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
       {activeView === 'sacred-home' ? (
         <SacredHomePage
           user={user}
-          userProfile={userProfile}
-          userStreak={userStreak}
-          activatedChakras={activatedChakras}
+          userProfile={safeUserProfile}
+          userStreak={safeUserStreak}
+          activatedChakras={safeActivatedChakras}
           onLogout={logoutHandler}
           onNodeSelect={handleNodeSelect}
         />
       ) : (
         <DashboardLayout
-          username={userProfile?.username || user?.email?.split('@')[0] || 'Seeker'}
-          astralLevel={userProfile?.astral_level || 1}
+          username={safeUserProfile?.username || user?.email?.split('@')[0] || 'Seeker'}
+          astralLevel={safeUserProfile?.astral_level || 1}
           onLogout={logoutHandler}
         >
           <UserStats
-            energyPoints={userProfile?.energy_points || 0}
-            streakDays={userStreak.current}
-            activatedChakras={activatedChakras}
+            energyPoints={safeUserProfile?.energy_points || 0}
+            streakDays={safeUserStreak.current}
+            activatedChakras={safeActivatedChakras}
           />
           
           <ChakraActivationManager 
             userId={user.id}
-            userStreak={userStreak}
-            activatedChakras={activatedChakras}
+            userStreak={safeUserStreak}
+            activatedChakras={safeActivatedChakras}
             updateStreak={updateStreak}
             updateActivatedChakras={updateActivatedChakras}
             updateUserProfile={updateUserProfile}
           />
           
           <UserDashboardCards 
-            energyPoints={userProfile?.energy_points || 0}
-            astralLevel={userProfile?.astral_level || 1}
+            energyPoints={safeUserProfile?.energy_points || 0}
+            astralLevel={safeUserProfile?.astral_level || 1}
             todayChallenge={todayChallenge}
           />
           
           <MainContent 
-            userProfile={userProfile}
+            userProfile={safeUserProfile}
             onChallengeComplete={onChallengeComplete}
           />
         </DashboardLayout>

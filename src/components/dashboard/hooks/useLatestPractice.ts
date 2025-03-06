@@ -1,94 +1,85 @@
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-interface LatestPractice {
-  title: string;
-  completedAt: string;
-  category: string;
-}
-
-interface UseLatestPracticeResult {
-  latestPractice: LatestPractice | null;
-  loading: boolean;
-  error: Error | null;
-  refetch: () => Promise<void>;
-}
-
-/**
- * Custom hook to fetch the latest practice completed by the user
- */
-export function useLatestPractice(): UseLatestPracticeResult {
-  const [latestPractice, setLatestPractice] = useState<LatestPractice | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+export const useLatestPractice = (userId: string | undefined) => {
+  const [latestPractice, setLatestPractice] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { user } = useAuth();
 
-  const fetchLatestPractice = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('user_progress')
-        .select('challenge_id, completed_at, category')
-        .eq('user_id', user.id)
-        .order('completed_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          // No data found
+  useEffect(() => {
+    const fetchLatestPractice = async () => {
+      if (!userId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        
+        // Get the latest user progress entry
+        const { data: progressData, error: progressError } = await supabase
+          .from('user_progress')
+          .select('challenge_id, completed_at, category')
+          .eq('user_id', userId)
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .single();
+          
+        if (progressError) {
+          throw progressError;
+        }
+
+        if (!progressData) {
           setLatestPractice(null);
-          setLoading(false);
+          setIsLoading(false);
           return;
         }
-        throw new Error(fetchError.message);
-      }
-      
-      if (data) {
-        // Get the challenge details to get the title
-        const { data: challengeData, error: challengeError } = await supabase
-          .from('challenges')
-          .select('title')
-          .eq('id', data.challenge_id)
-          .single();
-        
-        if (challengeError) {
-          throw new Error(challengeError.message);
-        }
-        
-        setLatestPractice({
-          title: challengeData?.title || 'Unknown practice',
-          completedAt: data.completed_at,
-          category: data.category
-        });
-      } else {
-        setLatestPractice(null);
-      }
-    } catch (err) {
-      console.error('Error fetching latest practice:', err);
-      setError(err instanceof Error ? err : new Error('An unknown error occurred'));
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  useEffect(() => {
-    fetchLatestPractice();
-  }, [user]);
 
-  return {
-    latestPractice,
-    loading,
-    error,
-    refetch: fetchLatestPractice
-  };
-}
+        // Check if the challenge_id is a valid UUID before querying challenges table
+        const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(progressData.challenge_id);
+        
+        let title = '';
+        if (isValidUuid) {
+          // Only query the challenges table if we have a valid UUID
+          const { data: challengeData, error: challengeError } = await supabase
+            .from('challenges')
+            .select('title')
+            .eq('id', progressData.challenge_id)
+            .single();
+            
+          if (challengeError && !challengeError.message.includes('No rows found')) {
+            throw challengeError;
+          }
+          
+          title = challengeData?.title || '';
+        } else {
+          // Handle non-UUID challenge IDs (like "chakra_5")
+          if (progressData.challenge_id.startsWith('chakra_')) {
+            const chakraNumber = progressData.challenge_id.split('_')[1];
+            title = `Chakra ${chakraNumber} Activation`;
+          } else {
+            title = progressData.challenge_id;
+          }
+        }
+
+        setLatestPractice({
+          title,
+          completedAt: progressData.completed_at,
+          category: progressData.category
+        });
+      } catch (error) {
+        console.error('Error fetching latest practice:', error);
+        setError(error as Error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLatestPractice();
+  }, [userId]);
+
+  return { latestPractice, isLoading, error };
+};
+
+export default useLatestPractice;

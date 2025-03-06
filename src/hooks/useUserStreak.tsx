@@ -6,13 +6,20 @@ import { useToast } from '@/components/ui/use-toast';
 export const useUserStreak = (userId: string | undefined) => {
   const [userStreak, setUserStreak] = useState({ current: 0, longest: 0 });
   const [activatedChakras, setActivatedChakras] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchUserStreak = async () => {
-      if (!userId) return;
+      if (!userId) {
+        setIsLoading(false);
+        return;
+      }
       
       try {
+        setIsLoading(true);
+        // Fetch streak data
         const { data: streakData, error: streakError } = await supabase
           .from('user_streaks')
           .select('*')
@@ -20,16 +27,35 @@ export const useUserStreak = (userId: string | undefined) => {
           .single();
           
         if (streakError) {
-          console.error('Error fetching user streak:', streakError);
-          return;
-        }
-        
-        if (streakData) {
+          if (streakError.code === 'PGRST116') {
+            // No streak record found, create one
+            try {
+              await supabase
+                .from('user_streaks')
+                .insert({
+                  user_id: userId,
+                  current_streak: 0,
+                  longest_streak: 0,
+                  last_activity_date: new Date().toISOString()
+                });
+                
+              setUserStreak({ current: 0, longest: 0 });
+            } catch (insertError) {
+              console.error('Error creating user streak record:', insertError);
+            }
+          } else {
+            console.error('Error fetching user streak:', streakError);
+            setError(streakError);
+          }
+        } else if (streakData) {
           setUserStreak({
             current: streakData.current_streak || 0,
             longest: streakData.longest_streak || 0
           });
-          
+        }
+        
+        // Fetch activated chakras from the past week
+        try {
           const today = new Date();
           const startOfWeek = new Date(today);
           startOfWeek.setDate(today.getDate() - today.getDay());
@@ -44,10 +70,8 @@ export const useUserStreak = (userId: string | undefined) => {
             
           if (chakraError) {
             console.error('Error fetching chakra data:', chakraError);
-            return;
-          }
-          
-          if (chakraData && chakraData.length > 0) {
+            setError(chakraError);
+          } else if (chakraData && chakraData.length > 0) {
             const activatedDays = chakraData.map(item => {
               const date = new Date(item.completed_at);
               return date.getDay();
@@ -55,22 +79,28 @@ export const useUserStreak = (userId: string | undefined) => {
             
             setActivatedChakras([...new Set(activatedDays)]);
           }
+        } catch (chakraError) {
+          console.error('Error processing chakra data:', chakraError);
+          setError(chakraError as Error);
         }
       } catch (error) {
         console.error('Error in fetchUserStreak:', error);
+        setError(error as Error);
+      } finally {
+        setIsLoading(false);
       }
     };
     
     fetchUserStreak();
-  }, [userId]);
+  }, [userId, toast]);
 
   const updateStreak = async (newStreak: number) => {
-    if (!userId) return;
+    if (!userId) return undefined;
     
     try {
       const newLongest = Math.max(newStreak, userStreak.longest);
       
-      await supabase
+      const { error } = await supabase
         .from('user_streaks')
         .update({
           current_streak: newStreak,
@@ -78,6 +108,8 @@ export const useUserStreak = (userId: string | undefined) => {
           last_activity_date: new Date().toISOString()
         })
         .eq('user_id', userId);
+        
+      if (error) throw error;
         
       setUserStreak({
         current: newStreak,
@@ -92,17 +124,28 @@ export const useUserStreak = (userId: string | undefined) => {
         description: error.message,
         variant: "destructive"
       });
+      return undefined;
     }
   };
   
   const updateActivatedChakras = (newActivatedChakras: number[]) => {
-    setActivatedChakras(prev => [...new Set([...prev, ...newActivatedChakras])]);
+    if (!newActivatedChakras || !Array.isArray(newActivatedChakras)) {
+      console.error('Invalid activatedChakras data:', newActivatedChakras);
+      return;
+    }
+    
+    setActivatedChakras(prev => {
+      const uniqueChakras = [...new Set([...(prev || []), ...newActivatedChakras])];
+      return uniqueChakras;
+    });
   };
 
   return {
     userStreak,
     activatedChakras,
     updateStreak,
-    updateActivatedChakras
+    updateActivatedChakras,
+    isLoading,
+    error
   };
 };
