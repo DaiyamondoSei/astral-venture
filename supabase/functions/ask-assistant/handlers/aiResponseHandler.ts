@@ -2,7 +2,7 @@
 import { createSuccessResponse } from "../../shared/responseUtils.ts";
 import { extractKeyInsights } from "../services/insightExtractor.ts";
 import { extractSuggestedPractices } from "../services/insightExtractor.ts";
-import { AIModel } from "../services/openaiService.ts";
+import { AIModel } from "../services/openai/index.ts";
 
 export async function processAIResponse(
   aiResponse: string, 

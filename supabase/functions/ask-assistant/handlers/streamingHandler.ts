@@ -1,6 +1,6 @@
 
 import { createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
-import { generateStreamingResponse, AIModel } from "../services/openaiService.ts";
+import { generateStreamingResponse, AIModel } from "../services/openai/index.ts";
 
 // Handle streaming responses with improved implementation
 export async function handleStreamingRequest(

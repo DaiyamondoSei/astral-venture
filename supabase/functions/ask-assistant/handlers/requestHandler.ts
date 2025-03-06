@@ -2,8 +2,8 @@
 import { createSuccessResponse, createErrorResponse, ErrorCode, validateRequiredParameters } from "../../shared/responseUtils.ts";
 import { checkMessageModeration } from "../services/moderationService.ts";
 import { fetchUserContext } from "../services/userContextService.ts";
-import { createPersonalizedSystemPrompt, buildContextualizedPrompt } from "../services/responseGenerator.ts";
-import { generateChatResponse, selectOptimalModel } from "../services/openaiService.ts";
+import { createPersonalizedSystemPrompt, buildContextualizedPrompt } from "../services/promptBuilder.ts";
+import { generateChatResponse, selectOptimalModel } from "../services/openai/index.ts";
 import { handleStreamingRequest } from "./streamingHandler.ts";
 import { processAIResponse } from "./aiResponseHandler.ts";
 import { handleError } from "./errorHandler.ts";
