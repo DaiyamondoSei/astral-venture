@@ -1,10 +1,10 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { ContentRecommendation } from '../types';
 
-// Mock content items
+// Sample mock content items to seed the database if empty
 const mockContentItems: Partial<ContentRecommendation>[] = [
   {
-    id: "content1",
     title: "Beginner's Guide to Meditation",
     type: "practice",
     category: "meditation",
@@ -13,7 +13,6 @@ const mockContentItems: Partial<ContentRecommendation>[] = [
     recommendationReason: "Matches your selected practice types"
   },
   {
-    id: "content2",
     title: "Heart Chakra Activation",
     type: "meditation",
     category: "chakras",
@@ -22,7 +21,6 @@ const mockContentItems: Partial<ContentRecommendation>[] = [
     recommendationReason: "Aligns with your chakra focus"
   },
   {
-    id: "content3",
     title: "Daily Reflection Practice",
     type: "reflection",
     category: "reflection",
@@ -31,7 +29,6 @@ const mockContentItems: Partial<ContentRecommendation>[] = [
     recommendationReason: "Based on your reflection history"
   },
   {
-    id: "content4",
     title: "Breathing Techniques for Beginners",
     type: "practice",
     category: "breathing",
@@ -40,7 +37,6 @@ const mockContentItems: Partial<ContentRecommendation>[] = [
     recommendationReason: "Matches your content level"
   },
   {
-    id: "content5",
     title: "Understanding Energy Flow",
     type: "lesson",
     category: "chakras",
@@ -49,6 +45,43 @@ const mockContentItems: Partial<ContentRecommendation>[] = [
     recommendationReason: "Recommended for all chakra work"
   }
 ];
+
+// Helper function to ensure the database has some content
+async function ensureContentExists() {
+  // Check if content exists
+  const { data, error } = await supabase
+    .from('content_library')
+    .select('id')
+    .limit(1);
+    
+  if (error) {
+    console.error('Error checking for content:', error);
+    return;
+  }
+  
+  // If no content exists, seed with mock data
+  if (data.length === 0) {
+    console.log('Seeding content library with initial data');
+    
+    const contentToInsert = mockContentItems.map(item => ({
+      title: item.title || 'Untitled Content',
+      type: item.type || 'lesson',
+      category: item.category || 'general',
+      relevance_score: item.relevanceScore || 50,
+      chakra_alignment: item.chakraAlignment || null,
+      emotional_resonance: item.emotionalResonance || null,
+      recommendation_reason: item.recommendationReason || 'Recommended for you'
+    }));
+    
+    const { error: insertError } = await supabase
+      .from('content_library')
+      .insert(contentToInsert);
+      
+    if (insertError) {
+      console.error('Error seeding content library:', insertError);
+    }
+  }
+}
 
 /**
  * Repository for content library data
@@ -64,22 +97,31 @@ export const contentRepository = {
     try {
       console.log(`Getting content for categories: ${categories.join(', ')}`);
       
-      // Filter mock content by categories
-      const filteredContent = mockContentItems
-        .filter(item => categories.includes(item.category || ""))
-        .map(item => ({
-          id: item.id || `content_${Math.random().toString(36).substring(2, 9)}`,
-          title: item.title || "Untitled Content",
-          type: item.type || "lesson",
-          category: item.category || "general",
-          relevanceScore: item.relevanceScore || 50,
-          chakraAlignment: item.chakraAlignment,
-          emotionalResonance: item.emotionalResonance,
-          recommendationReason: item.recommendationReason || "Recommended for you"
-        }))
-        .slice(0, limit);
+      // Ensure we have some content in the database
+      await ensureContentExists();
       
-      return filteredContent as ContentRecommendation[];
+      // Filter content by categories
+      const { data, error } = await supabase
+        .from('content_library')
+        .select('*')
+        .in('category', categories)
+        .limit(limit);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Map database records to ContentRecommendation type
+      return data.map(item => ({
+        id: item.id,
+        title: item.title,
+        type: item.type,
+        category: item.category,
+        relevanceScore: item.relevance_score,
+        chakraAlignment: item.chakra_alignment,
+        emotionalResonance: item.emotional_resonance,
+        recommendationReason: item.recommendation_reason
+      }));
     } catch (error) {
       console.error('Error getting content by categories:', error);
       return [];
@@ -90,45 +132,68 @@ export const contentRepository = {
    * Get content by ID
    */
   async getContentById(id: string): Promise<ContentRecommendation | null> {
-    console.log(`Getting content with ID: ${id}`);
-    
-    // Find content by ID
-    const content = mockContentItems.find(item => item.id === id);
-    
-    if (!content) {
+    try {
+      console.log(`Getting content with ID: ${id}`);
+      
+      const { data, error } = await supabase
+        .from('content_library')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (error) {
+        return null;
+      }
+      
+      return {
+        id: data.id,
+        title: data.title,
+        type: data.type,
+        category: data.category,
+        relevanceScore: data.relevance_score,
+        chakraAlignment: data.chakra_alignment,
+        emotionalResonance: data.emotional_resonance,
+        recommendationReason: data.recommendation_reason
+      };
+    } catch (error) {
+      console.error('Error fetching content by ID:', error);
       return null;
     }
-    
-    return {
-      id: content.id || `content_${Math.random().toString(36).substring(2, 9)}`,
-      title: content.title || "Untitled Content",
-      type: content.type || "lesson",
-      category: content.category || "general",
-      relevanceScore: content.relevanceScore || 50,
-      chakraAlignment: content.chakraAlignment,
-      emotionalResonance: content.emotionalResonance,
-      recommendationReason: content.recommendationReason || "Recommended for you"
-    };
   },
   
   /**
    * Get all available content
    */
   async getAllContent(limit = 20): Promise<ContentRecommendation[]> {
-    console.log(`Getting all content, limit: ${limit}`);
-    
-    // Map mock content to proper ContentRecommendation objects
-    return mockContentItems
-      .map(item => ({
-        id: item.id || `content_${Math.random().toString(36).substring(2, 9)}`,
-        title: item.title || "Untitled Content",
-        type: item.type || "lesson",
-        category: item.category || "general",
-        relevanceScore: item.relevanceScore || 50,
-        chakraAlignment: item.chakraAlignment,
-        emotionalResonance: item.emotionalResonance,
-        recommendationReason: item.recommendationReason || "Recommended for you"
-      }))
-      .slice(0, limit) as ContentRecommendation[];
+    try {
+      console.log(`Getting all content, limit: ${limit}`);
+      
+      // Ensure we have some content in the database
+      await ensureContentExists();
+      
+      const { data, error } = await supabase
+        .from('content_library')
+        .select('*')
+        .limit(limit);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Map database records to ContentRecommendation type
+      return data.map(item => ({
+        id: item.id,
+        title: item.title,
+        type: item.type,
+        category: item.category,
+        relevanceScore: item.relevance_score,
+        chakraAlignment: item.chakra_alignment,
+        emotionalResonance: item.emotional_resonance,
+        recommendationReason: item.recommendation_reason
+      }));
+    } catch (error) {
+      console.error('Error getting all content:', error);
+      return [];
+    }
   }
 };

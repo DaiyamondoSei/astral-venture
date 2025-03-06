@@ -1,8 +1,6 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { UserActivity } from '../types';
-
-// Cache for user activities (in-memory substitute for database)
-const userActivitiesCache = new Map<string, UserActivity[]>();
 
 /**
  * Repository for user activity data
@@ -18,24 +16,22 @@ export const activityRepository = {
     try {
       console.log(`Recording activity for user ${userId}`, activity);
       
-      // Create a new activity object
-      const newActivity: UserActivity = {
-        id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        userId,
-        timestamp: new Date().toISOString(),
-        activityType: activity.activityType,
-        duration: activity.duration,
-        chakrasActivated: activity.chakrasActivated,
-        completionRate: activity.completionRate,
-        emotionalResponse: activity.emotionalResponse,
-        metadata: activity.metadata
-      };
-      
-      // Get existing activities or initialize empty array
-      const existingActivities = userActivitiesCache.get(userId) || [];
-      
-      // Add new activity to the beginning of the array
-      userActivitiesCache.set(userId, [newActivity, ...existingActivities]);
+      // Insert activity into the user_activities table
+      const { error } = await supabase
+        .from('user_activities')
+        .insert({
+          user_id: userId,
+          activity_type: activity.activityType,
+          duration: activity.duration,
+          chakras_activated: activity.chakrasActivated,
+          completion_rate: activity.completionRate,
+          emotional_response: activity.emotionalResponse,
+          metadata: activity.metadata
+        });
+        
+      if (error) {
+        throw error;
+      }
       
     } catch (error) {
       console.error('Error recording user activity:', error);
@@ -50,11 +46,29 @@ export const activityRepository = {
     try {
       console.log(`Getting activities for user ${userId}, limit: ${limit}`);
       
-      // Get activities from cache or return empty array
-      const activities = userActivitiesCache.get(userId) || [];
+      const { data, error } = await supabase
+        .from('user_activities')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+        
+      if (error) {
+        throw error;
+      }
       
-      // Return activities limited to the requested number
-      return activities.slice(0, limit);
+      // Map database records to UserActivity type
+      return data.map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        activityType: item.activity_type,
+        timestamp: item.timestamp,
+        duration: item.duration,
+        chakrasActivated: item.chakras_activated,
+        completionRate: item.completion_rate,
+        emotionalResponse: item.emotional_response,
+        metadata: item.metadata
+      }));
     } catch (error) {
       console.error('Error fetching user activities:', error);
       return [];

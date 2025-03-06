@@ -42,6 +42,45 @@ export type Database = {
         }
         Relationships: []
       }
+      content_library: {
+        Row: {
+          category: string
+          chakra_alignment: Json | null
+          created_at: string
+          emotional_resonance: Json | null
+          id: string
+          recommendation_reason: string | null
+          relevance_score: number
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          chakra_alignment?: Json | null
+          created_at?: string
+          emotional_resonance?: Json | null
+          id?: string
+          recommendation_reason?: string | null
+          relevance_score?: number
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          chakra_alignment?: Json | null
+          created_at?: string
+          emotional_resonance?: Json | null
+          id?: string
+          recommendation_reason?: string | null
+          relevance_score?: number
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       emotional_analysis: {
         Row: {
           analysis_data: Json
@@ -96,6 +135,42 @@ export type Database = {
         }
         Relationships: []
       }
+      personalization_metrics: {
+        Row: {
+          chakra_balance_improvement: number
+          content_relevance_rating: number
+          created_at: string
+          emotional_growth_rate: number
+          engagement_score: number
+          id: string
+          progress_acceleration: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chakra_balance_improvement?: number
+          content_relevance_rating?: number
+          created_at?: string
+          emotional_growth_rate?: number
+          engagement_score?: number
+          id?: string
+          progress_acceleration?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chakra_balance_improvement?: number
+          content_relevance_rating?: number
+          created_at?: string
+          emotional_growth_rate?: number
+          engagement_score?: number
+          id?: string
+          progress_acceleration?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       quantum_downloads: {
         Row: {
           category: string
@@ -120,6 +195,66 @@ export type Database = {
           id?: string
           level?: number
           title?: string
+        }
+        Relationships: []
+      }
+      user_activities: {
+        Row: {
+          activity_type: string
+          chakras_activated: Json | null
+          completion_rate: number | null
+          duration: number | null
+          emotional_response: Json | null
+          id: string
+          metadata: Json | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          chakras_activated?: Json | null
+          completion_rate?: number | null
+          duration?: number | null
+          emotional_response?: Json | null
+          id?: string
+          metadata?: Json | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          chakras_activated?: Json | null
+          completion_rate?: number | null
+          duration?: number | null
+          emotional_response?: Json | null
+          id?: string
+          metadata?: Json | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          preferences: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preferences?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preferences?: Json
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

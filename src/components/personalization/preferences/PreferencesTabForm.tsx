@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider } from 'react-hook-form';
@@ -25,10 +26,10 @@ const PreferencesTabForm: React.FC = () => {
       practiceReminders: preferences?.practiceReminders || true,
       contentLevel: preferences?.contentLevel || 'beginner',
       privacySettings: {
-        shareUsageData: preferences?.privacySettings?.shareUsageData || true,
-        allowRecommendations: preferences?.privacySettings?.allowRecommendations || true,
-        storeActivityHistory: preferences?.privacySettings?.storeActivityHistory || true,
-        dataRetentionPeriod: preferences?.privacySettings?.dataRetentionPeriod || 90
+        shareUsageData: preferences?.privacySettings?.shareUsageData ?? true,
+        allowRecommendations: preferences?.privacySettings?.allowRecommendations ?? true,
+        storeActivityHistory: preferences?.privacySettings?.storeActivityHistory ?? true,
+        dataRetentionPeriod: preferences?.privacySettings?.dataRetentionPeriod ?? 90
       }
     }
   });
@@ -44,25 +45,34 @@ const PreferencesTabForm: React.FC = () => {
         notificationFrequency: preferences.notificationFrequency,
         practiceReminders: preferences.practiceReminders,
         contentLevel: preferences.contentLevel,
-        privacySettings: preferences.privacySettings
+        privacySettings: {
+          shareUsageData: preferences.privacySettings.shareUsageData,
+          allowRecommendations: preferences.privacySettings.allowRecommendations,
+          storeActivityHistory: preferences.privacySettings.storeActivityHistory,
+          dataRetentionPeriod: preferences.privacySettings.dataRetentionPeriod
+        }
       });
     }
   }, [preferences, form]);
   
   const onSubmit = async (data: PreferencesFormType) => {
     try {
-      // Ensure that all required properties are present in the privacySettings
-      const formattedData = {
-        ...data,
+      await updatePreferences({
+        contentCategories: data.contentCategories,
+        practiceTypes: data.practiceTypes,
+        chakraFocus: data.chakraFocus,
+        interfaceTheme: data.interfaceTheme,
+        notificationFrequency: data.notificationFrequency,
+        practiceReminders: data.practiceReminders,
+        contentLevel: data.contentLevel,
         privacySettings: {
           shareUsageData: data.privacySettings.shareUsageData,
           allowRecommendations: data.privacySettings.allowRecommendations,
           storeActivityHistory: data.privacySettings.storeActivityHistory,
           dataRetentionPeriod: data.privacySettings.dataRetentionPeriod
         }
-      };
+      });
       
-      await updatePreferences(formattedData);
       toast({
         title: "Preferences saved",
         description: "Your personalized experience has been updated.",
@@ -79,15 +89,13 @@ const PreferencesTabForm: React.FC = () => {
   
   const onPrivacySubmit = async (data: PreferencesFormType['privacySettings']) => {
     try {
-      // Ensure all required fields are present
-      const formattedData = {
+      await updatePrivacySettings({
         shareUsageData: data.shareUsageData,
         allowRecommendations: data.allowRecommendations,
         storeActivityHistory: data.storeActivityHistory,
         dataRetentionPeriod: data.dataRetentionPeriod
-      };
+      });
       
-      await updatePrivacySettings(formattedData);
       toast({
         title: "Privacy settings saved",
         description: "Your privacy preferences have been updated.",

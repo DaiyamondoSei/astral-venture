@@ -1,9 +1,7 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { UserPreferences, PrivacySettings } from './types';
 import { toast } from '@/components/ui/use-toast';
-
-// Cache for user preferences (in-memory substitute for database)
-const userPreferencesCache = new Map<string, UserPreferences>();
 
 /**
  * Service for managing user preferences
@@ -18,16 +16,23 @@ export const preferencesService = {
     try {
       console.log(`Getting preferences for user ${userId}`);
       
-      // Check if we have cached preferences for this user
-      if (userPreferencesCache.has(userId)) {
-        return userPreferencesCache.get(userId) || getDefaultPreferences();
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('preferences')
+        .eq('user_id', userId)
+        .single();
+      
+      if (error) {
+        console.log('No preferences found, using defaults');
+        
+        // Create default preferences for this user
+        const defaultPrefs = getDefaultPreferences();
+        await this.updateUserPreferences(userId, defaultPrefs);
+        
+        return defaultPrefs;
       }
       
-      // In a real implementation, we would fetch from the database
-      // For now, return default preferences and store in cache
-      const defaultPrefs = getDefaultPreferences();
-      userPreferencesCache.set(userId, defaultPrefs);
-      return defaultPrefs;
+      return data.preferences as UserPreferences;
     } catch (error) {
       console.error('Error fetching user preferences:', error);
       toast({
@@ -50,17 +55,49 @@ export const preferencesService = {
       console.log(`Updating preferences for user ${userId}`, preferences);
       
       // First get current preferences
-      const currentPrefs = await this.getUserPreferences(userId);
+      let currentPrefs: UserPreferences;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('preferences')
+          .eq('user_id', userId)
+          .single();
+          
+        if (error) {
+          currentPrefs = getDefaultPreferences();
+        } else {
+          currentPrefs = data.preferences as UserPreferences;
+        }
+      } catch (e) {
+        currentPrefs = getDefaultPreferences();
+      }
       
       // Merge with new preferences
       const updatedPrefs = {
         ...currentPrefs,
-        ...preferences
+        ...preferences,
+        // Ensure privacy settings are properly merged
+        privacySettings: {
+          ...currentPrefs.privacySettings,
+          ...(preferences.privacySettings || {})
+        }
       };
       
-      // In a real implementation, we would save to the database
-      // For now, just update the cache
-      userPreferencesCache.set(userId, updatedPrefs);
+      // Save to database
+      const { error } = await supabase
+        .from('user_preferences')
+        .upsert({
+          user_id: userId,
+          preferences: updatedPrefs,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+      
+      if (error) {
+        throw error;
+      }
       
       toast({
         title: "Preferences updated",
@@ -105,9 +142,14 @@ export const preferencesService = {
     try {
       console.log(`Deleting preferences for user ${userId}`);
       
-      // In a real implementation, we would delete from the database
-      // For now, just remove from cache
-      userPreferencesCache.delete(userId);
+      const { error } = await supabase
+        .from('user_preferences')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (error) {
+        throw error;
+      }
       
       console.log('User preferences deleted for GDPR compliance');
     } catch (error) {
