@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -10,6 +9,7 @@ import DreamCapture from '@/pages/DreamCapture';
 import AstralBodyDemo from '@/pages/AstralBodyDemo';
 import Dashboard from '@/pages/Dashboard';
 import NotFound from '@/pages/NotFound';
+import PersonalizationPage from './pages/PersonalizationPage';
 import { Toaster } from '@/components/ui/toaster';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
@@ -32,6 +32,7 @@ function App() {
               <Route path="/dream-capture" element={<DreamCapture />} />
               <Route path="/astral-body-demo" element={<AstralBodyDemo />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/preferences" element={<PersonalizationPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
