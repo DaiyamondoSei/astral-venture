@@ -1,9 +1,8 @@
-
 import { createSuccessResponse, createErrorResponse, ErrorCode, validateRequiredParameters } from "../../shared/responseUtils.ts";
 import { checkMessageModeration } from "../services/moderationService.ts";
 import { fetchUserContext } from "../services/userContextService.ts";
 import { createPersonalizedSystemPrompt, buildContextualizedPrompt, extractKeyInsights, extractSuggestedPractices } from "../services/responseGenerator.ts";
-import { generateChatResponse, selectOptimalModel, AIModel } from "../services/openaiService.ts";
+import { generateChatResponse, generateStreamingResponse, selectOptimalModel, AIModel } from "../services/openaiService.ts";
 
 // Main request handler (runs after authentication)
 export async function handleAIRequest(user: any, req: Request): Promise<Response> {
@@ -105,38 +104,21 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
   }
 }
 
-// Handle streaming responses
+// Handle streaming responses with improved implementation
 async function handleStreamingRequest(
   prompt: string, 
   systemPrompt: string, 
   model: AIModel
 ): Promise<Response> {
   try {
-    // For now, we'll just return a non-streaming response
-    // This will be updated to support actual streaming in the next phase
-    const { content: aiResponse, metrics } = await generateChatResponse(
+    // Use OpenAI's streaming API integration
+    const { response, metrics } = await generateStreamingResponse(
       prompt, 
       systemPrompt,
-      { 
-        model,
-        stream: false // We'll change this to true when streaming is implemented 
-      }
+      { model }
     );
     
-    const suggestedPractices = extractSuggestedPractices(aiResponse);
-    
-    return createSuccessResponse(
-      {
-        answer: aiResponse,
-        suggestedPractices,
-        relatedInsights: []
-      },
-      {
-        tokenUsage: metrics.totalTokens,
-        model: metrics.model,
-        note: "Streaming not fully implemented yet"
-      }
-    );
+    return response;
   } catch (error) {
     console.error("Error in streaming request:", error);
     return createErrorResponse(

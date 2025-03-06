@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useTodaysChallenge } from './hooks/useTodaysChallenge';
 import { useLatestPractice } from './hooks/useLatestPractice';
@@ -30,7 +31,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const { latestPractice, isLoading: loadingPractice, error: practiceError } = useLatestPractice(user?.id);
 
   const handleOpenAiAssistant = () => {
-    onOpenAiAssistant();
+    onOpenAiAssistant(); // Removing the argument as it's not expected
   };
 
   return (

@@ -78,7 +78,7 @@ export async function askAIAssistant(
     
     // Structure the response
     const response = {
-      answer: data.response || data.answer,
+      answer: data.answer || "",
       relatedInsights: data.insights || [],
       suggestedPractices: data.suggestedPractices || [],
       meta
@@ -131,7 +131,7 @@ async function handleStreamingRequest(
     // For streaming, we just return a minimal response to acknowledge the request was accepted
     // The actual content will be delivered via the streaming callback
     return {
-      answer: data.initialResponse || "Processing your question...",
+      answer: data?.initialResponse || "Processing your question...",
       relatedInsights: [],
       suggestedPractices: [],
       meta: {
