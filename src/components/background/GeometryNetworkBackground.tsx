@@ -28,19 +28,19 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
   // Generate connections between nodes
   const connections = [];
   for (let i = 0; i < nodes.length; i++) {
-    // Connect each node to 2-3 closest nodes
-    const connectionsCount = Math.floor(Math.random() * 2) + 1;
+    // Connect each node to 2-4 closest nodes for better network density
+    const connectionsCount = Math.floor(Math.random() * 3) + 2;
     
     for (let j = 0; j < connectionsCount; j++) {
-      if (i + j + 1 < nodes.length) {
-        connections.push({
-          id: `${i}-${i + j + 1}`,
-          from: i,
-          to: i + j + 1,
-          duration: (Math.random() * 20 + 40) / speed,
-          delay: Math.random() * 2
-        });
-      }
+      // Create connections in a more distributed way
+      const targetNodeIndex = (i + j + 1 + Math.floor(Math.random() * (nodes.length/4))) % nodes.length;
+      connections.push({
+        id: `${i}-${targetNodeIndex}`,
+        from: i,
+        to: targetNodeIndex,
+        duration: (Math.random() * 20 + 40) / speed,
+        delay: Math.random() * 2
+      });
     }
   }
 
@@ -54,12 +54,13 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
       {nodes.map((node) => (
         <motion.div
           key={`node-${node.id}`}
-          className="absolute w-1 h-1 bg-white rounded-full opacity-30"
+          className="absolute rounded-full"
           style={{
             left: `${node.x}%`,
             top: `${node.y}%`,
             width: `${node.size}rem`,
-            height: `${node.size}rem`
+            height: `${node.size}rem`,
+            background: `radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 70%)`,
           }}
           animate={{
             opacity: [0.1, 0.4, 0.1],
@@ -74,14 +75,18 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
         />
       ))}
       
-      {/* Lines connecting nodes */}
+      {/* Lines connecting nodes - improved with gradients and pulse animations */}
       <svg className="absolute inset-0 w-full h-full">
         <defs>
           <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="rgba(255,255,255,0.05)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0.2)" />
+            <stop offset="50%" stopColor="rgba(255,255,255,0.3)" />
             <stop offset="100%" stopColor="rgba(255,255,255,0.05)" />
           </linearGradient>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
         
         {connections.map((connection) => {
@@ -97,10 +102,11 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
               y2={`${toNode.y}%`}
               stroke="url(#lineGradient)"
               strokeWidth="0.5"
-              strokeOpacity="0.3"
+              filter="url(#glow)"
               initial={{ strokeOpacity: 0 }}
               animate={{
-                strokeOpacity: [0.1, 0.3, 0.1]
+                strokeOpacity: [0.1, 0.4, 0.1],
+                strokeDasharray: ["5 3", "3 5", "5 3"],
               }}
               transition={{
                 duration: connection.duration,
@@ -113,8 +119,25 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
         })}
       </svg>
       
-      {/* Background glass effects */}
-      <div className="absolute inset-0 bg-gradient-to-b from-quantum-900/50 to-quantum-900/30 backdrop-blur-[100px]" />
+      {/* Improved background glass effects */}
+      <div className="absolute inset-0 bg-gradient-to-b from-quantum-900/40 to-quantum-900/20 backdrop-blur-[80px]" />
+      
+      {/* Subtle pulse effect in the center */}
+      <motion.div 
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/4 h-1/4 rounded-full"
+        style={{
+          background: "radial-gradient(circle, rgba(138, 92, 246, 0.15) 0%, rgba(138, 92, 246, 0) 70%)",
+        }}
+        animate={{
+          scale: [1, 1.5, 1],
+          opacity: [0.2, 0.5, 0.2],
+        }}
+        transition={{
+          duration: 8,
+          repeat: Infinity,
+          repeatType: "mirror"
+        }}
+      />
     </div>
   );
 };
