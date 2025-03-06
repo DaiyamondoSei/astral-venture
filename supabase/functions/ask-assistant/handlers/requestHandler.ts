@@ -7,7 +7,6 @@ import { generateChatResponse, selectOptimalModel } from "../services/openaiServ
 import { handleStreamingRequest } from "./streamingHandler.ts";
 import { processAIResponse } from "./aiResponseHandler.ts";
 import { handleError } from "./errorHandler.ts";
-import { extractSuggestedPractices } from "../services/insightExtractor.ts";
 
 // Main request handler (runs after authentication)
 export async function handleAIRequest(user: any, req: Request): Promise<Response> {
