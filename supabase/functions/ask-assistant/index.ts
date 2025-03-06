@@ -18,7 +18,8 @@ import {
   generateChatResponse, 
   ContentModerationType,
   selectOptimalModel,
-  AIModel
+  AIModel,
+  moderateContent
 } from "./openaiService.ts";
 import { 
   buildContextualizedPrompt,
@@ -257,8 +258,14 @@ async function checkMessageModeration(message: string): Promise<{
       };
     }
     
-    // Implement OpenAI moderation API call here for production
-    // This is just a placeholder - in real implementation, integrate with OpenAI moderation
+    // Use OpenAI moderation API for more comprehensive check
+    const moderationResult = await moderateContent(message);
+    if (moderationResult.flagged) {
+      return {
+        allowed: false,
+        flags: moderationResult.flaggedCategories
+      };
+    }
     
     return { allowed: true };
   } catch (error) {
