@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from "@/lib/utils";
@@ -6,8 +5,17 @@ import GlowEffect from '@/components/GlowEffect';
 import { useNavigate } from 'react-router-dom';
 import { 
   Compass, Star, Flower, Sun, Moon, Sparkles, 
-  Brain, Heart, Eye, Zap, Flame, Triangle, CircleDot 
+  Brain, Heart, Eye, Zap, Flame, Triangle, CircleDot,
+  Download, FileText, Book, Archive, Package
 } from 'lucide-react';
+
+interface DownloadableMaterial {
+  id: string;
+  name: string;
+  description: string;
+  type: 'pdf' | 'audio' | 'video' | 'practice' | 'guide';
+  icon: React.ReactNode;
+}
 
 interface GeometryNode {
   id: string;
@@ -18,12 +26,13 @@ interface GeometryNode {
   position: string;
   route?: string;
   action?: () => void;
+  downloadables?: DownloadableMaterial[];
 }
 
 interface MetatronsCubeProps {
   userId?: string;
   className?: string;
-  onSelectNode?: (nodeId: string) => void;
+  onSelectNode?: (nodeId: string, downloadables?: DownloadableMaterial[]) => void;
   energyPoints: number;
 }
 
@@ -37,6 +46,92 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
   const [hoverNode, setHoverNode] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // Define downloadable materials for each node
+  const downloadableMaterials: Record<string, DownloadableMaterial[]> = {
+    'meditation': [
+      { 
+        id: 'med-guide-1', 
+        name: 'Beginner Meditation', 
+        description: 'A complete guide for beginners',
+        type: 'pdf',
+        icon: <FileText size={18} />
+      },
+      { 
+        id: 'med-audio-1', 
+        name: 'Guided Meditation', 
+        description: '15-minute guided audio session',
+        type: 'audio',
+        icon: <Package size={18} />
+      }
+    ],
+    'chakras': [
+      { 
+        id: 'chakra-map', 
+        name: 'Chakra Map', 
+        description: 'Complete guide to your energy centers',
+        type: 'pdf',
+        icon: <FileText size={18} />
+      },
+      { 
+        id: 'chakra-balancing', 
+        name: 'Balancing Practice', 
+        description: 'Step-by-step chakra balancing technique',
+        type: 'practice',
+        icon: <Book size={18} />
+      }
+    ],
+    'dreams': [
+      { 
+        id: 'dream-journal', 
+        name: 'Dream Journal Template', 
+        description: 'Track and analyze your dreams',
+        type: 'pdf',
+        icon: <FileText size={18} />
+      }
+    ],
+    'energy': [
+      { 
+        id: 'energy-meditation', 
+        name: 'Energy Meditation', 
+        description: 'Focus your internal energy',
+        type: 'audio',
+        icon: <Package size={18} />
+      },
+      { 
+        id: 'energy-exercises', 
+        name: 'Daily Energy Exercises', 
+        description: '5-minute practices for daily energy',
+        type: 'guide',
+        icon: <Book size={18} />
+      }
+    ],
+    'wisdom': [
+      { 
+        id: 'ancient-texts', 
+        name: 'Ancient Wisdom Texts', 
+        description: 'Collection of wisdom teachings',
+        type: 'pdf',
+        icon: <Archive size={18} />
+      }
+    ],
+    'astral': [
+      { 
+        id: 'astral-guide', 
+        name: 'Astral Projection Guide', 
+        description: 'Safe techniques for astral travel',
+        type: 'pdf',
+        icon: <FileText size={18} />
+      },
+      { 
+        id: 'astral-meditation', 
+        name: 'Astral Meditation', 
+        description: 'Prepare for out-of-body experiences',
+        type: 'audio',
+        icon: <Package size={18} />
+      }
+    ]
+  };
+
   // Define the sacred geometry nodes
   const geometryNodes: GeometryNode[] = [
     {
@@ -46,7 +141,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       description: 'Center your consciousness and access higher states of being',
       color: 'from-purple-400 to-purple-600',
       position: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
-      action: () => onSelectNode?.('meditation')
+      downloadables: downloadableMaterials['meditation'],
+      action: () => onSelectNode?.('meditation', downloadableMaterials['meditation'])
     },
     {
       id: 'chakras',
@@ -55,7 +151,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       description: 'Balance your energy centers for optimal flow',
       color: 'from-orange-400 to-red-500',
       position: 'top-0 left-1/2 -translate-x-1/2',
-      action: () => onSelectNode?.('chakras')
+      downloadables: downloadableMaterials['chakras'],
+      action: () => onSelectNode?.('chakras', downloadableMaterials['chakras'])
     },
     {
       id: 'dreams',
@@ -64,7 +161,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       description: 'Explore your subconscious through dream analysis',
       color: 'from-indigo-400 to-indigo-600',
       position: 'top-1/4 right-0 translate-x-1/4',
-      action: () => onSelectNode?.('dreams')
+      downloadables: downloadableMaterials['dreams'],
+      action: () => onSelectNode?.('dreams', downloadableMaterials['dreams'])
     },
     {
       id: 'energy',
@@ -73,7 +171,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       description: 'Harness and direct your subtle energy field',
       color: 'from-cyan-400 to-blue-500',
       position: 'bottom-1/4 right-0 translate-x-1/4',
-      action: () => onSelectNode?.('energy')
+      downloadables: downloadableMaterials['energy'],
+      action: () => onSelectNode?.('energy', downloadableMaterials['energy'])
     },
     {
       id: 'reflection',
@@ -100,7 +199,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       description: 'Access universal knowledge and higher guidance',
       color: 'from-amber-400 to-yellow-500',
       position: 'top-1/4 left-0 -translate-x-1/4',
-      action: () => onSelectNode?.('wisdom')
+      downloadables: downloadableMaterials['wisdom'],
+      action: () => onSelectNode?.('wisdom', downloadableMaterials['wisdom'])
     },
     {
       id: 'astral',
@@ -109,7 +209,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       description: 'Journey beyond physical limitations',
       color: 'from-violet-400 to-purple-600',
       position: 'top-[15%] left-[15%]',
-      action: () => onSelectNode?.('astral')
+      downloadables: downloadableMaterials['astral'],
+      action: () => onSelectNode?.('astral', downloadableMaterials['astral'])
     },
     {
       id: 'sacred',
@@ -254,6 +355,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       {/* Geometry Nodes */}
       {geometryNodes.map((node, index) => {
         const nodeStatus = getNodeStatus(index);
+        const hasDownloadables = node.downloadables && node.downloadables.length > 0;
+        
         return (
           <motion.div
             key={node.id}
@@ -273,7 +376,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
               className={cn(
                 "w-16 h-16 rounded-full flex items-center justify-center cursor-pointer",
                 "transition-all duration-300",
-                nodeStatus.unlocked ? "bg-black/30" : "bg-black/50"
+                nodeStatus.unlocked ? "bg-black/30" : "bg-black/50",
+                hasDownloadables && "ring-2 ring-white/30 ring-offset-2 ring-offset-transparent"
               )}
               color={nodeStatus.unlocked ? `${node.color.split(' ')[1]}80` : "rgba(100,100,100,0.3)"}
               intensity={activeNode === node.id ? "high" : "medium"}
@@ -286,9 +390,17 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
               <div className={cn(
                 "w-12 h-12 rounded-full flex items-center justify-center",
                 "bg-gradient-to-br",
-                nodeStatus.unlocked ? node.color : "from-gray-600 to-gray-700"
+                nodeStatus.unlocked ? node.color : "from-gray-600 to-gray-700",
+                "relative"
               )}>
                 {node.icon}
+                
+                {/* Download indicator */}
+                {hasDownloadables && nodeStatus.unlocked && (
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                    <Download size={12} className="text-quantum-600" />
+                  </div>
+                )}
               </div>
               
               {/* Tooltip */}
@@ -300,6 +412,12 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
                 >
                   <div className="font-semibold text-white">{node.name}</div>
                   <div className="text-xs text-white/80 mt-1">{node.description}</div>
+                  {hasDownloadables && nodeStatus.unlocked && (
+                    <div className="text-xs text-quantum-300 mt-1 flex items-center justify-center">
+                      <Download size={10} className="mr-1" />
+                      {node.downloadables?.length} materials available
+                    </div>
+                  )}
                   {!nodeStatus.unlocked && (
                     <div className="text-xs text-amber-400 mt-1">
                       Unlocks at {nodeStatus.threshold} energy points

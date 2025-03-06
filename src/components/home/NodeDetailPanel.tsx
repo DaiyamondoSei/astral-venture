@@ -2,202 +2,222 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Lock } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import DownloadableMaterialsPanel from '@/components/home/DownloadableMaterialsPanel';
+
+interface DownloadableMaterial {
+  id: string;
+  name: string;
+  description: string;
+  type: 'pdf' | 'audio' | 'video' | 'practice' | 'guide';
+  icon: React.ReactNode;
+}
 
 interface NodeDetailPanelProps {
   nodeId: string;
   energyPoints: number;
+  downloadableMaterials?: DownloadableMaterial[];
 }
 
-const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ nodeId, energyPoints }) => {
-  const navigate = useNavigate();
-  
+const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ 
+  nodeId, 
+  energyPoints,
+  downloadableMaterials
+}) => {
   // Define node details
   const nodeDetails = {
     'meditation': {
       title: 'Meditation Practices',
-      description: 'Center your consciousness and access higher states of being through guided and self-directed meditation practices.',
-      actions: [
-        { label: 'Mindfulness Meditation', path: '/meditation/mindfulness', threshold: 0 },
-        { label: 'Energy Centering', path: '/meditation/energy', threshold: 50 },
-        { label: 'Transcendence Practice', path: '/meditation/transcendence', threshold: 200 }
+      description: 'Explore techniques to quiet the mind and expand consciousness.',
+      practices: [
+        'Mindfulness Meditation',
+        'Transcendental Meditation',
+        'Guided Visualization',
+        'Breath Awareness'
       ]
     },
     'chakras': {
-      title: 'Chakra Balancing',
-      description: 'Activate, balance and harmonize your seven primary energy centers for optimal energy flow throughout your being.',
-      actions: [
-        { label: 'Daily Activation', path: '/chakras/daily', threshold: 0 },
-        { label: 'Chakra Analysis', path: '/chakras/analysis', threshold: 100 },
-        { label: 'Advanced Harmonization', path: '/chakras/advanced', threshold: 300 }
+      title: 'Chakra System',
+      description: 'Work with your energy centers to balance and harmonize your entire being.',
+      practices: [
+        'Root Chakra Grounding',
+        'Heart Chakra Opening',
+        'Third Eye Activation',
+        'Full Chakra Alignment'
       ]
     },
     'dreams': {
       title: 'Dream Exploration',
-      description: 'Record, analyze and work with your dreams to unlock insights from your subconscious mind.',
-      actions: [
-        { label: 'Dream Capture', path: '/dream-capture', threshold: 0 },
-        { label: 'Dream Analysis', path: '/dreams/analysis', threshold: 150 },
-        { label: 'Lucid Dreaming', path: '/dreams/lucid', threshold: 400 }
+      description: 'Uncover the wisdom of your subconscious through dream work.',
+      practices: [
+        'Dream Journaling',
+        'Lucid Dream Techniques',
+        'Dream Symbol Analysis',
+        'Astral Projection from Dreams'
       ]
     },
     'energy': {
       title: 'Energy Work',
-      description: 'Learn to sense, direct and work with subtle energy fields within and around you.',
-      actions: [
-        { label: 'Energy Perception', path: '/energy/perception', threshold: 0 },
-        { label: 'Energy Channeling', path: '/energy/channeling', threshold: 120 },
-        { label: 'Advanced Energy Work', path: '/energy/advanced', threshold: 350 }
+      description: 'Learn to sense, direct and cultivate your subtle energy.',
+      practices: [
+        'Energy Sensing',
+        'Energy Circulation',
+        'Aura Cleansing',
+        'Energy Center Activation'
       ]
     },
     'reflection': {
-      title: 'Conscious Reflection',
-      description: 'Deepen self-awareness through guided reflection practices that illuminate your inner landscape.',
-      actions: [
-        { label: 'Daily Reflection', path: '/reflection/daily', threshold: 0 },
-        { label: 'Past Pattern Analysis', path: '/reflection/patterns', threshold: 80 },
-        { label: 'Shadow Integration', path: '/reflection/shadow', threshold: 250 }
+      title: 'Self-Reflection',
+      description: 'Deepen self-awareness through conscious introspection practices.',
+      practices: [
+        'Shadow Work',
+        'Inner Child Healing',
+        'Higher Self Connection',
+        'Journaling Prompts'
       ]
     },
     'healing': {
-      title: 'Energy Healing',
-      description: 'Learn techniques to promote healing and balance for yourself and others through energy work.',
-      actions: [
-        { label: 'Self-Healing', path: '/healing/self', threshold: 50 },
-        { label: 'Distance Healing', path: '/healing/distance', threshold: 200 },
-        { label: 'Advanced Healing', path: '/healing/advanced', threshold: 500 }
+      title: 'Healing Practices',
+      description: 'Restore balance to your physical, emotional, and energetic bodies.',
+      practices: [
+        'Self-Healing Techniques',
+        'Sound Healing',
+        'Energy Healing',
+        'Emotional Release'
       ]
     },
     'wisdom': {
       title: 'Cosmic Wisdom',
-      description: 'Access universal knowledge and higher guidance through connection with your higher self.',
-      actions: [
-        { label: 'Wisdom Teachings', path: '/wisdom/teachings', threshold: 100 },
-        { label: 'Channeled Messages', path: '/wisdom/channeled', threshold: 300 },
-        { label: 'Akashic Records', path: '/wisdom/akashic', threshold: 700 }
+      description: 'Access universal knowledge and higher dimensional information.',
+      practices: [
+        'Channeling Practice',
+        'Akashic Records Access',
+        'Intuitive Development',
+        'Ancient Wisdom Study'
       ]
     },
     'astral': {
-      title: 'Astral Projection',
-      description: 'Learn techniques to consciously project your awareness beyond the physical body.',
-      actions: [
-        { label: 'Astral Basics', path: '/astral/basics', threshold: 150 },
-        { label: 'Guided Projection', path: '/astral/guided', threshold: 400 },
-        { label: 'Advanced Projection', path: '/astral/advanced', threshold: 800 }
+      title: 'Astral Travel',
+      description: 'Learn to safely navigate beyond physical limitations.',
+      practices: [
+        'Astral Projection Techniques',
+        'Astral Body Strengthening',
+        'Safe Travel Protocols',
+        'Dimensional Exploration'
       ]
     },
     'sacred': {
       title: 'Sacred Geometry',
-      description: 'Explore the mathematical patterns that form the foundation of physical and spiritual reality.',
-      actions: [
-        { label: 'Introduction', path: '/sacred/intro', threshold: 50 },
-        { label: 'Meditation with Forms', path: '/sacred/meditation', threshold: 200 },
-        { label: 'Advanced Applications', path: '/sacred/advanced', threshold: 600 }
+      description: 'Explore the mathematical patterns that form the fabric of reality.',
+      practices: [
+        'Geometric Meditation',
+        'Mandala Creation',
+        'Flower of Life Study',
+        'Merkaba Activation'
       ]
     },
     'elements': {
       title: 'Elemental Work',
-      description: 'Connect with and harness the energies of earth, air, fire, water and ether.',
-      actions: [
-        { label: 'Element Basics', path: '/elements/basics', threshold: 100 },
-        { label: 'Elemental Attunement', path: '/elements/attunement', threshold: 300 },
-        { label: 'Advanced Elements', path: '/elements/advanced', threshold: 600 }
+      description: 'Connect with and harness the elemental forces of nature.',
+      practices: [
+        'Earth Grounding',
+        'Water Flow Meditation',
+        'Fire Transformation',
+        'Air Expansion'
       ]
     },
     'consciousness': {
-      title: 'Consciousness Expansion',
-      description: 'Expand your awareness beyond ordinary limitations through advanced practices.',
-      actions: [
-        { label: 'Awareness Basics', path: '/consciousness/basics', threshold: 100 },
-        { label: 'Beyond Duality', path: '/consciousness/duality', threshold: 400 },
-        { label: 'Universal Consciousness', path: '/consciousness/universal', threshold: 1000 }
+      title: 'Consciousness Exploration',
+      description: 'Expand your awareness beyond ordinary limitations.',
+      practices: [
+        'Observer Consciousness',
+        'Non-Dual Awareness',
+        'Quantum Consciousness',
+        'Unity Consciousness'
       ]
     },
     'nature': {
       title: 'Nature Connection',
-      description: 'Deepen your relationship with the natural world and its healing powers.',
-      actions: [
-        { label: 'Natural Awareness', path: '/nature/awareness', threshold: 50 },
-        { label: 'Plant Communication', path: '/nature/plants', threshold: 250 },
-        { label: 'Advanced Communion', path: '/nature/communion', threshold: 500 }
+      description: 'Deepen your relationship with the natural world.',
+      practices: [
+        'Forest Bathing',
+        'Plant Communication',
+        'Nature Meditation',
+        'Elemental Attunement'
       ]
     },
     'guidance': {
       title: 'Higher Guidance',
-      description: 'Connect with your inner wisdom, spirit guides and higher dimensional beings.',
-      actions: [
-        { label: 'Inner Guidance', path: '/guidance/inner', threshold: 100 },
-        { label: 'Guide Connection', path: '/guidance/connection', threshold: 350 },
-        { label: 'Advanced Channeling', path: '/guidance/advanced', threshold: 700 }
+      description: 'Connect with your inner wisdom and spiritual guides.',
+      practices: [
+        'Inner Guidance Meditation',
+        'Spirit Guide Connection',
+        'Higher Self Communion',
+        'Intuitive Development'
       ]
     },
     'cosmic-center': {
-      title: 'Cosmic Core',
-      description: 'The central point where all energies converge. Your journey\'s heart and source of power.',
-      actions: [
-        { label: 'Energy Overview', path: '/dashboard', threshold: 0 },
-        { label: 'Activation History', path: '/profile/history', threshold: 0 },
-        { label: 'Advanced Visualization', path: '/astral-body-demo', threshold: 0 }
+      title: 'Cosmic Center',
+      description: 'The central point of your spiritual journey, representing your total energy and consciousness integration.',
+      practices: [
+        'Cosmic Meditation',
+        'Energy Center Balance',
+        'Consciousness Expansion',
+        'Quantum Integration'
       ]
     }
   };
   
-  // Get the details for the selected node
-  const details = nodeDetails[nodeId as keyof typeof nodeDetails] || {
+  const details = nodeDetails[nodeId] || {
     title: 'Unknown Node',
-    description: 'Information not available.',
-    actions: []
-  };
-
-  const handleActionClick = (path: string) => {
-    navigate(path);
+    description: 'Information about this node is not available.',
+    practices: []
   };
 
   return (
-    <motion.div 
-      className="glass-card p-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <h2 className="text-xl font-display mb-2">{details.title}</h2>
-      <p className="text-white/80 mb-6">{details.description}</p>
-      
-      <div className="space-y-3">
-        {details.actions.map((action, index) => {
-          const isLocked = energyPoints < action.threshold;
-          
-          return (
-            <div key={index} className="flex items-center justify-between">
+    <div className="glass-card p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <h2 className="text-2xl font-display mb-2">{details.title}</h2>
+        <p className="text-white/80 mb-6">{details.description}</p>
+        
+        <h3 className="text-lg font-display mb-3">Practices</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+          {details.practices.map((practice, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2, delay: index * 0.1 }}
+              className="bg-black/20 p-3 rounded-lg"
+            >
               <div className="flex items-center">
-                {isLocked && (
-                  <Lock className="h-4 w-4 mr-2 text-amber-400" />
-                )}
-                <span className={isLocked ? 'text-white/50' : 'text-white/90'}>
-                  {action.label}
-                </span>
-                {isLocked && (
-                  <span className="ml-2 text-xs text-amber-400">
-                    ({action.threshold} points)
-                  </span>
-                )}
+                <div className="w-6 h-6 rounded-full bg-quantum-500/20 flex items-center justify-center mr-2">
+                  {index + 1}
+                </div>
+                <span>{practice}</span>
               </div>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-white/70 hover:text-white"
-                disabled={isLocked}
-                onClick={() => handleActionClick(action.path)}
-              >
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          );
-        })}
-      </div>
-    </motion.div>
+            </motion.div>
+          ))}
+        </div>
+        
+        <Button variant="default" className="astral-button">
+          <span>Begin Practice</span>
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </motion.div>
+
+      {/* Add downloadable materials panel if available */}
+      {downloadableMaterials && downloadableMaterials.length > 0 && (
+        <DownloadableMaterialsPanel 
+          materials={downloadableMaterials}
+          nodeName={details.title}
+        />
+      )}
+    </div>
   );
 };
 

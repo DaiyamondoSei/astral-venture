@@ -8,6 +8,15 @@ import EnergyInfoCard from '@/components/home/EnergyInfoCard';
 import { Sparkles } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 
+// Define the DownloadableMaterial interface
+interface DownloadableMaterial {
+  id: string;
+  name: string;
+  description: string;
+  type: 'pdf' | 'audio' | 'video' | 'practice' | 'guide';
+  icon: React.ReactNode;
+}
+
 interface SacredHomePageProps {
   user: any;
   userProfile: any;
@@ -26,6 +35,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
   onNodeSelect
 }) => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedNodeMaterials, setSelectedNodeMaterials] = useState<DownloadableMaterial[] | null>(null);
   
   // Add logging to debug component mounting and props
   useEffect(() => {
@@ -47,9 +57,10 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
   const astralLevel = userProfile?.astral_level || 1;
   const energyPoints = userProfile?.energy_points || 0;
   
-  const handleNodeSelect = (nodeId: string) => {
-    console.log("Node selected in SacredHomePage:", nodeId);
+  const handleNodeSelect = (nodeId: string, downloadables?: DownloadableMaterial[]) => {
+    console.log("Node selected in SacredHomePage:", nodeId, downloadables);
     setSelectedNode(nodeId);
+    setSelectedNodeMaterials(downloadables || null);
     
     if (onNodeSelect) {
       onNodeSelect(nodeId);
@@ -126,7 +137,11 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
               transition={{ duration: 0.3 }}
               className="lg:hidden"
             >
-              <NodeDetailPanel nodeId={selectedNode} energyPoints={energyPoints} />
+              <NodeDetailPanel 
+                nodeId={selectedNode} 
+                energyPoints={energyPoints}
+                downloadableMaterials={selectedNodeMaterials || undefined}
+              />
             </motion.div>
           )}
         </div>
@@ -156,7 +171,11 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
           transition={{ duration: 0.3 }}
           className="mt-8 hidden lg:block"
         >
-          <NodeDetailPanel nodeId={selectedNode} energyPoints={energyPoints} />
+          <NodeDetailPanel 
+            nodeId={selectedNode} 
+            energyPoints={energyPoints}
+            downloadableMaterials={selectedNodeMaterials || undefined}
+          />
         </motion.div>
       )}
     </div>
