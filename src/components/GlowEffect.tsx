@@ -8,11 +8,12 @@ export interface GlowEffectProps {
   children?: React.ReactNode;
   color?: string;
   intensity?: 'low' | 'medium' | 'high';
-  animation?: 'none' | 'pulse';
+  animation?: 'none' | 'pulse' | 'breathe';
   interactive?: boolean;
   onClick?: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  style?: React.CSSProperties;
 }
 
 const GlowEffect: React.FC<GlowEffectProps> = ({
@@ -24,7 +25,8 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
   interactive = false,
   onClick,
   onMouseEnter,
-  onMouseLeave
+  onMouseLeave,
+  style
 }) => {
   // Map intensity levels to box shadow blur values
   const intensityMap = {
@@ -34,20 +36,41 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
   };
 
   // Define animation variants
-  const pulseAnimation = animation === 'pulse' ? {
-    animate: {
-      boxShadow: [
-        `0 0 ${intensityMap[intensity]} ${color}`,
-        `0 0 ${parseInt(intensityMap[intensity]) + 5}px ${color}`,
-        `0 0 ${intensityMap[intensity]} ${color}`
-      ],
-      transition: {
-        duration: 2,
-        repeat: Infinity,
-        repeatType: "reverse" as const
-      }
+  const getAnimationVariants = () => {
+    if (animation === 'pulse') {
+      return {
+        animate: {
+          boxShadow: [
+            `0 0 ${intensityMap[intensity]} ${color}`,
+            `0 0 ${parseInt(intensityMap[intensity]) + 5}px ${color}`,
+            `0 0 ${intensityMap[intensity]} ${color}`
+          ],
+          transition: {
+            duration: 2,
+            repeat: Infinity,
+            repeatType: "reverse" as const
+          }
+        }
+      };
+    } else if (animation === 'breathe') {
+      return {
+        animate: {
+          scale: [1, 1.05, 1],
+          boxShadow: [
+            `0 0 ${intensityMap[intensity]} ${color}`,
+            `0 0 ${parseInt(intensityMap[intensity]) + 10}px ${color}`,
+            `0 0 ${intensityMap[intensity]} ${color}`
+          ],
+          transition: {
+            duration: 4,
+            repeat: Infinity,
+            repeatType: "reverse" as const
+          }
+        }
+      };
     }
-  } : {};
+    return {};
+  };
 
   return (
     <motion.div
@@ -57,14 +80,15 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
         className
       )}
       style={{
-        boxShadow: `0 0 ${intensityMap[intensity]} ${color}`
+        boxShadow: `0 0 ${intensityMap[intensity]} ${color}`,
+        ...style
       }}
       whileHover={interactive ? { scale: 1.05 } : {}}
       whileTap={interactive ? { scale: 0.98 } : {}}
       onClick={interactive ? onClick : undefined}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      {...pulseAnimation}
+      {...getAnimationVariants()}
     >
       {children}
     </motion.div>
