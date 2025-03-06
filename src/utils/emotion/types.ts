@@ -25,8 +25,10 @@ export interface EmotionAnalysisResult {
   chakrasActivated: number[];
   emotionBreakdown: Record<string, number>;
   recommendations?: string[];
-  chakras?: number[]; // Adding this for backward compatibility
-  dominantThemes?: string[]; // Adding this for backward compatibility
+  chakras?: number[]; // For backward compatibility
+  dominantThemes?: string[]; // For backward compatibility
+  emotions?: string[]; // Adding this for backward compatibility
+  insights?: string[]; // Adding this for backward compatibility
 }
 
 // Chakra analysis result interface
@@ -35,6 +37,10 @@ export interface ChakraAnalysisResult {
   dominantChakra?: number;
   chakraBalance: Record<number, number>;
   recommendations?: string[];
-  chakras?: number[]; // Adding this for backward compatibility
-  dominantThemes?: string[]; // Adding this for backward compatibility
+  chakras?: number[]; // For backward compatibility
+  dominantThemes?: string[]; // For backward compatibility
+  emotions?: string[]; // For backward compatibility
+  insights?: string[]; // For backward compatibility
+  intensity?: number[]; // For backward compatibility with intensity
+  balanceScore?: number; // For backward compatibility
 }
