@@ -69,11 +69,7 @@ export const activityRepository = {
         // Convert JSON data to proper types
         chakrasActivated: normalizeChakraData(item.chakras_activated),
         completionRate: item.completion_rate,
-        emotionalResponse: Array.isArray(item.emotional_response) 
-          ? item.emotional_response 
-          : (typeof item.emotional_response === 'string' 
-              ? [item.emotional_response] 
-              : []),
+        emotionalResponse: normalizeEmotionalResponse(item.emotional_response),
         metadata: item.metadata as Record<string, any> || {}
       }));
     } catch (error) {
@@ -82,3 +78,44 @@ export const activityRepository = {
     }
   }
 };
+
+/**
+ * Normalizes emotional response data from JSON to string array
+ */
+function normalizeEmotionalResponse(emotionalResponse: Json | null): string[] {
+  if (!emotionalResponse) return [];
+  
+  // If already an array, convert all items to strings
+  if (Array.isArray(emotionalResponse)) {
+    return emotionalResponse.map(item => String(item));
+  }
+  
+  // If it's a string, try to parse it as JSON
+  if (typeof emotionalResponse === 'string') {
+    try {
+      const parsed = JSON.parse(emotionalResponse);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => String(item));
+      }
+      return [emotionalResponse]; // Single string
+    } catch (e) {
+      return [emotionalResponse]; // Single string (not JSON)
+    }
+  }
+  
+  // If it's a number or boolean, convert to string
+  if (typeof emotionalResponse === 'number' || typeof emotionalResponse === 'boolean') {
+    return [String(emotionalResponse)];
+  }
+  
+  // If it's an object, convert values to string array
+  if (typeof emotionalResponse === 'object') {
+    try {
+      return Object.values(emotionalResponse).map(item => String(item));
+    } catch (e) {
+      return [];
+    }
+  }
+  
+  return [];
+}
