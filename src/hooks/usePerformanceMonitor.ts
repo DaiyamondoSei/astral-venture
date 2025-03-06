@@ -8,6 +8,11 @@ interface PerformanceMetrics {
   lastUpdate: number;
 }
 
+/**
+ * Hook for monitoring application performance metrics
+ * @param isMonitoring Toggle for enabling/disabling the monitoring
+ * @returns Performance metrics and status information
+ */
 export function usePerformanceMonitor(isMonitoring: boolean) {
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     fps: 0,
@@ -33,75 +38,108 @@ export function usePerformanceMonitor(isMonitoring: boolean) {
     });
   }, []);
   
+  // Logging function for performance issues
+  const logPerformanceIssue = useCallback((message: string, data?: any) => {
+    // Only log in development or if explicitly enabled
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('enablePerfLogs') === 'true') {
+      console.warn(`[Performance Monitor] ${message}`, data);
+    }
+  }, []);
+  
   // Optimized performance monitoring with throttling
   useEffect(() => {
     if (!isMonitoring) return;
     
-    lastTimeRef.current = performance.now();
-    frameCountRef.current = 0;
-    
-    // Throttle updates to reduce performance impact of the monitor itself
-    let lastUpdateTime = 0;
-    const updateInterval = 1000; // Update metrics once per second
-    
-    const measurePerformance = () => {
-      const now = performance.now();
-      frameCountRef.current++;
+    try {
+      lastTimeRef.current = performance.now();
+      frameCountRef.current = 0;
       
-      // Update metrics once per interval
-      if (now - lastUpdateTime >= updateInterval) {
-        lastUpdateTime = now;
-        const elapsed = now - lastTimeRef.current;
-        
-        // Only calculate if we have a meaningful time interval
-        if (elapsed >= 500) {
-          const fps = Math.round(frameCountRef.current * 1000 / elapsed);
-          const renderTime = parseFloat((performance.now() - now).toFixed(2));
+      // Throttle updates to reduce performance impact of the monitor itself
+      let lastUpdateTime = 0;
+      const updateInterval = 1000; // Update metrics once per second
+      
+      const measurePerformance = () => {
+        try {
+          const now = performance.now();
+          frameCountRef.current++;
           
-          // Get memory usage if available
-          let memoryUsage = 0;
-          try {
-            // Try to access memory API (only available in some browsers)
-            if ((performance as any).memory) {
-              memoryUsage = Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024));
+          // Update metrics once per interval
+          if (now - lastUpdateTime >= updateInterval) {
+            lastUpdateTime = now;
+            const elapsed = now - lastTimeRef.current;
+            
+            // Only calculate if we have a meaningful time interval
+            if (elapsed >= 500) {
+              const fps = Math.round(frameCountRef.current * 1000 / elapsed);
+              const renderTime = parseFloat((performance.now() - now).toFixed(2));
+              
+              // Get memory usage if available
+              let memoryUsage = 0;
+              try {
+                // Try to access memory API (only available in some browsers)
+                if ((performance as any).memory) {
+                  memoryUsage = Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024));
+                  
+                  // Log warning if memory usage is high
+                  if (memoryUsage > 500) {
+                    logPerformanceIssue(`High memory usage detected: ${memoryUsage}MB`);
+                  }
+                }
+              } catch (e) {
+                // Ignore errors - memory API is not available in all browsers
+              }
+              
+              const newMetrics = {
+                fps,
+                renderTime,
+                memoryUsage,
+                lastUpdate: now
+              };
+              
+              // Log warning for low FPS
+              if (fps < 30) {
+                logPerformanceIssue(`Low FPS detected: ${fps}`);
+              }
+              
+              // Log warning for high render time
+              if (renderTime > 16) {
+                logPerformanceIssue(`High render time detected: ${renderTime}ms`);
+              }
+              
+              setMetrics(newMetrics);
+              updateHistory(newMetrics);
+              
+              frameCountRef.current = 0;
+              lastTimeRef.current = now;
             }
-          } catch (e) {
-            // Ignore errors - memory API is not available in all browsers
           }
           
-          const newMetrics = {
-            fps,
-            renderTime,
-            memoryUsage,
-            lastUpdate: now
-          };
-          
-          setMetrics(newMetrics);
-          updateHistory(newMetrics);
-          
-          frameCountRef.current = 0;
-          lastTimeRef.current = now;
+          rafIdRef.current = requestAnimationFrame(measurePerformance);
+        } catch (innerError) {
+          console.error("Error in performance measurement loop:", innerError);
+          rafIdRef.current = requestAnimationFrame(measurePerformance);
         }
+      };
+      
+      // Use requestIdleCallback if available to reduce impact on main thread
+      if (window.requestIdleCallback) {
+        window.requestIdleCallback(() => {
+          rafIdRef.current = requestAnimationFrame(measurePerformance);
+        });
+      } else {
+        rafIdRef.current = requestAnimationFrame(measurePerformance);
       }
       
-      rafIdRef.current = requestAnimationFrame(measurePerformance);
-    };
-    
-    // Use requestIdleCallback if available to reduce impact on main thread
-    if (window.requestIdleCallback) {
-      window.requestIdleCallback(() => {
-        rafIdRef.current = requestAnimationFrame(measurePerformance);
-      });
-    } else {
-      rafIdRef.current = requestAnimationFrame(measurePerformance);
+      return () => {
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
+        }
+      };
+    } catch (error) {
+      console.error("Failed to initialize performance monitoring:", error);
+      return () => {};
     }
-    
-    return () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-      }
-    };
-  }, [isMonitoring, updateHistory]);
+  }, [isMonitoring, updateHistory, logPerformanceIssue]);
   
   // Get performance status label and color based on metrics
   const getPerformanceStatus = useCallback(() => {
@@ -115,6 +153,7 @@ export function usePerformanceMonitor(isMonitoring: boolean) {
   return {
     metrics,
     history,
-    status: getPerformanceStatus()
+    status: getPerformanceStatus(),
+    logPerformanceIssue
   };
 }

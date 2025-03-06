@@ -1,163 +1,121 @@
 
-// Service for handling OpenAI API requests
-import { createClient } from 'https://esm.sh/@supabase/supabase-js';
+// OpenAI service for ask-assistant edge function
 
-// OpenAI API related constants
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODEL = "gpt-4o-mini"; // Using a cost-effective but powerful model
-const RESPONSE_TIMEOUT = 15000; // 15 seconds timeout
+// Define content moderation types
+export type ContentModerationType = 
+  | "hate"
+  | "harassment"
+  | "self-harm"
+  | "sexual"
+  | "violence"
+  | "graphic";
 
-/**
- * Generates an AI response using OpenAI's API
- * 
- * @param question The user's question
- * @param context Optional reflection context from the user
- * @param userContext Optional user profile context data
- * @param apiKey OpenAI API key from environment variables
- * @returns Promise containing the AI response
- */
-export async function generateOpenAIResponse(
-  question: string, 
-  context?: string, 
-  userContext?: string,
-  apiKey?: string
-): Promise<any> {
-  // Validate required parameters
-  if (!question || !apiKey) {
-    console.error("Missing required parameters for OpenAI call");
-    throw new Error("Invalid parameters for AI response generation");
-  }
+// Chat message type
+type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
 
+// Generate chat response using OpenAI API
+export async function generateChatResponse(userPrompt: string): Promise<string> {
   try {
-    console.log("Starting OpenAI request preparation");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     
-    // Build the system prompt with available context
-    let systemPrompt = `You are Quantum Guide, an AI assistant for a spiritual and energy practice app.
-Your role is to provide thoughtful, insightful responses about energy practices, chakras, meditation,
-and spiritual experiences. Be supportive, wise, and helpful.
-
-Keep responses concise but meaningful, around 2-3 paragraphs.
-
-Always respond with unique, varied content that directly addresses the user's question.
-Avoid generic or repetitive answers.
-
-IMPORTANT: Always provide a fresh, unique response even for similar questions.
-Never return the exact same response twice, even for similar questions.`;
-
-    // Add user context if available
-    if (userContext) {
-      systemPrompt += `\n\nUser Context: ${userContext}`;
+    if (!OPENAI_API_KEY) {
+      console.error("Missing OpenAI API key");
+      return "I'm unable to respond right now due to a configuration issue. Please try again later.";
     }
-
-    // Add reflection context if available
-    if (context) {
-      systemPrompt += `\n\nRecent Reflection: ${context}`;
-    }
-
-    // Prepare messages for the OpenAI API
-    const messages = [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content: question
-      }
-    ];
-
-    console.log("Making request to OpenAI API");
     
-    // Make request to OpenAI API with timeout
-    const response = await fetch(OPENAI_API_URL, {
+    // System message to set the context and behavior
+    const systemMessage: ChatMessage = {
+      role: "system",
+      content: `You are a spiritual guide and energy healing assistant for a wellness application.
+      Provide thoughtful, insightful responses about energy healing, meditation, chakras,
+      and spiritual wellness. Keep responses concise, supportive, and focused on the user's
+      question. Avoid medical advice or claims that energy work can cure physical conditions.`
+    };
+    
+    // User message
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: userPrompt
+    };
+    
+    // Call OpenAI API
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
+        "Authorization": `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages: messages,
-        temperature: 0.8, // Slightly higher for more variety
-        max_tokens: 500   // Reasonable limit for concise responses
-      }),
-      signal: AbortSignal.timeout(RESPONSE_TIMEOUT)
+        model: "gpt-4",  // Using GPT-4 for more nuanced responses
+        messages: [systemMessage, userMessage],
+        temperature: 0.7,
+        max_tokens: 500,
+        top_p: 1,
+        frequency_penalty: 0.0,
+        presence_penalty: 0.6
+      })
     });
-
-    // Parse API response
-    const data = await response.json();
     
     if (!response.ok) {
-      console.error("OpenAI API error:", data);
-      throw new Error(`OpenAI API error: ${data.error?.message || "Unknown error"}`);
+      const errorData = await response.json();
+      console.error("OpenAI API error:", errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
-
-    // Extract the response content
-    const aiResponse = data.choices[0]?.message?.content;
-    if (!aiResponse) {
-      throw new Error("No response content from OpenAI");
-    }
-
-    console.log("Successfully received OpenAI response");
     
-    // Generate some suggested practices based on the question topic
-    const suggestedPractices = generateSuggestedPractices(question, aiResponse);
-
-    return {
-      answer: aiResponse,
-      relatedInsights: [
-        {
-          id: crypto.randomUUID(),
-          content: "Your energy journey is unique to you - trust your intuition",
-          category: "insight",
-          confidence: 0.95,
-          created_at: new Date().toISOString()
-        }
-      ],
-      suggestedPractices
-    };
+    const data = await response.json();
+    return data.choices[0].message.content;
+    
   } catch (error) {
-    console.error("Error generating OpenAI response:", error);
-    throw error;
+    console.error("Error generating chat response:", error);
+    return "I'm sorry, I encountered an error while processing your request. Please try again later.";
   }
 }
 
-/**
- * Generate relevant suggested practices based on user question
- */
-function generateSuggestedPractices(question: string, aiResponse: string): string[] {
-  const lowerQuestion = question.toLowerCase();
-  
-  // Default practices that work for many scenarios
-  const defaultPractices = [
-    "Practice mindful breathing for 5 minutes daily",
-    "Journal about your energy experiences",
-    "Try a body scan meditation"
-  ];
-  
-  // Topic-specific practice suggestions
-  if (lowerQuestion.includes("chakra") || aiResponse.toLowerCase().includes("chakra")) {
-    return [
-      "Visualize the color associated with that chakra during meditation",
-      "Practice yoga poses that activate the specific chakra",
-      "Use sound healing with the corresponding chakra frequency",
-      "Journal about blockages you feel in this energy center"
-    ];
-  } else if (lowerQuestion.includes("meditation") || lowerQuestion.includes("focus")) {
-    return [
-      "Try a guided meditation for beginners",
-      "Practice breath counting to improve concentration",
-      "Use a meditation timer to gradually increase session length",
-      "Create a dedicated meditation space in your home"
-    ];
-  } else if (lowerQuestion.includes("dream") || lowerQuestion.includes("sleep")) {
-    return [
-      "Keep a dream journal by your bed",
-      "Practice reality checks throughout the day",
-      "Try a bedtime meditation focused on intention setting",
-      "Reduce screen time 1 hour before sleep"
-    ];
+// Check content moderation (in production, this would call OpenAI's moderation API)
+export async function checkContentModeration(
+  content: string
+): Promise<{ flagged: boolean; categories: ContentModerationType[] }> {
+  try {
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    
+    if (!OPENAI_API_KEY) {
+      console.error("Missing OpenAI API key for moderation");
+      return { flagged: false, categories: [] };
+    }
+    
+    // In a production environment, implement the OpenAI moderation API call here
+    // This is a placeholder for now
+    
+    // For now, we'll do a simple keyword check
+    const moderationKeywords: Record<ContentModerationType, string[]> = {
+      "hate": ["hate", "despise", "loathe"],
+      "harassment": ["harass", "bully", "intimidate"],
+      "self-harm": ["suicide", "self-harm", "kill myself"],
+      "sexual": ["explicit", "sexual", "nsfw"],
+      "violence": ["violence", "attack", "kill", "murder"],
+      "graphic": ["graphic", "gore", "blood"]
+    };
+    
+    const flaggedCategories: ContentModerationType[] = [];
+    const lowerContent = content.toLowerCase();
+    
+    // Check each category for flagged keywords
+    Object.entries(moderationKeywords).forEach(([category, keywords]) => {
+      if (keywords.some(keyword => lowerContent.includes(keyword))) {
+        flaggedCategories.push(category as ContentModerationType);
+      }
+    });
+    
+    return {
+      flagged: flaggedCategories.length > 0,
+      categories: flaggedCategories
+    };
+    
+  } catch (error) {
+    console.error("Error in content moderation:", error);
+    return { flagged: false, categories: [] };
   }
-  
-  return defaultPractices;
 }
