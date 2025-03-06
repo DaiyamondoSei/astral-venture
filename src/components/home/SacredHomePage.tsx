@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import MetatronsCube from '@/components/sacred-geometry/MetatronsCube';
 import UserWelcome from '@/components/UserWelcome';
 import NodeDetailPanel from '@/components/home/NodeDetailPanel';
 import EnergyInfoCard from '@/components/home/EnergyInfoCard';
 import { Sparkles } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 interface SacredHomePageProps {
   user: any;
@@ -26,12 +27,28 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
 }) => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   
+  // Add logging to debug component mounting and props
+  useEffect(() => {
+    console.log("SacredHomePage mounted with:", {
+      user: !!user,
+      userProfile: !!userProfile,
+      userStreak,
+      activatedChakras,
+      selectedNode
+    });
+    
+    if (!userProfile) {
+      console.warn("User profile is missing in SacredHomePage");
+    }
+  }, [user, userProfile, userStreak, activatedChakras, selectedNode]);
+  
   // Derive username from user data
   const username = userProfile?.username || user?.email?.split('@')[0] || 'Seeker';
   const astralLevel = userProfile?.astral_level || 1;
   const energyPoints = userProfile?.energy_points || 0;
   
   const handleNodeSelect = (nodeId: string) => {
+    console.log("Node selected in SacredHomePage:", nodeId);
     setSelectedNode(nodeId);
     
     if (onNodeSelect) {
