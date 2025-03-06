@@ -7,6 +7,8 @@ export interface AchievementData {
   description: string;
   icon: string;
   requiredStep?: string;
+  requiredInteraction?: string;
+  requiredSteps?: string[];
   points: number;
   type: 'discovery' | 'completion' | 'interaction';
 }
@@ -18,6 +20,7 @@ export interface FeatureTooltipData {
   description: string;
   position: 'top' | 'right' | 'bottom' | 'left';
   order: number;
+  requiredStep?: string;
 }
 
 export interface GuidedTourStep {
@@ -33,6 +36,7 @@ export interface GuidedTourData {
   title: string;
   description: string;
   steps: GuidedTourStep[];
+  requiredStep?: string;
 }
 
 // Achievements that can be earned during onboarding
@@ -90,6 +94,34 @@ export const onboardingAchievements: AchievementData[] = [
     requiredStep: 'complete',
     points: 50,
     type: 'completion'
+  },
+  // New interaction-based achievements
+  {
+    id: 'mindful-explorer',
+    title: 'Mindful Explorer',
+    description: 'Engaged deeply with meditation concepts and practices',
+    icon: 'meditation',
+    requiredInteraction: 'meditation_practice_started',
+    points: 20,
+    type: 'interaction'
+  },
+  {
+    id: 'chakra-master',
+    title: 'Chakra Master',
+    description: 'Demonstrated comprehensive understanding of all chakras',
+    icon: 'chakra',
+    requiredSteps: ['chakras', 'meditation', 'reflection'],
+    points: 45,
+    type: 'completion'
+  },
+  {
+    id: 'consistent-practitioner',
+    title: 'Consistent Practitioner',
+    description: 'Completed multiple steps in your sacred journey',
+    icon: 'energy',
+    requiredSteps: ['sacred-geometry', 'chakras', 'energy-points'],
+    points: 40,
+    type: 'completion'
   }
 ];
 
@@ -101,7 +133,8 @@ export const featureTooltips: FeatureTooltipData[] = [
     title: 'Metatron\'s Cube',
     description: 'Explore the sacred geometry of consciousness through this interactive pattern',
     position: 'bottom',
-    order: 1
+    order: 1,
+    requiredStep: 'sacred-geometry'
   },
   {
     id: 'energy-points',
@@ -109,7 +142,8 @@ export const featureTooltips: FeatureTooltipData[] = [
     title: 'Energy Points',
     description: 'Track your spiritual growth and unlock new content',
     position: 'left',
-    order: 2
+    order: 2,
+    requiredStep: 'energy-points'
   },
   {
     id: 'chakra-activation',
@@ -117,7 +151,8 @@ export const featureTooltips: FeatureTooltipData[] = [
     title: 'Chakra Activation',
     description: 'Monitor your active energy centers and their balance',
     position: 'right',
-    order: 3
+    order: 3,
+    requiredStep: 'chakras'
   },
   {
     id: 'daily-practice',
@@ -125,7 +160,8 @@ export const featureTooltips: FeatureTooltipData[] = [
     title: 'Daily Practice',
     description: 'Engage with suggested practices to deepen your journey',
     position: 'top',
-    order: 4
+    order: 4,
+    requiredStep: 'meditation'
   }
 ];
 
@@ -135,6 +171,7 @@ export const guidedTours: GuidedTourData[] = [
     id: 'sacred-geometry-tour',
     title: 'Sacred Geometry Explorer',
     description: 'Discover the profound connections in geometric patterns',
+    requiredStep: 'sacred-geometry',
     steps: [
       {
         id: 'step-1',
@@ -163,6 +200,7 @@ export const guidedTours: GuidedTourData[] = [
     id: 'chakra-tour',
     title: 'Chakra System Guide',
     description: 'Explore your seven primary energy centers',
+    requiredStep: 'chakras',
     steps: [
       {
         id: 'step-1',
@@ -184,6 +222,35 @@ export const guidedTours: GuidedTourData[] = [
         title: 'Root Chakra',
         content: 'Foundation for stability and groundedness',
         position: 'bottom'
+      }
+    ]
+  },
+  {
+    id: 'meditation-practice-tour',
+    title: 'Meditation Practices',
+    description: 'Learn about various meditation techniques to enhance your practice',
+    requiredStep: 'meditation',
+    steps: [
+      {
+        id: 'step-1',
+        target: '.meditation-timer',
+        title: 'Meditation Timer',
+        content: 'Set your meditation duration and track your sessions',
+        position: 'bottom'
+      },
+      {
+        id: 'step-2',
+        target: '.meditation-techniques',
+        title: 'Meditation Techniques',
+        content: 'Explore different meditation approaches for various purposes',
+        position: 'right'
+      },
+      {
+        id: 'step-3',
+        target: '.meditation-progress',
+        title: 'Track Your Progress',
+        content: 'Monitor your meditation journey and growth over time',
+        position: 'top'
       }
     ]
   }

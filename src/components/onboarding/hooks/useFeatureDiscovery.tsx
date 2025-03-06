@@ -1,6 +1,7 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { featureTooltips, guidedTours, FeatureTooltipData, GuidedTourData } from '../onboardingData';
+import { useToast } from '@/components/ui/use-toast';
 
 export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
   const [seenTooltips, setSeenTooltips] = useState<Record<string, boolean>>({});
@@ -8,6 +9,7 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
   const [showFeatureTooltips, setShowFeatureTooltips] = useState(false);
   const [activeTour, setActiveTour] = useState<string>('');
   const [activeTooltips, setActiveTooltips] = useState<FeatureTooltipData[]>([]);
+  const { toast } = useToast();
   
   // Load seen tooltips and completed tours
   useEffect(() => {
@@ -51,11 +53,16 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
       
       if (eligibleTour) {
         setActiveTour(eligibleTour.id);
+        toast({
+          title: "Guided Tour Available",
+          description: `Learn about ${eligibleTour.title}`,
+          duration: 5000,
+        });
       }
     }
-  }, [showFeatureTooltips, seenTooltips, completedTours, activeTour]);
+  }, [showFeatureTooltips, seenTooltips, completedTours, activeTour, toast]);
   
-  const dismissTooltip = (tooltipId: string) => {
+  const dismissTooltip = useCallback((tooltipId: string) => {
     const userId = localStorage.getItem('userId') || 'anonymous';
     const updatedSeenTooltips = { ...seenTooltips, [tooltipId]: true };
     setSeenTooltips(updatedSeenTooltips);
@@ -63,9 +70,9 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
     
     // Remove from active tooltips
     setActiveTooltips(prev => prev.filter(t => t.id !== tooltipId));
-  };
+  }, [seenTooltips]);
   
-  const dismissTour = (tourId: string) => {
+  const dismissTour = useCallback((tourId: string) => {
     const userId = localStorage.getItem('userId') || 'anonymous';
     const updatedCompletedTours = { ...completedTours, [tourId]: true };
     setCompletedTours(updatedCompletedTours);
@@ -73,18 +80,29 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
     
     // Clear active tour
     setActiveTour('');
-  };
+    
+    toast({
+      title: "Tour Completed",
+      description: "You've completed this guided tour. Continue exploring!",
+      duration: 3000,
+    });
+  }, [completedTours, toast]);
+  
+  // Handle existing methods for backward compatibility
+  const handleTooltipDismiss = useCallback((tooltipId: string) => dismissTooltip(tooltipId), [dismissTooltip]);
+  const handleTourComplete = useCallback((tourId: string) => dismissTour(tourId), [dismissTour]);
   
   return {
     activeTooltips,
     activeTour,
     guidedTours,
-    dismissTooltip,
-    dismissTour,
+    featureTooltips,
     seenTooltips,
     completedTours,
     showFeatureTooltips,
-    handleTooltipDismiss: dismissTooltip,
-    handleTourComplete: dismissTour
+    dismissTooltip,
+    dismissTour,
+    handleTooltipDismiss,
+    handleTourComplete
   };
 };

@@ -1,7 +1,8 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { onboardingAchievements, AchievementData } from '../onboardingData';
 import { StepInteraction } from '@/contexts/onboarding/types';
+import { useToast } from '@/components/ui/use-toast';
 
 export const useAchievementTracker = (
   userId: string, 
@@ -11,6 +12,7 @@ export const useAchievementTracker = (
   const [earnedAchievements, setEarnedAchievements] = useState<AchievementData[]>([]);
   const [achievementHistory, setAchievementHistory] = useState<Record<string, {awarded: boolean, timestamp: string}>>({});
   const [currentAchievement, setCurrentAchievement] = useState<AchievementData | null>(null);
+  const { toast } = useToast();
 
   // Load previously awarded achievements
   useEffect(() => {
@@ -50,6 +52,13 @@ export const useAchievementTracker = (
         newAchievements.forEach(achievement => {
           if (!updatedAchievements.find(a => a.id === achievement.id)) {
             updatedAchievements.push(achievement);
+            
+            // Show toast notification for new achievement
+            toast({
+              title: "Achievement Unlocked!",
+              description: `${achievement.title}: ${achievement.description}`,
+              duration: 5000,
+            });
           }
         });
         
@@ -68,7 +77,7 @@ export const useAchievementTracker = (
       localStorage.setItem(`achievements-${userId}`, JSON.stringify(updatedAchievements));
       setAchievementHistory(updatedAchievements);
     }
-  }, [completedSteps, stepInteractions, achievementHistory, userId]);
+  }, [completedSteps, stepInteractions, achievementHistory, userId, toast]);
 
   // Display current achievement
   useEffect(() => {
@@ -77,30 +86,42 @@ export const useAchievementTracker = (
     }
   }, [earnedAchievements, currentAchievement]);
 
-  const dismissAchievement = (achievementId: string) => {
+  const dismissAchievement = useCallback((achievementId: string) => {
     setEarnedAchievements(prevAchievements => 
       prevAchievements.filter(achievement => achievement.id !== achievementId)
     );
     setCurrentAchievement(null);
-  };
+  }, []);
 
   // Analyze user interaction patterns
-  const getUserInteractions = () => {
+  const getUserInteractions = useCallback(() => {
     return stepInteractions.map(interaction => ({
       stepId: interaction.stepId,
       interactionType: interaction.interactionType
     }));
-  };
+  }, [stepInteractions]);
 
   // Get total earned points
-  const getTotalPoints = (): number => {
+  const getTotalPoints = useCallback((): number => {
     return Object.keys(achievementHistory)
       .filter(id => achievementHistory[id].awarded)
       .reduce((total, id) => {
         const achievement = onboardingAchievements.find(a => a.id === id);
         return total + (achievement?.points || 0);
       }, 0);
-  };
+  }, [achievementHistory]);
+  
+  // Get progress percentage towards next milestone
+  const getProgressPercentage = useCallback((): number => {
+    const totalPoints = getTotalPoints();
+    const milestone = Math.ceil(totalPoints / 100) * 100;
+    const prevMilestone = milestone - 100;
+    
+    const progressToNextMilestone = totalPoints - prevMilestone;
+    const percentageComplete = (progressToNextMilestone / 100) * 100;
+    
+    return Math.min(Math.round(percentageComplete), 100);
+  }, [getTotalPoints]);
 
   return {
     earnedAchievements,
@@ -108,6 +129,7 @@ export const useAchievementTracker = (
     dismissAchievement,
     getUserInteractions,
     getTotalPoints,
+    getProgressPercentage,
     achievementHistory
   };
 };

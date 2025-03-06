@@ -1,9 +1,7 @@
-
 import React from 'react';
 import { useFeatureDiscovery } from './hooks/useFeatureDiscovery';
 import FeatureTooltip from './FeatureTooltip';
 import GuidedTour from './GuidedTour';
-import { GuidedTourData } from './onboardingData';
 
 interface FeatureDiscoveryLayerProps {
   hasCompletedOnboarding: boolean;

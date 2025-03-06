@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -197,6 +196,11 @@ const GuidedTour: React.FC<GuidedTourProps> = ({
         </div>
         
         <p className="text-xs text-muted-foreground mb-4">{currentStep.content}</p>
+        
+        {/* Tour progress indicator */}
+        <div className="mb-2 text-xs text-muted-foreground">
+          Step {currentStepIndex + 1} of {steps.length}
+        </div>
         
         {/* Navigation */}
         <div className="flex items-center justify-between">
