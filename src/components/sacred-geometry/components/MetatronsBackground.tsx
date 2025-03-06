@@ -2,328 +2,188 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const MetatronsBackground: React.FC = () => {
-  return (
-    <svg 
-      viewBox="0 0 500 500" 
-      className="absolute inset-0 w-full h-full pointer-events-none z-0"
-    >
-      <defs>
-        <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-          <stop offset="0%" stopColor="rgba(138, 92, 246, 0.2)" />
-          <stop offset="100%" stopColor="rgba(138, 92, 246, 0)" />
-        </radialGradient>
-        
-        <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.1)" />
-          <stop offset="50%" stopColor="rgba(255,255,255,0.3)" />
-          <stop offset="100%" stopColor="rgba(255,255,255,0.1)" />
-        </linearGradient>
-        
-        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-      </defs>
-      
-      {/* Background glow effect */}
-      <motion.circle 
-        cx="250" 
-        cy="250" 
-        r="200" 
-        fill="url(#centerGlow)"
-        initial={{ opacity: 0.5 }}
+interface MetatronsBackgroundProps {
+  energyPoints?: number;
+  opacity?: number;
+  enableAnimation?: boolean;
+}
+
+const MetatronsBackground: React.FC<MetatronsBackgroundProps> = ({
+  energyPoints = 0,
+  opacity = 0.15,
+  enableAnimation = true
+}) => {
+  // Calculate complexity based on energy points
+  const complexity = Math.min(Math.floor(energyPoints / 100) + 2, 6);
+  
+  // Calculate rotation duration based on energy
+  const rotationDuration = Math.max(120 - energyPoints / 20, 60);
+  
+  // Calculate pulsation intensity
+  const pulsationIntensity = Math.min(0.2 + energyPoints / 2000, 0.4);
+  
+  // Generate circles for Metatron's Cube
+  const circles = Array.from({ length: complexity }).map((_, index) => {
+    const radius = (40 - index * 4);
+    return (
+      <motion.circle
+        key={`circle-${index}`}
+        cx="50%"
+        cy="50%"
+        r={`${radius}%`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={0.3 + (index * 0.1)}
+        className="text-purple-500/30"
+        initial={{ opacity: 0 }}
         animate={{ 
-          opacity: [0.5, 0.7, 0.5],
-          r: [200, 210, 200]
+          opacity: opacity,
+          strokeDashoffset: enableAnimation ? [0, 1000] : 0
         }}
         transition={{ 
-          duration: 10,
-          repeat: Infinity,
-          repeatType: "reverse"
+          opacity: { duration: 1 },
+          strokeDashoffset: { 
+            duration: rotationDuration + (index * 10), 
+            repeat: Infinity,
+            ease: "linear" 
+          }
+        }}
+        strokeDasharray={index % 2 === 0 ? "4 4" : "1 8"}
+      />
+    );
+  });
+  
+  // Generate lines connecting the nodes in Metatron's Cube
+  const lines = [];
+  
+  // Helper function to create line with specific angle
+  const createLine = (angle: number, index: number) => {
+    const length = 38; // Percentage of the viewBox
+    const x1 = 50;
+    const y1 = 50;
+    const x2 = x1 + length * Math.cos(angle);
+    const y2 = y1 + length * Math.sin(angle);
+    
+    return (
+      <motion.line
+        key={`line-${index}`}
+        x1={`${x1}%`}
+        y1={`${y1}%`}
+        x2={`${x2}%`}
+        y2={`${y2}%`}
+        stroke="currentColor"
+        strokeWidth={0.5}
+        className="text-purple-400/20"
+        initial={{ opacity: 0 }}
+        animate={{ 
+          opacity: opacity,
+          rotate: enableAnimation ? [0, 360] : 0
+        }}
+        transition={{ 
+          opacity: { duration: 1 },
+          rotate: { 
+            duration: rotationDuration * 2,
+            repeat: Infinity,
+            ease: "linear"
+          }
         }}
       />
+    );
+  };
+  
+  // Create 6 or 12 lines (depending on energy level)
+  const lineCount = energyPoints > 500 ? 12 : 6;
+  
+  for (let i = 0; i < lineCount; i++) {
+    const angle = (Math.PI * 2 * i) / lineCount;
+    lines.push(createLine(angle, i));
+  }
+  
+  // Create internal connections if energy level is high enough
+  if (energyPoints > 300) {
+    for (let i = 0; i < 6; i++) {
+      const angle1 = (Math.PI * 2 * i) / 6;
+      const angle2 = (Math.PI * 2 * ((i + 2) % 6)) / 6;
       
-      {/* Center circle */}
-      <motion.circle 
-        cx="250" 
-        cy="250" 
-        r="20" 
-        fill="none" 
-        stroke="rgba(255,255,255,0.6)" 
-        strokeWidth="1"
+      const radius = 30;
+      const x1 = 50 + radius * Math.cos(angle1);
+      const y1 = 50 + radius * Math.sin(angle1);
+      const x2 = 50 + radius * Math.cos(angle2);
+      const y2 = 50 + radius * Math.sin(angle2);
+      
+      lines.push(
+        <motion.line
+          key={`connection-${i}`}
+          x1={`${x1}%`}
+          y1={`${y1}%`}
+          x2={`${x2}%`}
+          y2={`${y2}%`}
+          stroke="currentColor"
+          strokeWidth={0.3}
+          className="text-blue-400/20"
+          initial={{ opacity: 0 }}
+          animate={{ 
+            opacity: [opacity * 0.5, opacity, opacity * 0.5]
+          }}
+          transition={{ 
+            opacity: { 
+              duration: 4 + i,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }
+          }}
+        />
+      );
+    }
+  }
+  
+  // Add sacred geometry shapes for higher energy levels
+  let sacredShapes = null;
+  
+  if (energyPoints > 600) {
+    sacredShapes = (
+      <motion.polygon
+        points="50,20 80,65 35,90 20,65 65,40"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={0.4}
+        className="text-indigo-400/20"
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1 }}
+        animate={{ 
+          opacity: opacity,
+          rotate: enableAnimation ? [0, 360] : 0,
+          scale: [1, 1 + pulsationIntensity, 1]
+        }}
+        transition={{ 
+          opacity: { duration: 1 },
+          rotate: { 
+            duration: rotationDuration,
+            repeat: Infinity,
+            ease: "linear"
+          },
+          scale: {
+            duration: 20,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut"
+          }
+        }}
       />
-      
-      {/* Inner circles */}
-      <g fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8">
-        <motion.circle 
-          cx="250" cy="180" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.1 }}
-        />
-        <motion.circle 
-          cx="320" cy="215" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.2 }}
-        />
-        <motion.circle 
-          cx="320" cy="285" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.3 }}
-        />
-        <motion.circle 
-          cx="250" cy="320" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.4 }}
-        />
-        <motion.circle 
-          cx="180" cy="285" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.5 }}
-        />
-        <motion.circle 
-          cx="180" cy="215" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.6 }}
-        />
-      </g>
-      
-      {/* Outer circles */}
-      <g fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="0.7">
-        <motion.circle 
-          cx="250" cy="110" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.7 }}
-        />
-        <motion.circle 
-          cx="390" cy="180" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.8 }}
-        />
-        <motion.circle 
-          cx="390" cy="320" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.9 }}
-        />
-        <motion.circle 
-          cx="250" cy="390" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1.0 }}
-        />
-        <motion.circle 
-          cx="110" cy="320" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1.1 }}
-        />
-        <motion.circle 
-          cx="110" cy="180" r="20"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1.2 }}
-        />
-      </g>
-      
-      {/* Connecting lines */}
-      <g stroke="url(#lineGradient)" strokeWidth="0.5">
-        {/* Inner hexagon */}
-        <motion.line 
-          x1="250" y1="180" x2="320" y2="215" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.5 }}
-          transition={{ duration: 1.5, delay: 1.3 }}
-        />
-        <motion.line 
-          x1="320" y1="215" x2="320" y2="285" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.5 }}
-          transition={{ duration: 1.5, delay: 1.4 }}
-        />
-        <motion.line 
-          x1="320" y1="285" x2="250" y2="320" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.5 }}
-          transition={{ duration: 1.5, delay: 1.5 }}
-        />
-        <motion.line 
-          x1="250" y1="320" x2="180" y2="285" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.5 }}
-          transition={{ duration: 1.5, delay: 1.6 }}
-        />
-        <motion.line 
-          x1="180" y1="285" x2="180" y2="215" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.5 }}
-          transition={{ duration: 1.5, delay: 1.7 }}
-        />
-        <motion.line 
-          x1="180" y1="215" x2="250" y2="180" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.5 }}
-          transition={{ duration: 1.5, delay: 1.8 }}
-        />
-        
-        {/* Outer hexagon */}
-        <motion.line 
-          x1="250" y1="110" x2="390" y2="180" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.3 }}
-          transition={{ duration: 1.5, delay: 1.9 }}
-        />
-        <motion.line 
-          x1="390" y1="180" x2="390" y2="320" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.3 }}
-          transition={{ duration: 1.5, delay: 2.0 }}
-        />
-        <motion.line 
-          x1="390" y1="320" x2="250" y2="390" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.3 }}
-          transition={{ duration: 1.5, delay: 2.1 }}
-        />
-        <motion.line 
-          x1="250" y1="390" x2="110" y2="320" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.3 }}
-          transition={{ duration: 1.5, delay: 2.2 }}
-        />
-        <motion.line 
-          x1="110" y1="320" x2="110" y2="180" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.3 }}
-          transition={{ duration: 1.5, delay: 2.3 }}
-        />
-        <motion.line 
-          x1="110" y1="180" x2="250" y2="110" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.3 }}
-          transition={{ duration: 1.5, delay: 2.4 }}
-        />
-        
-        {/* Connecting spokes */}
-        <motion.line 
-          x1="250" y1="250" x2="250" y2="110" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.2 }}
-          transition={{ duration: 1.5, delay: 2.5 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="390" y2="180" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.2 }}
-          transition={{ duration: 1.5, delay: 2.6 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="390" y2="320" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.2 }}
-          transition={{ duration: 1.5, delay: 2.7 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="250" y2="390" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.2 }}
-          transition={{ duration: 1.5, delay: 2.8 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="110" y2="320" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.2 }}
-          transition={{ duration: 1.5, delay: 2.9 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="110" y2="180" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.2 }}
-          transition={{ duration: 1.5, delay: 3.0 }}
-        />
-        
-        {/* Inner connections */}
-        <motion.line 
-          x1="250" y1="250" x2="250" y2="180" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.4 }}
-          transition={{ duration: 1.5, delay: 3.1 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="320" y2="215" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.4 }}
-          transition={{ duration: 1.5, delay: 3.2 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="320" y2="285" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.4 }}
-          transition={{ duration: 1.5, delay: 3.3 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="250" y2="320" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.4 }}
-          transition={{ duration: 1.5, delay: 3.4 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="180" y2="285" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.4 }}
-          transition={{ duration: 1.5, delay: 3.5 }}
-        />
-        <motion.line 
-          x1="250" y1="250" x2="180" y2="215" 
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.4 }}
-          transition={{ duration: 1.5, delay: 3.6 }}
-        />
-      </g>
-      
-      {/* Sacred geometry patterns */}
-      <g stroke="rgba(255,255,255,0.15)" fill="none">
-        <motion.circle 
-          cx="250" 
-          cy="250" 
-          r="100" 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 2, delay: 3.7 }}
-        />
-        <motion.circle 
-          cx="250" 
-          cy="250" 
-          r="150" 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 2, delay: 3.8 }}
-        />
-        <motion.path 
-          d="M150,250 A100,100 0 0,1 350,250 A100,100 0 0,1 150,250" 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 2, delay: 3.9 }}
-        />
-        <motion.path 
-          d="M250,150 A100,100 0 0,1 250,350 A100,100 0 0,1 250,150" 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 2, delay: 4.0 }}
-        />
-      </g>
-    </svg>
+    );
+  }
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      <svg
+        viewBox="0 0 100 100"
+        className="w-full h-full"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {circles}
+        {lines}
+        {sacredShapes}
+      </svg>
+    </div>
   );
 };
 
