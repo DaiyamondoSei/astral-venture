@@ -8,9 +8,16 @@ const GeometryNetworkBackground = lazy(() => import('./background/GeometryNetwor
 interface LayoutProps {
   children: React.ReactNode;
   className?: string;
+  contentWidth?: 'narrow' | 'standard' | 'wide' | 'full';
+  removeBackground?: boolean;
 }
 
-const Layout = ({ children, className }: LayoutProps) => {
+const Layout = ({ 
+  children, 
+  className,
+  contentWidth = 'standard',
+  removeBackground = false
+}: LayoutProps) => {
   const [isBackgroundLoaded, setIsBackgroundLoaded] = useState(false);
 
   // Delay loading background until after main content is rendered
@@ -21,18 +28,34 @@ const Layout = ({ children, className }: LayoutProps) => {
     
     return () => clearTimeout(timer);
   }, []);
+
+  // Map content width options to appropriate max-width classes
+  const getContentWidthClass = () => {
+    switch (contentWidth) {
+      case 'narrow':
+        return 'max-w-3xl';
+      case 'standard':
+        return 'max-w-screen-xl';
+      case 'wide':
+        return 'max-w-screen-2xl';
+      case 'full':
+        return 'max-w-none px-2';
+      default:
+        return 'max-w-screen-xl';
+    }
+  };
   
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Load background after initial render for faster FCP */}
-      {isBackgroundLoaded && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/80" />}>
+    <div className="min-h-screen relative overflow-hidden" role="main">
+      {/* Background - only load if not explicitly removed */}
+      {!removeBackground && isBackgroundLoaded && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black/80" aria-hidden="true" />}>
           <GeometryNetworkBackground density={35} speed={0.6} className="z-0" />
         </Suspense>
       )}
       
       {/* Simplified glass background layers with reduced animations */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
+      <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
         {/* Reduced number of orbs and simplified animations */}
         <div className="orb w-[30vw] h-[30vw] -top-[10vw] -left-[10vw] from-quantum-300/20 to-quantum-500/5 animate-pulse-slow" />
         <div className="orb w-[25vw] h-[25vw] top-1/3 -right-[5vw] from-astral-300/15 to-astral-500/5 animate-float" 
@@ -53,7 +76,7 @@ const Layout = ({ children, className }: LayoutProps) => {
       <main className={cn(
         "container mx-auto px-4 py-8 relative z-10",
         "transition-all duration-300 ease-in-out", // Reduced transition duration
-        "max-w-screen-xl", // Add max width constraint for better readability
+        getContentWidthClass(), // Dynamic max-width based on prop
         className
       )}>
         {/* Skip link for keyboard users for better accessibility */}

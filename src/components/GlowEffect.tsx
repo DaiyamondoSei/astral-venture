@@ -16,6 +16,8 @@ export interface GlowEffectProps {
   style?: React.CSSProperties;
   ariaLabel?: string;
   role?: string;
+  focusable?: boolean;
+  disabled?: boolean;
 }
 
 const GlowEffect = memo<GlowEffectProps>(({
@@ -30,9 +32,11 @@ const GlowEffect = memo<GlowEffectProps>(({
   onMouseLeave,
   style,
   ariaLabel,
-  role
+  role,
+  focusable = true,
+  disabled = false
 }) => {
-  // Map intensity levels to box shadow blur values with improved values
+  // Map intensity levels to box shadow blur values with optimized values for better contrast
   const intensityMap = {
     low: '8px',
     medium: '15px',
@@ -79,7 +83,7 @@ const GlowEffect = memo<GlowEffectProps>(({
   };
 
   // Enhance hover effect for interactive elements
-  const hoverEffect = interactive ? {
+  const hoverEffect = interactive && !disabled ? {
     whileHover: { 
       scale: 1.05,
       boxShadow: `0 0 ${parseInt(intensityMap[intensity]) + 5}px ${color}`,
@@ -105,12 +109,18 @@ const GlowEffect = memo<GlowEffectProps>(({
       role?: string;
       'aria-label'?: string;
       tabIndex?: number;
+      'aria-disabled'?: boolean;
     } = {};
     
     if (interactive) {
       props.role = role || 'button';
       props['aria-label'] = ariaLabel;
-      props.tabIndex = 0;
+      
+      if (disabled) {
+        props['aria-disabled'] = true;
+      } else if (focusable) {
+        props.tabIndex = 0;
+      }
     }
     
     return props;
@@ -120,27 +130,31 @@ const GlowEffect = memo<GlowEffectProps>(({
     <motion.div
       className={cn(
         "relative",
-        interactive && "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-quantum-400",
+        interactive && !disabled && "cursor-pointer",
+        interactive && focusable && "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-quantum-400",
+        disabled && "opacity-60 pointer-events-none",
         className
       )}
       style={{
         boxShadow: `0 0 ${intensityMap[intensity]} ${color}`,
-        willChange: animation !== 'none' ? 'transform, box-shadow' : 'auto', // Add will-change hint for browser optimization
+        willChange: animation !== 'none' ? 'transform, box-shadow' : 'auto', // Optimization for browser rendering
         ...style
       }}
-      onClick={interactive ? onClick : undefined}
+      onClick={interactive && !disabled ? onClick : undefined}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       {...getAnimationVariants()}
       {...hoverEffect}
       {...getAccessibilityProps()}
       // Add keyboard accessibility for interactive elements
-      onKeyDown={interactive ? (e) => {
+      onKeyDown={interactive && !disabled ? (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onClick?.();
         }
       } : undefined}
+      // Improved motion accessibility
+      data-reduced-motion={window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'true' : 'false'}
     >
       {children}
     </motion.div>

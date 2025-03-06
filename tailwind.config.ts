@@ -20,7 +20,22 @@ const config = {
     },
     extend: {
       fontFamily: {
-        display: ['var(--font-heading)', 'sans-serif'],
+        display: ['var(--font-heading)', 'system-ui', 'sans-serif'],
+        body: ['var(--font-body)', 'system-ui', 'sans-serif']
+      },
+      fontSize: {
+        '2xs': '0.625rem', // 10px
+        xs: '0.75rem',     // 12px
+        sm: '0.875rem',    // 14px
+        base: '1rem',      // 16px
+        lg: '1.125rem',    // 18px
+        xl: '1.25rem',     // 20px
+        '2xl': '1.5rem',   // 24px
+        '3xl': '1.875rem', // 30px
+        '4xl': '2.25rem',  // 36px
+        '5xl': '3rem',     // 48px
+        '6xl': '3.75rem',  // 60px
+        '7xl': '4.5rem',   // 72px
       },
       colors: {
         border: "hsl(var(--border))",
@@ -90,6 +105,16 @@ const config = {
           800: "#165a4e",
           900: "#0b2d27",
         },
+        // Standardized chakra colors for better consistency
+        chakra: {
+          root: "#ff0000",
+          sacral: "#ff8c00",
+          solarPlexus: "#ffff00",
+          heart: "#00ff00",
+          throat: "#00bfff",
+          thirdEye: "#0000ff",
+          crown: "#8a2be2",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -125,6 +150,14 @@ const config = {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" },
         },
+        "fade-in": {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        },
+        "fade-out": {
+          "0%": { opacity: "1", transform: "translateY(0)" },
+          "100%": { opacity: "0", transform: "translateY(10px)" }
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -134,10 +167,18 @@ const config = {
         "draw": "draw 8s ease forwards",
         "shimmer": "shimmer 3s ease-in-out infinite",
         "spin-slow": "spin-slow 10s linear infinite",
+        "fade-in": "fade-in 0.3s ease-out",
+        "fade-out": "fade-out 0.3s ease-out",
       },
       backdropFilter: {
         'none': 'none',
         'blur': 'blur(20px)',
+      },
+      boxShadow: {
+        'glow-sm': '0 0 8px',
+        'glow-md': '0 0 15px',
+        'glow-lg': '0 0 25px',
+        'glow-xl': '0 0 40px',
       },
     },
   },

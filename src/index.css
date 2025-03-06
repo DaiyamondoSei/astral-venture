@@ -2,6 +2,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import './styles/global-styles.css';
 
 @layer base {
   :root {
@@ -34,6 +35,10 @@
     --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
+    
+    /* Font variables */
+    --font-heading: 'Inter', sans-serif;
+    --font-body: 'Inter', sans-serif;
     
     /* Chakra colors as CSS variables for consistent use */
     --chakra-color-0: #ff0000;  /* Root */
@@ -113,13 +118,43 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+  }
+  h1 {
+    @apply text-4xl font-bold font-display;
+    font-size: var(--font-size-4xl);
+    line-height: var(--line-height-tight);
+  }
+  h2 {
+    @apply text-3xl font-semibold font-display;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-tight);
+  }
+  h3 {
+    @apply text-2xl font-semibold font-display;
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-snug);
+  }
+  h4 {
+    @apply text-xl font-medium font-display;
+    font-size: var(--font-size-xl);
+    line-height: var(--line-height-snug);
+  }
+  h5 {
+    @apply text-lg font-medium font-display;
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-normal);
+  }
+  p {
+    margin-bottom: 1rem;
   }
 }
 
 /* Custom Application Styles */
 body {
   @apply bg-gradient-to-b from-quantum-900 to-black min-h-screen text-white;
-  font-family: 'Inter', sans-serif;
 }
 
 /* Glassmorphism Cards and UI Components */
@@ -238,4 +273,52 @@ body {
 
 .astral-body-silhouette {
   filter: drop-shadow(0 0 8px rgba(138, 92, 246, 0.4));
+}
+
+/* Standardized focus styles for interactive elements */
+.focus-outline {
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-quantum-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
+
+/* Button states for better visual feedback */
+.btn-state-hover {
+  @apply hover:bg-opacity-90 hover:scale-[1.02] transition-all;
+}
+
+.btn-state-active {
+  @apply active:scale-[0.98] transition-all;
+}
+
+/* Form input states */
+.input-focus {
+  @apply focus:border-quantum-400/50 focus:ring-2 focus:ring-quantum-400/20 transition-all;
+}
+
+.input-error {
+  @apply border-red-500/70 focus:border-red-500 focus:ring-red-500/20;
+}
+
+/* Improved scrollbars for better usability */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(104, 55, 217, 0.5) rgba(0, 0, 0, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(104, 55, 217, 0.5);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(104, 55, 217, 0.7);
 }
