@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { featureTooltips, guidedTours } from '../onboardingData';
+import { featureTooltips, guidedTours, FeatureTooltipData, GuidedTourData } from '../onboardingData';
 
 export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
   // We'll track which tooltips have been seen
@@ -10,6 +10,7 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
   // Feature discovery state
   const [showFeatureTooltips, setShowFeatureTooltips] = useState(false);
   const [activeTour, setActiveTour] = useState<string | null>(null);
+  const [activeTooltips, setActiveTooltips] = useState<FeatureTooltipData[]>([]);
 
   // Load saved state from localStorage
   useEffect(() => {
@@ -23,7 +24,7 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
     }
   }, [hasCompletedOnboarding, showFeatureTooltips]);
 
-  // Load saved progress from localStorage
+  // Load saved progress from localStorage and determine active tooltips
   useEffect(() => {
     // Load seen tooltips and completed tours from localStorage
     const storedSeenTooltips = JSON.parse(localStorage.getItem('seen-tooltips') || '{}');
@@ -39,19 +40,31 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
         setActiveTour(firstTour);
       }
     }
-  }, [hasCompletedOnboarding]);
 
-  const handleTooltipDismiss = (tooltipId: string) => {
+    // Determine active tooltips - only those not seen before
+    if (showFeatureTooltips) {
+      const filteredTooltips = featureTooltips.filter(
+        tooltip => !storedSeenTooltips[tooltip.id]
+      ).sort((a, b) => a.order - b.order);
+      
+      setActiveTooltips(filteredTooltips);
+    } else {
+      setActiveTooltips([]);
+    }
+  }, [hasCompletedOnboarding, showFeatureTooltips]);
+
+  const dismissTooltip = (tooltipId: string) => {
     const updatedSeenTooltips = {
       ...seenTooltips,
       [tooltipId]: true
     };
     
     setSeenTooltips(updatedSeenTooltips);
+    setActiveTooltips(prev => prev.filter(tooltip => tooltip.id !== tooltipId));
     localStorage.setItem('seen-tooltips', JSON.stringify(updatedSeenTooltips));
   };
 
-  const handleTourComplete = (tourId: string) => {
+  const dismissTour = (tourId: string) => {
     const updatedCompletedTours = {
       ...completedTours,
       [tourId]: true
@@ -77,9 +90,10 @@ export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
     guidedTours,
     seenTooltips,
     activeTour,
+    activeTooltips,
     showFeatureTooltips,
     completedTours,
-    handleTooltipDismiss,
-    handleTourComplete
+    dismissTooltip,
+    dismissTour
   };
 };

@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { useFeatureDiscovery } from './hooks/useFeatureDiscovery';
 import FeatureTooltip from './FeatureTooltip';
 import GuidedTour from './GuidedTour';
+import { GuidedTourData } from './onboardingData';
 
 interface FeatureDiscoveryLayerProps {
   hasCompletedOnboarding: boolean;
@@ -13,18 +15,28 @@ const FeatureDiscoveryLayer: React.FC<FeatureDiscoveryLayerProps> = ({
   const {
     activeTooltips,
     activeTour,
+    guidedTours,
     dismissTooltip,
     dismissTour
   } = useFeatureDiscovery(hasCompletedOnboarding);
 
   // If there's an active tour, prioritize showing it
   if (activeTour) {
-    return (
-      <GuidedTour 
-        tour={activeTour} 
-        onDismiss={dismissTour} 
-      />
-    );
+    const tourData = guidedTours.find(tour => tour.id === activeTour);
+    if (tourData) {
+      return (
+        <GuidedTour 
+          tourId={tourData.id}
+          title={tourData.title}
+          description={tourData.description}
+          steps={tourData.steps.map(step => ({
+            ...step,
+            targetSelector: step.target // Map to expected prop name
+          }))}
+          onComplete={() => dismissTour(tourData.id)}
+        />
+      );
+    }
   }
 
   // Otherwise, show any feature tooltips if present

@@ -1,14 +1,14 @@
 
 import { useState, useEffect } from 'react';
 import { onboardingAchievements, AchievementData } from '../onboardingData';
+import { StepInteraction } from '@/contexts/onboarding/types';
 
-interface StepInteraction {
-  stepId: string;
-  interactionType: string;
-}
-
-export const useAchievementTracker = (userId: string, completedSteps: Record<string, boolean>) => {
-  const [pendingAchievements, setPendingAchievements] = useState<AchievementData[]>([]);
+export const useAchievementTracker = (
+  userId: string, 
+  completedSteps: Record<string, boolean>,
+  stepInteractions: StepInteraction[]
+) => {
+  const [earnedAchievements, setEarnedAchievements] = useState<AchievementData[]>([]);
   const [currentAchievement, setCurrentAchievement] = useState<AchievementData | null>(null);
 
   // Check for achievements based on completed steps
@@ -24,8 +24,16 @@ export const useAchievementTracker = (userId: string, completedSteps: Record<str
     });
     
     if (newAchievements.length > 0) {
-      // Update local state with new achievements
-      setPendingAchievements(prevAchievements => [...prevAchievements, ...newAchievements]);
+      // Update earned achievements state
+      setEarnedAchievements(prevAchievements => {
+        const updatedAchievements = [...prevAchievements];
+        newAchievements.forEach(achievement => {
+          if (!updatedAchievements.find(a => a.id === achievement.id)) {
+            updatedAchievements.push(achievement);
+          }
+        });
+        return updatedAchievements;
+      });
       
       // Store as awarded in localStorage
       const updatedAchievements = { ...storedAchievements };
@@ -40,24 +48,22 @@ export const useAchievementTracker = (userId: string, completedSteps: Record<str
     }
   }, [completedSteps, userId]);
 
-  // Display achievements one at a time
+  // Display current achievement
   useEffect(() => {
-    if (pendingAchievements.length > 0 && !currentAchievement) {
-      // Take the first pending achievement and show it
-      const nextAchievement = pendingAchievements[0];
-      setCurrentAchievement(nextAchievement);
-      
-      // Remove it from the pending list
-      setPendingAchievements(prevAchievements => prevAchievements.slice(1));
+    if (earnedAchievements.length > 0 && !currentAchievement) {
+      setCurrentAchievement(earnedAchievements[0]);
     }
-  }, [pendingAchievements, currentAchievement]);
+  }, [earnedAchievements, currentAchievement]);
 
-  const handleAchievementDismiss = () => {
+  const dismissAchievement = (achievementId: string) => {
+    setEarnedAchievements(prevAchievements => 
+      prevAchievements.filter(achievement => achievement.id !== achievementId)
+    );
     setCurrentAchievement(null);
   };
 
-  // Determine user's primary interaction patterns
-  const getUserInteractions = (stepInteractions: any[]) => {
+  // Analyze user interaction patterns (could be used for future achievements)
+  const getUserInteractions = () => {
     return stepInteractions.map(interaction => ({
       stepId: interaction.stepId,
       interactionType: interaction.interactionType
@@ -65,8 +71,9 @@ export const useAchievementTracker = (userId: string, completedSteps: Record<str
   };
 
   return {
+    earnedAchievements,
     currentAchievement,
-    handleAchievementDismiss,
+    dismissAchievement,
     getUserInteractions
   };
 };
