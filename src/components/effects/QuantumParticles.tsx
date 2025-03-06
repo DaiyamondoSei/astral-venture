@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface QuantumParticle {
@@ -28,9 +28,14 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
 }) => {
   const [particles, setParticles] = useState<QuantumParticle[]>([]);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const initialized = useRef(false);
   
   // Generate random particles only once on mount
   useEffect(() => {
+    // Prevent multiple initializations causing infinite loop
+    if (initialized.current) return;
+    initialized.current = true;
+    
     const newParticles: QuantumParticle[] = [];
     
     for (let i = 0; i < count; i++) {

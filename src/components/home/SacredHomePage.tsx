@@ -1,18 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { toast } from '@/components/ui/use-toast';
-import { fadeInUp } from '@/utils/animations/cosmicAnimations';
+import { GlassCard } from '@/components/ui/glass-card';
+import QuantumParticles from '@/components/effects/QuantumParticles';
+import InteractiveEnergyField from '@/components/effects/InteractiveEnergyField';
 
 // Import our components
 import WelcomeHeader from '@/components/home/widgets/WelcomeHeader';
 import LeftSidebar from '@/components/home/widgets/LeftSidebar';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
 import DetailSection from '@/components/home/widgets/DetailSection';
-import QuantumParticles from '@/components/effects/QuantumParticles';
-import InteractiveEnergyField from '@/components/effects/InteractiveEnergyField';
-import { GlassCard } from '@/components/ui/glass-card';
 
 interface SacredHomePageProps {
   user: any;
@@ -93,7 +92,8 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     return Math.min(Math.round((pointsInCurrentLevel / pointsNeededForNextLevel) * 100), 100);
   };
 
-  const pageVariants = {
+  // Properly defined variants for animations
+  const pageVariants: Variants = {
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1,
@@ -101,6 +101,15 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
         staggerChildren: 0.1,
         when: "beforeChildren"
       }
+    }
+  };
+
+  const fadeInUpVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.6, ease: "easeOut" }
     }
   };
 
@@ -115,7 +124,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       <QuantumParticles count={20} interactive={true} className="z-0" />
       
       {/* Welcome Header */}
-      <motion.div variants={fadeInUp}>
+      <motion.div variants={fadeInUpVariants}>
         <WelcomeHeader 
           username={username}
           onLogout={onLogout}
@@ -125,7 +134,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative z-10">
         {/* Left column with energy information */}
-        <motion.div variants={fadeInUp}>
+        <motion.div variants={fadeInUpVariants}>
           <GlassCard animate variant="purple" className="p-6">
             <LeftSidebar 
               energyPoints={energyPoints}
@@ -142,7 +151,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
         {/* Center column with Metatron's Cube */}
         <motion.div 
           className="lg:col-span-2"
-          variants={fadeInUp}
+          variants={fadeInUpVariants}
         >
           <GlassCard animate variant="default" className="p-4 relative overflow-hidden">
             {/* Energy field background effect */}
