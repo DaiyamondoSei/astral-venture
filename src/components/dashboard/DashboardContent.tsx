@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+
+import React from 'react';
+import { useTodaysChallenge } from './hooks/useTodaysChallenge';
+import { useLatestPractice } from './hooks/useLatestPractice';
+import { useReflections } from './hooks/useReflections';
+import TodaysChallenge from './presentation/TodaysChallenge';
+import AIDashboardCard from './presentation/AIDashboardCard';
+import AIGuidedPracticeCard from './presentation/AIGuidedPracticeCard';
+import LatestPracticeCard from './presentation/LatestPracticeCard';
+import CategoryGrid from './CategoryGrid';
 import StreakTracker from '@/components/StreakTracker';
-import TodaysChallengeCard from '@/components/dashboard/TodaysChallengeCard';
-import MostRecentPracticeCard from '@/components/dashboard/MostRecentPracticeCard';
-import CategoryGrid from '@/components/dashboard/CategoryGrid';
-import AIDashboardWidget from '@/components/ai-assistant/AIDashboardWidget';
-import AIGuidedPractice from '@/components/ai-assistant/AIGuidedPractice';
-import { getTodaysChallenge } from '@/services/challengeService';
 
 interface DashboardContentProps {
   userProfile: any;
@@ -22,88 +23,47 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   onCategorySelect,
   onOpenAiAssistant
 }) => {
-  const [todayChallenge, setTodayChallenge] = useState(null);
-  const [latestReflection, setLatestReflection] = useState<any>(null);
-  const [loadingChallenge, setLoadingChallenge] = useState(true);
-  const { user } = useAuth();
-
-  useEffect(() => {
-    const loadChallenge = async () => {
-      if (user) {
-        setLoadingChallenge(true);
-        try {
-          const challenge = await getTodaysChallenge(user.id);
-          setTodayChallenge(challenge);
-        } catch (error) {
-          console.error('Error fetching today\'s challenge:', error);
-        } finally {
-          setLoadingChallenge(false);
-        }
-      }
-    };
-
-    loadChallenge();
-  }, [user]);
-
-  // Fetch latest reflection when component mounts
-  useEffect(() => {
-    if (user) {
-      const fetchLatestReflection = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('energy_reflections')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          
-          if (data && !error) {
-            setLatestReflection(data);
-          }
-        } catch (error) {
-          console.error('Error fetching latest reflection:', error);
-        }
-      };
-      
-      fetchLatestReflection();
-    }
-  }, [user]);
+  // Custom hooks for data fetching
+  const { todayChallenge, loading: loadingChallenge, handleChallengeComplete } = useTodaysChallenge();
+  const { latestReflection } = useReflections();
+  const { latestPractice } = useLatestPractice();
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {todayChallenge && (
-          <div className="lg:col-span-2">
-            <TodaysChallengeCard
-              challenge={todayChallenge}
-              onComplete={onChallengeComplete}
-            />
-          </div>
-        )}
+        {/* Today's Challenge */}
+        <div className="lg:col-span-2">
+          <TodaysChallenge
+            challenge={todayChallenge}
+            isLoading={loadingChallenge}
+            onComplete={(challengeId) => handleChallengeComplete(challengeId, onChallengeComplete)}
+          />
+        </div>
         
-        {/* AI Dashboard Widget to make AI more prominent */}
-        <AIDashboardWidget 
-          latestReflection={latestReflection}
-          onOpenAssistant={onOpenAiAssistant}
-        />
+        {/* AI Dashboard Widget */}
+        <div className="col-span-1">
+          <AIDashboardCard 
+            latestReflection={latestReflection}
+            onOpenAssistant={onOpenAiAssistant}
+          />
+        </div>
         
         {/* AI Guided Practice widget */}
         <div className="lg:col-span-2">
-          <AIGuidedPractice 
+          <AIGuidedPracticeCard 
             practiceType="meditation"
             duration={5}
             chakraFocus={latestReflection?.chakras_activated?.[0]}
           />
         </div>
         
-        {/* Keep other existing cards */}
+        {/* Latest Practice Card */}
         <div className="col-span-1">
-          <MostRecentPracticeCard />
+          <LatestPracticeCard latestPractice={latestPractice} />
         </div>
       </div>
       
-      {/* Keep existing content */}
+      {/* Categories and Streaks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h3 className="font-display text-lg mb-4">Energy Categories</h3>

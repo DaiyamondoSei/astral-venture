@@ -29,24 +29,24 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
   // Get user streak data from hook
   const { userStreak, activatedChakras } = useUserStreak(userId);
   
-  // Get achievement data and operations
+  // Get achievement data and operations using the new hook structure
   const { 
     earnedAchievements, 
     dismissAchievement, 
     getTotalPoints,
     getProgressPercentage,
     progressTracking
-  } = useAchievementTracker(
+  } = useAchievementTracker({
     userId, 
     completedSteps, 
     stepInteractions,
-    userStreak.current,
+    currentStreak: userStreak.current,
     reflectionCount,
     meditationMinutes,
     totalPoints,
-    activatedChakras.length,
-    wisdomResourcesCount
-  );
+    uniqueChakrasActivated: activatedChakras.length,
+    wisdomResourcesExplored: wisdomResourcesCount
+  });
 
   // Handle achievement notifications and progress tracker visibility
   const {

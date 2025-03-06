@@ -1,13 +1,12 @@
 
 import React from 'react';
-import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
+import { cn } from '@/lib/utils';
 import ProgressGlow from './progress/ProgressGlow';
 import ProgressValue from './progress/ProgressValue';
 import { 
   ProgressTrackerProps,
   LabelPosition
-} from './progress/types';
+} from './onboarding/data/types';
 import {
   getColorScheme,
   getProgressHeight,
@@ -17,71 +16,69 @@ import {
 } from './progress/utils';
 
 const ProgressTracker: React.FC<ProgressTrackerProps> = ({ 
-  progress, 
-  className, 
-  label, 
-  showPercentage = true,
-  glowIntensity = 'medium',
-  size = 'md',
+  progress,
+  label,
   labelPosition = 'top',
-  animation,
-  colorScheme: userColorScheme,
-  showValue = true,
-  labelClassName,
-  valueClassName,
-  valuePrefix,
-  valueSuffix
+  showValue = false,
+  colorScheme = 'primary',
+  size = 'md',
+  glowIntensity = 'medium',
+  animation = 'none',
+  className
 }) => {
-  // Get color based on progress or user-specified color scheme
-  const colorScheme = getColorScheme(progress, userColorScheme);
+  // Ensure progress is between 0 and 100
+  const normalizedProgress = Math.min(Math.max(0, progress), 100);
   
-  // Get height based on size
-  const heightClass = getProgressHeight(size);
-  
-  // Get animation style - comes from prop or derived from glowIntensity
-  const animationStyle = getGlowAnimation(glowIntensity, animation);
-  
-  // Get layout class based on label position
+  // Get style classes
+  const progressHeight = getProgressHeight(size);
   const layoutClass = getLayoutClass(labelPosition);
+  const labelClass = getLabelClass(labelPosition);
+  const colorClasses = getColorScheme(colorScheme);
+  const animationStyle = getGlowAnimation(animation);
   
-  // Get label positioning class
-  const labelClass = getLabelClass(labelPosition, labelClassName);
-
   return (
-    <div className={cn(layoutClass, className)}>
-      {/* Label - shown based on position */}
-      {(label && (labelPosition === 'top' || labelPosition === 'left')) && (
+    <div className={cn(
+      'w-full',
+      layoutClass,
+      className
+    )}>
+      {/* Label (if provided) */}
+      {label && (
         <div className={labelClass}>
-          {label}
+          <span className="text-sm text-muted-foreground">{label}</span>
         </div>
       )}
       
       {/* Progress bar container */}
-      <div className={cn("relative bg-black/10 rounded-full overflow-hidden", heightClass)}>
-        <ProgressGlow 
-          progress={progress}
-          colorScheme={colorScheme}
-          animation={animationStyle}
-          intensity={glowIntensity}
-        />
+      <div className="relative w-full overflow-hidden bg-muted/30 rounded-full">
+        <div className={cn(
+          'relative rounded-full overflow-hidden flex-shrink-0',
+          progressHeight
+        )}>
+          {/* Progress background */}
+          <div 
+            className={cn(
+              'absolute inset-0 rounded-full transition-all duration-500 ease-out',
+              colorClasses
+            )}
+            style={{ width: `${normalizedProgress}%` }}
+          />
+          
+          {/* Glow effect (if progress > 0) */}
+          {normalizedProgress > 0 && (
+            <ProgressGlow 
+              progress={normalizedProgress}
+              intensity={glowIntensity} 
+              animation={animation as "pulse" | "slide" | "ripple" | "none"}
+              colorScheme={colorScheme}
+            />
+          )}
+        </div>
       </div>
       
-      {/* Progress value */}
+      {/* Progress value (if enabled) */}
       {showValue && (
-        <ProgressValue 
-          progress={progress}
-          showPercentage={showPercentage}
-          valueClassName={valueClassName}
-          valuePrefix={valuePrefix}
-          valueSuffix={valueSuffix}
-        />
-      )}
-      
-      {/* Label - alternative positions */}
-      {(label && (labelPosition === 'bottom' || labelPosition === 'right')) && (
-        <div className={labelClass}>
-          {label}
-        </div>
+        <ProgressValue value={normalizedProgress} />
       )}
     </div>
   );
