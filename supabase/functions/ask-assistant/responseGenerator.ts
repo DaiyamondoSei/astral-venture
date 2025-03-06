@@ -1,117 +1,191 @@
 
-import { generateOpenAIResponse } from './openaiService.ts';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Fall back to basic response if OpenAI is unavailable
-export function generateBasicResponse(question: string, context?: string, userContext?: string) {
-  // Normalize the question
-  const lowerQuestion = question.toLowerCase();
-  let answer = "";
-  let suggestedPractices = [];
+/**
+ * Builds a contextualized prompt for the AI assistant
+ * @param message User's message or question
+ * @param userContext User's context data 
+ * @param reflectionContent Optional reflection content for context
+ * @returns Formatted prompt with context
+ */
+export function buildContextualizedPrompt(
+  message: string,
+  userContext: Record<string, any> = {},
+  reflectionContent?: string
+): string {
+  // Start with base prompt instructions
+  let prompt = 
+    "You are a spiritual guide and meditation assistant with expertise in energy work and emotional wellness.\n\n";
   
-  // Check for various question types and provide appropriate responses
-  if (lowerQuestion.includes("tingling") || lowerQuestion.includes("sensation")) {
-    answer = "Tingling sensations during meditation or energy practices are common signs of energy movement in your body. These sensations often indicate that blocked energy is beginning to flow more freely. If you feel tingling in specific areas, it may reflect activation of nearby chakras or meridian points.";
-    suggestedPractices = [
-      "Try a body scan meditation to increase awareness of these sensations",
-      "Journal about where you feel the sensations and what triggers them",
-      "Practice grounding exercises if the sensations become too intense"
-    ];
-  } 
-  else if (lowerQuestion.includes("throat chakra") || lowerQuestion.includes("communication")) {
-    answer = "The throat chakra governs expression, communication, and speaking your truth. When this chakra is blocked, you might experience difficulty expressing yourself, fear of speaking up, or physical issues in the throat area. Balance in this chakra brings clear, authentic communication.";
-    suggestedPractices = [
-      "Practice humming or chanting to stimulate the throat area",
-      "Express yourself through journaling or creative writing",
-      "Visualization meditation focusing on blue light at the throat",
-      "Try neck stretches and shoulder rolls to release physical tension"
-    ];
-  }
-  else if (lowerQuestion.includes("heart chakra") || lowerQuestion.includes("love")) {
-    answer = "The heart chakra is the center of love, compassion, and connection. Blockages here can manifest as difficulty giving or receiving love, holding grudges, or feeling disconnected from others. A balanced heart chakra allows for open, unconditional love and deep connection with yourself and others.";
-    suggestedPractices = [
-      "Practice loving-kindness meditation",
-      "Try heart-opening yoga poses like backbends",
-      "Work with rose quartz or green crystals",
-      "Practice forgiveness exercises to release old wounds"
-    ];
-  }
-  else if (lowerQuestion.includes("dream") || lowerQuestion.includes("dreams")) {
-    answer = "Dreams can be powerful indicators of your subconscious energy processing. Vivid or recurring dreams often reflect important themes your higher self is working through. Pay attention to symbols, emotions, and recurring patterns as they may provide insights into your energy state and spiritual development.";
-    suggestedPractices = [
-      "Keep a dream journal by your bed to record dreams immediately upon waking",
-      "Practice reality checks throughout the day to increase dream awareness",
-      "Set intentions before sleep to remember your dreams",
-      "Meditate on recurring dream symbols to understand their meaning"
-    ];
-  }
-  else if (lowerQuestion.includes("synchronicity") || lowerQuestion.includes("coincidence")) {
-    answer = "Synchronicities are meaningful coincidences that often indicate you're aligned with your higher purpose or receiving guidance. These experiences suggest you're becoming more attuned to the interconnected nature of reality. When you notice synchronicities increasing, it typically means you're becoming more energetically sensitive and your consciousness is expanding.";
-    suggestedPractices = [
-      "Keep a synchronicity journal to record meaningful coincidences",
-      "Practice present moment awareness to notice subtle patterns",
-      "Set intentions to receive guidance through synchronistic events",
-      "Meditate on the meaning behind significant synchronicities"
-    ];
-  }
-  else {
-    // Default response for other questions
-    answer = "That's an interesting question about your energy practice. As you continue your journey, pay attention to your intuition and how your body responds to different practices. Regular reflection, meditation, and mindfulness will help you develop greater awareness and understanding of your unique energy patterns.";
-    suggestedPractices = [
-      "Practice daily mindfulness meditation",
-      "Journal regularly about your experiences",
-      "Explore different energy practices to see what resonates with you",
-      "Connect with nature to harmonize your energy"
-    ];
+  // Add user context if available
+  if (Object.keys(userContext).length > 0) {
+    prompt += "User Context:\n";
+    
+    if (userContext.energyPoints) {
+      prompt += `- Energy Points: ${userContext.energyPoints}\n`;
+    }
+    
+    if (userContext.astralLevel) {
+      prompt += `- Astral Level: ${userContext.astralLevel}\n`;
+    }
+    
+    if (userContext.dominantEmotions && userContext.dominantEmotions.length > 0) {
+      prompt += `- Dominant Emotions: ${userContext.dominantEmotions.join(", ")}\n`;
+    }
+    
+    if (userContext.chakrasActivated && userContext.chakrasActivated.length > 0) {
+      prompt += `- Active Chakras: ${userContext.chakrasActivated.join(", ")}\n`;
+    }
+    
+    prompt += "\n";
   }
   
-  // Add context-specific insights if provided
-  if (context) {
-    answer += "\n\nBased on your reflection, I notice you're exploring themes that relate to your question. Continue to observe how these experiences unfold and document the patterns you notice.";
+  // Add reflection content for more context if available
+  if (reflectionContent) {
+    prompt += "User's Reflection:\n";
+    prompt += `"${reflectionContent}"\n\n`;
   }
   
-  // Add user-specific insights if available
-  if (userContext) {
-    answer += "\n\nYour energy profile suggests you might benefit from practices that focus on " + 
-      (userContext.includes("Heart") ? "heart-centered connection and compassion" : 
-       userContext.includes("Third Eye") ? "intuition and inner vision" :
-       userContext.includes("Crown") ? "spiritual connection and higher awareness" :
-       userContext.includes("Throat") ? "authentic expression and communication" :
-       userContext.includes("Solar Plexus") ? "personal power and confidence" :
-       userContext.includes("Sacral") ? "creativity and emotional flow" :
-       userContext.includes("Root") ? "grounding and stability" :
-       "balanced energy across all chakras") + ".";
-  }
+  // Append instruction for how to respond
+  prompt += 
+    "Provide an insightful, compassionate response that addresses the following question or request. " +
+    "Keep your response concise, practical, and spiritually aligned. " +
+    "Include recommendations for practices when appropriate.\n\n";
   
-  return {
-    answer,
-    relatedInsights: [
-      {
-        id: crypto.randomUUID(),
-        content: "Regular practice strengthens your energy awareness",
-        category: "practice",
-        confidence: 0.9,
-        created_at: new Date().toISOString()
-      }
-    ],
-    suggestedPractices
-  };
+  // Add the user's message
+  prompt += `User's Question: ${message}`;
+  
+  return prompt;
 }
 
-// Main response generation function
-export async function generateResponse(question: string, context?: string, userContext?: string) {
-  const openAiKey = Deno.env.get('OPENAI_API_KEY');
+/**
+ * Extracts key insights from an AI response
+ * @param response The full AI response text
+ * @returns Array of extracted key insights
+ */
+export function extractKeyInsights(response: string): Array<{
+  insight: string;
+  category: string;
+  relevance: number;
+}> {
+  try {
+    // Simple rule-based insight extraction
+    // In a production system, this would be more sophisticated
+    
+    const insights: Array<{
+      insight: string;
+      category: string;
+      relevance: number;
+    }> = [];
+    
+    // Split response into paragraphs for analysis
+    const paragraphs = response.split(/\n\n+/);
+    
+    // Categories to look for
+    const categories = [
+      { name: "meditation", keywords: ["meditat", "breath", "focus", "mindful"] },
+      { name: "chakra", keywords: ["chakra", "energy center", "aura", "energy flow"] },
+      { name: "emotional", keywords: ["emotion", "feel", "process", "grief", "joy"] },
+      { name: "practice", keywords: ["practice", "exercise", "technique", "ritual"] },
+      { name: "spiritual", keywords: ["spirit", "conscious", "soul", "divine", "higher"] }
+    ];
+    
+    // Process each paragraph
+    paragraphs.forEach((paragraph, index) => {
+      if (paragraph.length < 20) return; // Skip very short paragraphs
+      
+      // Determine the most relevant category
+      let bestCategory = "general";
+      let highestRelevance = 0;
+      
+      categories.forEach(category => {
+        let relevance = 0;
+        
+        category.keywords.forEach(keyword => {
+          const regex = new RegExp(keyword, "gi");
+          const matches = paragraph.match(regex);
+          
+          if (matches) {
+            relevance += matches.length;
+          }
+        });
+        
+        if (relevance > highestRelevance) {
+          highestRelevance = relevance;
+          bestCategory = category.name;
+        }
+      });
+      
+      // Calculate normalized relevance score (0-1)
+      const normalizedRelevance = Math.min(highestRelevance / 3, 1);
+      
+      // Add to insights if relevance is sufficient
+      if (normalizedRelevance > 0.1) {
+        insights.push({
+          insight: paragraph,
+          category: bestCategory,
+          relevance: normalizedRelevance
+        });
+      }
+    });
+    
+    // Return top insights, sorted by relevance
+    return insights
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, 3);
+  } catch (error) {
+    console.error("Error extracting insights:", error);
+    return [];
+  }
+}
+
+/**
+ * Creates a personalized system prompt based on user data
+ * @param userContext User context data
+ * @returns Personalized system prompt
+ */
+export function createPersonalizedSystemPrompt(
+  userContext: Record<string, any> = {}
+): string {
+  let systemPrompt = 
+    "You are an empathetic spiritual guide specialized in energy work, meditation, and emotional wellness. ";
   
-  // Try to use OpenAI if API key is available
-  if (openAiKey) {
-    try {
-      return await generateOpenAIResponse(question, context, userContext, openAiKey);
-    } catch (error) {
-      console.error("OpenAI request failed, falling back to basic response:", error);
-      return generateBasicResponse(question, context, userContext);
+  // Personalize based on user's astral level
+  if (userContext.astralLevel) {
+    if (userContext.astralLevel <= 2) {
+      systemPrompt += "The user is a beginner in their spiritual journey. Use accessible language and start with fundamentals. ";
+    } else if (userContext.astralLevel <= 5) {
+      systemPrompt += "The user has intermediate experience with spiritual practices. You can reference more advanced concepts. ";
+    } else {
+      systemPrompt += "The user is advanced in their spiritual journey. Feel free to discuss profound concepts and advanced practices. ";
     }
   }
   
-  // Fall back to basic response if no API key
-  console.log("No OpenAI API key found, using basic response generator");
-  return generateBasicResponse(question, context, userContext);
+  // Adjust tone based on dominant emotions if available
+  if (userContext.dominantEmotions && userContext.dominantEmotions.length > 0) {
+    const emotions = userContext.dominantEmotions;
+    
+    if (emotions.includes("anxiety") || emotions.includes("stress")) {
+      systemPrompt += "The user has been experiencing anxiety. Offer calming guidance and grounding techniques. ";
+    }
+    
+    if (emotions.includes("sadness") || emotions.includes("grief")) {
+      systemPrompt += "The user has been processing sadness. Provide compassionate support and healing practices. ";
+    }
+    
+    if (emotions.includes("confusion") || emotions.includes("uncertainty")) {
+      systemPrompt += "The user has been feeling uncertain. Offer clarity and centering exercises. ";
+    }
+    
+    if (emotions.includes("joy") || emotions.includes("gratitude")) {
+      systemPrompt += "The user has been experiencing positive emotions. Help them deepen and expand these feelings. ";
+    }
+  }
+  
+  // Add guidance on response style
+  systemPrompt += 
+    "Keep your responses concise, warm, and practical. When appropriate, suggest specific practices or exercises. " +
+    "Focus on quality over quantity, and infuse your responses with wisdom and compassion.";
+  
+  return systemPrompt;
 }
