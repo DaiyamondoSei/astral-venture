@@ -3,7 +3,7 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import PreferencesForm from '@/components/personalization/PreferencesForm';
+import { PreferencesForm } from '@/components/personalization/preferences';
 import RecommendationsDisplay from '@/components/personalization/RecommendationsDisplay';
 import PersonalizationMetricsCard from '@/components/personalization/PersonalizationMetricsCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,17 +59,7 @@ const PersonalizationPage: React.FC = () => {
           </TabsList>
           
           <TabsContent value="preferences">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personalization Preferences</CardTitle>
-                <CardDescription>
-                  Customize how your experience is personalized based on your preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PreferencesForm />
-              </CardContent>
-            </Card>
+            <PreferencesForm />
           </TabsContent>
           
           <TabsContent value="recommendations">
