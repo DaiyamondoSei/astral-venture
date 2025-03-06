@@ -40,11 +40,11 @@ const ProgressTracker = ({
     }
   };
 
-  // Calculate glow intensity
+  // Calculate glow intensity - updated to use valid types only
   const getGlowEffect = () => {
     switch (glowIntensity) {
-      case 'low': return 'pulse-subtle';
-      case 'high': return 'pulse-intense';
+      case 'low': return 'none';
+      case 'high': return 'breathe';
       default: return 'pulse';
     }
   };
