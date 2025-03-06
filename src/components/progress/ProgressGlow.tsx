@@ -20,6 +20,10 @@ const ProgressGlow: React.FC<ProgressGlowProps> = ({
 }) => {
   const animationClass = getAnimationClass(animation);
   
+  // Map AnimationStyle to GlowEffect animation prop
+  // This ensures type compatibility
+  const glowAnimation = animation === 'slide' ? 'pulse' : animation;
+  
   return (
     <GlowEffect 
       className={cn(
@@ -28,7 +32,7 @@ const ProgressGlow: React.FC<ProgressGlowProps> = ({
         animationClass,
         className
       )}
-      animation={animation === 'none' ? 'none' : animation}
+      animation={glowAnimation}
       style={{ width: `${progress}%` }}
     />
   );
