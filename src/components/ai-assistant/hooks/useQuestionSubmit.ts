@@ -48,7 +48,8 @@ export function useQuestionSubmit({
         try {
           // Append text as it comes in for streaming UI
           const appendToStream = (text: string) => {
-            state.setStreamingResponse(prev => {
+            // Fix: Use functional update to properly append to streaming response
+            state.setStreamingResponse((prev) => {
               return prev ? prev + text : text;
             });
           };

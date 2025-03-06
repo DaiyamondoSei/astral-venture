@@ -30,6 +30,7 @@ export interface AIResponse {
     model?: string;
     tokenUsage?: number;
     processingTime?: number;
+    streaming?: boolean;
   };
 }
 
@@ -37,3 +38,4 @@ export interface AIResponse {
 export type AIModel = 
   | "gpt-4o"         // High quality, higher cost, slower
   | "gpt-4o-mini";   // Good quality, lower cost, faster
+

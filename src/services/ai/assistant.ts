@@ -138,7 +138,7 @@ async function handleStreamingRequest(
         model: requestData.model,
         tokenUsage: 0,
         processingTime: 0,
-        streaming: true
+        streaming: true // This is now permitted by the updated interface
       }
     };
   } catch (error) {

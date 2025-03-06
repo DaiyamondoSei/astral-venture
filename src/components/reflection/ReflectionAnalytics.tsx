@@ -28,6 +28,7 @@ const ReflectionAnalytics: React.FC<ReflectionAnalyticsProps> = ({
     // If reflections were passed as props, use those
     if (passedReflections) {
       setReflections(passedReflections);
+      // Fix: Use directly getReflectionInsights as it returns string[] not Promise<string>
       setInsights(getReflectionInsights(passedReflections));
       setLoading(false);
       return;
@@ -43,9 +44,11 @@ const ReflectionAnalytics: React.FC<ReflectionAnalyticsProps> = ({
           setJourneyData(journey);
           if (journey.recentReflections) {
             setReflections(journey.recentReflections);
-            setInsights(journey.dominantEmotions.map(emotion => 
+            // Fix: Convert emotion data to strings and combine with reflection insights
+            const emotionInsights = journey.dominantEmotions.map(emotion => 
               `Your practice shows strong ${emotion} energy`
-            ).concat(getReflectionInsights(journey.recentReflections)));
+            );
+            setInsights([...emotionInsights, ...getReflectionInsights(journey.recentReflections)]);
           } else {
             setInsights([]); // No reflections available
           }
