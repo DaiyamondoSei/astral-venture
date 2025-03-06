@@ -1,22 +1,43 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Award, CheckCircle, X } from 'lucide-react';
+import { Award, CheckCircle, X, Sparkles, Heart, Lightbulb } from 'lucide-react';
 import { AchievementData } from './onboardingData';
 import { Button } from '@/components/ui/button';
 
 interface AchievementNotificationProps {
   achievement: AchievementData;
   onDismiss: () => void;
+  userInteractions?: Array<{stepId: string, interactionType: string}>;
 }
 
 const AchievementNotification: React.FC<AchievementNotificationProps> = ({
   achievement,
-  onDismiss
+  onDismiss,
+  userInteractions = []
 }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [personalizedMessage, setPersonalizedMessage] = useState('');
   
   useEffect(() => {
+    // Personalize message based on user interactions
+    if (userInteractions.length > 0) {
+      // Check if user has interacted with related content
+      const hasExploredRelatedContent = userInteractions.some(
+        interaction => interaction.stepId === achievement.requiredStep
+      );
+      
+      if (hasExploredRelatedContent) {
+        setPersonalizedMessage("You've shown great curiosity in this area!");
+      }
+      
+      // Check if user completes steps quickly
+      const interactionCount = userInteractions.length;
+      if (interactionCount > 5) {
+        setPersonalizedMessage("Your dedication to spiritual growth is impressive!");
+      }
+    }
+    
     // Delay showing the achievement to allow for smoother animations
     const timer = setTimeout(() => {
       setIsVisible(true);
@@ -31,7 +52,7 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
       clearTimeout(timer);
       clearTimeout(dismissTimer);
     };
-  }, []);
+  }, [userInteractions]);
   
   const handleDismiss = () => {
     setIsVisible(false);
@@ -46,11 +67,11 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
       case 'chakra':
         return <Award className="h-12 w-12 text-purple-500" />;
       case 'energy':
-        return <Award className="h-12 w-12 text-blue-500" />;
+        return <Sparkles className="h-12 w-12 text-blue-500" />;
       case 'meditation':
-        return <Award className="h-12 w-12 text-cyan-500" />;
+        return <Heart className="h-12 w-12 text-cyan-500" />;
       case 'reflection':
-        return <Award className="h-12 w-12 text-emerald-500" />;
+        return <Lightbulb className="h-12 w-12 text-emerald-500" />;
       case 'cosmic':
         return <Award className="h-12 w-12 text-quantum-400" />;
       default:
@@ -69,6 +90,18 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
           transition={{ type: "spring", bounce: 0.3 }}
         >
           <div className="bg-gradient-to-br from-quantum-900/95 to-astral-900/95 backdrop-blur-md rounded-lg shadow-xl border border-quantum-500/20 overflow-hidden">
+            <motion.div 
+              className="absolute inset-0 bg-gradient-to-br from-quantum-500/5 to-astral-500/5 rounded-lg"
+              animate={{ 
+                background: [
+                  "radial-gradient(circle at center, rgba(136, 85, 255, 0.05) 0%, transparent 70%)",
+                  "radial-gradient(circle at center, rgba(136, 85, 255, 0.1) 0%, transparent 70%)",
+                  "radial-gradient(circle at center, rgba(136, 85, 255, 0.05) 0%, transparent 70%)"
+                ]
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+            />
+            
             <div className="relative p-4">
               <button
                 onClick={handleDismiss}
@@ -97,6 +130,17 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({
                   
                   <p className="font-medium text-white mt-1">{achievement.title}</p>
                   <p className="text-sm text-white/80 mt-1">{achievement.description}</p>
+                  
+                  {personalizedMessage && (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.7 }}
+                      className="text-sm text-quantum-300 mt-1 italic"
+                    >
+                      {personalizedMessage}
+                    </motion.p>
+                  )}
                   
                   <motion.div 
                     className="mt-2 text-quantum-300 text-sm font-medium flex items-center gap-1"

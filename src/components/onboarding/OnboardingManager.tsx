@@ -22,7 +22,8 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
     isActive, 
     hasCompletedOnboarding,
     completedSteps,
-    currentStep
+    currentStep,
+    stepInteractions
   } = useOnboarding();
 
   // We'll track which tooltips have been seen
@@ -108,6 +109,14 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
     }
   }, [pendingAchievements, currentAchievement]);
 
+  // Determine user's primary interaction patterns
+  const getUserInteractions = () => {
+    return stepInteractions.map(interaction => ({
+      stepId: interaction.stepId,
+      interactionType: interaction.interactionType
+    }));
+  };
+
   const handleTooltipDismiss = (tooltipId: string) => {
     const updatedSeenTooltips = {
       ...seenTooltips,
@@ -178,6 +187,7 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
       {currentAchievement && (
         <AchievementNotification 
           achievement={currentAchievement}
+          userInteractions={getUserInteractions()}
           onDismiss={handleAchievementDismiss}
         />
       )}

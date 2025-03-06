@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -12,6 +11,12 @@ type OnboardingStep =
   | 'reflection'
   | 'complete';
 
+interface StepInteraction {
+  stepId: string;
+  interactionType: string;
+  timestamp: string;
+}
+
 interface OnboardingState {
   currentStep: OnboardingStep;
   isActive: boolean;
@@ -19,6 +24,7 @@ interface OnboardingState {
   hasCompletedAnyStep: boolean;
   progress: number;
   completedSteps: Record<string, boolean>;
+  stepInteractions: StepInteraction[];
   startOnboarding: () => void;
   skipOnboarding: () => void;
   nextStep: () => void;
@@ -26,6 +32,7 @@ interface OnboardingState {
   goToStep: (step: OnboardingStep) => void;
   completeOnboarding: () => void;
   restartOnboarding: () => void;
+  trackStepInteraction: (stepId: string, interactionType: string) => void;
 }
 
 const OnboardingContext = createContext<OnboardingState | undefined>(undefined);
@@ -48,8 +55,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
   const [hasCompletedAnyStep, setHasCompletedAnyStep] = useState(false);
+  const [stepInteractions, setStepInteractions] = useState<StepInteraction[]>([]);
 
-  // Load onboarding state from localStorage on mount
   useEffect(() => {
     if (user) {
       const completedOnboarding = localStorage.getItem(`onboarding-completed-${user.id}`);
@@ -83,7 +90,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [user]);
 
-  // Calculate progress percentage based on current step
   const progress = ONBOARDING_STEPS.indexOf(currentStep) / (ONBOARDING_STEPS.length - 1) * 100;
 
   const startOnboarding = () => {
@@ -118,17 +124,42 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const trackStepInteraction = (stepId: string, interactionType: string) => {
+    const newInteraction = {
+      stepId,
+      interactionType,
+      timestamp: new Date().toISOString()
+    };
+    
+    setStepInteractions(prev => [...prev, newInteraction]);
+    
+    if (interactionType.includes('clicked') || interactionType.includes('selected')) {
+      toast({
+        title: "Exploration in progress",
+        description: "You're discovering deeper aspects of your spiritual journey.",
+        variant: "default",
+      });
+    }
+    
+    if (user) {
+      const storedInteractions = JSON.parse(localStorage.getItem(`onboarding-interactions-${user.id}`) || '[]');
+      localStorage.setItem(
+        `onboarding-interactions-${user.id}`, 
+        JSON.stringify([...storedInteractions, newInteraction])
+      );
+    }
+  };
+
   const nextStep = () => {
     const currentIndex = ONBOARDING_STEPS.indexOf(currentStep);
     if (currentIndex < ONBOARDING_STEPS.length - 1) {
-      // Mark the current step as completed before moving to the next
       saveCompletedStep(currentStep);
       
-      // Move to next step
       const nextStep = ONBOARDING_STEPS[currentIndex + 1];
       setCurrentStep(nextStep);
       
-      // Announce for screen readers
+      trackStepInteraction(currentStep, 'completed');
+      
       const announcer = document.getElementById('a11y-announcer');
       if (announcer) {
         announcer.textContent = `Moved to step ${currentIndex + 2} of ${ONBOARDING_STEPS.length}: ${nextStep.replace('-', ' ')}`;
@@ -143,7 +174,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (currentIndex > 0) {
       setCurrentStep(ONBOARDING_STEPS[currentIndex - 1]);
       
-      // Announce for screen readers
       const announcer = document.getElementById('a11y-announcer');
       if (announcer) {
         announcer.textContent = `Moved to step ${currentIndex} of ${ONBOARDING_STEPS.length}: ${ONBOARDING_STEPS[currentIndex - 1].replace('-', ' ')}`;
@@ -157,7 +187,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const completeOnboarding = () => {
     if (user) {
-      // Save all steps as completed
       const allSteps = ONBOARDING_STEPS.reduce((acc, step) => {
         if (step !== 'complete') {
           acc[step] = true;
@@ -168,6 +197,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCompletedSteps(allSteps);
       localStorage.setItem(`onboarding-steps-${user.id}`, JSON.stringify(allSteps));
       localStorage.setItem(`onboarding-completed-${user.id}`, 'completed');
+      
+      trackStepInteraction('complete', 'onboarding_completed');
     }
     
     setIsActive(false);
@@ -192,7 +223,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   return (
     <>
-      {/* Accessibility announcer for screen readers */}
       <div 
         id="a11y-announcer" 
         className="sr-only" 
@@ -208,13 +238,15 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           hasCompletedAnyStep,
           progress,
           completedSteps,
+          stepInteractions,
           startOnboarding,
           skipOnboarding,
           nextStep,
           previousStep,
           goToStep,
           completeOnboarding,
-          restartOnboarding
+          restartOnboarding,
+          trackStepInteraction
         }}
       >
         {children}
