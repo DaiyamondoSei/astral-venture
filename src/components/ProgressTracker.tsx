@@ -2,92 +2,83 @@
 import React from 'react';
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import GlowEffect from './GlowEffect';
+import ProgressGlow from './progress/ProgressGlow';
+import ProgressValue from './progress/ProgressValue';
+import { 
+  ProgressTrackerProps,
+  LabelPosition
+} from './progress/types';
+import {
+  getColorScheme,
+  getProgressHeight,
+  getGlowAnimation,
+  getLayoutClass,
+  getLabelClass
+} from './progress/utils';
 
-interface ProgressTrackerProps {
-  progress: number; // 0-100
-  className?: string;
-  label?: string;
-  showPercentage?: boolean;
-  glowIntensity?: 'low' | 'medium' | 'high';
-  size?: 'sm' | 'md' | 'lg';
-  labelPosition?: 'top' | 'bottom' | 'left' | 'right';
-}
-
-const ProgressTracker = ({ 
+const ProgressTracker: React.FC<ProgressTrackerProps> = ({ 
   progress, 
   className, 
   label, 
   showPercentage = true,
   glowIntensity = 'medium',
   size = 'md',
-  labelPosition = 'top'
-}: ProgressTrackerProps) => {
-  // Calculate color based on progress
-  const getColor = () => {
-    if (progress < 30) return 'from-quantum-300 to-quantum-500';
-    if (progress < 60) return 'from-astral-300 to-astral-500';
-    return 'from-ethereal-300 to-ethereal-500';
-  };
-
-  // Calculate height based on size
-  const getHeight = () => {
-    switch (size) {
-      case 'sm': return 'h-2';
-      case 'md': return 'h-4';
-      case 'lg': return 'h-6';
-      default: return 'h-4';
-    }
-  };
-
-  // Calculate glow intensity - updated to use valid types only
-  const getGlowEffect = () => {
-    switch (glowIntensity) {
-      case 'low': return 'none';
-      case 'high': return 'breathe';
-      default: return 'pulse';
-    }
-  };
+  labelPosition = 'top',
+  animation,
+  colorScheme: userColorScheme,
+  showValue = true,
+  labelClassName,
+  valueClassName,
+  valuePrefix,
+  valueSuffix
+}) => {
+  // Get color based on progress or user-specified color scheme
+  const colorScheme = getColorScheme(progress, userColorScheme);
+  
+  // Get height based on size
+  const heightClass = getProgressHeight(size);
+  
+  // Get animation style - comes from prop or derived from glowIntensity
+  const animationStyle = getGlowAnimation(glowIntensity, animation);
+  
+  // Get layout class based on label position
+  const layoutClass = getLayoutClass(labelPosition);
+  
+  // Get label positioning class
+  const labelClass = getLabelClass(labelPosition, labelClassName);
 
   return (
-    <div className={cn(
-      "w-full", 
-      {
-        'flex items-center gap-3': labelPosition === 'left' || labelPosition === 'right',
-      },
-      className
-    )}>
+    <div className={cn(layoutClass, className)}>
+      {/* Label - shown based on position */}
       {(label && (labelPosition === 'top' || labelPosition === 'left')) && (
-        <div className={cn(
-          "text-sm font-medium text-muted-foreground",
-          { 'mb-1': labelPosition === 'top' }
-        )}>
+        <div className={labelClass}>
           {label}
         </div>
       )}
       
-      <div className={cn("relative bg-black/10 rounded-full overflow-hidden", getHeight())}>
-        <GlowEffect 
-          className={cn(
-            "absolute h-full left-0 rounded-full bg-gradient-to-r transition-all duration-1000 ease-out",
-            getColor()
-          )}
-          animation={getGlowEffect()}
-          style={{ width: `${progress}%` }}
+      {/* Progress bar container */}
+      <div className={cn("relative bg-black/10 rounded-full overflow-hidden", heightClass)}>
+        <ProgressGlow 
+          progress={progress}
+          colorScheme={colorScheme}
+          animation={animationStyle}
         />
       </div>
       
-      {showPercentage && (
-        <div className="mt-1 text-xs text-right font-medium text-muted-foreground">
-          {progress}%
-        </div>
+      {/* Progress value */}
+      {showValue && (
+        <ProgressValue 
+          progress={progress}
+          showPercentage={showPercentage}
+          valueClassName={valueClassName}
+          valuePrefix={valuePrefix}
+          valueSuffix={valueSuffix}
+        />
       )}
       
+      {/* Label - alternative positions */}
       {(label && (labelPosition === 'bottom' || labelPosition === 'right')) && (
-        <div className={cn(
-          "text-sm font-medium text-muted-foreground",
-          { 'mt-1': labelPosition === 'bottom' }
-        )}>
+        <div className={labelClass}>
           {label}
         </div>
       )}
