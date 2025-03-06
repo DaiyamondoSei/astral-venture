@@ -29,6 +29,7 @@ const AuthStateManager: React.FC<AuthStateManagerProps> = ({ onLoadingComplete }
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
   const [loadAttempts, setLoadAttempts] = useState(0);
+  const [hasCompletedLoading, setHasCompletedLoading] = useState(false);
   const { 
     userProfile, 
     todayChallenge, 
@@ -52,31 +53,38 @@ const AuthStateManager: React.FC<AuthStateManagerProps> = ({ onLoadingComplete }
       userProfile: userProfile ? "exists" : "null",
       userStreak,
       activatedChakras,
-      loadAttempts
+      loadAttempts,
+      hasCompletedLoading
     });
-  }, [isLoading, profileLoading, user, userProfile, userStreak, activatedChakras, loadAttempts]);
+  }, [isLoading, profileLoading, user, userProfile, userStreak, activatedChakras, loadAttempts, hasCompletedLoading]);
 
-  // Handle errors with loading state
+  // Handle errors with loading state - fix for infinite loop
   useEffect(() => {
-    if (!isLoading && !profileLoading) {
+    // Only proceed if we haven't already completed loading and all data is ready
+    if (!hasCompletedLoading && !isLoading && !profileLoading) {
       if (user && !userProfile && loadAttempts < 3) {
         // If profile is missing but we have a user, retry loading
         setLoadAttempts(prev => prev + 1);
         
         // Add a delay before retry
-        const timer = setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-        
         toast({
           title: "Loading profile data",
           description: "Retrying to load your profile...",
           duration: 1500
         });
         
+        // Use setTimeout to delay the reload
+        const timer = setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+        
         return () => clearTimeout(timer);
       }
       
+      // Mark as completed to prevent further calls
+      setHasCompletedLoading(true);
+      
+      // Call the completion handler only once
       onLoadingComplete({
         user,
         userProfile: userProfile || {
@@ -96,9 +104,22 @@ const AuthStateManager: React.FC<AuthStateManagerProps> = ({ onLoadingComplete }
         updateUserProfile
       });
     }
-  }, [isLoading, profileLoading, user, userProfile, todayChallenge, 
-      userStreak, activatedChakras, onLoadingComplete, loadAttempts, 
-      handleLogout, updateStreak, updateActivatedChakras, updateUserProfile]);
+  }, [
+    isLoading, 
+    profileLoading, 
+    user, 
+    userProfile, 
+    todayChallenge, 
+    userStreak, 
+    activatedChakras, 
+    loadAttempts, 
+    handleLogout, 
+    updateStreak, 
+    updateActivatedChakras, 
+    updateUserProfile, 
+    onLoadingComplete,
+    hasCompletedLoading
+  ]);
 
   if (isLoading || profileLoading) {
     return (

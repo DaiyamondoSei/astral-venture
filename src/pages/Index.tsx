@@ -5,6 +5,7 @@ import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthStateManager from '@/components/AuthStateManager';
 import OnboardingManager from '@/components/onboarding/OnboardingManager';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Lazy load components that aren't needed for initial render
 const UserDashboardView = lazy(() => import('@/components/UserDashboardView'));
@@ -38,54 +39,60 @@ const Index = () => {
   }, [user, navigate]);
 
   const handleAuthStateLoaded = (authData: any) => {
+    console.log("Auth state loaded:", authData.user ? "User exists" : "No user");
     setAuthState(authData);
   };
 
   const handleEntryAnimationComplete = () => {
     setShowEntryAnimation(false);
+    if (user) {
+      localStorage.setItem(`entry-animation-shown-${user.id}`, 'true');
+    }
   };
 
   return (
     <Layout>
-      <AuthStateManager onLoadingComplete={handleAuthStateLoaded} />
-      
-      {authState && (
-        <Suspense fallback={<LoadingFallback />}>
-          {showEntryAnimation ? (
-            <EntryAnimationView 
-              user={authState.user}
-              onComplete={handleEntryAnimationComplete}
-              showTestButton={false}
-            />
-          ) : (!authState.user ? (
-            <LandingView />
-          ) : (
-            <OnboardingManager userId={authState.user.id}>
-              <ChallengeManager
-                userProfile={authState.userProfile}
-                activatedChakras={authState.activatedChakras}
-                updateUserProfile={authState.updateUserProfile}
-                updateActivatedChakras={authState.updateActivatedChakras}
-              >
-                {(handleChallengeComplete) => (
-                  <UserDashboardView
-                    user={authState.user}
-                    userProfile={authState.userProfile}
-                    todayChallenge={authState.todayChallenge}
-                    userStreak={authState.userStreak}
-                    activatedChakras={authState.activatedChakras}
-                    onLogout={authState.handleLogout}
-                    updateStreak={authState.updateStreak}
-                    updateActivatedChakras={authState.updateActivatedChakras}
-                    updateUserProfile={authState.updateUserProfile}
-                    onChallengeComplete={handleChallengeComplete}
-                  />
-                )}
-              </ChallengeManager>
-            </OnboardingManager>
-          ))}
-        </Suspense>
-      )}
+      <ErrorBoundary>
+        <AuthStateManager onLoadingComplete={handleAuthStateLoaded} />
+        
+        {authState && (
+          <Suspense fallback={<LoadingFallback />}>
+            {showEntryAnimation ? (
+              <EntryAnimationView 
+                user={authState.user}
+                onComplete={handleEntryAnimationComplete}
+                showTestButton={false}
+              />
+            ) : (!authState.user ? (
+              <LandingView />
+            ) : (
+              <OnboardingManager userId={authState.user.id}>
+                <ChallengeManager
+                  userProfile={authState.userProfile}
+                  activatedChakras={authState.activatedChakras}
+                  updateUserProfile={authState.updateUserProfile}
+                  updateActivatedChakras={authState.updateActivatedChakras}
+                >
+                  {(handleChallengeComplete) => (
+                    <UserDashboardView
+                      user={authState.user}
+                      userProfile={authState.userProfile}
+                      todayChallenge={authState.todayChallenge}
+                      userStreak={authState.userStreak}
+                      activatedChakras={authState.activatedChakras}
+                      onLogout={authState.handleLogout}
+                      updateStreak={authState.updateStreak}
+                      updateActivatedChakras={authState.updateActivatedChakras}
+                      updateUserProfile={authState.updateUserProfile}
+                      onChallengeComplete={handleChallengeComplete}
+                    />
+                  )}
+                </ChallengeManager>
+              </OnboardingManager>
+            ))}
+          </Suspense>
+        )}
+      </ErrorBoundary>
     </Layout>
   );
 };
