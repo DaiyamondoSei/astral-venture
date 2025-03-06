@@ -1,32 +1,48 @@
 
 import React, { useEffect, useState } from 'react';
 import ProgressTracker from '@/components/ProgressTracker';
+import ProgressValue from '@/components/progress/ProgressValue';
 import { motion } from 'framer-motion';
 import { Sparkles, Trophy, Zap, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AchievementData } from './data/types';
+import { getProgressColor } from './hooks/achievement';
+import combinedAchievementService from '@/services/achievements';
 
 interface AchievementProgressTrackerProps {
   progressPercentage: number;
   totalPoints: number;
   nextAchievement?: AchievementData;
   streakDays?: number;
+  animate?: boolean;
 }
 
 const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
   progressPercentage,
   totalPoints,
   nextAchievement,
-  streakDays = 0
+  streakDays = 0,
+  animate = true
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   
   // Trigger the animation when the component mounts
   useEffect(() => {
-    setIsAnimating(true);
-    const timer = setTimeout(() => setIsAnimating(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
+    if (animate) {
+      setIsAnimating(true);
+      const timer = setTimeout(() => setIsAnimating(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [animate]);
+
+  // Calculate next milestone
+  const currentMilestone = Math.floor(totalPoints / 100) * 100;
+  const nextMilestone = currentMilestone + 100;
+  const pointsToNextMilestone = nextMilestone - totalPoints;
+
+  // Calculate achievement progress if available
+  const achievementProgress = nextAchievement ? 
+    combinedAchievementService.calculateProgress(nextAchievement, 0) : 0;
 
   return (
     <motion.div 
@@ -44,7 +60,12 @@ const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
         <h4 className="font-medium text-sm">Your Progress</h4>
         <Badge variant="outline" className="flex items-center gap-1 text-xs">
           <Sparkles size={12} className="text-primary" />
-          <span>{totalPoints}</span>
+          <ProgressValue 
+            value={totalPoints} 
+            showPercentSign={false} 
+            animate={animate}
+            initialValue={totalPoints - 5} 
+          />
         </Badge>
       </div>
       
@@ -60,7 +81,9 @@ const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
         {progressPercentage >= 100 ? (
           <span>Level milestone reached! ✨</span>
         ) : (
-          <span>{100 - progressPercentage}% until next level</span>
+          <span className={getProgressColor(progressPercentage)}>
+            {pointsToNextMilestone} points until {nextMilestone}
+          </span>
         )}
       </div>
 
@@ -82,7 +105,7 @@ const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
           <div className="text-xs text-muted-foreground">{nextAchievement.title}</div>
           <div className="mt-1">
             <ProgressTracker 
-              progress={0} // This would be populated from getAchievementProgress
+              progress={achievementProgress} 
               size="sm"
               colorScheme="from-quantum-300 to-quantum-600"
             />

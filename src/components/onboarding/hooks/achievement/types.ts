@@ -45,4 +45,33 @@ export interface AchievementTrackerResult {
   getProgressPercentage: () => number;
   achievementHistory: Record<string, {awarded: boolean, timestamp: string, tier?: number}>;
   progressTracking: Record<string, number>;
+  getUpcomingAchievements?: () => AchievementData[];
+  getAchievementAnalytics?: () => {
+    completionRate: number;
+    achievementsByType: Record<string, number>;
+  };
+}
+
+// Define event types for achievement system
+export enum AchievementEventType {
+  ACHIEVEMENT_EARNED = 'achievement_earned',
+  ACHIEVEMENT_PROGRESS = 'achievement_progress',
+  MILESTONE_REACHED = 'milestone_reached',
+  STREAK_UPDATED = 'streak_updated'
+}
+
+export interface AchievementEvent {
+  type: AchievementEventType;
+  achievementId?: string;
+  data?: any;
+  timestamp: string;
+}
+
+// Define persistence strategy interfaces
+export interface AchievementStorageStrategy {
+  saveAchievements: (userId: string, achievements: Record<string, any>) => Promise<void>;
+  loadAchievements: (userId: string) => Promise<Record<string, any>>;
+  saveProgress: (userId: string, progress: Record<string, number>) => Promise<void>;
+  loadProgress: (userId: string) => Promise<Record<string, number>>;
+  clear: (userId: string) => Promise<void>;
 }

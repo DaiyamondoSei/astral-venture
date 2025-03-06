@@ -8,7 +8,7 @@ export function useProgressTracking(
 ): ProgressTrackingResult {
   // Track progress for a specific type
   const trackProgress = useCallback((type: string, amount: number) => {
-    setProgressTracking(prev => ({
+    setProgressTracking((prev: Record<string, number>) => ({
       ...prev,
       [type]: (prev[type] || 0) + amount
     }));

@@ -1,92 +1,74 @@
 
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
-import { AchievementData } from '../data/types';
 import { motion } from 'framer-motion';
-import { formatAchievementPoints, getAchievementIcon, getProgressColor } from '../hooks/achievement';
-import { 
-  Trophy, 
-  Star, 
-  Sparkles, 
-  MousePointer, 
-  Flame, 
-  TrendingUp, 
-  Award,
-  Check 
-} from 'lucide-react';
+import { Award, Sparkles } from 'lucide-react';
+import { formatAchievementPoints, getProgressColor } from '../hooks/achievement';
+import { AchievementData } from '../data/types';
+import ProgressValue from '@/components/progress/ProgressValue';
+import { achievementService } from '@/services/achievements';
 
 interface AchievementSummaryProps {
   achievement: AchievementData;
-  progress?: number;
-  onDismiss?: () => void;
-  showDetails?: boolean;
+  progress: number;
+  totalPoints: number;
+  showProgress?: boolean;
+  animate?: boolean;
 }
 
 const AchievementSummary: React.FC<AchievementSummaryProps> = ({
   achievement,
-  progress = 0,
-  onDismiss,
-  showDetails = true
+  progress,
+  totalPoints,
+  showProgress = true,
+  animate = true
 }) => {
-  const renderAchievementIcon = () => {
-    switch (achievement.type) {
-      case 'discovery':
-        return <Sparkles className="h-5 w-5 text-cyan-400" />;
-      case 'completion':
-        return <Check className="h-5 w-5 text-green-400" />;
-      case 'interaction':
-        return <MousePointer className="h-5 w-5 text-indigo-400" />;
-      case 'streak':
-        return <Flame className="h-5 w-5 text-orange-400" />;
-      case 'progressive':
-        return <TrendingUp className="h-5 w-5 text-blue-400" />;
-      case 'milestone':
-        return <Award className="h-5 w-5 text-purple-400" />;
-      default:
-        return <Star className="h-5 w-5 text-yellow-400" />;
-    }
-  };
-
+  const formattedPoints = formatAchievementPoints(achievement.points);
+  const progressColor = getProgressColor(progress);
+  
   return (
-    <motion.div
-      className="bg-black/40 border border-quantum-500/30 rounded-lg p-4 shadow-lg backdrop-blur-sm"
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+    <motion.div 
+      className="bg-background/95 border border-border rounded-lg p-4 shadow-sm"
+      initial={animate ? { opacity: 0, y: 10 } : undefined}
+      animate={animate ? { opacity: 1, y: 0 } : undefined}
       transition={{ duration: 0.3 }}
     >
       <div className="flex items-start">
-        <div className="p-2 bg-quantum-900/60 rounded-lg mr-3">
-          {renderAchievementIcon()}
+        <div className="flex-shrink-0 mr-3">
+          <motion.div
+            initial={animate ? { scale: 0.8 } : undefined}
+            animate={animate ? { scale: 1 } : undefined}
+            transition={{ delay: 0.1, type: "spring" }}
+          >
+            <Award className="h-10 w-10 text-primary" />
+          </motion.div>
         </div>
         
-        <div className="flex-1">
-          <h4 className="text-lg font-medium text-white">{achievement.title}</h4>
-          <p className="text-sm text-white/70 mb-2">{achievement.description}</p>
+        <div className="flex-grow">
+          <h4 className="font-medium text-foreground">{achievement.title}</h4>
+          <p className="text-sm text-muted-foreground mt-1">{achievement.description}</p>
           
-          {showDetails && (
-            <div className="flex items-center justify-between mt-3">
-              <Badge variant="outline" className="bg-black/30 border-quantum-400/40">
-                {formatAchievementPoints(achievement.points)}
-              </Badge>
-              
-              <Badge variant="outline" className={`bg-black/30 border-quantum-400/40 ${getProgressColor(progress)}`}>
-                {achievement.type === 'streak' ? `${achievement.streakDays} days` : ''}
-                {achievement.type === 'progressive' ? `Tier ${achievement.tier || 1}` : ''}
-              </Badge>
+          {showProgress && (
+            <div className="mt-3">
+              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-primary"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${Math.min(100, progress)}%` }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                />
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-xs text-muted-foreground">
+                  {progress < 100 ? `${Math.round(progress)}% complete` : 'Completed'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  <span className="text-xs font-medium">{achievement.points}</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
-        
-        {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className="ml-2 text-white/50 hover:text-white"
-            aria-label="Dismiss achievement"
-          >
-            ✕
-          </button>
-        )}
       </div>
     </motion.div>
   );

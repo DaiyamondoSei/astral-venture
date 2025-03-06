@@ -1,5 +1,9 @@
 
 import { AchievementData } from '@/components/onboarding/data/types';
+import { AchievementEvent, AchievementEventType } from '@/components/onboarding/hooks/achievement/types';
+
+// Event listeners for the achievement system
+const eventListeners: Record<string, Function[]> = {};
 
 // Create a single source of truth for achievement-related operations
 export const achievementService = {
@@ -77,5 +81,94 @@ export const achievementService = {
     
     // Default to the achievement's base points
     return achievement.points;
+  },
+  
+  /**
+   * Get the next achievement to focus on
+   * @param allAchievements List of all available achievements
+   * @param completedAchievementIds IDs of completed achievements
+   * @param progressData Current progress tracking data
+   * @returns The next achievement to focus on, or null if all complete
+   */
+  getNextAchievement: (
+    allAchievements: AchievementData[],
+    completedAchievementIds: string[],
+    progressData: Record<string, number>
+  ): AchievementData | null => {
+    // Filter to incomplete achievements
+    const incompleteAchievements = allAchievements.filter(
+      a => !completedAchievementIds.includes(a.id)
+    );
+    
+    if (incompleteAchievements.length === 0) return null;
+    
+    // Find achievement closest to completion
+    let highestProgress = -1;
+    let nextAchievement: AchievementData | null = null;
+    
+    incompleteAchievements.forEach(achievement => {
+      let progress = 0;
+      
+      // Calculate progress based on achievement type
+      if (achievement.type === 'streak' && achievement.streakDays) {
+        const streakDays = progressData.streakDays || 0;
+        progress = (streakDays / achievement.streakDays) * 100;
+      } 
+      else if (achievement.type === 'milestone' && achievement.progressThreshold && achievement.trackedValue) {
+        const currentValue = progressData[achievement.trackedValue] || 0;
+        progress = (currentValue / achievement.progressThreshold) * 100;
+      }
+      else if (achievement.type === 'progressive' && achievement.tieredLevels && achievement.trackedValue) {
+        const currentValue = progressData[achievement.trackedValue] || 0;
+        const nextTierIndex = 0; // Assuming we start at the first tier
+        if (nextTierIndex < achievement.tieredLevels.length) {
+          const nextThreshold = achievement.tieredLevels[nextTierIndex];
+          progress = (currentValue / nextThreshold) * 100;
+        }
+      }
+      
+      // Save achievement with highest progress
+      if (progress > highestProgress) {
+        highestProgress = progress;
+        nextAchievement = achievement;
+      }
+    });
+    
+    return nextAchievement;
+  },
+  
+  /**
+   * Add event listener for achievement events
+   */
+  addEventListener: (
+    eventType: AchievementEventType,
+    callback: (event: AchievementEvent) => void
+  ) => {
+    if (!eventListeners[eventType]) {
+      eventListeners[eventType] = [];
+    }
+    eventListeners[eventType].push(callback);
+  },
+  
+  /**
+   * Remove event listener
+   */
+  removeEventListener: (
+    eventType: AchievementEventType,
+    callback: (event: AchievementEvent) => void
+  ) => {
+    if (!eventListeners[eventType]) return;
+    eventListeners[eventType] = eventListeners[eventType].filter(cb => cb !== callback);
+  },
+  
+  /**
+   * Dispatch achievement event
+   */
+  dispatchEvent: (event: AchievementEvent) => {
+    if (!eventListeners[event.type]) return;
+    eventListeners[event.type].forEach(callback => callback(event));
   }
 };
+
+// Export event types
+export { AchievementEventType };

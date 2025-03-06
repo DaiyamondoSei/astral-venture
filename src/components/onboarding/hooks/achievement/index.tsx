@@ -6,7 +6,7 @@ export { useAchievementProgress } from './useAchievementProgress';
 export { useAchievementDetection } from './useAchievementDetection';
 export { useAchievementVisualization } from './useAchievementVisualization';
 export { useProgressTracking } from './useProgressTracking';
-export { useAchievementNotification } from './useAchievementNotification';
+export { useAchievementNotification } from '../../hooks/useAchievementNotification';
 
 // Re-export types
 export * from './types';

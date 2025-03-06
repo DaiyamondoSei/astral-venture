@@ -48,15 +48,14 @@ const ProgressValue: React.FC<ProgressValueProps> = ({
           initial={{ opacity: 0.5, y: 5 }}
           animate={{ 
             opacity: 1, 
-            y: 0,
-            count: value
+            y: 0
           }}
           transition={{ 
             duration: duration / 1000,
             ease: "easeOut" 
           }}
         >
-          {typeof initialValue !== 'undefined' ? formatValue(initialValue) : '0'}
+          {displayValue}
         </motion.span>
         <span className="text-muted-foreground">{suffix}{percentSign}</span>
       </div>
