@@ -14,23 +14,18 @@ export interface MetricItemProps {
 }
 
 export const getIconByMetricType = (metricType: string, value?: number) => {
-  switch (metricType) {
-    case 'Engagement':
-    case 'Engagement Score':
-      return <Activity size={compact ? 16 : 20} />;
-    case 'Content Relevance':
-      return <Gauge size={compact ? 16 : 20} />;
-    case 'Chakra Balance':
-    case 'Chakra Balance Improvement':
-      return <Heart size={compact ? 16 : 20} />;
-    case 'Growth Rate':
-    case 'Emotional Growth Rate':
-      return <TrendingUp size={compact ? 16 : 20} />;
-    case 'Progress Acceleration':
-      return value && value >= 0 ? <TrendingUp size={compact ? 16 : 20} /> : <TrendingDown size={compact ? 16 : 20} />;
-    default:
-      return <BarChart3 size={compact ? 16 : 20} />;
-  }
+  const iconMap: Record<string, React.ReactNode> = {
+    'Engagement': <Activity />,
+    'Engagement Score': <Activity />,
+    'Content Relevance': <Gauge />,
+    'Chakra Balance': <Heart />,
+    'Chakra Balance Improvement': <Heart />,
+    'Growth Rate': <TrendingUp />,
+    'Emotional Growth Rate': <TrendingUp />,
+    'Progress Acceleration': value && value >= 0 ? <TrendingUp /> : <TrendingDown />
+  };
+  
+  return iconMap[metricType] || <BarChart3 />;
 };
 
 const MetricItem: React.FC<MetricItemProps> = ({ 

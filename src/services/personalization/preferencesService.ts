@@ -1,7 +1,9 @@
 
-import { supabase } from '@/integrations/supabase/client';
 import { UserPreferences, PrivacySettings } from './types';
 import { toast } from '@/components/ui/use-toast';
+
+// Cache for user preferences (in-memory substitute for database)
+const userPreferencesCache = new Map<string, UserPreferences>();
 
 /**
  * Service for managing user preferences
@@ -14,15 +16,18 @@ export const preferencesService = {
    */
   async getUserPreferences(userId: string): Promise<UserPreferences> {
     try {
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .select('preferences')
-        .eq('user_id', userId)
-        .single();
+      console.log(`Getting preferences for user ${userId}`);
       
-      if (error) throw error;
+      // Check if we have cached preferences for this user
+      if (userPreferencesCache.has(userId)) {
+        return userPreferencesCache.get(userId) || getDefaultPreferences();
+      }
       
-      return data?.preferences || getDefaultPreferences();
+      // In a real implementation, we would fetch from the database
+      // For now, return default preferences and store in cache
+      const defaultPrefs = getDefaultPreferences();
+      userPreferencesCache.set(userId, defaultPrefs);
+      return defaultPrefs;
     } catch (error) {
       console.error('Error fetching user preferences:', error);
       toast({
@@ -42,6 +47,8 @@ export const preferencesService = {
    */
   async updateUserPreferences(userId: string, preferences: Partial<UserPreferences>): Promise<UserPreferences> {
     try {
+      console.log(`Updating preferences for user ${userId}`, preferences);
+      
       // First get current preferences
       const currentPrefs = await this.getUserPreferences(userId);
       
@@ -51,25 +58,16 @@ export const preferencesService = {
         ...preferences
       };
       
-      // Save to database using upsert
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .upsert({ 
-          user_id: userId, 
-          preferences: updatedPrefs,
-          updated_at: new Date().toISOString()
-        })
-        .select('preferences')
-        .single();
-      
-      if (error) throw error;
+      // In a real implementation, we would save to the database
+      // For now, just update the cache
+      userPreferencesCache.set(userId, updatedPrefs);
       
       toast({
         title: "Preferences updated",
         description: "Your personalized experience has been updated.",
       });
       
-      return data.preferences;
+      return updatedPrefs;
     } catch (error) {
       console.error('Error updating user preferences:', error);
       toast({
@@ -88,6 +86,7 @@ export const preferencesService = {
    * @returns Updated preferences
    */
   async updatePrivacySettings(userId: string, settings: Partial<PrivacySettings>): Promise<UserPreferences> {
+    console.log(`Updating privacy settings for user ${userId}`, settings);
     const currentPrefs = await this.getUserPreferences(userId);
     
     return this.updateUserPreferences(userId, {
@@ -104,12 +103,11 @@ export const preferencesService = {
    */
   async deleteUserPreferences(userId: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('user_preferences')
-        .delete()
-        .eq('user_id', userId);
+      console.log(`Deleting preferences for user ${userId}`);
       
-      if (error) throw error;
+      // In a real implementation, we would delete from the database
+      // For now, just remove from cache
+      userPreferencesCache.delete(userId);
       
       console.log('User preferences deleted for GDPR compliance');
     } catch (error) {

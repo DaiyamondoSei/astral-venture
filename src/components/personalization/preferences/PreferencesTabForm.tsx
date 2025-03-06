@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider } from 'react-hook-form';
@@ -52,7 +51,18 @@ const PreferencesTabForm: React.FC = () => {
   
   const onSubmit = async (data: PreferencesFormType) => {
     try {
-      await updatePreferences(data);
+      // Ensure that all required properties are present in the privacySettings
+      const formattedData = {
+        ...data,
+        privacySettings: {
+          shareUsageData: data.privacySettings.shareUsageData,
+          allowRecommendations: data.privacySettings.allowRecommendations,
+          storeActivityHistory: data.privacySettings.storeActivityHistory,
+          dataRetentionPeriod: data.privacySettings.dataRetentionPeriod
+        }
+      };
+      
+      await updatePreferences(formattedData);
       toast({
         title: "Preferences saved",
         description: "Your personalized experience has been updated.",
@@ -69,7 +79,15 @@ const PreferencesTabForm: React.FC = () => {
   
   const onPrivacySubmit = async (data: PreferencesFormType['privacySettings']) => {
     try {
-      await updatePrivacySettings(data);
+      // Ensure all required fields are present
+      const formattedData = {
+        shareUsageData: data.shareUsageData,
+        allowRecommendations: data.allowRecommendations,
+        storeActivityHistory: data.storeActivityHistory,
+        dataRetentionPeriod: data.dataRetentionPeriod
+      };
+      
+      await updatePrivacySettings(formattedData);
       toast({
         title: "Privacy settings saved",
         description: "Your privacy preferences have been updated.",
