@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +18,7 @@ export interface GlowEffectProps {
   role?: string;
 }
 
-const GlowEffect: React.FC<GlowEffectProps> = ({
+const GlowEffect = memo<GlowEffectProps>(({
   className,
   children,
   color = 'rgba(139, 92, 246, 0.5)',
@@ -39,7 +39,7 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
     high: '25px'
   };
 
-  // Define animation variants with enhanced effects
+  // Define animation variants with enhanced effects and performance optimizations
   const getAnimationVariants = () => {
     if (animation === 'pulse') {
       return {
@@ -49,7 +49,7 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
             `0 0 ${parseInt(intensityMap[intensity]) + 10}px ${color}`,
             `0 0 ${intensityMap[intensity]} ${color}`
           ],
-          transition: {
+          transition: { 
             duration: 2.5,
             repeat: Infinity,
             repeatType: "reverse" as const,
@@ -125,6 +125,7 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
       )}
       style={{
         boxShadow: `0 0 ${intensityMap[intensity]} ${color}`,
+        willChange: animation !== 'none' ? 'transform, box-shadow' : 'auto', // Add will-change hint for browser optimization
         ...style
       }}
       onClick={interactive ? onClick : undefined}
@@ -144,6 +145,8 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
       {children}
     </motion.div>
   );
-};
+});
+
+GlowEffect.displayName = 'GlowEffect';
 
 export default GlowEffect;

@@ -1,16 +1,11 @@
-import React, { useState, useEffect } from 'react';
+
+import React from 'react';
 import { Activity, BarChart, Cpu, Zap, Play, Pause, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-
-interface PerformanceMetrics {
-  fps: number;
-  renderTime: number;
-  memoryUsage: number;
-  lastUpdate: number;
-}
+import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 
 interface PerformanceMonitorProps {
   isMonitoring: boolean;
@@ -21,69 +16,7 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   isMonitoring,
   setIsMonitoring
 }) => {
-  const [metrics, setMetrics] = useState<PerformanceMetrics>({
-    fps: 0,
-    renderTime: 0,
-    memoryUsage: 0,
-    lastUpdate: 0
-  });
-  
-  const [history, setHistory] = useState<PerformanceMetrics[]>([]);
-  
-  useEffect(() => {
-    if (!isMonitoring) return;
-    
-    let frameCount = 0;
-    let lastTime = performance.now();
-    let animationFrameId: number;
-    
-    const measurePerformance = () => {
-      const now = performance.now();
-      frameCount++;
-      
-      // Update metrics once per second
-      if (now - lastTime >= 1000) {
-        const fps = Math.round(frameCount * 1000 / (now - lastTime));
-        const renderTime = parseFloat((performance.now() - now).toFixed(2));
-        
-        // Get memory usage if available
-        const memoryUsage = (window.performance as any).memory 
-          ? Math.round((window.performance as any).memory.usedJSHeapSize / (1024 * 1024))
-          : 0;
-        
-        const newMetrics = {
-          fps,
-          renderTime,
-          memoryUsage,
-          lastUpdate: now
-        };
-        
-        setMetrics(newMetrics);
-        setHistory(prev => [...prev.slice(-19), newMetrics]);
-        
-        frameCount = 0;
-        lastTime = now;
-      }
-      
-      animationFrameId = requestAnimationFrame(measurePerformance);
-    };
-    
-    animationFrameId = requestAnimationFrame(measurePerformance);
-    
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [isMonitoring]);
-  
-  const getPerformanceStatus = () => {
-    if (metrics.fps >= 55) return { label: "Excellent", color: "bg-green-500" };
-    if (metrics.fps >= 40) return { label: "Good", color: "bg-green-400" };
-    if (metrics.fps >= 30) return { label: "Fair", color: "bg-yellow-400" };
-    if (metrics.fps >= 20) return { label: "Poor", color: "bg-orange-400" };
-    return { label: "Critical", color: "bg-red-500" };
-  };
-  
-  const status = getPerformanceStatus();
+  const { metrics, history, status } = usePerformanceMonitor(isMonitoring);
   
   return (
     <Card className="bg-black/50 border border-white/10 mb-4">

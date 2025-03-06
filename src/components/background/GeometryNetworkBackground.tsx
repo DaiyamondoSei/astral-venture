@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { motion } from 'framer-motion';
 
 interface GeometryNetworkBackgroundProps {
@@ -8,41 +8,47 @@ interface GeometryNetworkBackgroundProps {
   className?: string;
 }
 
-const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
+const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = memo(({
   density = 20,
   speed = 1,
   className
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const nodesRef = useRef<{id: number, x: number, y: number, size: number, delay: number, duration: number}[]>([]);
+  const connectionsRef = useRef<{id: string, from: number, to: number, duration: number, delay: number}[]>([]);
   
-  // Generate random nodes for the network with better distribution
-  const nodes = Array.from({ length: density }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 0.3 + 0.1, // 0.1-0.4rem size
-    delay: Math.random() * 5,
-    duration: (Math.random() * 30 + 50) / speed
-  }));
-  
-  // Optimize connections between nodes to reduce unnecessary rendering
-  const connections = [];
-  for (let i = 0; i < nodes.length; i++) {
-    // Connect each node to 2-3 closest nodes for better network density without overwhelming visuals
-    const connectionsCount = Math.floor(Math.random() * 2) + 2;
+  // Generate nodes and connections only once unless props change
+  useEffect(() => {
+    // Generate random nodes with better distribution
+    nodesRef.current = Array.from({ length: density }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 0.3 + 0.1, // 0.1-0.4rem size
+      delay: Math.random() * 5,
+      duration: (Math.random() * 30 + 50) / speed
+    }));
     
-    for (let j = 0; j < connectionsCount; j++) {
-      // Create connections in a more distributed way
-      const targetNodeIndex = (i + j + 1 + Math.floor(Math.random() * (nodes.length/4))) % nodes.length;
-      connections.push({
-        id: `${i}-${targetNodeIndex}`,
-        from: i,
-        to: targetNodeIndex,
-        duration: (Math.random() * 20 + 40) / speed,
-        delay: Math.random() * 2
-      });
+    // Optimize connections between nodes
+    const connections: {id: string, from: number, to: number, duration: number, delay: number}[] = [];
+    for (let i = 0; i < nodesRef.current.length; i++) {
+      // Connect each node to 2-3 closest nodes for better network density without overwhelming visuals
+      const connectionsCount = Math.floor(Math.random() * 2) + 2;
+      
+      for (let j = 0; j < connectionsCount; j++) {
+        // Create connections in a more distributed way
+        const targetNodeIndex = (i + j + 1 + Math.floor(Math.random() * (nodesRef.current.length/4))) % nodesRef.current.length;
+        connections.push({
+          id: `${i}-${targetNodeIndex}`,
+          from: i,
+          to: targetNodeIndex,
+          duration: (Math.random() * 20 + 40) / speed,
+          delay: Math.random() * 2
+        });
+      }
     }
-  }
+    connectionsRef.current = connections;
+  }, [density, speed]);
 
   return (
     <div 
@@ -50,8 +56,8 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
       className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
       aria-hidden="true"
     >
-      {/* Animated nodes with improved visibility */}
-      {nodes.map((node) => (
+      {/* Animated nodes with improved visibility and reduced DOM elements */}
+      {nodesRef.current.map((node) => (
         <motion.div
           key={`node-${node.id}`}
           className="absolute rounded-full"
@@ -61,7 +67,9 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
             width: `${node.size}rem`,
             height: `${node.size}rem`,
             background: `radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.15) 70%)`,
+            willChange: 'opacity, transform', // Hint for browser optimization
           }}
+          initial={{ opacity: 0.2, scale: 1 }}
           animate={{
             opacity: [0.2, 0.5, 0.2],
             scale: [1, 1.4, 1],
@@ -75,7 +83,7 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
         />
       ))}
       
-      {/* Lines connecting nodes - improved with gradients and pulse animations */}
+      {/* Lines connecting nodes - optimized with reduced motion and view-box based culling */}
       <svg className="absolute inset-0 w-full h-full">
         <defs>
           <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -89,9 +97,9 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
           </filter>
         </defs>
         
-        {connections.map((connection) => {
-          const fromNode = nodes[connection.from];
-          const toNode = nodes[connection.to];
+        {connectionsRef.current.map((connection) => {
+          const fromNode = nodesRef.current[connection.from];
+          const toNode = nodesRef.current[connection.to];
           
           return (
             <motion.line
@@ -105,7 +113,7 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
               filter="url(#glow)"
               initial={{ strokeOpacity: 0 }}
               animate={{
-                strokeOpacity: [0.2, 0.5, 0.2],
+                strokeOpacity: [0.2, 0.4, 0.2], // Reduced opacity change for better performance
                 strokeDasharray: ["5 3", "3 5", "5 3"],
               }}
               transition={{
@@ -119,18 +127,20 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
         })}
       </svg>
       
-      {/* Optimized background glass effect for better contrast */}
-      <div className="absolute inset-0 bg-gradient-to-b from-quantum-900/50 to-quantum-900/30 backdrop-blur-[60px]" />
+      {/* Optimized background glass effect with reduced blur for better performance */}
+      <div className="absolute inset-0 bg-gradient-to-b from-quantum-900/50 to-quantum-900/30 backdrop-blur-[30px]" />
       
-      {/* Central glow effect for better focus point */}
+      {/* Simplified central glow effect */}
       <motion.div 
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-1/3 rounded-full"
         style={{
           background: "radial-gradient(circle, rgba(138, 92, 246, 0.2) 0%, rgba(138, 92, 246, 0) 70%)",
+          willChange: 'transform, opacity', // Hint for browser optimization
         }}
+        initial={{ opacity: 0.3, scale: 1 }}
         animate={{
-          scale: [1, 1.5, 1],
-          opacity: [0.3, 0.6, 0.3],
+          scale: [1, 1.3, 1],
+          opacity: [0.3, 0.5, 0.3],
         }}
         transition={{
           duration: 8,
@@ -140,6 +150,8 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
       />
     </div>
   );
-};
+});
+
+GeometryNetworkBackground.displayName = 'GeometryNetworkBackground';
 
 export default GeometryNetworkBackground;
