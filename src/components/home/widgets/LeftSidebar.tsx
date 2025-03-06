@@ -106,9 +106,11 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
           <span className="text-lg font-medium text-white">{getConsciousnessDescription(consciousnessLevel)}</span>
         </div>
         
-        <Progress value={(consciousnessLevel / 7) * 100} 
+        <Progress 
+          value={(consciousnessLevel / 7) * 100} 
           className="h-1.5 bg-black/50"
-          indicatorClassName={`${getConsciousnessColor(consciousnessLevel)}`} />
+          indicatorClassName={`${getConsciousnessColor(consciousnessLevel)}`} 
+        />
         
         <p className="text-xs text-white/70 mt-2">
           Your consciousness has expanded to level {consciousnessLevel}. Continue your practice to reach higher states.
@@ -153,7 +155,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
               <ul className="space-y-1">
                 {selectedNodeMaterials.map((material, index) => (
                   <li key={index} className="text-xs text-quantum-300">
-                    • {material.title}
+                    • {material.name}
                   </li>
                 ))}
               </ul>

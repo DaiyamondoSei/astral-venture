@@ -35,10 +35,11 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
     // Notify parent component
     onSelectNode('portal-center', [
       {
-        title: 'Portal Activation Guide',
+        id: 'portal-guide',
+        name: 'Portal Activation Guide',
         description: 'Learn to navigate through dimensional frequencies',
-        url: '#',
-        type: 'pdf'
+        type: 'pdf',
+        icon: null
       }
     ]);
   };

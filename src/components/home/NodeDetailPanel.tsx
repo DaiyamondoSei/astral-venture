@@ -7,18 +7,21 @@ interface NodeDetailPanelProps {
   nodeId: string;
   energyPoints: number;
   downloadableMaterials?: DownloadableMaterial[];
+  consciousnessLevel?: number;
 }
 
 const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ 
   nodeId, 
   energyPoints,
-  downloadableMaterials
+  downloadableMaterials,
+  consciousnessLevel
 }) => {
   return (
     <div className="glass-card p-6">
       <NodeDetailContent 
         nodeId={nodeId} 
-        downloadableMaterials={downloadableMaterials} 
+        downloadableMaterials={downloadableMaterials}
+        consciousnessLevel={consciousnessLevel}
       />
     </div>
   );

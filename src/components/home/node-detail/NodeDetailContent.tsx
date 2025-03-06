@@ -10,11 +10,13 @@ import DownloadableMaterialsPanel from '@/components/home/DownloadableMaterialsP
 interface NodeDetailContentProps {
   nodeId: string;
   downloadableMaterials?: DownloadableMaterial[];
+  consciousnessLevel?: number;
 }
 
 const NodeDetailContent: React.FC<NodeDetailContentProps> = ({ 
   nodeId, 
-  downloadableMaterials 
+  downloadableMaterials,
+  consciousnessLevel
 }) => {
   const details = nodeDetailsData[nodeId] || {
     title: 'Unknown Node',
@@ -30,6 +32,14 @@ const NodeDetailContent: React.FC<NodeDetailContentProps> = ({
     >
       <h2 className="text-2xl font-display mb-2">{details.title}</h2>
       <p className="text-white/80 mb-6">{details.description}</p>
+      
+      {consciousnessLevel && consciousnessLevel > 1 && (
+        <div className="my-4 p-3 bg-quantum-900/30 border border-quantum-400/20 rounded-lg">
+          <p className="text-quantum-300 text-sm">
+            Consciousness Level {consciousnessLevel} insights available
+          </p>
+        </div>
+      )}
       
       <PracticesList practices={details.practices} />
       

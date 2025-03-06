@@ -8,12 +8,14 @@ interface DetailSectionProps {
   selectedNode: string | null;
   energyPoints: number;
   selectedNodeMaterials: DownloadableMaterial[] | null;
+  consciousnessLevel?: number;
 }
 
 const DetailSection: React.FC<DetailSectionProps> = ({
   selectedNode,
   energyPoints,
-  selectedNodeMaterials
+  selectedNodeMaterials,
+  consciousnessLevel
 }) => {
   if (!selectedNode) return null;
   
@@ -28,6 +30,7 @@ const DetailSection: React.FC<DetailSectionProps> = ({
         nodeId={selectedNode} 
         energyPoints={energyPoints}
         downloadableMaterials={selectedNodeMaterials || undefined}
+        consciousnessLevel={consciousnessLevel}
       />
     </motion.div>
   );

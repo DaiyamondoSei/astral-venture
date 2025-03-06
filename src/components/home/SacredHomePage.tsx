@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import { motion, Variants } from 'framer-motion';
@@ -36,9 +35,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
   const [pageLoaded, setPageLoaded] = useState(false);
   const [consciousnessLevel, setConsciousnessLevel] = useState(1);
   
-  // Add loading effect
   useEffect(() => {
-    // Simulate loading
     const timer = setTimeout(() => {
       setPageLoaded(true);
       toast({
@@ -47,7 +44,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       });
     }, 800);
     
-    // Add logging to debug component mounting and props
     console.log("SacredHomePage mounted with:", {
       user: !!user,
       userProfile: !!userProfile,
@@ -63,19 +59,14 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     return () => clearTimeout(timer);
   }, [user, userProfile, userStreak, activatedChakras, selectedNode]);
   
-  // Calculate consciousness level based on user stats
   useEffect(() => {
-    // Base calculation on energy points and activated chakras
     const energyPoints = userProfile?.energy_points || 0;
     const baseLevel = Math.max(1, Math.floor(energyPoints / 200));
     
-    // Bonus for activated chakras
     const chakraBonus = Math.min(activatedChakras.length / 2, 1.5);
     
-    // Bonus for streak
     const streakBonus = Math.min(userStreak.current / 10, 1);
     
-    // Calculate total consciousness level (capped at 7)
     const calculatedLevel = Math.min(Math.floor(baseLevel + chakraBonus + streakBonus), 7);
     
     setConsciousnessLevel(calculatedLevel);
@@ -85,7 +76,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     });
   }, [userProfile, activatedChakras, userStreak]);
   
-  // Derive username from user data
   const username = userProfile?.username || user?.email?.split('@')[0] || 'Seeker';
   const astralLevel = userProfile?.astral_level || 1;
   const energyPoints = userProfile?.energy_points || 0;
@@ -95,7 +85,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     setSelectedNode(nodeId);
     setSelectedNodeMaterials(downloadables || null);
     
-    // Add visual feedback
     const nodeDisplayName = nodeId === 'portal-center' 
       ? 'Dimensional Portal' 
       : nodeId.charAt(0).toUpperCase() + nodeId.slice(1);
@@ -113,7 +102,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
   };
   
   const getProgressPercentage = () => {
-    // Calculate progress percentage based on current level
     const nextLevelThreshold = astralLevel * 100;
     const currentLevelThreshold = (astralLevel - 1) * 100;
     const pointsInCurrentLevel = energyPoints - currentLevelThreshold;
@@ -122,7 +110,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
     return Math.min(Math.round((pointsInCurrentLevel / pointsNeededForNextLevel) * 100), 100);
   };
 
-  // Properly defined variants for animations
   const pageVariants: Variants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -150,7 +137,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       variants={pageVariants}
       className="min-h-screen px-4 py-8 relative"
     >
-      {/* Enhanced background effects */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-black via-quantum-950/50 to-black/90 z-0"></div>
         <MetatronsBackground 
@@ -163,7 +149,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
         <QuantumParticles count={20} interactive={true} className="z-0" />
       </div>
       
-      {/* Welcome Header */}
       <motion.div variants={fadeInUpVariants} className="relative z-10">
         <WelcomeHeader 
           username={username}
@@ -173,7 +158,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
       </motion.div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative z-10">
-        {/* Left column with energy information */}
         <motion.div variants={fadeInUpVariants}>
           <GlassCard animate variant="purple" className="p-6">
             <LeftSidebar 
@@ -189,13 +173,11 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
           </GlassCard>
         </motion.div>
         
-        {/* Center column with Metatron's Cube */}
         <motion.div 
           className="lg:col-span-2"
           variants={fadeInUpVariants}
         >
           <GlassCard animate variant="default" className="p-4 relative overflow-hidden">
-            {/* Energy field background effect */}
             <div className="absolute inset-0 opacity-50">
               <InteractiveEnergyField 
                 energyPoints={energyPoints} 
@@ -215,7 +197,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
         </motion.div>
       </div>
       
-      {/* Selected node detail panel */}
       {selectedNode && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
