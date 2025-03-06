@@ -12,7 +12,7 @@ const Layout = ({ children, className }: LayoutProps) => {
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced background with sacred geometry network animation */}
-      <GeometryNetworkBackground density={35} speed={0.6} />
+      <GeometryNetworkBackground density={35} speed={0.6} className="z-0" />
       
       {/* Improved glass background layers with better positioning and animations */}
       <div className="fixed inset-0 -z-10 overflow-hidden">
@@ -29,17 +29,26 @@ const Layout = ({ children, className }: LayoutProps) => {
           <div className="wave wave-3" />
         </div>
         
-        {/* Subtle vignette effect around the edges */}
-        <div className="absolute inset-0 bg-gradient-radial from-transparent to-black/30 pointer-events-none" />
+        {/* Improved vignette effect around the edges for better focus */}
+        <div className="absolute inset-0 bg-gradient-radial from-transparent to-black/40 pointer-events-none" />
       </div>
       
       {/* Main content with improved spacing and z-indexing */}
       <main className={cn(
         "container mx-auto px-4 py-8 relative z-10",
-        "transition-all duration-500 ease-in-out", 
+        "transition-all duration-500 ease-in-out",
+        "max-w-screen-xl", // Add max width constraint for better readability
         className
       )}>
-        {children}
+        {/* Skip link for keyboard users for better accessibility */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        
+        {/* Main content area with proper semantic structure */}
+        <div id="main-content" className="focus:outline-none" tabIndex={-1}>
+          {children}
+        </div>
       </main>
     </div>
   );

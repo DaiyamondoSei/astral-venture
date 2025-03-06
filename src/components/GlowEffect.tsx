@@ -14,6 +14,8 @@ export interface GlowEffectProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   style?: React.CSSProperties;
+  ariaLabel?: string;
+  role?: string;
 }
 
 const GlowEffect: React.FC<GlowEffectProps> = ({
@@ -26,7 +28,9 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
   onClick,
   onMouseEnter,
   onMouseLeave,
-  style
+  style,
+  ariaLabel,
+  role
 }) => {
   // Map intensity levels to box shadow blur values with improved values
   const intensityMap = {
@@ -94,12 +98,29 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
       }
     }
   } : {};
+  
+  // Determine proper ARIA attributes for accessibility
+  const getAccessibilityProps = () => {
+    const props: {
+      role?: string;
+      'aria-label'?: string;
+      tabIndex?: number;
+    } = {};
+    
+    if (interactive) {
+      props.role = role || 'button';
+      props['aria-label'] = ariaLabel;
+      props.tabIndex = 0;
+    }
+    
+    return props;
+  };
 
   return (
     <motion.div
       className={cn(
         "relative",
-        interactive && "cursor-pointer",
+        interactive && "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-quantum-400",
         className
       )}
       style={{
@@ -111,6 +132,14 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
       onMouseLeave={onMouseLeave}
       {...getAnimationVariants()}
       {...hoverEffect}
+      {...getAccessibilityProps()}
+      // Add keyboard accessibility for interactive elements
+      onKeyDown={interactive ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      } : undefined}
     >
       {children}
     </motion.div>

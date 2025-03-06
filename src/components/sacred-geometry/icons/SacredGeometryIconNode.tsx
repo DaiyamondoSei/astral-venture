@@ -50,7 +50,7 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
   
   const { fromColor, toColor } = getColorsFromGradient(color);
   
-  // Get the glow color based on the "to" color in the gradient
+  // Get the glow color based on the "to" color in the gradient with better opacity for contrast
   const glowColor = `var(--${toColor.replace('-', '-color-')})`;
   
   return (
@@ -79,13 +79,14 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
           "w-16 h-16 rounded-full flex items-center justify-center cursor-pointer",
           "transition-all duration-300",
           unlocked ? "bg-black/30 backdrop-blur-md" : "bg-black/50",
-          hasDownloadables && "ring-2 ring-white/30 ring-offset-2 ring-offset-transparent"
+          hasDownloadables && "ring-2 ring-white/40 ring-offset-1 ring-offset-black/20"
         )}
-        color={unlocked ? `${glowColor}80` : "rgba(100,100,100,0.3)"}
+        color={unlocked ? `${glowColor}90` : "rgba(100,100,100,0.4)"} // Improved contrast
         intensity={isActive ? "high" : "medium"}
         animation={isActive ? "pulse" : "none"}
         interactive={unlocked}
         onClick={unlocked ? onClick : undefined}
+        ariaLabel={`${name} node. ${isLocked ? 'Locked.' : ''} ${hasDownloadables ? 'Has downloadable materials.' : ''}`}
       >
         <div className={cn(
           "w-12 h-12 rounded-full flex items-center justify-center",
@@ -101,10 +102,10 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
             animated={isActive}
           />
           
-          {/* Enhanced download indicator with animation */}
+          {/* Enhanced download indicator with animation and better visibility */}
           {hasDownloadables && unlocked && (
             <motion.div 
-              className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-md"
+              className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-lg"
               initial={{ y: 0 }}
               animate={{ y: [0, -2, 0] }}
               transition={{ 
@@ -114,7 +115,7 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
                 ease: "easeInOut"
               }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-quantum-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-quantum-600">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -122,15 +123,15 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
             </motion.div>
           )}
           
-          {/* Improved lock indicator with subtle animation */}
+          {/* Improved lock indicator with better contrast */}
           {isLocked && (
             <motion.div 
-              className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center"
+              className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"
               initial={{ opacity: 0.8 }}
-              animate={{ opacity: [0.8, 0.9, 0.8] }}
+              animate={{ opacity: [0.8, 0.95, 0.8] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/90">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/95">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
@@ -138,18 +139,18 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
           )}
         </div>
         
-        {/* Enhanced tooltip on hover with animation */}
+        {/* Enhanced tooltip on hover with animation and better contrast */}
         <AnimatePresence>
           {onHover && id === hoverNode && (
             <motion.div 
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 p-3 bg-black/70 backdrop-blur-xl border border-white/10 rounded-lg text-center z-20 shadow-xl"
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 p-3 bg-black/80 backdrop-blur-xl border border-white/20 rounded-lg text-center z-20 shadow-xl"
               initial={{ opacity: 0, y: -5, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -5, scale: 0.95 }}
               transition={{ duration: 0.2 }}
             >
               <div className="font-display font-semibold text-white">{name}</div>
-              <div className="text-xs text-white/80 mt-1">{description}</div>
+              <div className="text-xs text-white/90 mt-1">{description}</div>
               {hasDownloadables && unlocked && (
                 <div className="text-xs text-quantum-300 mt-2 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
@@ -171,8 +172,8 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
                 </div>
               )}
               
-              {/* Triangle pointer */}
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-black/70"></div>
+              {/* Triangle pointer with improved visibility */}
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-black/80"></div>
             </motion.div>
           )}
         </AnimatePresence>

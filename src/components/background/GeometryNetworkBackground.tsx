@@ -15,7 +15,7 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Generate random nodes for the network
+  // Generate random nodes for the network with better distribution
   const nodes = Array.from({ length: density }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
@@ -25,11 +25,11 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
     duration: (Math.random() * 30 + 50) / speed
   }));
   
-  // Generate connections between nodes
+  // Optimize connections between nodes to reduce unnecessary rendering
   const connections = [];
   for (let i = 0; i < nodes.length; i++) {
-    // Connect each node to 2-4 closest nodes for better network density
-    const connectionsCount = Math.floor(Math.random() * 3) + 2;
+    // Connect each node to 2-3 closest nodes for better network density without overwhelming visuals
+    const connectionsCount = Math.floor(Math.random() * 2) + 2;
     
     for (let j = 0; j < connectionsCount; j++) {
       // Create connections in a more distributed way
@@ -50,7 +50,7 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
       className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
       aria-hidden="true"
     >
-      {/* Animated nodes */}
+      {/* Animated nodes with improved visibility */}
       {nodes.map((node) => (
         <motion.div
           key={`node-${node.id}`}
@@ -60,11 +60,11 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
             top: `${node.y}%`,
             width: `${node.size}rem`,
             height: `${node.size}rem`,
-            background: `radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 70%)`,
+            background: `radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.15) 70%)`,
           }}
           animate={{
-            opacity: [0.1, 0.4, 0.1],
-            scale: [1, 1.5, 1],
+            opacity: [0.2, 0.5, 0.2],
+            scale: [1, 1.4, 1],
           }}
           transition={{
             duration: node.duration,
@@ -79,12 +79,12 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
       <svg className="absolute inset-0 w-full h-full">
         <defs>
           <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.05)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0.3)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0.05)" />
+            <stop offset="0%" stopColor="rgba(255,255,255,0.1)" />
+            <stop offset="50%" stopColor="rgba(255,255,255,0.4)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0.1)" />
           </linearGradient>
           <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
@@ -105,7 +105,7 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
               filter="url(#glow)"
               initial={{ strokeOpacity: 0 }}
               animate={{
-                strokeOpacity: [0.1, 0.4, 0.1],
+                strokeOpacity: [0.2, 0.5, 0.2],
                 strokeDasharray: ["5 3", "3 5", "5 3"],
               }}
               transition={{
@@ -119,18 +119,18 @@ const GeometryNetworkBackground: React.FC<GeometryNetworkBackgroundProps> = ({
         })}
       </svg>
       
-      {/* Improved background glass effects */}
-      <div className="absolute inset-0 bg-gradient-to-b from-quantum-900/40 to-quantum-900/20 backdrop-blur-[80px]" />
+      {/* Optimized background glass effect for better contrast */}
+      <div className="absolute inset-0 bg-gradient-to-b from-quantum-900/50 to-quantum-900/30 backdrop-blur-[60px]" />
       
-      {/* Subtle pulse effect in the center */}
+      {/* Central glow effect for better focus point */}
       <motion.div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/4 h-1/4 rounded-full"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-1/3 rounded-full"
         style={{
-          background: "radial-gradient(circle, rgba(138, 92, 246, 0.15) 0%, rgba(138, 92, 246, 0) 70%)",
+          background: "radial-gradient(circle, rgba(138, 92, 246, 0.2) 0%, rgba(138, 92, 246, 0) 70%)",
         }}
         animate={{
           scale: [1, 1.5, 1],
-          opacity: [0.2, 0.5, 0.2],
+          opacity: [0.3, 0.6, 0.3],
         }}
         transition={{
           duration: 8,
