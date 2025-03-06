@@ -1,15 +1,18 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from '@/components/ui/use-toast';
 
-export const useUserStreak = (userId: string | undefined) => {
-  const [userStreak, setUserStreak] = useState({ current: 0, longest: 0 });
+export function useUserStreak(userId: string | undefined) {
+  const [userStreak, setUserStreak] = useState<{ current: number; longest: number }>({ 
+    current: 0, 
+    longest: 0 
+  });
   const [activatedChakras, setActivatedChakras] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { toast } = useToast();
 
+  // Fetch user streak data
   useEffect(() => {
     const fetchUserStreak = async () => {
       if (!userId) {
@@ -17,141 +20,153 @@ export const useUserStreak = (userId: string | undefined) => {
         return;
       }
       
+      setIsLoading(true);
       try {
-        setIsLoading(true);
         // Fetch streak data
         const { data: streakData, error: streakError } = await supabase
           .from('user_streaks')
           .select('*')
           .eq('user_id', userId)
           .single();
-          
+
         if (streakError) {
-          if (streakError.code === 'PGRST116') {
-            // No streak record found, create one
-            try {
-              await supabase
-                .from('user_streaks')
-                .insert({
-                  user_id: userId,
-                  current_streak: 0,
-                  longest_streak: 0,
-                  last_activity_date: new Date().toISOString()
-                });
-                
-              setUserStreak({ current: 0, longest: 0 });
-            } catch (insertError) {
-              console.error('Error creating user streak record:', insertError);
-              // Don't throw, just continue with default streak values
-            }
-          } else {
-            console.error('Error fetching user streak:', streakError);
-            setError(streakError);
-            // Continue with default values
-          }
+          console.error('Error fetching user streak:', streakError);
+          // Set fallback values instead of throwing
+          setUserStreak({ current: 0, longest: 0 });
         } else if (streakData) {
           setUserStreak({
             current: streakData.current_streak || 0,
             longest: streakData.longest_streak || 0
           });
         }
-        
-        // Fetch activated chakras from the past week
-        try {
-          const today = new Date();
-          const startOfWeek = new Date(today);
-          startOfWeek.setDate(today.getDate() - today.getDay());
-          startOfWeek.setHours(0, 0, 0, 0);
-          
-          const { data: chakraData, error: chakraError } = await supabase
-            .from('user_progress')
-            .select('*')
-            .eq('user_id', userId)
-            .gte('completed_at', startOfWeek.toISOString())
-            .order('completed_at', { ascending: false });
-            
-          if (chakraError) {
-            console.error('Error fetching chakra data:', chakraError);
-            setError(chakraError);
-            // Continue with default values
-          } else if (chakraData && chakraData.length > 0) {
-            const activatedDays = chakraData.map(item => {
-              const date = new Date(item.completed_at);
-              return date.getDay();
-            });
-            
-            setActivatedChakras([...new Set(activatedDays)]);
-          }
-        } catch (chakraError) {
-          console.error('Error processing chakra data:', chakraError);
-          setError(chakraError as Error);
-          // Continue with default values
+
+        // Fetch user progress to determine activated chakras
+        const { data: progressData, error: progressError } = await supabase
+          .from('user_progress')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('completed_at', new Date(new Date().setDate(new Date().getDate() - 30)).toISOString())
+          .order('completed_at', { ascending: false });
+
+        if (progressError) {
+          console.error('Error fetching user progress:', progressError);
+        } else {
+          // Extract chakra activation information from progress data
+          const chakraActivations = progressData
+            ?.filter(item => item.category === 'chakra_activation' || item.category === 'chakra_recalibration')
+            ?.map(item => {
+              const match = item.challenge_id.match(/chakra_(\d+)/);
+              return match ? parseInt(match[1], 10) : null;
+            })
+            .filter((chakraIndex): chakraIndex is number => chakraIndex !== null && !isNaN(chakraIndex));
+
+          setActivatedChakras(chakraActivations || []);
         }
-      } catch (error) {
-        console.error('Error in fetchUserStreak:', error);
-        setError(error as Error);
+      } catch (err) {
+        console.error('Error in useUserStreak:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error occurred'));
+        // Set fallback values
+        setUserStreak({ current: 0, longest: 0 });
+        setActivatedChakras([]);
       } finally {
         setIsLoading(false);
       }
     };
-    
-    fetchUserStreak();
-  }, [userId, toast]);
 
-  const updateStreak = async (newStreak: number) => {
-    if (!userId) return undefined;
-    
-    try {
-      const newLongest = Math.max(newStreak, userStreak.longest);
-      
-      const { error } = await supabase
-        .from('user_streaks')
-        .update({
-          current_streak: newStreak,
-          longest_streak: newLongest,
-          last_activity_date: new Date().toISOString()
-        })
-        .eq('user_id', userId);
-        
-      if (error) throw error;
-        
-      setUserStreak({
-        current: newStreak,
-        longest: newLongest
+    fetchUserStreak();
+  }, [userId]);
+
+  // Update user streak
+  const updateStreak = async (newStreak: number): Promise<number | undefined> => {
+    if (!userId) {
+      toast({
+        title: "Error updating streak",
+        description: "User ID is missing.",
+        variant: "destructive"
       });
-      
-      return newLongest;
-    } catch (error: any) {
+      return undefined;
+    }
+
+    try {
+      const { data: existingStreak, error: fetchError } = await supabase
+        .from('user_streaks')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
+
+      // Calculate longest streak
+      const longestStreak = existingStreak 
+        ? Math.max(existingStreak.longest_streak || 0, newStreak) 
+        : newStreak;
+
+      if (existingStreak) {
+        // Update existing streak
+        const { data, error } = await supabase
+          .from('user_streaks')
+          .update({
+            current_streak: newStreak,
+            longest_streak: longestStreak,
+            last_activity_date: new Date().toISOString().split('T')[0]
+          })
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (error) throw error;
+
+        setUserStreak({
+          current: data?.current_streak || newStreak,
+          longest: data?.longest_streak || longestStreak
+        });
+        
+        return data?.current_streak;
+      } else {
+        // Create new streak record
+        const { data, error } = await supabase
+          .from('user_streaks')
+          .insert({
+            user_id: userId,
+            current_streak: newStreak,
+            longest_streak: newStreak,
+            last_activity_date: new Date().toISOString().split('T')[0]
+          })
+          .select('*')
+          .single();
+
+        if (error) throw error;
+
+        setUserStreak({
+          current: data?.current_streak || newStreak,
+          longest: data?.longest_streak || newStreak
+        });
+        
+        return data?.current_streak;
+      }
+    } catch (error) {
       console.error('Error updating streak:', error);
       toast({
         title: "Failed to update streak",
-        description: error.message,
+        description: "Please try again later.",
         variant: "destructive"
       });
       return undefined;
     }
   };
-  
+
   const updateActivatedChakras = (newActivatedChakras: number[]) => {
-    if (!newActivatedChakras || !Array.isArray(newActivatedChakras)) {
-      console.error('Invalid activatedChakras data:', newActivatedChakras);
-      return;
-    }
-    
-    setActivatedChakras(prev => {
-      const uniqueChakras = [...new Set([...(prev || []), ...newActivatedChakras])];
-      return uniqueChakras;
-    });
+    setActivatedChakras(newActivatedChakras);
   };
 
   return {
     userStreak,
     activatedChakras,
-    updateStreak,
-    updateActivatedChakras,
     isLoading,
-    error
+    error, 
+    updateStreak,
+    updateActivatedChakras
   };
-};
-
-export default useUserStreak;
+}

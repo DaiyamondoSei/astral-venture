@@ -37,11 +37,14 @@ const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => 
     }, 300);
   };
 
+  // Ensure userProfile has a fallback value
+  const safeUserProfile = userProfile || {};
+
   return (
     <div className="space-y-6">
       {activeTab === 'dashboard' && (
         <DashboardContent 
-          userProfile={userProfile}
+          userProfile={safeUserProfile}
           onChallengeComplete={onChallengeComplete}
           onCategorySelect={handleCategorySelect}
           onOpenAiAssistant={handleOpenAiAssistant}

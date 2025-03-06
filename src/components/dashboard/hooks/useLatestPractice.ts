@@ -1,10 +1,10 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 
-export const useLatestPractice = (userId: string | undefined) => {
+export function useLatestPractice(userId: string | undefined) {
   const [latestPractice, setLatestPractice] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
@@ -14,77 +14,68 @@ export const useLatestPractice = (userId: string | undefined) => {
         return;
       }
 
+      setIsLoading(true);
+      setError(null);
+
       try {
-        setIsLoading(true);
-        
-        // Get the latest user progress entry
+        // First get the latest user_progress to find what they completed
         const { data: progressData, error: progressError } = await supabase
           .from('user_progress')
           .select('challenge_id, completed_at, category')
           .eq('user_id', userId)
           .order('completed_at', { ascending: false })
-          .limit(1)
-          .single();
-          
+          .limit(1);
+
         if (progressError) {
           throw progressError;
         }
 
-        if (!progressData) {
+        if (!progressData || progressData.length === 0) {
           setLatestPractice(null);
           setIsLoading(false);
           return;
         }
 
-        // Check if the challenge_id is a valid UUID before querying challenges table
-        const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(progressData.challenge_id);
-        
-        let title = '';
-        if (isValidUuid) {
-          try {
-            // Only query the challenges table if we have a valid UUID
-            const { data: challengeData, error: challengeError } = await supabase
-              .from('challenges')
-              .select('title')
-              .eq('id', progressData.challenge_id)
-              .single();
-              
-            if (challengeError && !challengeError.message.includes('No rows found')) {
-              console.error('Challenge lookup error:', challengeError);
-              // Don't throw here, just continue with a fallback title
-            } else if (challengeData) {
-              title = challengeData.title || '';
-            }
-          } catch (err) {
-            console.error('Error in challenge lookup:', err);
-            // Continue with empty title, don't abort the whole operation
-          }
-        }
-        
-        // Handle non-UUID challenge IDs (like "chakra_5") or fallback if the UUID lookup failed
-        if (!title) {
-          if (progressData.challenge_id.startsWith('chakra_')) {
-            const chakraNumber = progressData.challenge_id.split('_')[1];
-            title = `Chakra ${chakraNumber} Activation`;
-          } else {
-            title = progressData.challenge_id || 'Unknown Practice';
-          }
+        const latestProgress = progressData[0];
+        const challengeId = latestProgress.challenge_id;
+        const category = latestProgress.category || 'unknown';
+
+        // Check if the challenge_id is a UUID or a special ID like "chakra_5"
+        if (challengeId.includes('chakra_') || challengeId.includes('_')) {
+          // For special IDs, create a simplified practice object
+          setLatestPractice({
+            title: `${category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' ')} Practice`,
+            category: category,
+            completedAt: latestProgress.completed_at
+          });
+          setIsLoading(false);
+          return;
         }
 
-        setLatestPractice({
-          title,
-          completedAt: progressData.completed_at,
-          category: progressData.category
-        });
-      } catch (error) {
-        console.error('Error fetching latest practice:', error);
-        setError(error as Error);
-        // Set a fallback latest practice object so the UI can still render
-        setLatestPractice({
-          title: 'Recent practice',
-          completedAt: new Date().toISOString(),
-          category: 'practice'
-        });
+        // For regular UUID challenges, fetch the challenge details
+        const { data: challengeData, error: challengeError } = await supabase
+          .from('challenges')
+          .select('*')
+          .eq('id', challengeId)
+          .single();
+
+        if (challengeError) {
+          console.error('Error fetching challenge data:', challengeError);
+          // Instead of throwing, create a fallback object
+          setLatestPractice({
+            title: `${category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' ')} Practice`,
+            category: category,
+            completedAt: latestProgress.completed_at
+          });
+        } else {
+          setLatestPractice({
+            ...challengeData,
+            completedAt: latestProgress.completed_at
+          });
+        }
+      } catch (err) {
+        console.error('Error in useLatestPractice:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error occurred'));
       } finally {
         setIsLoading(false);
       }
@@ -94,6 +85,4 @@ export const useLatestPractice = (userId: string | undefined) => {
   }, [userId]);
 
   return { latestPractice, isLoading, error };
-};
-
-export default useLatestPractice;
+}
