@@ -1,57 +1,82 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { FeatureTooltipData, GuidedTourData } from './onboardingData';
 import FeatureTooltip from './FeatureTooltip';
 import GuidedTour from './GuidedTour';
-import { useFeatureDiscovery } from './hooks/useFeatureDiscovery';
 
 interface FeatureDiscoveryLayerProps {
-  hasCompletedOnboarding: boolean;
+  showFeatureTooltips: boolean;
+  featureTooltips: FeatureTooltipData[];
+  seenTooltips: Record<string, boolean>;
+  activeTour: string | null;
+  guidedTours: GuidedTourData[];
+  handleTooltipDismiss: (tooltipId: string) => void;
+  handleTourComplete: (tourId: string) => void;
 }
 
-const FeatureDiscoveryLayer: React.FC<FeatureDiscoveryLayerProps> = ({ 
-  hasCompletedOnboarding 
-}) => {
-  const {
-    featureTooltips,
-    guidedTours,
-    seenTooltips,
-    activeTour,
-    showFeatureTooltips,
-    completedTours,
-    handleTooltipDismiss,
-    handleTourComplete
-  } = useFeatureDiscovery(hasCompletedOnboarding);
+// Type that aligns with what GuidedTour expects
+interface TourStep {
+  id: string;
+  targetSelector: string;
+  title: string;
+  content: string;
+  position: 'top' | 'right' | 'bottom' | 'left';
+}
 
-  if (!hasCompletedOnboarding) return null;
+const FeatureDiscoveryLayer: React.FC<FeatureDiscoveryLayerProps> = ({
+  showFeatureTooltips,
+  featureTooltips,
+  seenTooltips,
+  activeTour,
+  guidedTours,
+  handleTooltipDismiss,
+  handleTourComplete
+}) => {
+  // Get the current active tour data
+  const activeTourData = guidedTours.find(tour => tour.id === activeTour);
+  
+  // Convert GuidedTourStep[] to TourStep[] by adding targetSelector
+  const tourSteps: TourStep[] = activeTourData?.steps.map(step => ({
+    ...step,
+    targetSelector: step.target, // Map 'target' to 'targetSelector'
+    content: step.content,      // Keep existing content
+    description: step.content   // Add description property (same as content)
+  })) || [];
+
+  if (!showFeatureTooltips && !activeTourData) {
+    return null;
+  }
 
   return (
-    <>
-      {/* Feature discovery tooltips - only show after onboarding is complete */}
-      {showFeatureTooltips && featureTooltips.map(tooltip => (
-        <FeatureTooltip
-          key={tooltip.id}
-          id={tooltip.id}
-          targetSelector={tooltip.targetSelector}
-          title={tooltip.title}
-          description={tooltip.description}
-          position={tooltip.position}
-          order={tooltip.order}
-          isActive={!seenTooltips[tooltip.id]}
-          onDismiss={handleTooltipDismiss}
-        />
-      ))}
+    <div className="feature-discovery-layer">
+      {/* Feature tooltips */}
+      <AnimatePresence>
+        {showFeatureTooltips && featureTooltips.map(tooltip => {
+          // Only show tooltips that haven't been seen
+          if (seenTooltips[tooltip.id]) return null;
+          
+          return (
+            <FeatureTooltip
+              key={tooltip.id}
+              tooltip={tooltip}
+              onDismiss={() => handleTooltipDismiss(tooltip.id)}
+            />
+          );
+        })}
+      </AnimatePresence>
       
-      {/* Guided tours - show one at a time */}
-      {guidedTours.map(tour => (
+      {/* Guided tour */}
+      {activeTourData && (
         <GuidedTour
-          key={tour.id}
-          tourId={tour.id}
-          steps={tour.steps}
-          isActive={activeTour === tour.id && !completedTours[tour.id]}
-          onComplete={() => handleTourComplete(tour.id)}
+          tourId={activeTourData.id}
+          title={activeTourData.title}
+          description={activeTourData.description}
+          steps={tourSteps}
+          onComplete={() => handleTourComplete(activeTourData.id)}
         />
-      ))}
-    </>
+      )}
+    </div>
   );
 };
 

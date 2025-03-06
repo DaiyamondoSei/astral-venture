@@ -1,394 +1,241 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, X, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface TourStep {
   id: string;
   targetSelector: string;
   title: string;
-  description: string;
-  position?: 'top' | 'right' | 'bottom' | 'left';
-  accentColor?: string;
-  imageUrl?: string;
+  content: string;
+  position: 'top' | 'right' | 'bottom' | 'left';
+  description?: string; // Optional for backward compatibility
 }
 
 interface GuidedTourProps {
   tourId: string;
+  title: string;
+  description: string;
   steps: TourStep[];
-  isActive?: boolean;
-  onComplete?: () => void;
+  onComplete: () => void;
 }
 
 const GuidedTour: React.FC<GuidedTourProps> = ({
   tourId,
+  title,
+  description,
   steps,
-  isActive = true,
   onComplete
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
-  const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
-  const [hasCompletedTour, setHasCompletedTour] = useState(false);
-  const [isScrolling, setIsScrolling] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [tooltipPosition, setTooltipPosition] = useState<'top' | 'right' | 'bottom' | 'left'>('bottom');
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const focusRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isVisible) return;
-      
-      switch (e.key) {
-        case 'Escape':
-          completeTour();
-          break;
-        case 'ArrowRight':
-        case 'Enter':
-          handleNext();
-          break;
-        case 'ArrowLeft':
-          if (currentStepIndex > 0) {
-            setCurrentStepIndex(prev => prev - 1);
-          }
-          break;
-      }
-    };
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  
+  const currentStep = steps[currentStepIndex];
+  
+  const calculatePosition = () => {
+    if (!currentStep) return;
     
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isVisible, currentStepIndex]);
-
-  useEffect(() => {
-    if (isVisible && focusRef.current) {
-      setTimeout(() => {
-        focusRef.current?.focus();
-      }, 100);
-    }
-  }, [isVisible, currentStepIndex]);
-
-  useEffect(() => {
-    const completedTours = JSON.parse(localStorage.getItem('completed-tours') || '{}');
-    if (completedTours[tourId]) {
-      setHasCompletedTour(true);
-      return;
-    }
-
-    if (isActive && !hasCompletedTour) {
-      const timer = setTimeout(() => {
-        positionTooltip();
-        setIsVisible(true);
-      }, 500);
-
-      window.addEventListener('resize', positionTooltip);
-      window.addEventListener('scroll', handleScroll, true);
-      
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('resize', positionTooltip);
-        window.removeEventListener('scroll', handleScroll, true);
-      };
-    }
-  }, [isActive, tourId, hasCompletedTour]);
-
-  useEffect(() => {
-    if (isVisible) {
-      positionTooltip();
-    }
-  }, [currentStepIndex, isVisible]);
-
-  const handleScroll = () => {
-    setIsScrolling(true);
-    clearTimeout(window.onscrollend);
-    
-    window.onscrollend = setTimeout(() => {
-      setIsScrolling(false);
-      positionTooltip();
-    }, 100) as unknown as number;
-  };
-
-  const positionTooltip = () => {
-    if (steps.length === 0 || currentStepIndex >= steps.length) return;
-    
-    const currentStep = steps[currentStepIndex];
     const targetElement = document.querySelector(currentStep.targetSelector);
+    if (!targetElement) return;
     
-    if (!targetElement) {
-      console.warn(`Target element not found: ${currentStep.targetSelector}`);
-      return;
-    }
-
-    const rect = targetElement.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    const tooltipElement = tooltipRef.current;
+    if (!tooltipElement) return;
     
-    if (
-      rect.bottom < 0 || 
-      rect.top > window.innerHeight || 
-      rect.right < 0 || 
-      rect.left > window.innerWidth
-    ) {
-      targetElement.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
-      });
-      
-      setTimeout(positionTooltip, 500);
-      return;
-    }
+    const tooltipRect = tooltipElement.getBoundingClientRect();
     
-    targetElement.classList.add('ring-2', 'ring-offset-2', 'transition-all', 'duration-300');
-    
-    if (currentStep.accentColor) {
-      targetElement.classList.add('ring-[color:var(--accent-color)]');
-      targetElement.style.setProperty('--accent-color', currentStep.accentColor);
-    } else {
-      targetElement.classList.add('ring-quantum-500');
-    }
-    
-    let x = 0, y = 0;
+    // Determine the best position
     const position = currentStep.position || 'bottom';
+    setTooltipPosition(position);
+    
+    let top = 0;
+    let left = 0;
     
     switch (position) {
       case 'top':
-        x = rect.left + rect.width / 2;
-        y = rect.top - 20;
+        top = targetRect.top - tooltipRect.height - 10;
+        left = targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2);
         break;
       case 'right':
-        x = rect.right + 20;
-        y = rect.top + rect.height / 2;
+        top = targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2);
+        left = targetRect.right + 10;
         break;
       case 'bottom':
-        x = rect.left + rect.width / 2;
-        y = rect.bottom + 20;
+        top = targetRect.bottom + 10;
+        left = targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2);
         break;
       case 'left':
-        x = rect.left - 20;
-        y = rect.top + rect.height / 2;
+        top = targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2);
+        left = targetRect.left - tooltipRect.width - 10;
         break;
     }
-
-    setCoordinates({ x, y });
     
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries[0].isIntersecting && isVisible) {
-        positionTooltip();
-      }
-    }, { threshold: 0.5 });
-    
-    observer.observe(targetElement);
-    
-    return () => {
-      targetElement.classList.remove(
-        'ring-2', 
-        'ring-quantum-500', 
-        'ring-offset-2',
-        'ring-[color:var(--accent-color)]'
-      );
-      observer.disconnect();
+    // Ensure the tooltip stays within viewport
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
     };
+    
+    top = Math.max(10, Math.min(viewport.height - tooltipRect.height - 10, top));
+    left = Math.max(10, Math.min(viewport.width - tooltipRect.width - 10, left));
+    
+    setPosition({ top, left });
   };
-
-  const handleNext = () => {
-    const currentStep = steps[currentStepIndex];
-    const currentTarget = document.querySelector(currentStep.targetSelector);
-    if (currentTarget) {
-      currentTarget.classList.remove(
-        'ring-2', 
-        'ring-quantum-500', 
-        'ring-offset-2',
-        'ring-[color:var(--accent-color)]'
-      );
+  
+  useEffect(() => {
+    calculatePosition();
+    
+    // Set up resize observer and window resize handler
+    const handleResize = () => {
+      calculatePosition();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    // Use ResizeObserver to monitor target element size changes
+    if (currentStep) {
+      const targetElement = document.querySelector(currentStep.targetSelector);
+      if (targetElement && 'ResizeObserver' in window) {
+        resizeObserverRef.current = new ResizeObserver(handleResize);
+        resizeObserverRef.current.observe(targetElement);
+      }
     }
     
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+    };
+  }, [currentStep]);
+  
+  const handlePrevStep = () => {
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex(currentStepIndex - 1);
+    }
+  };
+  
+  const handleNextStep = () => {
     if (currentStepIndex < steps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      completeTour();
+      onComplete();
     }
   };
-
-  const completeTour = () => {
-    setIsVisible(false);
-    
-    if (steps.length > 0) {
-      const finalStep = steps[currentStepIndex];
-      const finalTarget = document.querySelector(finalStep.targetSelector);
-      if (finalTarget) {
-        finalTarget.classList.remove(
-          'ring-2', 
-          'ring-quantum-500', 
-          'ring-offset-2',
-          'ring-[color:var(--accent-color)]'
-        );
-      }
-    }
-    
-    const completedTours = JSON.parse(localStorage.getItem('completed-tours') || '{}');
-    completedTours[tourId] = true;
-    localStorage.setItem('completed-tours', JSON.stringify(completedTours));
-    
-    setHasCompletedTour(true);
-    
-    if (onComplete) {
-      setTimeout(() => {
-        onComplete();
-      }, 300);
-    }
-  };
-
-  if (!isActive || hasCompletedTour || steps.length === 0) return null;
-
-  const currentStep = steps[currentStepIndex];
-  if (!currentStep) return null;
-
-  const getPositionStyles = () => {
-    const position = currentStep.position || 'bottom';
-    switch (position) {
-      case 'top':
-        return {
-          container: 'translate(-50%, -100%) mb-3',
-          arrow: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45'
-        };
-      case 'right':
-        return {
-          container: 'translate(0, -50%) ml-3',
-          arrow: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
-        };
-      case 'bottom':
-        return {
-          container: 'translate(-50%, 0) mt-3',
-          arrow: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
-        };
-      case 'left':
-        return {
-          container: 'translate(-100%, -50%) mr-3',
-          arrow: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2 rotate-45'
-        };
-    }
-  };
-
-  const positionStyles = getPositionStyles();
   
-  if (isScrolling) return null;
-
+  // Highlight the current target element
+  useEffect(() => {
+    if (!currentStep) return;
+    
+    const targetElement = document.querySelector(currentStep.targetSelector);
+    if (!targetElement) return;
+    
+    // Add highlight class
+    targetElement.classList.add('tour-highlight');
+    
+    // Store original style
+    const originalOutline = (targetElement as HTMLElement).style.outline;
+    const originalPosition = (targetElement as HTMLElement).style.position;
+    const originalZIndex = (targetElement as HTMLElement).style.zIndex;
+    
+    // Apply highlight styles
+    (targetElement as HTMLElement).style.outline = '2px solid rgba(136, 85, 255, 0.7)';
+    (targetElement as HTMLElement).style.position = 'relative';
+    (targetElement as HTMLElement).style.zIndex = '1000';
+    
+    return () => {
+      // Restore original styles
+      targetElement.classList.remove('tour-highlight');
+      (targetElement as HTMLElement).style.outline = originalOutline;
+      (targetElement as HTMLElement).style.position = originalPosition;
+      (targetElement as HTMLElement).style.zIndex = originalZIndex;
+    };
+  }, [currentStep]);
+  
+  if (!currentStep) return null;
+  
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <>
-          <div 
-            className="sr-only" 
-            role="status" 
-            aria-live="polite"
+    <motion.div
+      ref={tooltipRef}
+      className="fixed z-[1001] bg-background border border-quantum-500/30 rounded-lg shadow-lg w-72"
+      style={{ 
+        top: position.top,
+        left: position.left,
+        transform: 'translate(0, 0)'
+      }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.2 }}
+    >
+      {/* Position indicator triangle */}
+      <div
+        className={`absolute w-3 h-3 bg-background border-t border-l border-quantum-500/30 transform rotate-45 ${
+          tooltipPosition === 'top' ? 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1.5' :
+          tooltipPosition === 'right' ? 'left-0 top-1/2 -translate-y-1/2 -translate-x-1.5' :
+          tooltipPosition === 'bottom' ? 'top-0 left-1/2 -translate-x-1/2 -translate-y-1.5' :
+          'right-0 top-1/2 -translate-y-1/2 translate-x-1.5'
+        }`}
+      />
+      
+      {/* Content */}
+      <div className="p-4">
+        <div className="flex justify-between items-center mb-2">
+          <h4 className="text-sm font-medium text-foreground">{currentStep.title}</h4>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={onComplete}
           >
-            Step {currentStepIndex + 1} of {steps.length}: {currentStep.title}
-          </div>
+            <X size={14} />
+          </Button>
+        </div>
         
-          <div 
-            className="fixed z-50 pointer-events-none"
-            style={{ 
-              left: coordinates.x, 
-              top: coordinates.y 
-            }}
-            ref={tooltipRef}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className={cn(
-                "pointer-events-auto w-80 bg-gradient-to-br from-quantum-900/95 to-astral-900/95 backdrop-blur-sm text-white p-4 rounded-lg shadow-xl",
-                positionStyles.container
-              )}
-              style={currentStep.accentColor ? {
-                backgroundImage: `linear-gradient(to bottom right, rgba(30, 30, 45, 0.95), rgba(20, 20, 35, 0.95))`,
-                borderLeft: `3px solid ${currentStep.accentColor}`
-              } : undefined}
-            >
-              <button 
-                onClick={completeTour}
-                className="absolute top-2 right-2 text-white/70 hover:text-white p-1 rounded-full hover:bg-white/10"
-                aria-label="Close tour"
-              >
-                <X size={16} />
-              </button>
-              
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5">
-                  <Info 
-                    size={18} 
-                    className="text-quantum-400" 
-                    style={currentStep.accentColor ? { color: currentStep.accentColor } : undefined} 
-                  />
-                </div>
-                <div>
-                  <div className="mb-1 font-semibold text-lg">{currentStep.title}</div>
-                  <p className="text-sm text-white/80 mb-4">{currentStep.description}</p>
-                </div>
-              </div>
-              
-              {currentStep.imageUrl && (
-                <div className="mt-2 mb-4 rounded-md overflow-hidden">
-                  <img 
-                    src={currentStep.imageUrl} 
-                    alt={`Visual aid for ${currentStep.title}`} 
-                    className="w-full h-auto"
-                  />
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between">
-                <div className="flex gap-1">
-                  {steps.map((_, index) => (
-                    <div 
-                      key={index}
-                      className={cn(
-                        "w-1.5 h-1.5 rounded-full transition-all duration-200",
-                        index === currentStepIndex 
-                          ? "bg-white" 
-                          : "bg-white/30"
-                      )}
-                      style={
-                        index === currentStepIndex && currentStep.accentColor 
-                          ? { backgroundColor: currentStep.accentColor } 
-                          : undefined
-                      }
-                      aria-hidden="true"
-                    ></div>
-                  ))}
-                </div>
-                
-                <Button 
-                  size="sm" 
-                  onClick={handleNext}
-                  className={cn(
-                    "bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1 h-8"
-                  )}
-                  style={currentStep.accentColor ? {
-                    backgroundColor: `${currentStep.accentColor}40`,
-                    color: 'white'
-                  } : undefined}
-                  ref={focusRef}
-                >
-                  {currentStepIndex < steps.length - 1 ? (
-                    <>Next <ArrowRight size={12} className="ml-1" /></>
-                  ) : (
-                    'Finish'
-                  )}
-                </Button>
-              </div>
-              
-              <div className={cn(
-                "absolute w-3 h-3", 
-                positionStyles.arrow
-              )} 
-              style={{
-                backgroundColor: currentStep.accentColor || '#1f1f2f',
-                boxShadow: '0 0 0 1px rgba(0,0,0,0.05)'
-              }}></div>
-            </motion.div>
+        <p className="text-xs text-muted-foreground mb-4">{currentStep.content}</p>
+        
+        {/* Navigation */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {steps.map((_, index) => (
+              <div
+                key={index}
+                className={`w-1.5 h-1.5 rounded-full ${
+                  index === currentStepIndex
+                    ? 'bg-quantum-500'
+                    : 'bg-muted-foreground/30'
+                }`}
+              />
+            ))}
           </div>
-        </>
-      )}
-    </AnimatePresence>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handlePrevStep}
+              disabled={currentStepIndex === 0}
+            >
+              <ChevronLeft size={16} />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleNextStep}
+            >
+              {currentStepIndex < steps.length - 1 ? <ChevronRight size={16} /> : <X size={16} />}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 };
 
