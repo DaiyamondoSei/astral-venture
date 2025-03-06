@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabaseClient';
+import { toast } from '@/components/ui/use-toast';
 
 // Define standardized API response types
 type ApiResponse<T> = {
@@ -35,10 +36,17 @@ export async function callEdgeFunction<T, U = unknown>(
   body?: U
 ): Promise<T> {
   try {
+    // Track request start time for metrics
+    const startTime = performance.now();
+    
     const { data, error } = await supabase.functions.invoke<ApiResponse<T>>(
       functionName,
       { body }
     );
+    
+    // Calculate processing time
+    const processingTime = performance.now() - startTime;
+    console.log(`Edge function ${functionName} took ${processingTime.toFixed(2)}ms`);
     
     if (error) {
       console.error(`Error calling ${functionName}:`, error);

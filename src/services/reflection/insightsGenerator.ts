@@ -1,30 +1,6 @@
 
-import { supabase } from '@/lib/supabaseClient';
+import { api, ApiError } from '@/utils/apiClient';
 import { toast } from '@/components/ui/use-toast';
-
-// Types for API responses
-type ApiSuccessResponse<T> = {
-  status: 'success';
-  data: T;
-  meta?: {
-    processingTime?: number;
-    version?: string;
-  };
-};
-
-type ApiErrorResponse = {
-  status: 'error';
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-  meta?: {
-    version?: string;
-  };
-};
-
-type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 // Function to generate insights from user reflections
 export const generateInsightsFromReflections = async (
@@ -36,31 +12,20 @@ export const generateInsightsFromReflections = async (
       throw new Error('No reflections provided for insight generation');
     }
 
-    // Call our edge function
-    const { data, error } = await supabase.functions.invoke<ApiResponse<{
-      insights: any[];
-    }>>('generate-insights', {
-      body: { reflections, userId },
-    });
-
-    if (error) {
-      console.error('Error calling generate-insights function:', error);
-      throw new Error(`Failed to generate insights: ${error.message}`);
-    }
-
-    // Check for API error response
-    if (data.status === 'error') {
-      console.error('API returned error:', data.error);
-      throw new Error(`API error: ${data.error.message}`);
-    }
-
-    // Return the generated insights
-    return data.data.insights;
-  } catch (error: any) {
+    // Use our standardized API client
+    const insights = await api.generateInsights(reflections, userId);
+    return insights;
+  } catch (error) {
     console.error('Error generating insights:', error);
+    
+    // Format error message based on error type
+    const errorMessage = error instanceof ApiError
+      ? `${error.message} (${error.code})`
+      : error.message || 'An unknown error occurred';
+    
     toast({
       title: "Failed to generate insights",
-      description: error.message,
+      description: errorMessage,
       variant: "destructive"
     });
     return [];
@@ -74,37 +39,20 @@ export const getAIAssistantResponse = async (
   reflectionContent?: string
 ): Promise<string | null> => {
   try {
-    // Call our ask-assistant edge function with standardized response handling
-    const { data, error } = await supabase.functions.invoke<ApiResponse<{
-      response: string;
-      insights: any[];
-      reflectionId?: string;
-    }>>('ask-assistant', {
-      body: { 
-        message, 
-        reflectionId, 
-        reflectionContent 
-      },
-    });
-
-    if (error) {
-      console.error('Error calling ask-assistant function:', error);
-      throw new Error(`Failed to get AI response: ${error.message}`);
-    }
-
-    // Check for API error response
-    if (data.status === 'error') {
-      console.error('API returned error:', data.error);
-      throw new Error(`API error: ${data.error.message}`);
-    }
-
-    // Return the AI response
-    return data.data.response;
-  } catch (error: any) {
+    // Use our standardized API client
+    const response = await api.getAiResponse(message, reflectionId, reflectionContent);
+    return response.response;
+  } catch (error) {
     console.error('Error getting AI assistant response:', error);
+    
+    // Format error message based on error type
+    const errorMessage = error instanceof ApiError
+      ? `${error.message} (${error.code})`
+      : error.message || 'An unknown error occurred';
+    
     toast({
       title: "AI Assistant Error",
-      description: error.message,
+      description: errorMessage,
       variant: "destructive"
     });
     return null;
