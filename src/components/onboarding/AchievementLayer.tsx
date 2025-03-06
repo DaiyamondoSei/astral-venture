@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { useAchievementTracker } from './hooks/useAchievementTracker';
+import { useAchievementTracker } from './hooks/achievement';
 import { useAchievementNotification } from './hooks/useAchievementNotification';
 import AchievementNotification from './AchievementNotification';
 import AchievementProgressTracker from './AchievementProgressTracker';

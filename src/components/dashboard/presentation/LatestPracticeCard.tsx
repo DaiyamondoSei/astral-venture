@@ -10,16 +10,24 @@ interface LatestPracticeCardProps {
     completedAt: string;
     category: string;
   } | null;
+  isLoading?: boolean;
 }
 
-const LatestPracticeCard: React.FC<LatestPracticeCardProps> = ({ latestPractice }) => {
+const LatestPracticeCard: React.FC<LatestPracticeCardProps> = ({ 
+  latestPractice,
+  isLoading = false
+}) => {
   return (
     <Card className="h-full">
       <CardHeader>
         <CardTitle>Latest Practice</CardTitle>
       </CardHeader>
       <CardContent>
-        {latestPractice ? (
+        {isLoading ? (
+          <div className="h-24 flex items-center justify-center">
+            <div className="animate-pulse text-muted-foreground">Loading...</div>
+          </div>
+        ) : latestPractice ? (
           <div className="space-y-2">
             <h3 className="font-medium">{latestPractice.title}</h3>
             <div className="flex items-center text-sm text-muted-foreground">

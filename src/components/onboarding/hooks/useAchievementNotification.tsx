@@ -1,89 +1,60 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useToast } from '@/components/ui/use-toast';
-import { AchievementData } from '../onboardingData';
 
-export const useAchievementNotification = (
+import { useState, useCallback, useEffect } from 'react';
+import { AchievementData } from '../data/types';
+
+interface UseAchievementNotificationReturn {
+  currentNotification: AchievementData | null;
+  showProgressTracker: boolean;
+  handleDismiss: () => void;
+  showProgress: (duration?: number) => () => void;
+}
+
+/**
+ * Hook to manage achievement notifications and progress tracker visibility
+ */
+export function useAchievementNotification(
   earnedAchievements: AchievementData[],
   dismissAchievement: (id: string) => void
-) => {
+): UseAchievementNotificationReturn {
   const [currentNotification, setCurrentNotification] = useState<AchievementData | null>(null);
-  const [showProgressTracker, setShowProgressTracker] = useState(false);
-  const [progressTrackerTimer, setProgressTrackerTimer] = useState<NodeJS.Timeout | null>(null);
-  const { toast } = useToast();
+  const [showProgressTracker, setShowProgressTracker] = useState<boolean>(false);
+  const [notificationQueue, setNotificationQueue] = useState<AchievementData[]>([]);
 
-  // Show the most recent achievement that hasn't been dismissed
+  // Process earned achievements and add them to the queue
   useEffect(() => {
     if (earnedAchievements.length > 0) {
-      setCurrentNotification(earnedAchievements[0]);
-      
-      // Notify about new achievements with toast
-      const isNewAchievement = earnedAchievements[0] && !currentNotification;
-      if (isNewAchievement) {
-        toast({
-          title: "Achievement Unlocked!",
-          description: earnedAchievements[0].title,
-          duration: 4000,
-        });
-        
-        // Show progress tracker briefly after achievement
-        setShowProgressTracker(true);
-        
-        // Clear existing timer if there is one
-        if (progressTrackerTimer) {
-          clearTimeout(progressTrackerTimer);
-        }
-        
-        // Set new timer
-        const timer = setTimeout(() => setShowProgressTracker(false), 10000);
-        setProgressTrackerTimer(timer);
-      }
-    } else {
-      setCurrentNotification(null);
+      setNotificationQueue(prev => [...prev, ...earnedAchievements]);
     }
-    
-    // Clean up timer on unmount
-    return () => {
-      if (progressTrackerTimer) {
-        clearTimeout(progressTrackerTimer);
-      }
-    };
-  }, [earnedAchievements, toast, currentNotification, progressTrackerTimer]);
+  }, [earnedAchievements]);
 
+  // Process the notification queue
+  useEffect(() => {
+    if (notificationQueue.length > 0 && !currentNotification) {
+      const nextNotification = notificationQueue[0];
+      setCurrentNotification(nextNotification);
+      setNotificationQueue(prev => prev.slice(1));
+    }
+  }, [notificationQueue, currentNotification]);
+
+  // Handle dismissing the current notification
   const handleDismiss = useCallback(() => {
     if (currentNotification) {
       dismissAchievement(currentNotification.id);
       setCurrentNotification(null);
-      
-      // Keep the progress tracker visible after dismissing the notification
-      setShowProgressTracker(true);
-      
-      // Clear existing timer
-      if (progressTrackerTimer) {
-        clearTimeout(progressTrackerTimer);
-      }
-      
-      // Set new timer for progress tracker
-      const timer = setTimeout(() => setShowProgressTracker(false), 5000);
-      setProgressTrackerTimer(timer);
     }
-  }, [currentNotification, dismissAchievement, progressTrackerTimer]);
+  }, [currentNotification, dismissAchievement]);
 
-  // Force show progress tracker for a specific duration
-  const showProgress = useCallback((duration: number = 5000) => {
+  // Show the progress tracker for a specific duration
+  const showProgress = useCallback((duration = 5000) => {
     setShowProgressTracker(true);
     
-    // Clear existing timer
-    if (progressTrackerTimer) {
-      clearTimeout(progressTrackerTimer);
-    }
+    const timeout = setTimeout(() => {
+      setShowProgressTracker(false);
+    }, duration);
     
-    const timer = setTimeout(() => setShowProgressTracker(false), duration);
-    setProgressTrackerTimer(timer);
-    
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [progressTrackerTimer]);
+    // Return cleanup function
+    return () => clearTimeout(timeout);
+  }, []);
 
   return {
     currentNotification,
@@ -91,4 +62,4 @@ export const useAchievementNotification = (
     handleDismiss,
     showProgress
   };
-};
+}

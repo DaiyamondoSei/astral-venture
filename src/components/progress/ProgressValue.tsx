@@ -1,27 +1,25 @@
 
 import React from 'react';
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
-interface ProgressValueProps {
-  progress: number;
-  showPercentage?: boolean;
-  valueClassName?: string;
-  valuePrefix?: string;
-  valueSuffix?: string;
+export interface ProgressValueProps {
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  className?: string;
 }
 
-const ProgressValue: React.FC<ProgressValueProps> = ({
-  progress,
-  showPercentage = true,
-  valueClassName,
-  valuePrefix = '',
-  valueSuffix = '%'
+const ProgressValue: React.FC<ProgressValueProps> = ({ 
+  value, 
+  prefix = '', 
+  suffix = '%',
+  className 
 }) => {
-  if (!showPercentage) return null;
-  
   return (
-    <div className={cn("mt-1 text-xs text-right font-medium text-muted-foreground", valueClassName)}>
-      {valuePrefix}{progress}{valueSuffix}
+    <div className={cn("text-sm font-medium text-right mt-1", className)}>
+      <span className="text-muted-foreground">{prefix}</span>
+      <span>{Math.round(value)}</span>
+      <span className="text-muted-foreground">{suffix}</span>
     </div>
   );
 };

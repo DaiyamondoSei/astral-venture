@@ -1,55 +1,71 @@
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { GlowIntensity, AnimationStyle, ProgressColorScheme, ProgressGlowProps } from './types';
-import { getGlowClasses, getProgressColorClasses } from './utils';
+import { cn } from '@/lib/utils';
 
-const ProgressGlow: React.FC<ProgressGlowProps> = ({ 
-  progress, 
-  intensity = 'medium',
-  animation = 'none',
-  colorScheme = 'primary'
+type AnimationType = "pulse" | "slide" | "ripple" | "none";
+
+interface ProgressGlowProps {
+  progress: number;
+  intensity?: "low" | "medium" | "high";
+  animation?: AnimationType;
+  colorScheme?: string;
+}
+
+const ProgressGlow: React.FC<ProgressGlowProps> = ({
+  progress,
+  intensity = "medium",
+  animation = "none",
+  colorScheme = "primary"
 }) => {
-  // Animation variants
-  const glowVariants = {
-    pulse: {
-      opacity: [0.5, 0.8, 0.5],
-      transition: {
-        repeat: Infinity,
-        duration: 2,
-        ease: "easeInOut",
-      },
-    },
-    slide: {
-      x: ["0%", "100%"],
-      transition: {
-        repeat: Infinity,
-        duration: 2,
-        ease: "easeInOut",
-      },
-    },
-    ripple: {
-      scale: [1, 1.2, 1],
-      opacity: [0.7, 1, 0.7],
-      transition: {
-        repeat: Infinity,
-        duration: 1.5,
-        ease: "easeInOut",
-      },
-    },
-    none: {}
+  // Early return if no progress
+  if (progress <= 0) return null;
+  
+  // Define intensity values
+  const intensityClasses = {
+    low: "opacity-30 blur-[2px]",
+    medium: "opacity-50 blur-[3px]",
+    high: "opacity-70 blur-[4px]",
   };
-
-  // Fix for the type comparison issue
-  if (progress === 0 || animation === 'none') {
-    return null;
-  }
-
+  
+  // Define animation classes
+  const animationClasses = {
+    pulse: "animate-pulse",
+    slide: "animate-slide",
+    ripple: "animate-ripple",
+    none: ""
+  };
+  
+  // Get animation class based on type
+  const animationClass = animationClasses[animation];
+  
+  // Get intensity class
+  const intensityClass = intensityClasses[intensity];
+  
+  // Default glow color if colorScheme is a named scheme
+  const glowColorClasses = {
+    primary: "bg-primary",
+    secondary: "bg-secondary",
+    accent: "bg-accent",
+    quantum: "bg-quantum-500",
+    success: "bg-green-500",
+    warning: "bg-yellow-500",
+    error: "bg-red-500",
+  };
+  
+  // Choose color class based on scheme (default to primary if not found)
+  const colorClass = colorScheme.startsWith("from-") 
+    ? colorScheme.replace("from-", "bg-") 
+    : (glowColorClasses[colorScheme as keyof typeof glowColorClasses] || "bg-primary");
+  
   return (
-    <motion.div
-      className={`absolute inset-0 rounded-full ${getGlowClasses(intensity)} ${getProgressColorClasses(colorScheme)}`}
+    <div 
+      className={cn(
+        "absolute inset-0 rounded-full",
+        colorClass,
+        intensityClass,
+        animationClass
+      )}
       style={{ width: `${progress}%` }}
-      animate={animation === 'none' ? undefined : glowVariants[animation]}
     />
   );
 };
