@@ -18,7 +18,15 @@ export function analyzeDreamTheme(dominantTheme: string | null): EmotionAnalysis
   const emotions: string[] = [];
   const insights: string[] = [];
   
-  if (!dominantTheme) return { chakras, emotions, insights };
+  if (!dominantTheme) return { 
+    chakras, 
+    emotions, 
+    insights, 
+    chakrasActivated: [],
+    dominantEmotion: '',
+    emotionalDepth: 0,
+    emotionBreakdown: {}
+  };
   
   // Get chakras associated with theme
   const themeChakras = themeToChakraMap[dominantTheme];
@@ -38,5 +46,16 @@ export function analyzeDreamTheme(dominantTheme: string | null): EmotionAnalysis
     insights.push(themeInsight);
   }
   
-  return { chakras, emotions, insights };
+  return { 
+    chakras, 
+    emotions, 
+    insights, 
+    chakrasActivated: chakras,
+    dominantEmotion: emotions.length > 0 ? emotions[0] : undefined,
+    emotionalDepth: insights.length > 0 ? 0.5 : 0,
+    emotionBreakdown: emotions.reduce((acc, emotion) => {
+      acc[emotion.toLowerCase()] = 1;
+      return acc;
+    }, {} as Record<string, number>)
+  };
 }

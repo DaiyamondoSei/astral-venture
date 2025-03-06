@@ -154,6 +154,12 @@ export const analyzeChakraActivation = (
     balanceScore
   );
   
+  // Create chakra balance record
+  const chakraBalance: Record<number, number> = {};
+  activatedChakras.forEach(chakraIndex => {
+    chakraBalance[chakraIndex] = chakraIntensity[chakraIndex];
+  });
+  
   return {
     chakras: activatedChakras,
     intensity: chakraIntensity,
@@ -161,9 +167,10 @@ export const analyzeChakraActivation = (
     balanceScore,
     recommendations,
     dominantThemes: Array.from(dominantThemes),
-    // For compatibility with existing code
     emotions: Array.from(dominantThemes),
-    insights: recommendations
+    insights: recommendations,
+    activatedChakras,
+    chakraBalance
   };
 };
 
@@ -176,5 +183,7 @@ export const analyzeChakraActivation = (
 export const getActivatedChakraNames = (
   analysisResult: ChakraAnalysisResult
 ): string[] => {
-  return analysisResult.chakras.map(index => chakraNames[index] || `Chakra ${index}`);
+  // Use activatedChakras if available, fallback to chakras for backward compatibility
+  const chakras = analysisResult.activatedChakras || analysisResult.chakras || [];
+  return chakras.map(index => chakraNames[index] || `Chakra ${index}`);
 };

@@ -20,22 +20,22 @@ export type GeometryResourceType = {
 
 // Emotion analysis result interface
 export interface EmotionAnalysisResult {
-  dominantEmotion: string;
-  emotionalDepth: number;
-  chakrasActivated: number[];
-  emotionBreakdown: Record<string, number>;
+  dominantEmotion?: string;
+  emotionalDepth?: number;
+  chakrasActivated?: number[];
+  emotionBreakdown?: Record<string, number>;
   recommendations?: string[];
   chakras?: number[]; // For backward compatibility
   dominantThemes?: string[]; // For backward compatibility
-  emotions?: string[]; // Adding this for backward compatibility
-  insights?: string[]; // Adding this for backward compatibility
+  emotions?: string[]; // For backward compatibility
+  insights?: string[]; // For backward compatibility
 }
 
 // Chakra analysis result interface
 export interface ChakraAnalysisResult {
-  activatedChakras: number[];
+  activatedChakras?: number[];
   dominantChakra?: number;
-  chakraBalance: Record<number, number>;
+  chakraBalance?: Record<number, number>;
   recommendations?: string[];
   chakras?: number[]; // For backward compatibility
   dominantThemes?: string[]; // For backward compatibility

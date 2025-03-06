@@ -24,7 +24,7 @@ export function analyzeReflectionContent(
   const insights = [...existingInsights];
   
   // Track emotional keywords frequency with expanded vocabulary
-  const emotionalAnalysis: {[key: string]: number} = {
+  const emotionBreakdown: {[key: string]: number} = {
     love: 0,
     joy: 0,
     peace: 0,
@@ -48,7 +48,7 @@ export function analyzeReflectionContent(
       if (matches) {
         // Weight longer or more specific phrases higher
         const weight = word.includes(' ') ? 1.5 : 1.0;
-        emotionalAnalysis[emotion] += matches.length * weight;
+        emotionBreakdown[emotion] += matches.length * weight;
       }
     });
   });
@@ -60,30 +60,30 @@ export function analyzeReflectionContent(
     
     // Detect reflective language
     if (lowerSentence.includes('i feel') || lowerSentence.includes('i felt')) {
-      emotionalAnalysis.love += 0.5;
+      emotionBreakdown.love += 0.5;
     }
     
     // Detect spiritual awareness
     if (lowerSentence.includes('connection') || lowerSentence.includes('universe') || 
         lowerSentence.includes('divine') || lowerSentence.includes('consciousness')) {
-      emotionalAnalysis.spiritual += 0.7;
+      emotionBreakdown.spiritual += 0.7;
     }
     
     // Detect healing processes
     if (lowerSentence.includes('healing') || lowerSentence.includes('release') || 
         lowerSentence.includes('letting go') || lowerSentence.includes('transform')) {
-      emotionalAnalysis.healing += 0.7;
+      emotionBreakdown.healing += 0.7;
     }
     
     // Detect gratitude expressions
     if (lowerSentence.includes('grateful') || lowerSentence.includes('thankful') || 
         lowerSentence.includes('appreciate') || lowerSentence.includes('blessing')) {
-      emotionalAnalysis.gratitude += 1.0;
+      emotionBreakdown.gratitude += 1.0;
     }
   });
   
   // Get top emotions with improved weighting
-  const topEmotions = Object.entries(emotionalAnalysis)
+  const topEmotions = Object.entries(emotionBreakdown)
     .sort((a, b) => b[1] - a[1])
     .filter(([_, count]) => count > 0.5) // Higher threshold for more meaningful results
     .slice(0, 4) // Get more emotions for richer analysis
@@ -134,5 +134,19 @@ export function analyzeReflectionContent(
     insights.push("Continue your reflection practice to deepen your emotional awareness");
   }
   
-  return { chakras, emotions, insights };
+  // Get dominant emotion if available
+  const dominantEmotion = emotions.length > 0 ? emotions[0] : undefined;
+  
+  // Calculate emotional depth (based on insight count and emotion variety)
+  const emotionalDepth = Math.min((insights.length * 0.2) + (emotions.length * 0.15), 1.0);
+  
+  return { 
+    chakras, 
+    emotions, 
+    insights, 
+    dominantEmotion,
+    emotionalDepth,
+    chakrasActivated: chakras,
+    emotionBreakdown
+  };
 }
