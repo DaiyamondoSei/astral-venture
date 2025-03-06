@@ -8,14 +8,15 @@ export function useProgressTracking(
 ): ProgressTrackingResult {
   // Track progress for a specific type
   const trackProgress = useCallback((type: string, amount: number) => {
-    setProgressTracking((prev: Record<string, number>) => {
-      // Create a new object with the updated value
-      return {
-        ...prev,
-        [type]: (prev[type] || 0) + amount
-      };
-    });
-  }, [setProgressTracking]);
+    // Create a new object with the updated value
+    const updatedProgress = {
+      ...state.progressTracking,
+      [type]: (state.progressTracking[type] || 0) + amount
+    };
+    
+    // Call the setter with the new object directly
+    setProgressTracking(updatedProgress);
+  }, [state.progressTracking, setProgressTracking]);
 
   // Log activity with optional details
   const logActivity = useCallback((activityType: string, details?: Record<string, any>) => {
