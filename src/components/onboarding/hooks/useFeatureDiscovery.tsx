@@ -3,97 +3,88 @@ import { useState, useEffect } from 'react';
 import { featureTooltips, guidedTours, FeatureTooltipData, GuidedTourData } from '../onboardingData';
 
 export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
-  // We'll track which tooltips have been seen
   const [seenTooltips, setSeenTooltips] = useState<Record<string, boolean>>({});
   const [completedTours, setCompletedTours] = useState<Record<string, boolean>>({});
-  
-  // Feature discovery state
   const [showFeatureTooltips, setShowFeatureTooltips] = useState(false);
-  const [activeTour, setActiveTour] = useState<string | null>(null);
+  const [activeTour, setActiveTour] = useState<string>('');
   const [activeTooltips, setActiveTooltips] = useState<FeatureTooltipData[]>([]);
-
-  // Load saved state from localStorage
+  
+  // Load seen tooltips and completed tours
   useEffect(() => {
-    // Only show feature tooltips after onboarding is complete
-    if (hasCompletedOnboarding && !showFeatureTooltips) {
-      const timer = setTimeout(() => {
-        setShowFeatureTooltips(true);
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+    const userId = localStorage.getItem('userId') || 'anonymous';
+    const stored = localStorage.getItem(`seen-tooltips-${userId}`);
+    if (stored) {
+      setSeenTooltips(JSON.parse(stored));
     }
-  }, [hasCompletedOnboarding, showFeatureTooltips]);
-
-  // Load saved progress from localStorage and determine active tooltips
+    
+    const storedTours = localStorage.getItem(`completed-tours-${userId}`);
+    if (storedTours) {
+      setCompletedTours(JSON.parse(storedTours));
+    }
+    
+    // Only show tooltips if user has completed onboarding
+    setShowFeatureTooltips(hasCompletedOnboarding);
+  }, [hasCompletedOnboarding]);
+  
+  // Determine which tooltips to show
   useEffect(() => {
-    // Load seen tooltips and completed tours from localStorage
-    const storedSeenTooltips = JSON.parse(localStorage.getItem('seen-tooltips') || '{}');
-    const storedCompletedTours = JSON.parse(localStorage.getItem('completed-tours') || '{}');
+    if (!showFeatureTooltips) {
+      setActiveTooltips([]);
+      return;
+    }
     
-    setSeenTooltips(storedSeenTooltips);
-    setCompletedTours(storedCompletedTours);
+    // Find eligible tooltips (not seen yet)
+    const eligibleTooltips = featureTooltips.filter(tooltip => 
+      !seenTooltips[tooltip.id] && 
+      (!tooltip.requiredStep || localStorage.getItem(`step-completed-${tooltip.requiredStep}`))
+    );
     
-    // Start first tour after onboarding if no tours have been completed
-    if (hasCompletedOnboarding && Object.keys(storedCompletedTours).length === 0) {
-      const firstTour = guidedTours[0]?.id;
-      if (firstTour) {
-        setActiveTour(firstTour);
+    // Limit to max 1 tooltip at a time
+    setActiveTooltips(eligibleTooltips.slice(0, 1));
+    
+    // Check if we should start a tour
+    if (eligibleTooltips.length === 0 && !activeTour) {
+      const eligibleTour = guidedTours.find(tour => 
+        !completedTours[tour.id] && 
+        (!tour.requiredStep || localStorage.getItem(`step-completed-${tour.requiredStep}`))
+      );
+      
+      if (eligibleTour) {
+        setActiveTour(eligibleTour.id);
       }
     }
-
-    // Determine active tooltips - only those not seen before
-    if (showFeatureTooltips) {
-      const filteredTooltips = featureTooltips.filter(
-        tooltip => !storedSeenTooltips[tooltip.id]
-      ).sort((a, b) => a.order - b.order);
-      
-      setActiveTooltips(filteredTooltips);
-    } else {
-      setActiveTooltips([]);
-    }
-  }, [hasCompletedOnboarding, showFeatureTooltips]);
-
+  }, [showFeatureTooltips, seenTooltips, completedTours, activeTour]);
+  
   const dismissTooltip = (tooltipId: string) => {
-    const updatedSeenTooltips = {
-      ...seenTooltips,
-      [tooltipId]: true
-    };
-    
+    const userId = localStorage.getItem('userId') || 'anonymous';
+    const updatedSeenTooltips = { ...seenTooltips, [tooltipId]: true };
     setSeenTooltips(updatedSeenTooltips);
-    setActiveTooltips(prev => prev.filter(tooltip => tooltip.id !== tooltipId));
-    localStorage.setItem('seen-tooltips', JSON.stringify(updatedSeenTooltips));
+    localStorage.setItem(`seen-tooltips-${userId}`, JSON.stringify(updatedSeenTooltips));
+    
+    // Remove from active tooltips
+    setActiveTooltips(prev => prev.filter(t => t.id !== tooltipId));
   };
-
+  
   const dismissTour = (tourId: string) => {
-    const updatedCompletedTours = {
-      ...completedTours,
-      [tourId]: true
-    };
-    
+    const userId = localStorage.getItem('userId') || 'anonymous';
+    const updatedCompletedTours = { ...completedTours, [tourId]: true };
     setCompletedTours(updatedCompletedTours);
-    localStorage.setItem('completed-tours', JSON.stringify(updatedCompletedTours));
+    localStorage.setItem(`completed-tours-${userId}`, JSON.stringify(updatedCompletedTours));
     
-    setActiveTour(null);
-    
-    // Check if there are more tours to show
-    const nextTourIndex = guidedTours.findIndex(tour => tour.id === tourId) + 1;
-    if (nextTourIndex < guidedTours.length) {
-      // Schedule next tour
-      setTimeout(() => {
-        setActiveTour(guidedTours[nextTourIndex].id);
-      }, 5000);
-    }
+    // Clear active tour
+    setActiveTour('');
   };
-
+  
   return {
-    featureTooltips,
-    guidedTours,
-    seenTooltips,
-    activeTour,
     activeTooltips,
-    showFeatureTooltips,
-    completedTours,
+    activeTour,
+    guidedTours,
     dismissTooltip,
-    dismissTour
+    dismissTour,
+    seenTooltips,
+    completedTours,
+    showFeatureTooltips,
+    handleTooltipDismiss: dismissTooltip,
+    handleTourComplete: dismissTour
   };
 };
