@@ -16,11 +16,14 @@ import {
 import { withAuth } from "../shared/authUtils.ts";
 import { 
   generateChatResponse, 
-  ContentModerationType 
+  ContentModerationType,
+  selectOptimalModel,
+  AIModel
 } from "./openaiService.ts";
 import { 
   buildContextualizedPrompt,
-  extractKeyInsights 
+  extractKeyInsights,
+  createPersonalizedSystemPrompt
 } from "./responseGenerator.ts";
 import { fetchUserContext } from "./userContext.ts";
 
@@ -39,7 +42,7 @@ serve(async (req: Request) => {
 async function processRequest(user: any, req: Request): Promise<Response> {
   try {
     // Parse request body
-    const { message, reflectionId, reflectionContent } = await req.json();
+    const { message, reflectionId, reflectionContent, stream = false } = await req.json();
     
     // Validate required parameters
     const validation = validateRequiredParameters(
@@ -71,6 +74,9 @@ async function processRequest(user: any, req: Request): Promise<Response> {
     // Fetch user context for personalized responses
     const userContext = await fetchUserContext(user.id);
     
+    // Create personalized system prompt based on user context
+    const systemPrompt = createPersonalizedSystemPrompt(userContext);
+    
     // Build prompt with additional context
     const prompt = buildContextualizedPrompt(
       message,
@@ -78,11 +84,26 @@ async function processRequest(user: any, req: Request): Promise<Response> {
       reflectionContent
     );
     
-    // Generate response from AI
-    const aiResponse = await generateChatResponse(prompt);
+    // Determine the best model based on message complexity
+    const model = selectOptimalModel(message);
+    
+    // Check if this is a streaming request
+    if (stream) {
+      return handleStreamingRequest(prompt, systemPrompt, model);
+    }
+    
+    // Generate response from AI for non-streaming requests
+    const { content: aiResponse, metrics } = await generateChatResponse(
+      prompt, 
+      systemPrompt,
+      { model }
+    );
     
     // Extract insights from the response
     const insights = extractKeyInsights(aiResponse);
+    
+    // Process suggested practices from the response
+    const suggestedPractices = extractSuggestedPractices(aiResponse);
     
     // Calculate processing time
     const processingTime = Date.now() - startTime;
@@ -90,24 +111,104 @@ async function processRequest(user: any, req: Request): Promise<Response> {
     // Return success response
     return createSuccessResponse(
       {
-        response: aiResponse,
+        answer: aiResponse,
         insights,
-        reflectionId
+        reflectionId,
+        suggestedPractices,
+        relatedInsights: []
       },
       {
         processingTime,
-        version: "1.1.0"
+        tokenUsage: metrics.totalTokens,
+        model: metrics.model,
+        version: "1.2.0"
       }
     );
   } catch (error) {
     console.error("Error in ask-assistant function:", error);
     
+    // Determine if it's a quota error
+    const isQuotaError = error.message && error.message.includes("quota");
+    
     return createErrorResponse(
-      ErrorCode.INTERNAL_ERROR,
-      "Failed to process request",
+      isQuotaError ? ErrorCode.QUOTA_EXCEEDED : ErrorCode.INTERNAL_ERROR,
+      isQuotaError ? "AI service quota exceeded" : "Failed to process request",
       { errorMessage: error.message }
     );
   }
+}
+
+// Handle streaming responses
+async function handleStreamingRequest(
+  prompt: string, 
+  systemPrompt: string, 
+  model: AIModel
+): Promise<Response> {
+  // We'll implement streaming in the next phase
+  // For now, return an error to indicate it's not implemented yet
+  return createErrorResponse(
+    ErrorCode.NOT_IMPLEMENTED,
+    "Streaming responses not implemented yet",
+    { feature: "streaming" }
+  );
+}
+
+// Extract suggested practices from AI response
+function extractSuggestedPractices(response: string): string[] {
+  const practices: string[] = [];
+  
+  // Look for sections that might contain practices
+  const practiceSections = [
+    /suggested practices?:?\s*([\s\S]*?)(?=\n\n|$)/i,
+    /recommended practices?:?\s*([\s\S]*?)(?=\n\n|$)/i,
+    /try these practices?:?\s*([\s\S]*?)(?=\n\n|$)/i,
+    /exercises? to try:?\s*([\s\S]*?)(?=\n\n|$)/i
+  ];
+  
+  // Try to find practice sections
+  for (const regex of practiceSections) {
+    const match = response.match(regex);
+    if (match && match[1]) {
+      // Split by bullet points or numbers
+      const items = match[1]
+        .split(/\n[-•*]\s*|\n\d+\.\s*/)
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+      
+      practices.push(...items);
+      
+      // If we found practices, no need to check other patterns
+      if (items.length > 0) {
+        break;
+      }
+    }
+  }
+  
+  // If no structured practices found, look for sentences with practice keywords
+  if (practices.length === 0) {
+    const practiceKeywords = [
+      "try", "practice", "exercise", "technique", "meditation", 
+      "breathe", "visualize", "journal", "reflect"
+    ];
+    
+    const sentences = response.split(/[.!?]+/).map(s => s.trim());
+    
+    for (const sentence of sentences) {
+      if (sentence.length > 15 && sentence.length < 120) {
+        for (const keyword of practiceKeywords) {
+          if (sentence.toLowerCase().includes(keyword)) {
+            practices.push(sentence);
+            break;
+          }
+        }
+      }
+      
+      // Limit to 3 practices
+      if (practices.length >= 3) break;
+    }
+  }
+  
+  return practices.slice(0, 3); // Limit to top 3 practices
 }
 
 // Content moderation check

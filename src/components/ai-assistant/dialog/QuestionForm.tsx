@@ -13,6 +13,7 @@ interface QuestionFormProps {
   error: string | null;
   reflectionContext?: string;
   isUserLoggedIn: boolean;
+  streamingResponse?: string | null;
 }
 
 const QuestionForm: React.FC<QuestionFormProps> = ({
@@ -22,8 +23,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   loading,
   error,
   reflectionContext,
-  isUserLoggedIn
+  isUserLoggedIn,
+  streamingResponse
 }) => {
+  // Handle streaming responses if available
+  const showStreamingResponse = loading && streamingResponse !== null;
+  
   return (
     <div className="space-y-4">
       <div className="text-sm text-muted-foreground">
@@ -49,6 +54,15 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
           {error}. Please try again.
         </div>
       )}
+      
+      {showStreamingResponse && (
+        <div className="bg-black/20 p-3 rounded-lg border border-white/10 min-h-[80px]">
+          <div className="text-white/90">
+            {streamingResponse}
+            <span className="inline-block animate-pulse">▋</span>
+          </div>
+        </div>
+      )}
 
       <DialogFooter>
         <Button
@@ -60,7 +74,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
           {loading ? (
             <>
               <Loader2 size={16} className="mr-2 animate-spin" />
-              Analyzing...
+              {showStreamingResponse ? "Receiving..." : "Analyzing..."}
             </>
           ) : (
             <>

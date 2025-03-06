@@ -19,9 +19,11 @@ export const useAIAssistant = ({
   const [response, setResponse] = useState<AIResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streamingResponse, setStreamingResponse] = useState<string | null>(null);
+  const [modelInfo, setModelInfo] = useState<{model: string; tokens: number} | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
-
+  
   // Reset the state when the dialog opens/closes
   useEffect(() => {
     if (!open) {
@@ -38,11 +40,12 @@ export const useAIAssistant = ({
     
     setLoading(true);
     setError(null);
+    setStreamingResponse(null);
     
     try {
       console.log('Submitting question:', question);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 40000); // 40-second timeout
       
       const aiResponse = await askAIAssistant({
         question,
@@ -64,19 +67,34 @@ export const useAIAssistant = ({
         aiResponse.suggestedPractices = [];
       }
       
+      // Set model info if available in the response
+      if (aiResponse.meta && aiResponse.meta.model) {
+        setModelInfo({
+          model: aiResponse.meta.model,
+          tokens: aiResponse.meta.tokenUsage || 0
+        });
+      }
+      
       setResponse(aiResponse);
     } catch (error) {
       console.error('Error submitting question:', error);
       
-      // Determine if it's a timeout error
-      const errorMessage = error.name === 'AbortError' 
-        ? 'Request timed out. Please try again.'
-        : 'Failed to connect to AI assistant';
+      // Enhanced error handling
+      let errorMessage = 'Failed to connect to AI assistant';
+      
+      // Determine specific error types
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.message?.includes('quota')) {
+        errorMessage = 'AI service quota exceeded. Please try again later.';
+      } else if (error.message?.includes('rate limit')) {
+        errorMessage = 'Rate limit reached. Please wait a moment and try again.';
+      }
       
       setError(errorMessage);
       toast({
         title: "Couldn't connect to AI assistant",
-        description: "Please try again later.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -88,6 +106,8 @@ export const useAIAssistant = ({
     setQuestion('');
     setResponse(null);
     setError(null);
+    setStreamingResponse(null);
+    setModelInfo(null);
   };
 
   return {
@@ -98,7 +118,9 @@ export const useAIAssistant = ({
     error,
     handleSubmitQuestion,
     reset,
-    user
+    user,
+    streamingResponse,
+    modelInfo
   };
 };
 

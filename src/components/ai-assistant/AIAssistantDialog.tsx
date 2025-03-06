@@ -30,7 +30,9 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
     error,
     handleSubmitQuestion,
     reset,
-    user
+    user,
+    streamingResponse,
+    modelInfo
   } = useAIAssistant({
     reflectionContext,
     selectedReflectionId,
@@ -63,12 +65,14 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
               error={error}
               reflectionContext={reflectionContext}
               isUserLoggedIn={!!user}
+              streamingResponse={streamingResponse}
             />
           ) : (
             <AIResponse
               response={response}
               onReset={reset}
               loading={loading}
+              modelInfo={modelInfo}
             />
           )}
         </div>
