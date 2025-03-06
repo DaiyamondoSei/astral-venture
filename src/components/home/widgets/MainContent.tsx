@@ -44,7 +44,7 @@ const MainContent: React.FC<MainContentProps> = ({
           <CubeWrapper 
             userId={userId}
             energyPoints={energyPoints}
-            onNodeSelect={onNodeSelect}
+            onSelectNode={onNodeSelect}
           />
         </div>
       </GlassCard>
