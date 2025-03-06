@@ -44,7 +44,7 @@ const GlowEffect: React.FC<GlowEffectProps> = ({
       transition: {
         duration: 2,
         repeat: Infinity,
-        repeatType: 'reverse'
+        repeatType: "reverse" as const
       }
     }
   } : {};
