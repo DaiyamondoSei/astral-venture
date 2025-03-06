@@ -3,6 +3,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import EnergyInfoCard from '@/components/home/EnergyInfoCard';
 import { Sparkles } from 'lucide-react';
+import NodeDetailPanel from '@/components/home/NodeDetailPanel';
+import { DownloadableMaterial } from '@/components/home/node-detail/types';
 
 interface LeftSidebarProps {
   energyPoints: number;
@@ -11,7 +13,7 @@ interface LeftSidebarProps {
   progressPercentage: number;
   activatedChakras: number[];
   selectedNode: string | null;
-  selectedNodeMaterials: any[] | null;
+  selectedNodeMaterials: DownloadableMaterial[] | null;
 }
 
 const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -83,7 +85,5 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
     </div>
   );
 };
-
-import NodeDetailPanel from '@/components/home/NodeDetailPanel';
 
 export default LeftSidebar;

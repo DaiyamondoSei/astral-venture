@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import NodeDetailPanel from '@/components/home/NodeDetailPanel';
-import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
+import { DownloadableMaterial } from '@/components/home/node-detail/types';
 
 interface DetailSectionProps {
   selectedNode: string | null;
