@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useTodaysChallenge } from './hooks/useTodaysChallenge';
 import { useLatestPractice } from './hooks/useLatestPractice';
@@ -30,6 +29,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const { latestReflection } = useReflections(user?.id);
   const { latestPractice, isLoading: loadingPractice, error: practiceError } = useLatestPractice(user?.id);
 
+  const handleOpenAiAssistant = () => {
+    onOpenAiAssistant();
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -46,7 +49,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         <div className="col-span-1">
           <AIDashboardCard 
             latestReflection={latestReflection}
-            onOpenAssistant={onOpenAiAssistant}
+            onOpenAssistant={handleOpenAiAssistant}
           />
         </div>
         
