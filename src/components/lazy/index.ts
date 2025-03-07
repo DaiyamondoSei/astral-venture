@@ -1,48 +1,41 @@
 
-import React, { lazy, Suspense } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
+import React, { lazy } from 'react';
 
-// Default fallback for lazy components
-const DefaultFallback = () => (
-  <div className="animate-pulse flex flex-col space-y-4 p-4">
-    <Skeleton className="h-4 w-3/4 rounded" />
-    <Skeleton className="h-32 w-full rounded-md" />
-    <Skeleton className="h-4 w-1/2 rounded" />
-  </div>
-);
-
-// HOC for creating optimized lazy components
-const createLazyComponent = (importFn: () => Promise<any>, LoadingFallback = DefaultFallback) => {
+// Helper function to create lazy components with proper naming for better debugging
+const createLazyComponent = (importFn: () => Promise<any>, displayName: string) => {
   const LazyComponent = lazy(importFn);
-  
-  return (props: any) => (
-    <Suspense fallback={<LoadingFallback />}>
-      <LazyComponent {...props} />
-    </Suspense>
-  );
+  LazyComponent.displayName = `Lazy(${displayName})`;
+  return LazyComponent;
 };
 
-// Lazy loaded components with custom loading states
-export const LazyInteractiveEnergyField = createLazyComponent(
-  () => import('@/components/effects/InteractiveEnergyField')
-);
-
+// Lazy-loaded components
 export const LazyAstralBody = createLazyComponent(
-  () => import('@/components/astral-body/AstralBody')
+  () => import('../entry-animation/AstralBody'),
+  'AstralBody'
 );
 
 export const LazyCosmicAstralBody = createLazyComponent(
-  () => import('@/components/entry-animation/CosmicAstralBody')
-);
-
-export const QuantumParticles = createLazyComponent(
-  () => import('@/components/effects/QuantumParticles')
+  () => import('../entry-animation/CosmicAstralBody'),
+  'CosmicAstralBody'
 );
 
 export const VisualizationTabs = createLazyComponent(
-  () => import('@/components/astral-body-demo/VisualizationTabs')
+  () => import('../astral-body-demo/VisualizationTabs'),
+  'VisualizationTabs'
 );
 
-export const EntryAnimation = createLazyComponent(
-  () => import('@/components/EntryAnimation')
+export const AstralBody = createLazyComponent(
+  () => import('../entry-animation/AstralBody'),
+  'AstralBody'
+);
+
+export const CosmicAstralBody = createLazyComponent(
+  () => import('../entry-animation/CosmicAstralBody'),
+  'CosmicAstralBody'
+);
+
+// Explicitly export QuantumParticles for lazy loading in App.tsx
+export const QuantumParticles = createLazyComponent(
+  () => import('../effects/quantum-particles/QuantumParticles'),
+  'QuantumParticles'
 );

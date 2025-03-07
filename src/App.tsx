@@ -8,6 +8,7 @@ import { Toaster } from '@/components/ui/toaster';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { PerformanceProvider } from './contexts/PerformanceContext';
 import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
+import { QuantumParticles } from '@/components/lazy';
 
 // Lazy load the pages for better performance
 const Index = lazy(() => import('@/pages/index'));
@@ -59,7 +60,7 @@ function App() {
               }>
                 <div className="absolute inset-0 z-0">
                   <Suspense fallback={null}>
-                    <lazy.QuantumParticles count={40} speed={0.8} />
+                    <QuantumParticles count={40} speed={0.8} />
                   </Suspense>
                 </div>
               </ErrorBoundary>
