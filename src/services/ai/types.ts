@@ -1,40 +1,21 @@
 
-import { HistoricalReflection } from '@/components/reflection/types';
-
-/**
- * Shared types for AI services
- */
-
-export interface AIInsight {
-  id?: string;
-  content: string;
-  category: string;
-  confidence?: number;
-  relevance?: number;
-  created_at?: string;
-  reflection_id?: string;
-}
-
+// AI Question type for sending requests
 export interface AIQuestion {
   question: string;
-  context?: string;
   reflectionIds?: string[];
+  context?: string;
   stream?: boolean;
 }
 
+// AI Response type for receiving responses
 export interface AIResponse {
   answer: string;
-  relatedInsights: AIInsight[];
+  relatedInsights?: any[];
   suggestedPractices?: string[];
   meta?: {
-    model?: string;
-    tokenUsage?: number;
+    model: string;
+    tokenUsage: number;
     processingTime?: number;
     streaming?: boolean;
   };
 }
-
-// Supported AI models
-export type AIModel = 
-  | "gpt-4o"         // High quality, higher cost, slower
-  | "gpt-4o-mini";   // Good quality, lower cost, faster

@@ -1,10 +1,18 @@
 
 import { useCallback } from 'react';
 import { askAIAssistant } from '@/services/ai/assistant';
-import { AIQuestion } from '@/services/ai/types';
+import { AIQuestion, AIResponse } from '@/services/ai/types';
+
+interface AssistantState {
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  setResponse: (response: AIResponse) => void;
+  setStreamingResponse: (text: string | null) => void;
+  setModelInfo: (info: {model: string; tokens: number} | null) => void;
+}
 
 interface UseQuestionSubmitProps {
-  state: any;
+  state: AssistantState;
   reflectionContext?: string;
   selectedReflectionId?: string;
   userId: string;
@@ -18,7 +26,7 @@ export const useQuestionSubmit = ({
 }: UseQuestionSubmitProps) => {
   
   const submitQuestion = useCallback(async (question: string) => {
-    if (!question.trim()) return;
+    if (!question.trim() || !userId) return null;
     
     try {
       state.setLoading(true);

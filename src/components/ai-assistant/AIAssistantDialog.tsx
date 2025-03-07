@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent
@@ -39,8 +39,27 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
     open
   });
 
+  // Handle escape key to close dialog when not loading
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        onOpenChange(false);
+      }
+    };
+    
+    if (open) {
+      window.addEventListener('keydown', handleEscapeKey);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [open, loading, onOpenChange]);
+
   const handleClose = () => {
-    onOpenChange(false);
+    if (!loading) {
+      onOpenChange(false);
+    }
   };
 
   // Check if we're in offline mode

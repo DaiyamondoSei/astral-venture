@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { AIResponse } from '@/services/ai/aiService';
+import { AIResponse } from '@/services/ai/types';
 
 export function useAssistantState() {
   const [question, setQuestion] = useState<string>('');

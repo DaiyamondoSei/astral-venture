@@ -1,5 +1,5 @@
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantState } from './useAssistantState';
 import { useQuestionSubmit } from './useQuestionSubmit';
@@ -17,6 +17,17 @@ export const useAIAssistant = ({
 }: UseAIAssistantProps) => {
   const { user } = useAuth();
   const state = useAssistantState();
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    // Set isMounted to true when the component mounts
+    isMounted.current = true;
+    
+    // Set isMounted to false when the component unmounts
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
   
   const { submitQuestion } = useQuestionSubmit({
     state,
@@ -30,7 +41,9 @@ export const useAIAssistant = ({
     if (!open) {
       // Small delay to ensure smooth animation
       const timeout = setTimeout(() => {
-        state.reset();
+        if (isMounted.current) {
+          state.reset();
+        }
       }, 300);
       return () => clearTimeout(timeout);
     }
