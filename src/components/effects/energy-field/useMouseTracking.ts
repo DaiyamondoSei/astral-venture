@@ -1,61 +1,81 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, RefObject, useCallback } from 'react';
+
+interface MousePosition {
+  x: number;
+  y: number;
+}
+
+interface ClickWave {
+  x: number;
+  y: number;
+  active: boolean;
+}
 
 interface UseMouseTrackingProps {
-  containerRef: React.RefObject<HTMLDivElement>;
-  isMounted: React.MutableRefObject<boolean>;
+  containerRef: RefObject<HTMLElement>;
+  isMounted: boolean;
   reactToClick?: boolean;
 }
 
-export const useMouseTracking = ({ 
-  containerRef, 
+export const useMouseTracking = ({
+  containerRef,
   isMounted,
   reactToClick = true
 }: UseMouseTrackingProps) => {
-  const [mousePosition, setMousePosition] = useState<{ x: number, y: number } | null>(null);
-  const [clickWave, setClickWave] = useState<{ x: number, y: number, active: boolean } | null>(null);
+  const [mousePosition, setMousePosition] = useState<MousePosition | null>(null);
+  const [clickWave, setClickWave] = useState<ClickWave | null>(null);
   
-  // Track mouse movement
+  // Handle mouse movement
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setMousePosition({ x, y });
+  }, [containerRef]);
+  
+  // Handle mouse click
+  const handleMouseClick = useCallback((e: MouseEvent) => {
+    if (!containerRef.current || !reactToClick) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Create click wave
+    setClickWave({ x, y, active: true });
+    
+    // Reset click wave after animation completes
+    setTimeout(() => {
+      if (isMounted) {
+        setClickWave(null);
+      }
+    }, 1000); // Match the duration of the ClickWave animation
+  }, [containerRef, reactToClick, isMounted]);
+  
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (containerRef.current && isMounted.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setMousePosition({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
-        });
+    const element = containerRef.current;
+    if (!element) return;
+    
+    // Add event listeners
+    element.addEventListener('mousemove', handleMouseMove);
+    
+    if (reactToClick) {
+      element.addEventListener('click', handleMouseClick);
+    }
+    
+    // Remove event listeners on cleanup
+    return () => {
+      element.removeEventListener('mousemove', handleMouseMove);
+      
+      if (reactToClick) {
+        element.removeEventListener('click', handleMouseClick);
       }
     };
-    
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [containerRef, isMounted]);
-  
-  // Handle click events to create energy waves
-  useEffect(() => {
-    if (!reactToClick) return;
-    
-    const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && isMounted.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setClickWave({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-          active: true
-        });
-        
-        // Reset click wave after animation
-        setTimeout(() => {
-          if (isMounted.current) {
-            setClickWave(null);
-          }
-        }, 1000);
-      }
-    };
-    
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
-  }, [reactToClick, containerRef, isMounted]);
+  }, [containerRef, handleMouseMove, handleMouseClick, reactToClick]);
   
   return { mousePosition, clickWave };
 };

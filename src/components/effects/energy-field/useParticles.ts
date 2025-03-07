@@ -11,119 +11,116 @@ interface UseParticlesProps {
   isMounted: boolean;
 }
 
-export function useParticles({
+export const useParticles = ({
   energyPoints,
   colors,
   particleDensity,
   dimensions,
   mousePosition,
   isMounted
-}: UseParticlesProps) {
-  // Store particles in state
+}: UseParticlesProps) => {
   const [particles, setParticles] = useState<Particle[]>([]);
+  const animationFrameRef = useRef<number | null>(null);
   
-  // Use ref to track previous dimensions to avoid unnecessary recreations
-  const prevDimensionsRef = useRef<{ width: number; height: number } | null>(null);
-  
-  // Use ref to track dependency changes that should trigger particle recreation
-  const particleConfigRef = useRef({
-    energyPoints,
-    colors,
-    particleDensity
-  });
-  
-  // Create particles once dimensions are available or when particle configuration changes significantly
+  // Initialize particles
   useEffect(() => {
-    // Skip if we don't have dimensions yet or if component is not mounted
     if (!dimensions || !isMounted) return;
     
-    // Check if we need to recreate particles by comparing with previous config
-    const needsRecreation = 
-      particleConfigRef.current.energyPoints !== energyPoints ||
-      particleConfigRef.current.particleDensity !== particleDensity ||
-      particleConfigRef.current.colors.join() !== colors.join() ||
-      !prevDimensionsRef.current ||
-      dimensions.width !== prevDimensionsRef.current.width ||
-      dimensions.height !== prevDimensionsRef.current.height;
-    
-    if (!needsRecreation) return;
-    
-    // Update refs with current values
-    particleConfigRef.current = {
-      energyPoints,
-      colors,
-      particleDensity
-    };
-    prevDimensionsRef.current = dimensions;
-    
     // Calculate number of particles based on energy points and density
-    const particleCount = Math.max(5, Math.min(50, Math.floor(energyPoints / 100) * particleDensity));
+    const baseCount = Math.min(75, Math.ceil(energyPoints / 30)) * particleDensity;
+    const count = Math.max(10, Math.min(baseCount, 150)); // Cap between 10-150 particles
     
-    // Create new particles
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < particleCount; i++) {
-      newParticles.push(createParticle(i, dimensions, colors));
-    }
+    const newParticles: Particle[] = Array.from({ length: count }).map((_, index) => {
+      return {
+        id: `p-${index}`,
+        x: Math.random() * dimensions.width,
+        y: Math.random() * dimensions.height,
+        size: Math.random() * 5 + 2,
+        speed: Math.random() * 1.5 + 0.5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        opacity: Math.random() * 0.5 + 0.3,
+        direction: Math.random() * Math.PI * 2,
+        pulse: Math.random() * 2 + 1
+      };
+    });
     
     setParticles(newParticles);
     
-  }, [dimensions, energyPoints, colors, particleDensity, isMounted]);
+    // Cleanup animation frame on unmount
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [energyPoints, particleDensity, dimensions, colors, isMounted]);
   
-  // Update particles based on mouse position
+  // Animate particles
   useEffect(() => {
-    if (!mousePosition || !dimensions || particles.length === 0) return;
+    if (!dimensions || !isMounted) return;
     
-    const mouseX = mousePosition.x;
-    const mouseY = mousePosition.y;
+    let lastTime = performance.now();
     
-    // Skip updates if mouse is outside container
-    if (mouseX < 0 || mouseX > dimensions.width || mouseY < 0 || mouseY > dimensions.height) return;
-    
-    // Throttle mouse-based updates for performance
-    const updateInterval = window.requestAnimationFrame(() => {
+    const animate = (time: number) => {
+      if (!isMounted) return;
+      
+      const delta = time - lastTime;
+      lastTime = time;
+      
       setParticles(prevParticles => {
         return prevParticles.map(particle => {
-          // Calculate distance from mouse
-          const dx = mouseX - (dimensions.width * (particle.x / 100));
-          const dy = mouseY - (dimensions.height * (particle.y / 100));
-          const distance = Math.sqrt(dx * dx + dy * dy);
+          let { x, y, direction, pulse } = particle;
+          const { speed } = particle;
           
-          // Only update particles within interaction range
-          if (distance > 150) return particle;
+          // Apply mouse attraction if mouse is within container
+          let dx = 0;
+          let dy = 0;
           
-          // Calculate repulsion force (stronger for closer particles)
-          const force = Math.max(0.1, 1 - distance / 150);
+          if (mousePosition) {
+            dx = mousePosition.x - x;
+            dy = mousePosition.y - y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < 150) {
+              const factor = 0.02;
+              direction = Math.atan2(dy, dx);
+              pulse = Math.min(pulse + 0.1, 3);
+            } else {
+              // Random wandering
+              direction += (Math.random() - 0.5) * 0.2;
+              pulse = Math.max(pulse - 0.05, 1);
+            }
+          } else {
+            // Random wandering
+            direction += (Math.random() - 0.5) * 0.2;
+          }
           
-          // Update velocity based on force
-          const updatedVx = particle.vx - (dx / distance) * force * 0.2;
-          const updatedVy = particle.vy - (dy / distance) * force * 0.2;
+          // Update position
+          x += Math.cos(direction) * speed * (delta / 16);
+          y += Math.sin(direction) * speed * (delta / 16);
           
-          return {
-            ...particle,
-            vx: updatedVx,
-            vy: updatedVy
-          };
+          // Boundary checking
+          if (x < 0) x = dimensions.width;
+          if (x > dimensions.width) x = 0;
+          if (y < 0) y = dimensions.height;
+          if (y > dimensions.height) y = 0;
+          
+          return { ...particle, x, y, direction, pulse };
         });
       });
-    });
-    
-    // Clean up animation frame on unmount
-    return () => window.cancelAnimationFrame(updateInterval);
-  }, [mousePosition, dimensions, particles]);
-  
-  // Create a new particle with random properties
-  function createParticle(id: number, dimensions: {width: number, height: number}, colors: string[]): Particle {
-    return {
-      id,
-      x: Math.random() * 100, // percentage position
-      y: Math.random() * 100, // percentage position
-      size: Math.random() * 4 + 2,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      vx: (Math.random() - 0.5) * 0.1,
-      vy: (Math.random() - 0.5) * 0.1,
-      opacity: Math.random() * 0.5 + 0.2
+      
+      animationFrameRef.current = requestAnimationFrame(animate);
     };
-  }
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [dimensions, mousePosition, isMounted]);
   
   return particles;
-}
+};

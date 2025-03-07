@@ -25,7 +25,7 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
   className = ''
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const isMounted = useIsMounted();
+  const isMountedRef = useIsMounted();
   
   // Get container dimensions
   const dimensions = useDimensions(containerRef);
@@ -33,7 +33,7 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
   // Track mouse movements and clicks
   const { mousePosition, clickWave } = useMouseTracking({
     containerRef,
-    isMounted,
+    isMounted: isMountedRef.current, // Fixed: Passing the boolean value, not the ref
     reactToClick: reactToMouse
   });
   
@@ -50,7 +50,7 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
     particleDensity: adjustedDensity,
     dimensions,
     mousePosition,
-    isMounted
+    isMounted: isMountedRef.current // Fixed: Passing the boolean value, not the ref
   });
   
   return (
