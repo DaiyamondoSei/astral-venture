@@ -18,6 +18,7 @@ export const useParticleSystem = (
   const isMounted = useRef(true);
   const lastUpdateTime = useRef(0);
   const mousePosition = useRef<{x: number, y: number} | null>(null);
+  const particlesRef = useRef<QuantumParticle[]>([]);
 
   // Track mouse position for interactive mode
   useEffect(() => {
@@ -79,63 +80,65 @@ export const useParticleSystem = (
       createParticle(containerWidth, containerHeight, colors, maxSize, speed)
     );
     
+    particlesRef.current = newParticles;
     setParticles(newParticles);
     
     return () => {
       isMounted.current = false;
     };
-  }, [containerWidth, containerHeight, count, colors, maxSize, speed, particles.length]);
+  }, [containerWidth, containerHeight, count, colors, maxSize, speed]);
 
   // Update particle positions with performance optimizations
   const updateParticles = () => {
     if (!isMounted.current) return;
     
-    setParticles(prevParticles => 
-      prevParticles.map(particle => {
-        // Update position based on velocity
-        let newX = particle.x + particle.vx;
-        let newY = particle.y + particle.vy;
-        let newVx = particle.vx;
-        let newVy = particle.vy;
+    const updatedParticles = particlesRef.current.map(particle => {
+      // Update position based on velocity
+      let newX = particle.x + particle.vx;
+      let newY = particle.y + particle.vy;
+      let newVx = particle.vx;
+      let newVy = particle.vy;
+      
+      // Boundary check with improved bounce physics
+      if (newX < 0 || newX > 100) {
+        newVx = particle.vx * -0.95; // Slightly reduce velocity on bounce for realism
+        newX = newX < 0 ? 0.1 : 99.9; // Keep just inside boundary
+      }
+      
+      if (newY < 0 || newY > 100) {
+        newVy = particle.vy * -0.95;
+        newY = newY < 0 ? 0.1 : 99.9;
+      }
+      
+      // Apply interactive effects if mouse position exists and interactive mode is enabled
+      if (interactive && mousePosition.current) {
+        const dx = mousePosition.current.x - particle.x;
+        const dy = mousePosition.current.y - particle.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // Boundary check with improved bounce physics
-        if (newX < 0 || newX > 100) {
-          newVx = particle.vx * -0.95; // Slightly reduce velocity on bounce for realism
-          newX = newX < 0 ? 0.1 : 99.9; // Keep just inside boundary
+        // Attraction/repulsion based on distance
+        if (distance < 15) { // Percentage-based interaction radius
+          const force = 0.01 * (1 - distance / 15);
+          newVx += dx * force;
+          newVy += dy * force;
         }
-        
-        if (newY < 0 || newY > 100) {
-          newVy = particle.vy * -0.95;
-          newY = newY < 0 ? 0.1 : 99.9;
-        }
-        
-        // Apply interactive effects if mouse position exists and interactive mode is enabled
-        if (interactive && mousePosition.current) {
-          const dx = mousePosition.current.x - particle.x;
-          const dy = mousePosition.current.y - particle.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          // Attraction/repulsion based on distance
-          if (distance < 15) { // Percentage-based interaction radius
-            const force = 0.01 * (1 - distance / 15);
-            newVx += dx * force;
-            newVy += dy * force;
-          }
-        }
-        
-        // Apply slight drag for natural movement
-        newVx *= 0.99;
-        newVy *= 0.99;
-        
-        return {
-          ...particle,
-          x: newX,
-          y: newY,
-          vx: newVx,
-          vy: newVy
-        };
-      })
-    );
+      }
+      
+      // Apply slight drag for natural movement
+      newVx *= 0.99;
+      newVy *= 0.99;
+      
+      return {
+        ...particle,
+        x: newX,
+        y: newY,
+        vx: newVx,
+        vy: newVy
+      };
+    });
+    
+    particlesRef.current = updatedParticles;
+    setParticles(updatedParticles);
   };
 
   return {

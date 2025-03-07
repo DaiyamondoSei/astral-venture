@@ -34,11 +34,13 @@ const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
     backgroundColor: particle.color,
     opacity: particle.opacity,
     willChange: 'transform, opacity', // Performance hint for browsers
+    position: 'absolute',
+    borderRadius: '50%',
+    pointerEvents: 'none',
   }), [particle]);
   
   return (
     <motion.div
-      className="absolute rounded-full pointer-events-none"
       style={particleStyle}
       animate={animationValues.animate}
       transition={animationValues.transition}

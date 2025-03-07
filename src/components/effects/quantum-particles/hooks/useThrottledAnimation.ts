@@ -1,6 +1,6 @@
 
 import { useMemo } from 'react';
-import { getAnimationQualityLevel } from '@/utils/performanceUtils';
+import { getAnimationQualityLevel, getDeviceCapabilities } from '@/utils/performanceUtils';
 
 interface ThrottledAnimationProps {
   animateX: number[];
@@ -40,9 +40,13 @@ export function useThrottledAnimation({
   delay
 }: ThrottledAnimationProps): ThrottledAnimationResult {
   const qualityLevel = getAnimationQualityLevel();
+  const deviceCapabilities = getDeviceCapabilities();
   
   return useMemo(() => {
-    // Scale down animations based on device capability
+    // Scale down animations based on device capability and screen pixel ratio
+    const pixelRatioFactor = deviceCapabilities.pixelRatio > 2 ? 1 : 0.8;
+    
+    // Choose animation complexity based on quality level
     switch (qualityLevel) {
       case 'low':
         // For low-end devices, only animate opacity to save resources
@@ -77,16 +81,16 @@ export function useThrottledAnimation({
         
       case 'high':
       default:
-        // For high-end devices, use all animations
+        // For high-end devices, use all animations with adaptive quality
         return {
           animate: {
-            x: animateX,
-            y: animateY,
-            scale: animateScale,
+            x: deviceCapabilities.pixelRatio > 1 ? animateX : undefined,
+            y: deviceCapabilities.pixelRatio > 1 ? animateY : undefined,
+            scale: animateScale.map(s => s * pixelRatioFactor),
             opacity: animateOpacity
           },
           transition: {
-            duration,
+            duration: duration * pixelRatioFactor,
             repeat: Infinity,
             repeatType: 'reverse',
             delay,
@@ -94,5 +98,5 @@ export function useThrottledAnimation({
           }
         };
     }
-  }, [animateX, animateY, animateScale, animateOpacity, duration, delay, qualityLevel]);
+  }, [animateX, animateY, animateScale, animateOpacity, duration, delay, qualityLevel, deviceCapabilities.pixelRatio]);
 }

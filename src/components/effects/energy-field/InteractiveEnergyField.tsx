@@ -1,34 +1,53 @@
 
 import React, { useRef } from 'react';
-import { EnergyFieldProps } from './types';
-import ParticleComponent from './ParticleComponent';
-import BackgroundGlow from './BackgroundGlow';
-import ClickWave from './ClickWave';
-import { useParticles } from './useParticles';
-import { useMouseTracking } from './useMouseTracking';
 import { useDimensions } from './useDimensions';
 import { useIsMounted } from './useIsMounted';
+import { useMouseTracking } from './useMouseTracking';
+import { useParticles } from './useParticles';
+import ParticleComponent from './ParticleComponent';
+import ClickWave from './ClickWave';
+import BackgroundGlow from './BackgroundGlow';
+import { getOptimalElementCount } from '@/utils/performanceUtils';
 
-const InteractiveEnergyField: React.FC<EnergyFieldProps> = ({
-  energyPoints = 100,
-  colors = ['#8B5CF6', '#6366F1', '#4F46E5', '#A78BFA', '#C4B5FD'],
-  className = '',
-  particleDensity = 1,
-  reactToClick = true,
+interface InteractiveEnergyFieldProps {
+  energyPoints: number;
+  colors?: string[];
+  particleDensity?: number;
+  reactToMouse?: boolean;
+  className?: string;
+}
+
+const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
+  energyPoints,
+  colors = ['#8b5cf6', '#6366f1', '#ec4899', '#0ea5e9', '#22d3ee'],
+  particleDensity = 1.5,
+  reactToMouse = true,
+  className = ''
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isMounted = useIsMounted();
+  
+  // Get container dimensions
   const dimensions = useDimensions(containerRef);
-  const { mousePosition, clickWave } = useMouseTracking({ 
-    containerRef, 
+  
+  // Track mouse movements and clicks
+  const { mousePosition, clickWave } = useMouseTracking({
+    containerRef,
     isMounted,
-    reactToClick 
+    reactToClick: reactToMouse
   });
   
+  // Calculate optimal particle density based on device capabilities
+  const adjustedDensity = getOptimalElementCount(
+    Math.ceil(particleDensity), 
+    'medium'
+  ) / 10;
+  
+  // Create and update particles
   const particles = useParticles({
     energyPoints,
     colors,
-    particleDensity,
+    particleDensity: adjustedDensity,
     dimensions,
     mousePosition,
     isMounted
@@ -36,20 +55,29 @@ const InteractiveEnergyField: React.FC<EnergyFieldProps> = ({
   
   return (
     <div 
-      ref={containerRef} 
-      className={`relative overflow-hidden ${className}`}
-      style={{ minHeight: '200px' }}
+      ref={containerRef}
+      className={`relative overflow-hidden rounded-lg w-full h-full ${className}`}
+      aria-hidden="true"
     >
+      {/* Background glow */}
+      <BackgroundGlow energyPoints={energyPoints} />
+      
       {/* Render particles */}
       {particles.map(particle => (
-        <ParticleComponent key={particle.id} particle={particle} />
+        <ParticleComponent 
+          key={`energy-particle-${particle.id}`}
+          particle={particle}
+        />
       ))}
       
-      {/* Render click wave effect */}
-      <ClickWave clickWave={clickWave} />
-      
-      {/* Add subtle glow effect in the center */}
-      <BackgroundGlow colors={colors} dimensions={dimensions} />
+      {/* Render click wave if active */}
+      {clickWave && clickWave.active && (
+        <ClickWave 
+          x={clickWave.x}
+          y={clickWave.y}
+          color={colors[Math.floor(Math.random() * colors.length)]}
+        />
+      )}
     </div>
   );
 };
