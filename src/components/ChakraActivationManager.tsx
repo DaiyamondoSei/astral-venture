@@ -13,6 +13,9 @@ interface ChakraActivationManagerProps {
   updateUserProfile: (newData: any) => void;
 }
 
+/**
+ * Component that manages chakra activation and recalibration
+ */
 const ChakraActivationManager: React.FC<ChakraActivationManagerProps> = ({
   userId,
   userStreak,
