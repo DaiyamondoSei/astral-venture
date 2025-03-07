@@ -40,24 +40,25 @@ const MainContent: React.FC<MainContentProps> = ({
       animate="visible"
     >
       <GlassmorphicContainer 
-        variant="medium" 
+        variant={isMobile ? "subtle" : "medium"} 
         blur={isMobile ? "light" : "medium"}
         className="p-1 md:p-3 relative overflow-hidden rounded-full aspect-square"
         animate={true}
         motionProps={{
-          whileHover: { scale: 1.02 },
+          whileHover: { scale: 1.01 },
           transition: { duration: 0.3 }
         }}
+        centerContent={true}
       >
-        <div className="absolute inset-0 opacity-50">
+        <div className="absolute inset-0 opacity-40">
           <InteractiveEnergyField 
             energyPoints={energyPoints} 
-            particleDensity={0.5}
+            particleDensity={isMobile ? 0.3 : 0.5}
             className="w-full h-full"
           />
         </div>
         
-        <div className="relative z-10 w-full h-full">
+        <div className="relative z-10 w-full h-full flex items-center justify-center">
           <CubeWrapper 
             userId={userId}
             energyPoints={energyPoints}

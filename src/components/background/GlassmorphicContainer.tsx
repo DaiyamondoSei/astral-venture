@@ -1,5 +1,5 @@
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import { motion, MotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -13,6 +13,8 @@ interface GlassmorphicContainerProps extends React.HTMLAttributes<HTMLDivElement
   className?: string;
   centerContent?: boolean;
   motionProps?: MotionProps;
+  glowEffect?: boolean;
+  shimmer?: boolean;
 }
 
 /**
@@ -27,13 +29,23 @@ export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
   className,
   centerContent = false,
   motionProps,
+  glowEffect = false,
+  shimmer = false,
   ...props
 }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const deviceCapability = getPerformanceCategory();
+  const [performanceAdjusted, setPerformanceAdjusted] = useState(false);
   
   // Reduce effects on low-end devices for better performance
-  const adjustedBlur = deviceCapability === 'low' 
+  useEffect(() => {
+    if (deviceCapability === 'low') {
+      setPerformanceAdjusted(true);
+    }
+  }, [deviceCapability]);
+  
+  // Adjust blur based on device capability
+  const adjustedBlur = performanceAdjusted 
     ? (blur === 'heavy' ? 'medium' : blur === 'medium' ? 'light' : blur) 
     : blur;
   
@@ -73,6 +85,8 @@ export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
     getBgOpacity(),
     getBorderOpacity(),
     centerContent && "flex items-center justify-center",
+    glowEffect && !performanceAdjusted && "shadow-[0_0_15px_rgba(255,255,255,0.1)]",
+    shimmer && !performanceAdjusted && "overflow-hidden",
     className
   );
   
@@ -88,6 +102,21 @@ export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
         {...motionProps}
         {...props}
       >
+        {shimmer && !performanceAdjusted && (
+          <motion.div 
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+            animate={{ 
+              x: ["calc(-100% - 200px)", "calc(100% + 200px)"]
+            }}
+            transition={{ 
+              duration: 2.5, 
+              repeat: Infinity, 
+              ease: "linear",
+              repeatDelay: 4
+            }}
+            style={{ width: "100%" }}
+          />
+        )}
         {children}
       </motion.div>
     );
@@ -100,6 +129,11 @@ export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
       style={{ backdropFilter: `blur(${blurMap[adjustedBlur]})` }}
       {...props}
     >
+      {shimmer && !performanceAdjusted && (
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-shimmer" />
+        </div>
+      )}
       {children}
     </div>
   );

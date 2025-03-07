@@ -1,197 +1,154 @@
 
 /**
- * Performance Utilities
- * 
- * This module provides utilities for managing performance optimizations
- * based on device capabilities and current performance metrics.
+ * Performance detection and management utilities
  */
-
-// Device capability detection
-export type DevicePerformanceCategory = 'low' | 'medium' | 'high';
-export type AnimationQualityLevel = 'minimal' | 'reduced' | 'standard' | 'enhanced';
-
-export interface DeviceCapabilities {
-  // Core device information
-  cpuCores: number;
-  memoryInMB: number | null;
-  devicePixelRatio: number;
-  touchEnabled: boolean;
-  
-  // Browser/platform capabilities
-  webGL: boolean;
-  webGL2: boolean;
-  hardwareAcceleration: boolean;
-  
-  // Connection information
-  connectionType: string | null;
-  effectiveConnectionType: string | null;
-  
-  // Performance metrics
-  performanceGrade: DevicePerformanceCategory;
-}
 
 /**
- * Detect device capabilities for performance optimization
+ * Performance categories for adapting UI complexity
  */
-export function detectDeviceCapabilities(): DeviceCapabilities {
-  // Default/fallback values
-  const defaults: DeviceCapabilities = {
-    cpuCores: 2,
-    memoryInMB: null,
-    devicePixelRatio: 1,
-    touchEnabled: false,
-    webGL: false,
-    webGL2: false,
-    hardwareAcceleration: false,
-    connectionType: null,
-    effectiveConnectionType: null,
-    performanceGrade: 'medium'
-  };
-  
-  // Only run detection in browser environment
+export type PerformanceCategory = 'low' | 'medium' | 'high';
+
+/**
+ * Get device performance category based on device capabilities
+ * @returns PerformanceCategory - low, medium, or high
+ */
+export const getPerformanceCategory = (): PerformanceCategory => {
   if (typeof window === 'undefined') {
-    return defaults;
+    return 'medium'; // Default for SSR
   }
   
   try {
-    // CPU cores detection
-    const cpuCores = navigator.hardwareConcurrency || defaults.cpuCores;
+    // Check for navigator.deviceMemory (returns RAM in GB)
+    const deviceMemory = (navigator as any).deviceMemory || 4;
     
-    // Device pixel ratio
-    const devicePixelRatio = window.devicePixelRatio || 1;
+    // Check for hardware concurrency (CPU cores)
+    const cpuCores = navigator.hardwareConcurrency || 4;
     
-    // Touch capability
-    const touchEnabled = 'ontouchstart' in window || 
-      navigator.maxTouchPoints > 0 || 
-      (navigator as any).msMaxTouchPoints > 0;
+    // Mobile detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
     
-    // WebGL support
-    let webGL = false;
-    let webGL2 = false;
+    // Device pixel ratio (higher on high-end devices)
+    const pixelRatio = window.devicePixelRatio || 1;
+    
+    // Check if the device is an iOS device with low memory
+    const isLowPowerIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) && deviceMemory <= 2;
+    
+    // Check if reducedMotion is preferred
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    
+    // Calculate a rough performance score
+    let performanceScore = 0;
+    
+    // Memory score (0-10)
+    performanceScore += Math.min(deviceMemory * 2.5, 10);
+    
+    // CPU score (0-10)
+    performanceScore += Math.min(cpuCores / 2, 10);
+    
+    // Mobile penalty
+    if (isMobile) performanceScore -= 5;
+    
+    // Low power iOS penalty
+    if (isLowPowerIOS) performanceScore -= 5;
+    
+    // High DPI bonus (or penalty if very high on mobile)
+    if (pixelRatio > 1 && !isMobile) {
+      performanceScore += 2;
+    } else if (pixelRatio > 2 && isMobile) {
+      // High DPI on mobile actually requires more processing power
+      performanceScore -= 2;
+    }
+    
+    // Reduced motion preference is a strong signal
+    if (prefersReducedMotion) {
+      performanceScore -= 8;
+    }
+    
+    // Additional check: calculate a simple FPS benchmark
     try {
-      const canvas = document.createElement('canvas');
-      webGL = !!(window.WebGLRenderingContext && 
-        (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
-      webGL2 = !!(window.WebGL2RenderingContext && canvas.getContext('webgl2'));
+      let frameCount = 0;
+      const startTime = performance.now();
+      const checkFPS = () => {
+        frameCount++;
+        if (performance.now() - startTime < 500) {
+          requestAnimationFrame(checkFPS);
+        } else {
+          // Calculate FPS (multiply by 2 since we only measured 500ms)
+          const fps = frameCount * 2;
+          
+          // Adjust score based on FPS
+          if (fps < 30) performanceScore -= 5;
+          else if (fps > 55) performanceScore += 5;
+        }
+      };
+      
+      // Start FPS check
+      requestAnimationFrame(checkFPS);
     } catch (e) {
-      // WebGL not supported
+      // Failed to check FPS, don't adjust score
+      console.warn('Failed to check FPS:', e);
     }
     
-    // Memory detection (not available in all browsers)
-    let memoryInMB = null;
-    if ((navigator as any).deviceMemory) {
-      memoryInMB = (navigator as any).deviceMemory * 1024;
-    }
-    
-    // Network information
-    let connectionType = null;
-    let effectiveConnectionType = null;
-    if ((navigator as any).connection) {
-      connectionType = (navigator as any).connection.type;
-      effectiveConnectionType = (navigator as any).connection.effectiveType;
-    }
-    
-    // Hardware acceleration - check if transform3d is supported (basic check)
-    const hardwareAcceleration = (() => {
-      const el = document.createElement('div');
-      el.style.cssText = 'transform: translate3d(0, 0, 0)';
-      return el.style.length > 0;
-    })();
-    
-    // Performance categorization
-    let performanceGrade: DevicePerformanceCategory = 'medium';
-    if (
-      (cpuCores >= 6 && devicePixelRatio >= 2 && webGL2) ||
-      (cpuCores >= 4 && memoryInMB && memoryInMB >= 4096 && webGL2)
-    ) {
-      performanceGrade = 'high';
-    } else if (
-      (cpuCores <= 2) ||
-      (memoryInMB && memoryInMB < 2048) ||
-      (!webGL) ||
-      (effectiveConnectionType === '2g') ||
-      (effectiveConnectionType === 'slow-2g')
-    ) {
-      performanceGrade = 'low';
-    }
-    
-    return {
-      cpuCores,
-      memoryInMB,
-      devicePixelRatio,
-      touchEnabled,
-      webGL,
-      webGL2,
-      hardwareAcceleration,
-      connectionType,
-      effectiveConnectionType,
-      performanceGrade
-    };
+    // Convert score to category
+    if (performanceScore < 10) return 'low';
+    if (performanceScore < 18) return 'medium';
+    return 'high';
   } catch (error) {
-    console.warn('Error detecting device capabilities:', error);
-    return defaults;
+    console.warn('Error determining device performance:', error);
+    return 'medium'; // Default fallback
   }
-}
+};
 
 /**
- * Get a performance category (low, medium, high) based on device capabilities
+ * Adjusts animation settings based on device performance
+ * @param lowQuality Settings for low-performance devices
+ * @param mediumQuality Settings for medium-performance devices
+ * @param highQuality Settings for high-performance devices
+ * @returns Appropriate settings based on detected performance
  */
-export function getPerformanceCategory(): DevicePerformanceCategory {
-  const capabilities = detectDeviceCapabilities();
-  return capabilities.performanceGrade;
-}
-
-/**
- * Calculates optimal element count for visualizations based on device performance
- */
-export function getOptimalElementCount(
-  baseCount: number, 
-  componentComplexity: 'low' | 'medium' | 'high' = 'medium'
-): number {
-  const performanceCategory = getPerformanceCategory();
-  
-  // Complexity multipliers
-  const complexityFactors = {
-    low: 0.7,
-    medium: 1,
-    high: 1.3
-  };
-  
-  // Performance scaling factors
-  const performanceScalingFactors = {
-    low: 0.5,
-    medium: 0.8,
-    high: 1
-  };
-  
-  // Apply scaling based on performance category and component complexity
-  const scaledCount = Math.floor(
-    baseCount * 
-    performanceScalingFactors[performanceCategory] * 
-    complexityFactors[componentComplexity]
-  );
-  
-  // Ensure minimum and maximum values
-  return Math.max(
-    Math.floor(baseCount * 0.3), // Minimum 30% of base count
-    Math.min(scaledCount, baseCount) // Cap at base count
-  );
-}
-
-/**
- * Get animation quality level based on device capabilities
- */
-export function getAnimationQualityLevel(): AnimationQualityLevel {
+export function getPerformanceAdjustedSettings<T>(
+  lowQuality: T,
+  mediumQuality: T,
+  highQuality: T
+): T {
   const performanceCategory = getPerformanceCategory();
   
   switch (performanceCategory) {
     case 'low':
-      return 'minimal';
+      return lowQuality;
     case 'medium':
-      return 'reduced';
+      return mediumQuality;
     case 'high':
-      return 'standard';
+      return highQuality;
     default:
-      return 'reduced';
+      return mediumQuality;
   }
 }
+
+/**
+ * Adjusts particle count based on device performance
+ * @param baseCount Desired particle count
+ * @returns Adjusted particle count
+ */
+export const getAdjustedParticleCount = (baseCount: number): number => {
+  const performanceCategory = getPerformanceCategory();
+  
+  switch (performanceCategory) {
+    case 'low':
+      return Math.max(5, Math.floor(baseCount * 0.3));
+    case 'medium':
+      return Math.floor(baseCount * 0.7);
+    case 'high':
+      return baseCount;
+    default:
+      return Math.floor(baseCount * 0.7);
+  }
+};
+
+export default {
+  getPerformanceCategory,
+  getPerformanceAdjustedSettings,
+  getAdjustedParticleCount
+};

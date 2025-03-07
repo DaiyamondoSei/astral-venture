@@ -51,6 +51,17 @@
   /* High Contrast Mode Support */
   --high-contrast-text: #ffffff;
   --high-contrast-background: #000000;
+  
+  /* Glassmorphism Variables */
+  --glass-background: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --glass-blur: 10px;
+  
+  /* Quantum Theme Colors */
+  --quantum-glow: rgba(104, 55, 217, 0.6);
+  --astral-glow: rgba(50, 102, 205, 0.6);
+  --ethereal-glow: rgba(55, 225, 195, 0.6);
 }
 
 /* Typography Classes */
@@ -94,6 +105,50 @@
   font-family: var(--font-heading);
 }
 
+/* Glassmorphism Utilities */
+.glass-panel {
+  @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-lg;
+}
+
+.glass-panel-dark {
+  @apply bg-black/30 backdrop-blur-md border border-white/5 shadow-lg;
+}
+
+.glass-button {
+  @apply bg-white/10 backdrop-blur-md hover:bg-white/20 active:bg-white/15
+         border border-white/20 transition-all duration-200;
+}
+
+.glass-input {
+  @apply bg-black/20 backdrop-blur-md border border-white/10
+         focus:border-white/30 transition-colors;
+}
+
+/* Quantum Theme Specific Utilities */
+.quantum-gradient {
+  @apply bg-gradient-to-br from-quantum-500 to-quantum-700;
+}
+
+.astral-gradient {
+  @apply bg-gradient-to-br from-astral-500 to-astral-700;
+}
+
+.ethereal-gradient {
+  @apply bg-gradient-to-br from-ethereal-500 to-ethereal-700;
+}
+
+.quantum-glow {
+  box-shadow: 0 0 15px var(--quantum-glow);
+}
+
+.astral-glow {
+  box-shadow: 0 0 15px var(--astral-glow);
+}
+
+.ethereal-glow {
+  box-shadow: 0 0 15px var(--ethereal-glow);
+}
+
 /* Form element focus styles */
 button:focus-visible,
 a:focus-visible,
@@ -102,6 +157,13 @@ textarea:focus-visible,
 select:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
+}
+
+/* Enhanced focus styles for touch devices */
+@media (hover: none) {
+  .focus-outline {
+    @apply focus-visible:ring-2 focus-visible:ring-quantum-400 focus-visible:ring-offset-2;
+  }
 }
 
 /* High contrast mode support */
@@ -113,6 +175,12 @@ select:focus-visible {
   .glow-effect {
     forced-color-adjust: none;
     -ms-high-contrast-adjust: none;
+  }
+  
+  /* Ensure buttons have visible borders in high contrast mode */
+  button, 
+  .button {
+    border: 1px solid currentColor;
   }
 }
 
@@ -151,16 +219,48 @@ select:focus-visible {
   color: #e2e2e2;
 }
 
-/* Standardized input styles */
-.input-standard {
-  @apply bg-black/30 border border-white/20 hover:border-white/30 focus:border-white/40 rounded-md px-3 py-2 transition-colors;
-}
-
-.input-standard.error {
-  @apply border-destructive/70 focus:border-destructive focus:ring-destructive/20;
+/* Touch-optimized interactive elements */
+.touch-target {
+  @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
 }
 
 /* Skip links for keyboard users */
 .skip-link {
   @apply absolute -top-12 left-0 bg-black text-white p-3 z-[9999] transition-transform focus:translate-y-12 focus:outline-none;
+}
+
+/* Glassmorphic card styles */
+.glass-card {
+  @apply relative overflow-hidden rounded-xl;
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Advanced glassmorphism effects */
+.glass-card::before {
+  content: '';
+  @apply absolute inset-0 rounded-xl;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+
+/* New shimmer animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2.5s infinite;
 }
