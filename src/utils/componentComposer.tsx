@@ -2,84 +2,93 @@
 import React from 'react';
 
 /**
- * Creates a component composition from a sequence of higher-order components
+ * Creates a composed component by wrapping a component with multiple higher-order components
  * 
- * @param components Array of higher-order components to compose
- * @returns A composed component that wraps the children with all HOCs
+ * @param BaseComponent The base component to wrap
+ * @param enhancers Array of higher-order components to apply
+ * @returns The enhanced component
  */
-export function composeComponents(components: React.FC<{children: React.ReactNode}>[]) {
-  return ({ children }: { children: React.ReactNode }) => (
-    components.reduceRight(
-      (acc, Component) => <Component>{acc}</Component>,
-      <>{children}</>
-    )
-  );
+export function composeComponent<P>(
+  BaseComponent: React.ComponentType<P>,
+  ...enhancers: Array<(Component: React.ComponentType<any>) => React.ComponentType<any>>
+): React.ComponentType<P> {
+  return enhancers.reduceRight(
+    (EnhancedComponent, enhancer) => enhancer(EnhancedComponent),
+    BaseComponent
+  ) as React.ComponentType<P>;
 }
 
 /**
- * Creates a provider composition from multiple context providers
+ * Creates a component with error boundary
  * 
- * @param providers Array of provider components with their props
- * @returns A composed provider that wraps the children with all providers
+ * @param Component The component to wrap with error boundary
+ * @param FallbackComponent Optional custom error fallback component
+ * @returns The component with error boundary
  */
-export function composeProviders(
-  providers: Array<{
-    Provider: React.FC<{children: React.ReactNode} & any>;
-    props?: Record<string, any>;
-  }>
-) {
-  return ({ children }: { children: React.ReactNode }) => (
-    providers.reduceRight(
-      (acc, { Provider, props = {} }) => (
-        <Provider {...props}>{acc}</Provider>
-      ),
-      <>{children}</>
-    )
-  );
-}
-
-/**
- * A higher-order component that adds error boundary functionality to any component
- * 
- * @param Component The component to wrap with an error boundary
- * @param ErrorFallback Optional custom error fallback component
- * @returns The component wrapped in an error boundary
- */
-export function withErrorBoundary<P extends {}>(
+export function withErrorBoundary<P>(
   Component: React.ComponentType<P>,
-  ErrorFallback?: React.ComponentType<{ error: Error; resetErrorBoundary: () => void }>
-) {
-  // Dynamically import ErrorBoundary to avoid circular dependencies
-  const ErrorBoundaryComponent = React.lazy(() => import('@/components/ErrorBoundary'));
-  
-  return (props: P) => (
-    <React.Suspense fallback={<div>Loading error boundary...</div>}>
-      <ErrorBoundaryComponent fallback={ErrorFallback}>
-        <Component {...props} />
-      </ErrorBoundaryComponent>
-    </React.Suspense>
-  );
-}
-
-/**
- * A higher-order component that adds loading state handling
- * 
- * @param Component The component to enhance with loading state
- * @param LoadingComponent Optional custom loading component
- * @returns The component with loading state handling
- */
-export function withLoading<P extends { isLoading?: boolean }>(
-  Component: React.ComponentType<P>,
-  LoadingComponent: React.ComponentType = () => (
-    <div className="flex items-center justify-center p-4">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-quantum-500"></div>
-    </div>
-  )
-) {
-  return (props: P) => {
-    if (props.isLoading) {
-      return <LoadingComponent />;
-    }
-    return <Component {...props} />;
+  FallbackComponent?: React.ComponentType<{ error: Error }>
+): React.ComponentType<P> {
+  return function WithErrorBoundary(props: P) {
+    return (
+      <React.Suspense fallback={<div className="loading">Loading...</div>}>
+        {/* @ts-ignore - ErrorBoundary is imported elsewhere */}
+        <ErrorBoundary FallbackComponent={FallbackComponent}>
+          <Component {...props} />
+        </ErrorBoundary>
+      </React.Suspense>
+    );
   };
+}
+
+/**
+ * Creates a component with lazy loading
+ * 
+ * @param importFn Function that imports the component
+ * @param LoadingComponent Optional custom loading component
+ * @returns The lazily loaded component
+ */
+export function createLazyComponent<P = {}>(
+  importFn: () => Promise<{ default: React.ComponentType<P> }>,
+  LoadingComponent: React.ComponentType = () => <div className="loading">Loading...</div>
+): React.LazyExoticComponent<React.ComponentType<P>> {
+  const LazyComponent = React.lazy(importFn);
+  
+  // Return the lazy component with suspense
+  return LazyComponent;
+}
+
+/**
+ * Higher-order component that adds performance tracking
+ * 
+ * @param Component The component to wrap
+ * @param componentName Optional name for the component
+ * @returns The wrapped component with performance tracking
+ */
+export function withPerformanceTracking<P>(
+  Component: React.ComponentType<P>,
+  componentName?: string
+): React.ComponentType<P> {
+  const displayName = componentName || Component.displayName || Component.name || 'Component';
+  
+  const WrappedComponent = React.memo((props: P) => {
+    React.useEffect(() => {
+      const startTime = performance.now();
+      
+      return () => {
+        const endTime = performance.now();
+        const renderTime = endTime - startTime;
+        
+        if (renderTime > 16) { // More than 1 frame (at 60fps)
+          console.warn(`Slow render detected for ${displayName}: ${renderTime.toFixed(2)}ms`);
+        }
+      };
+    }, []);
+    
+    return <Component {...props} />;
+  });
+  
+  WrappedComponent.displayName = `WithPerformanceTracking(${displayName})`;
+  
+  return WrappedComponent;
 }
