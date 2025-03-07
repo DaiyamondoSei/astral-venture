@@ -1,24 +1,32 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import MetatronsCube from '@/components/sacred-geometry/MetatronsCube';
 import InteractiveMetatronsPortal from '@/components/sacred-geometry/components/InteractiveMetatronsPortal';
 import { toast } from '@/components/ui/use-toast';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 interface CubeWrapperProps {
   userId?: string;
   energyPoints: number;
   onSelectNode: (nodeId: string, downloadables?: DownloadableMaterial[]) => void;
+  onBack?: () => void;
+  isFullscreen?: boolean;
 }
 
 const CubeWrapper: React.FC<CubeWrapperProps> = ({
   userId,
   energyPoints,
-  onSelectNode
+  onSelectNode,
+  onBack,
+  isFullscreen = false
 }) => {
   const [portalActivated, setPortalActivated] = useState(false);
   const [consciousnessLevel, setConsciousnessLevel] = useState(1);
+  const navigate = useNavigate();
   
   const handlePortalActivation = () => {
     setPortalActivated(true);
@@ -44,8 +52,28 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
     ]);
   };
 
+  const handleBackNavigation = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      navigate('/');
+    }
+  };
+
   return (
-    <div className="lg:col-span-2 flex flex-col items-center justify-center">
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-black/90' : 'lg:col-span-2'} flex flex-col items-center justify-center`}>
+      {isFullscreen && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="absolute top-4 left-4 text-white/80 hover:text-white"
+          onClick={handleBackNavigation}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Back to Dashboard
+        </Button>
+      )}
+      
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -68,6 +96,7 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
             userId={userId}
             energyPoints={energyPoints}
             onSelectNode={onSelectNode}
+            onBack={onBack}
           />
         </div>
       </motion.div>

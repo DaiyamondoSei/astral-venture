@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,6 +21,8 @@ export interface SacredGeometryIconNodeProps {
   onHover?: (nodeId: string | null) => void;
 }
 
+let hoverNode: string | null = null;
+
 const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
   id,
   name,
@@ -36,9 +37,7 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
   onClick,
   onHover
 }) => {
-  // Extract color values from tailwind class
   const getColorsFromGradient = (gradientClass: string) => {
-    // Parse from-color-X to-color-Y format
     const fromMatch = gradientClass.match(/from-([a-z]+-\d+)/);
     const toMatch = gradientClass.match(/to-([a-z]+-\d+)/);
     
@@ -50,7 +49,6 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
   
   const { fromColor, toColor } = getColorsFromGradient(color);
   
-  // Get the glow color based on the "to" color in the gradient with better opacity for contrast
   const glowColor = `var(--${toColor.replace('-', '-color-')})`;
   
   return (
@@ -71,8 +69,14 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
         stiffness: 200,
         damping: 20
       }}
-      onMouseEnter={() => onHover?.(id)}
-      onMouseLeave={() => onHover?.(null)}
+      onMouseEnter={() => {
+        hoverNode = id;
+        onHover?.(id);
+      }}
+      onMouseLeave={() => {
+        hoverNode = null;
+        onHover?.(null);
+      }}
     >
       <GlowEffect 
         className={cn(
@@ -102,7 +106,6 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
             animated={isActive}
           />
           
-          {/* Enhanced download indicator with animation and better visibility */}
           {hasDownloadables && unlocked && (
             <motion.div 
               className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-lg"
@@ -123,7 +126,6 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
             </motion.div>
           )}
           
-          {/* Improved lock indicator with better contrast */}
           {isLocked && (
             <motion.div 
               className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"
@@ -139,7 +141,6 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
           )}
         </div>
         
-        {/* Enhanced tooltip on hover with animation and better contrast */}
         <AnimatePresence>
           {onHover && id === hoverNode && (
             <motion.div 
@@ -172,7 +173,6 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
                 </div>
               )}
               
-              {/* Triangle pointer with improved visibility */}
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-black/80"></div>
             </motion.div>
           )}
@@ -181,8 +181,5 @@ const SacredGeometryIconNode: React.FC<SacredGeometryIconNodeProps> = ({
     </motion.div>
   );
 };
-
-// Add a state variable to track hover
-let hoverNode: string | null = null;
 
 export default SacredGeometryIconNode;

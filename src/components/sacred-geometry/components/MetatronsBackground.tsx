@@ -1,351 +1,122 @@
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 
 interface MetatronsBackgroundProps {
-  energyPoints?: number;
-  opacity?: number;
-  enableAnimation?: boolean;
-  interactivity?: 'none' | 'basic' | 'advanced';
-  consciousnessLevel?: number;
+  intensity?: 'low' | 'medium' | 'high';
+  animated?: boolean;
 }
 
-const MetatronsBackground: React.FC<MetatronsBackgroundProps> = ({
-  energyPoints = 0,
-  opacity = 0.15,
-  enableAnimation = true,
-  interactivity = 'basic',
-  consciousnessLevel = 1
+const MetatronsBackground: React.FC<MetatronsBackgroundProps> = ({ 
+  intensity = 'medium', 
+  animated = true 
 }) => {
-  // Calculate complexity based on energy points
-  const complexity = Math.min(Math.floor(energyPoints / 100) + 2, 6);
+  // Calculate intensity values
+  const lineOpacity = intensity === 'low' ? 0.1 : intensity === 'medium' ? 0.15 : 0.2;
+  const glowIntensity = intensity === 'low' ? 0.3 : intensity === 'medium' ? 0.5 : 0.7;
   
-  // Calculate rotation duration based on energy and consciousness
-  const rotationDuration = Math.max(120 - (energyPoints / 20) - (consciousnessLevel * 5), 30);
+  // Animation variants
+  const rotateAnimation = animated ? {
+    rotate: [0, 360],
+    transition: { duration: 300, repeat: Infinity, ease: "linear" }
+  } : {};
   
-  // Calculate pulsation intensity
-  const pulsationIntensity = Math.min(0.2 + (energyPoints / 2000) + (consciousnessLevel / 20), 0.5);
-  
-  // Calculate color intensity based on consciousness level
-  const colorIntensity = Math.min(0.5 + (consciousnessLevel / 10), 1);
-  
-  // Generate colors based on consciousness level
-  const getColor = (baseColor: string, alpha: number): string => {
-    // Higher consciousness levels shift colors toward more violet/indigo tones
-    if (consciousnessLevel > 3) {
-      switch(baseColor) {
-        case 'purple-400': return `rgba(167, 139, 250, ${alpha})`;  // More vibrant purple
-        case 'purple-500': return `rgba(139, 92, 246, ${alpha})`;   // Standard purple
-        case 'blue-400': return `rgba(129, 140, 248, ${alpha})`;    // Indigo-ish
-        case 'quantum-400': return `rgba(124, 58, 237, ${alpha * 1.2})`;  // More vivid
-        case 'quantum-500': return `rgba(109, 40, 217, ${alpha * 1.2})`;  // Deeper quantum
-        case 'indigo-400': return `rgba(165, 180, 252, ${alpha * 1.1})`;  // Lighter indigo
-        default: return `rgba(139, 92, 246, ${alpha})`;             // Default to purple
-      }
-    }
-    // Default colors for regular consciousness levels
-    switch(baseColor) {
-      case 'purple-400': return `rgba(167, 139, 250, ${alpha})`;
-      case 'purple-500': return `rgba(139, 92, 246, ${alpha})`;
-      case 'blue-400': return `rgba(96, 165, 250, ${alpha})`;
-      case 'quantum-400': return `rgba(124, 58, 237, ${alpha})`;
-      case 'quantum-500': return `rgba(109, 40, 217, ${alpha})`;
-      case 'indigo-400': return `rgba(129, 140, 248, ${alpha})`;
-      default: return `rgba(139, 92, 246, ${alpha})`;
-    }
-  };
-
-  // Memoize the generated elements to prevent unnecessary re-renders
-  const { circles, lines, sacredShapes } = useMemo(() => {
-    // Generate circles for Metatron's Cube
-    const generatedCircles = Array.from({ length: complexity }).map((_, index) => {
-      const radius = (40 - index * 4);
-      const circleOpacity = opacity * (0.7 + (index / complexity) * 0.3) * colorIntensity;
-      
-      return (
-        <motion.circle
-          key={`circle-${index}`}
-          cx="50%"
-          cy="50%"
-          r={`${radius}%`}
-          fill="none"
-          stroke={getColor(index % 2 === 0 ? 'purple-500' : 'quantum-400', circleOpacity)}
-          strokeWidth={0.3 + (index * 0.1)}
-          initial={{ opacity: 0 }}
-          animate={{ 
-            opacity: circleOpacity,
-            strokeDashoffset: enableAnimation ? [0, 1000] : 0
-          }}
-          transition={{ 
-            opacity: { duration: 1 },
-            strokeDashoffset: { 
-              duration: rotationDuration + (index * 10), 
-              repeat: Infinity,
-              ease: "linear" 
-            }
-          }}
-          strokeDasharray={index % 2 === 0 ? "4 4" : "1 8"}
-        />
-      );
-    });
-    
-    // Generate lines connecting the nodes in Metatron's Cube
-    const generatedLines = [];
-    
-    // Helper function to create line with specific angle
-    const createLine = (angle: number, index: number) => {
-      const length = 38; // Percentage of the viewBox
-      const x1 = 50;
-      const y1 = 50;
-      const x2 = x1 + length * Math.cos(angle);
-      const y2 = y1 + length * Math.sin(angle);
-      const lineOpacity = opacity * (0.9 - (index % 3) * 0.2) * colorIntensity;
-      
-      return (
-        <motion.line
-          key={`line-${index}`}
-          x1={`${x1}%`}
-          y1={`${y1}%`}
-          x2={`${x2}%`}
-          y2={`${y2}%`}
-          stroke={getColor(index % 3 === 0 ? 'quantum-500' : (index % 3 === 1 ? 'purple-400' : 'indigo-400'), lineOpacity)}
-          strokeWidth={0.5}
-          initial={{ opacity: 0 }}
-          animate={{ 
-            opacity: lineOpacity,
-            rotate: enableAnimation ? [0, 360] : 0
-          }}
-          transition={{ 
-            opacity: { duration: 1 },
-            rotate: { 
-              duration: rotationDuration * 2,
-              repeat: Infinity,
-              ease: "linear"
-            }
-          }}
-        />
-      );
-    };
-    
-    // Create lines based on energy level
-    const lineCount = energyPoints > 500 ? 12 : (energyPoints > 300 ? 9 : 6);
-    
-    for (let i = 0; i < lineCount; i++) {
-      const angle = (Math.PI * 2 * i) / lineCount;
-      generatedLines.push(createLine(angle, i));
-    }
-    
-    // Create internal connections if energy level is high enough
-    if (energyPoints > 300) {
-      for (let i = 0; i < 6; i++) {
-        const angle1 = (Math.PI * 2 * i) / 6;
-        const angle2 = (Math.PI * 2 * ((i + 2) % 6)) / 6;
-        
-        const radius = 30;
-        const x1 = 50 + radius * Math.cos(angle1);
-        const y1 = 50 + radius * Math.sin(angle1);
-        const x2 = 50 + radius * Math.cos(angle2);
-        const y2 = 50 + radius * Math.sin(angle2);
-        const connectionOpacity = opacity * 0.8 * colorIntensity;
-        
-        generatedLines.push(
-          <motion.line
-            key={`connection-${i}`}
-            x1={`${x1}%`}
-            y1={`${y1}%`}
-            x2={`${x2}%`}
-            y2={`${y2}%`}
-            stroke={getColor('blue-400', connectionOpacity)}
-            strokeWidth={0.3}
-            initial={{ opacity: 0 }}
-            animate={{ 
-              opacity: [connectionOpacity * 0.5, connectionOpacity, connectionOpacity * 0.5]
-            }}
-            transition={{ 
-              opacity: { 
-                duration: 4 + i,
-                repeat: Infinity,
-                repeatType: "reverse"
-              }
-            }}
-          />
-        );
-      }
-    }
-    
-    // Add sacred geometry shapes for higher energy levels
-    let generatedSacredShapes = null;
-    
-    if (energyPoints > 500) {
-      // Higher consciousness levels get more complex sacred geometry
-      if (consciousnessLevel >= 3) {
-        // Use vesica piscis for higher consciousness
-        generatedSacredShapes = (
-          <motion.g>
-            <motion.circle
-              cx="40%"
-              cy="50%"
-              r="20%"
-              fill="none"
-              stroke={getColor('quantum-400', opacity * 0.25 * colorIntensity)}
-              strokeWidth={0.4}
-              initial={{ opacity: 0 }}
-              animate={{ 
-                opacity: opacity * 0.25 * colorIntensity,
-                rotate: enableAnimation ? [0, 360] : 0,
-                scale: [1, 1 + pulsationIntensity * 0.5, 1]
-              }}
-              transition={{ 
-                opacity: { duration: 1 },
-                rotate: { 
-                  duration: rotationDuration,
-                  repeat: Infinity,
-                  ease: "linear"
-                },
-                scale: {
-                  duration: 15,
-                  repeat: Infinity,
-                  repeatType: "reverse",
-                  ease: "easeInOut"
-                }
-              }}
-            />
-            <motion.circle
-              cx="60%"
-              cy="50%"
-              r="20%"
-              fill="none"
-              stroke={getColor('purple-500', opacity * 0.25 * colorIntensity)}
-              strokeWidth={0.4}
-              initial={{ opacity: 0 }}
-              animate={{ 
-                opacity: opacity * 0.25 * colorIntensity,
-                rotate: enableAnimation ? [0, -360] : 0,
-                scale: [1, 1 + pulsationIntensity * 0.5, 1]
-              }}
-              transition={{ 
-                opacity: { duration: 1 },
-                rotate: { 
-                  duration: rotationDuration * 1.1,
-                  repeat: Infinity,
-                  ease: "linear"
-                },
-                scale: {
-                  duration: 18,
-                  repeat: Infinity,
-                  repeatType: "reverse",
-                  ease: "easeInOut"
-                }
-              }}
-            />
-          </motion.g>
-        );
-      } else {
-        // Use simpler sacred geometry for regular consciousness
-        generatedSacredShapes = (
-          <motion.polygon
-            points="50,20 80,65 35,90 20,65 65,40"
-            fill="none"
-            stroke={getColor('purple-400', opacity * 0.3 * colorIntensity)}
-            strokeWidth={0.4}
-            initial={{ opacity: 0 }}
-            animate={{ 
-              opacity: opacity * 0.3 * colorIntensity,
-              rotate: enableAnimation ? [0, 360] : 0,
-              scale: [1, 1 + pulsationIntensity, 1]
-            }}
-            transition={{ 
-              opacity: { duration: 1 },
-              rotate: { 
-                duration: rotationDuration,
-                repeat: Infinity,
-                ease: "linear"
-              },
-              scale: {
-                duration: 20,
-                repeat: Infinity,
-                repeatType: "reverse",
-                ease: "easeInOut"
-              }
-            }}
-          />
-        );
-      }
-    }
-
-    // If energy points are very high, add flower of life pattern
-    if (energyPoints > 800 && consciousnessLevel > 2) {
-      // Create a flower of life pattern
-      const flowerRadius = 10;
-      const centers = [
-        [50, 50],  // Center
-        [50 + flowerRadius * Math.cos(0), 50 + flowerRadius * Math.sin(0)],
-        [50 + flowerRadius * Math.cos(Math.PI/3), 50 + flowerRadius * Math.sin(Math.PI/3)],
-        [50 + flowerRadius * Math.cos(2*Math.PI/3), 50 + flowerRadius * Math.sin(2*Math.PI/3)],
-        [50 + flowerRadius * Math.cos(Math.PI), 50 + flowerRadius * Math.sin(Math.PI)],
-        [50 + flowerRadius * Math.cos(4*Math.PI/3), 50 + flowerRadius * Math.sin(4*Math.PI/3)],
-        [50 + flowerRadius * Math.cos(5*Math.PI/3), 50 + flowerRadius * Math.sin(5*Math.PI/3)]
-      ];
-      
-      const flowerOfLife = (
-        <motion.g
-          initial={{ opacity: 0 }}
-          animate={{ 
-            opacity: opacity * 0.3 * colorIntensity,
-            rotate: [0, 360],
-            scale: [1, 1.05, 1]
-          }}
-          transition={{ 
-            opacity: { duration: 2 },
-            rotate: { 
-              duration: 120,
-              repeat: Infinity,
-              ease: "linear"
-            },
-            scale: {
-              duration: 15,
-              repeat: Infinity,
-              repeatType: "reverse",
-              ease: "easeInOut"
-            }
-          }}
-        >
-          {centers.map((center, index) => (
-            <circle
-              key={`flower-${index}`}
-              cx={`${center[0]}%`}
-              cy={`${center[1]}%`}
-              r="8%"
-              fill="none"
-              stroke={getColor('quantum-500', opacity * 0.2 * colorIntensity)}
-              strokeWidth={0.3}
-            />
-          ))}
-        </motion.g>
-      );
-      
-      generatedSacredShapes = (
-        <>
-          {generatedSacredShapes}
-          {flowerOfLife}
-        </>
-      );
-    }
-
-    return { circles: generatedCircles, lines: generatedLines, sacredShapes: generatedSacredShapes };
-  }, [complexity, rotationDuration, pulsationIntensity, enableAnimation, opacity, energyPoints, consciousnessLevel, colorIntensity]);
+  const pulseAnimation = animated ? {
+    scale: [1, 1.02, 1],
+    opacity: [lineOpacity, lineOpacity * 1.5, lineOpacity],
+    transition: { duration: 10, repeat: Infinity, ease: "easeInOut" }
+  } : {};
   
   return (
-    <div className="absolute inset-0 pointer-events-none">
+    <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+      {/* Outer glow effect */}
+      <div className="absolute inset-0 bg-gradient-radial from-quantum-800/10 via-transparent to-transparent" />
+      
+      {/* Base cube structure - fixed grid */}
       <svg
-        viewBox="0 0 100 100"
-        className="w-full h-full"
-        preserveAspectRatio="xMidYMid meet"
+        viewBox="0 0 400 400"
+        className="absolute w-full h-full stroke-white"
+        style={{ strokeOpacity: lineOpacity }}
       >
-        {circles}
-        {lines}
-        {sacredShapes}
+        {/* Outer circle */}
+        <circle cx="200" cy="200" r="180" fill="none" strokeWidth="0.5" />
+        
+        {/* Inner circles */}
+        <circle cx="200" cy="200" r="140" fill="none" strokeWidth="0.5" />
+        <circle cx="200" cy="200" r="100" fill="none" strokeWidth="0.5" />
+        
+        {/* Hexagon */}
+        <polygon 
+          points="200,20 340,110 340,290 200,380 60,290 60,110" 
+          fill="none" 
+          strokeWidth="0.5" 
+        />
+        
+        {/* Connection lines - perfectly aligned */}
+        <line x1="200" y1="20" x2="200" y2="380" strokeWidth="0.5" />
+        <line x1="60" y1="110" x2="340" y2="290" strokeWidth="0.5" />
+        <line x1="60" y1="290" x2="340" y2="110" strokeWidth="0.5" />
+        
+        {/* Inner hexagon */}
+        <polygon 
+          points="200,80 280,130 280,270 200,320 120,270 120,130" 
+          fill="none" 
+          strokeWidth="0.5" 
+        />
+        
+        {/* Node intersection points - where icons will be placed */}
+        <circle cx="200" cy="20" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="top" />
+        <circle cx="340" cy="110" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="top-right" />
+        <circle cx="340" cy="290" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="bottom-right" />
+        <circle cx="200" cy="380" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="bottom" />
+        <circle cx="60" cy="290" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="bottom-left" />
+        <circle cx="60" cy="110" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="top-left" />
+        
+        {/* Inner hexagon points */}
+        <circle cx="200" cy="80" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="inner-top" />
+        <circle cx="280" cy="130" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="inner-top-right" />
+        <circle cx="280" cy="270" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="inner-bottom-right" />
+        <circle cx="200" cy="320" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="inner-bottom" />
+        <circle cx="120" cy="270" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="inner-bottom-left" />
+        <circle cx="120" cy="130" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="inner-top-left" />
+        
+        {/* Center point */}
+        <circle cx="200" cy="200" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="center" />
       </svg>
+      
+      {/* Animated overlay - can rotate and pulse without affecting alignment */}
+      {animated && (
+        <motion.svg
+          viewBox="0 0 400 400"
+          className="absolute w-full h-full stroke-white"
+          style={{ strokeOpacity: lineOpacity * 0.6 }}
+          animate={rotateAnimation}
+        >
+          <circle cx="200" cy="200" r="160" fill="none" strokeWidth="0.3" />
+          <polygon 
+            points="200,40 320,120 320,280 200,360 80,280 80,120" 
+            fill="none" 
+            strokeWidth="0.3" 
+          />
+        </motion.svg>
+      )}
+      
+      {/* Pulse effect for nodes */}
+      {animated && (
+        <motion.svg
+          viewBox="0 0 400 400"
+          className="absolute w-full h-full"
+          animate={pulseAnimation}
+        >
+          <circle cx="200" cy="200" r="8" fill="rgba(255,255,255,0.2)" />
+          <circle cx="200" cy="20" r="6" fill="rgba(255,255,255,0.15)" />
+          <circle cx="340" cy="110" r="6" fill="rgba(255,255,255,0.15)" />
+          <circle cx="340" cy="290" r="6" fill="rgba(255,255,255,0.15)" />
+          <circle cx="200" cy="380" r="6" fill="rgba(255,255,255,0.15)" />
+          <circle cx="60" cy="290" r="6" fill="rgba(255,255,255,0.15)" />
+          <circle cx="60" cy="110" r="6" fill="rgba(255,255,255,0.15)" />
+        </motion.svg>
+      )}
     </div>
   );
 };
