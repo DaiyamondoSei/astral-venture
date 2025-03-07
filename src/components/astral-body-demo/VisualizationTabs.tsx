@@ -1,9 +1,9 @@
 
 import React, { memo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import AstralBody from '@/components/entry-animation/AstralBody';
-import CosmicAstralBody from '@/components/entry-animation/CosmicAstralBody';
 import { motion } from 'framer-motion';
+import { LazyAstralBody, LazyCosmicAstralBody } from '@/components/lazy';
+import LazyLoadWrapper from '@/components/LazyLoadWrapper';
 
 interface VisualizationTabsProps {
   energyPoints: number;
@@ -63,7 +63,9 @@ const VisualizationTabs: React.FC<VisualizationTabsProps> = memo(({ energyPoints
           ))}
           
           <div className="relative z-10">
-            <CosmicAstralBody energyPoints={energyPoints} />
+            <LazyLoadWrapper>
+              <LazyCosmicAstralBody energyPoints={energyPoints} />
+            </LazyLoadWrapper>
           </div>
         </motion.div>
         
@@ -89,7 +91,9 @@ const VisualizationTabs: React.FC<VisualizationTabsProps> = memo(({ energyPoints
           <div className="absolute inset-0 bg-gradient-to-b from-quantum-900/20 via-astral-900/15 to-astral-900/20"></div>
           
           <div className="relative z-10">
-            <AstralBody />
+            <LazyLoadWrapper>
+              <LazyAstralBody />
+            </LazyLoadWrapper>
           </div>
         </motion.div>
         
