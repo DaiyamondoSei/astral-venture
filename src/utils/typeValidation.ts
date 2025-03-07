@@ -1,268 +1,206 @@
 
-/**
- * Advanced TypeScript validation utilities
- * Provides systematic checks to prevent common TypeScript errors
- */
-
-import ts from 'typescript';
-import fs from 'fs';
-import path from 'path';
-import { captureException } from './errorHandling';
+import type { AchievementData, FeatureTooltipData, GuidedTourData } from '@/components/onboarding/data/types';
 
 /**
- * Configuration for the type validation process
+ * Type validation utility
+ * 
+ * This utility provides functions to validate data structures against TypeScript interfaces
+ * at runtime, which can help catch type-related issues early.
  */
-export interface ITypeValidationConfig {
-  // Directories to scan for TypeScript files
-  includeDirs: string[];
-  // Directories to exclude from scanning
-  excludeDirs: string[];
-  // Whether to validate test files
-  includeTests: boolean;
-  // Whether to check for prop consistency across components
-  checkPropConsistency: boolean;
-  // Whether to check for hook return type consistency
-  checkHookReturns: boolean;
-  // Whether to validate interface implementations
-  validateInterfaces: boolean;
+
+// Type guard for AchievementData
+export function isAchievementData(obj: unknown): obj is AchievementData {
+  if (!obj || typeof obj !== 'object') return false;
+  
+  const achievement = obj as Partial<AchievementData>;
+  
+  const requiredProps = ['id', 'title', 'description'];
+  for (const prop of requiredProps) {
+    if (!(prop in achievement) || typeof achievement[prop as keyof AchievementData] !== 'string') {
+      console.warn(`Invalid AchievementData: missing required property "${prop}"`);
+      return false;
+    }
+  }
+  
+  return true;
 }
 
-/**
- * Default configuration for type validation
- */
-export const defaultConfig: ITypeValidationConfig = {
-  includeDirs: ['src'],
-  excludeDirs: ['node_modules', 'dist', 'build'],
-  includeTests: true,
-  checkPropConsistency: true,
-  checkHookReturns: true,
-  validateInterfaces: true
-};
-
-/**
- * Result of a type validation check
- */
-export interface IValidationResult {
-  success: boolean;
-  errors: IValidationError[];
-  warnings: IValidationWarning[];
+// Type guard for FeatureTooltipData
+export function isFeatureTooltipData(obj: unknown): obj is FeatureTooltipData {
+  if (!obj || typeof obj !== 'object') return false;
+  
+  const tooltip = obj as Partial<FeatureTooltipData>;
+  
+  const requiredProps = ['id', 'targetSelector', 'title', 'description', 'position', 'order'];
+  for (const prop of requiredProps) {
+    if (!(prop in tooltip)) {
+      console.warn(`Invalid FeatureTooltipData: missing required property "${prop}"`);
+      return false;
+    }
+  }
+  
+  // Validate position values
+  const validPositions = ['top', 'bottom', 'left', 'right'];
+  if (!validPositions.includes(tooltip.position as string)) {
+    console.warn(`Invalid position value: ${tooltip.position}. Must be one of: ${validPositions.join(', ')}`);
+    return false;
+  }
+  
+  return true;
 }
 
-export interface IValidationError {
-  filePath: string;
-  line: number;
-  column: number;
-  message: string;
-  code: string;
-  severity: 'error';
+// Type guard for GuidedTourData
+export function isGuidedTourData(obj: unknown): obj is GuidedTourData {
+  if (!obj || typeof obj !== 'object') return false;
+  
+  const tour = obj as Partial<GuidedTourData>;
+  
+  const requiredProps = ['id', 'title', 'description', 'steps'];
+  for (const prop of requiredProps) {
+    if (!(prop in tour)) {
+      console.warn(`Invalid GuidedTourData: missing required property "${prop}"`);
+      return false;
+    }
+  }
+  
+  // Validate steps
+  if (!Array.isArray(tour.steps)) {
+    console.warn('Invalid GuidedTourData: steps must be an array');
+    return false;
+  }
+  
+  return true;
 }
 
-export interface IValidationWarning {
-  filePath: string;
-  line: number;
-  column: number;
-  message: string;
-  code: string;
-  severity: 'warning';
-}
-
-/**
- * Main function to validate TypeScript types in a project
- * This runs a series of validations beyond what the TypeScript compiler checks
- */
-export async function validateTypeConsistency(
-  config: Partial<ITypeValidationConfig> = {}
-): Promise<IValidationResult> {
-  const fullConfig = { ...defaultConfig, ...config };
-  const result: IValidationResult = {
-    success: true,
-    errors: [],
-    warnings: []
-  };
-
-  try {
-    console.log('Starting type validation with config:', fullConfig);
-    
-    // Create a TypeScript program
-    const compilerOptions = ts.readConfigFile(
-      path.resolve(process.cwd(), 'tsconfig.json'),
-      ts.sys.readFile
-    ).config.compilerOptions;
-    
-    const program = ts.createProgram(
-      findTsFiles(fullConfig.includeDirs, fullConfig.excludeDirs),
-      compilerOptions
+// Function to validate a collection of items against a type guard
+export function validateCollection<T>(
+  items: unknown[],
+  typeGuard: (item: unknown) => item is T,
+  collectionName: string
+): T[] {
+  const validItems: T[] = [];
+  const invalidIndices: number[] = [];
+  
+  items.forEach((item, index) => {
+    if (typeGuard(item)) {
+      validItems.push(item);
+    } else {
+      invalidIndices.push(index);
+    }
+  });
+  
+  if (invalidIndices.length > 0) {
+    console.warn(
+      `Found ${invalidIndices.length} invalid items in ${collectionName} at indices: ${invalidIndices.join(', ')}`
     );
+  }
+  
+  return validItems;
+}
+
+// Main validation function that can be called during development or at runtime
+export function validateTypeConsistency(): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  try {
+    // Import data files dynamically
+    const achievementsModule = require('@/components/onboarding/data/achievements');
+    const tooltipsModule = require('@/components/onboarding/data/tooltips');
+    const toursModule = require('@/components/onboarding/data/tours');
     
-    // Run validation checks
-    if (fullConfig.checkPropConsistency) {
-      validateComponentProps(program, result);
+    // Validate achievements
+    const achievements = achievementsModule.onboardingAchievements;
+    if (achievements) {
+      const validAchievements = validateCollection(
+        achievements,
+        isAchievementData,
+        'onboardingAchievements'
+      );
+      
+      if (validAchievements.length !== achievements.length) {
+        errors.push(`Found ${achievements.length - validAchievements.length} invalid achievements`);
+      }
     }
     
-    if (fullConfig.checkHookReturns) {
-      validateHookReturnTypes(program, result);
+    // Validate tooltips
+    const tooltips = tooltipsModule.featureTooltips;
+    if (tooltips) {
+      const validTooltips = validateCollection(
+        tooltips,
+        isFeatureTooltipData,
+        'featureTooltips'
+      );
+      
+      if (validTooltips.length !== tooltips.length) {
+        errors.push(`Found ${tooltips.length - validTooltips.length} invalid tooltips`);
+      }
     }
     
-    if (fullConfig.validateInterfaces) {
-      validateInterfaceImplementations(program, result);
+    // Validate tours
+    const tours = toursModule.guidedTours;
+    if (tours) {
+      const validTours = validateCollection(
+        tours,
+        isGuidedTourData,
+        'guidedTours'
+      );
+      
+      if (validTours.length !== tours.length) {
+        errors.push(`Found ${tours.length - validTours.length} invalid tours`);
+      }
     }
     
-    // Set success flag based on errors
-    result.success = result.errors.length === 0;
-    
-    console.log('Type validation complete!');
-    return result;
   } catch (error) {
-    captureException(error, 'Type validation process');
-    result.success = false;
-    result.errors.push({
-      filePath: 'unknown',
-      line: 0,
-      column: 0,
-      message: `Validation process failed: ${error instanceof Error ? error.message : String(error)}`,
-      code: 'VALIDATION_FAILED',
-      severity: 'error'
-    });
-    return result;
+    errors.push(`Error during type validation: ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-/**
- * Find all TypeScript files to validate
- */
-function findTsFiles(includeDirs: string[], excludeDirs: string[]): string[] {
-  const files: string[] = [];
   
-  const walk = (dir: string) => {
-    if (excludeDirs.some(excluded => dir.includes(excluded))) {
-      return;
-    }
-    
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (
-        entry.isFile() && 
-        (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))
-      ) {
-        files.push(fullPath);
-      }
-    }
+  return {
+    valid: errors.length === 0,
+    errors
   };
-  
-  for (const dir of includeDirs) {
-    walk(path.resolve(process.cwd(), dir));
-  }
-  
-  return files;
 }
 
-/**
- * Validate that components are called with correct props
- */
-function validateComponentProps(program: ts.Program, result: IValidationResult): void {
-  const checker = program.getTypeChecker();
-  const sourceFiles = program.getSourceFiles();
-  
-  // This is a simplified implementation
-  // A full implementation would analyze JSX element props against their component definitions
-  for (const sourceFile of sourceFiles) {
-    if (sourceFile.fileName.includes('node_modules')) continue;
-    
-    // Find all JSX elements
-    ts.forEachChild(sourceFile, function visit(node) {
-      if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-        // Analyze props against component definition
-        // This is a placeholder for the actual implementation
-      }
-      
-      ts.forEachChild(node, visit);
-    });
-  }
-}
-
-/**
- * Validate that hooks return values match their usage
- */
-function validateHookReturnTypes(program: ts.Program, result: IValidationResult): void {
-  const checker = program.getTypeChecker();
-  const sourceFiles = program.getSourceFiles();
-  
-  // This is a simplified implementation
-  // A full implementation would track hook usages and their return type expectations
-  for (const sourceFile of sourceFiles) {
-    if (sourceFile.fileName.includes('node_modules')) continue;
-    
-    // Find all hook usages
-    ts.forEachChild(sourceFile, function visit(node) {
-      if (ts.isCallExpression(node) && 
-          ts.isIdentifier(node.expression) && 
-          node.expression.text.startsWith('use')) {
-        // Validate hook return type usage
-        // This is a placeholder for the actual implementation
-      }
-      
-      ts.forEachChild(node, visit);
-    });
-  }
-}
-
-/**
- * Validate that classes/objects implement interfaces correctly
- */
-function validateInterfaceImplementations(program: ts.Program, result: IValidationResult): void {
-  const checker = program.getTypeChecker();
-  const sourceFiles = program.getSourceFiles();
-  
-  // This is a simplified implementation
-  // A full implementation would verify interface implementations
-  for (const sourceFile of sourceFiles) {
-    if (sourceFile.fileName.includes('node_modules')) continue;
-    
-    // Find all class declarations
-    ts.forEachChild(sourceFile, function visit(node) {
-      if (ts.isClassDeclaration(node) && node.heritageClauses) {
-        // Check interface implementations
-        // This is a placeholder for the actual implementation
-      }
-      
-      ts.forEachChild(node, visit);
-    });
-  }
-}
-
-/**
- * Integration with build process and CI
- * This could be called during pre-commit hooks or in CI pipelines
- */
+// Function to run the validation from the CLI or scripts
 export function runTypeValidationCLI(): void {
-  // This would be the entry point for running validation from command line
-  console.log('Running type validation from CLI...');
-  validateTypeConsistency()
-    .then(result => {
-      if (!result.success) {
-        console.error('Type validation failed!');
-        result.errors.forEach(error => {
-          console.error(`${error.filePath}:${error.line}:${error.column} - ${error.message} [${error.code}]`);
-        });
-        process.exit(1);
-      } else if (result.warnings.length > 0) {
-        console.warn('Type validation succeeded with warnings:');
-        result.warnings.forEach(warning => {
-          console.warn(`${warning.filePath}:${warning.line}:${warning.column} - ${warning.message} [${warning.code}]`);
-        });
-        process.exit(0);
-      } else {
-        console.log('Type validation succeeded!');
-        process.exit(0);
+  const result = validateTypeConsistency();
+  
+  if (result.valid) {
+    console.log('✅ Type validation passed successfully');
+  } else {
+    console.error('❌ Type validation failed with the following errors:');
+    result.errors.forEach(error => console.error(`  - ${error}`));
+    process.exit(1); // Exit with error code for CI pipelines
+  }
+}
+
+// Add runtime type checking decorator
+export function validateTypes<T>(typeGuard: (value: unknown) => value is T) {
+  return function(
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor
+  ) {
+    const originalMethod = descriptor.value;
+    
+    descriptor.value = function(...args: any[]) {
+      // Validate input arguments
+      args.forEach((arg, index) => {
+        if (!typeGuard(arg)) {
+          console.warn(`Type validation failed for argument ${index} in ${propertyKey}`);
+        }
+      });
+      
+      // Call the original method
+      const result = originalMethod.apply(this, args);
+      
+      // Validate return value if applicable
+      if (result !== undefined && !typeGuard(result)) {
+        console.warn(`Type validation failed for return value of ${propertyKey}`);
       }
-    })
-    .catch(error => {
-      console.error('Unexpected error in type validation:', error);
-      process.exit(1);
-    });
+      
+      return result;
+    };
+    
+    return descriptor;
+  };
 }
