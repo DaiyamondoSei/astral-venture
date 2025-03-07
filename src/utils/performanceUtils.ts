@@ -163,3 +163,188 @@ export function getOptimalAnimationSettings(): {
   
   return settings;
 }
+
+/**
+ * Determine the appropriate animation quality level for the current device
+ * @returns Animation quality level: 'low', 'medium', or 'high'
+ */
+export function getAnimationQualityLevel(): 'low' | 'medium' | 'high' {
+  const category = getPerformanceCategory();
+  const capabilities = getDeviceCapabilities();
+  
+  // For low-end devices or devices in low power mode, use low quality
+  if (category === 'low' || capabilities.isLowPowerMode) {
+    return 'low';
+  }
+  
+  // For high-end devices with good connection, use high quality
+  if (category === 'high' && ['4g', 'wifi'].includes(capabilities.connectionType)) {
+    return 'high';
+  }
+  
+  // Default to medium quality
+  return 'medium';
+}
+
+/**
+ * Monitor memory usage to detect potential memory leaks or high usage
+ * @param warningThreshold Percentage (0-1) of total memory at which to warn
+ * @param criticalThreshold Percentage (0-1) of total memory at which to alert
+ * @returns Object with memory metrics and status
+ */
+export function monitorMemoryUsage(
+  warningThreshold = 0.7,
+  criticalThreshold = 0.9
+): {
+  status: 'normal' | 'warning' | 'critical';
+  usedMemoryMB?: number;
+  totalMemoryMB?: number;
+  usagePercentage?: number;
+  isSupported: boolean;
+} {
+  // Default response for unsupported browsers
+  const defaultResponse = {
+    status: 'normal' as 'normal' | 'warning' | 'critical',
+    isSupported: false
+  };
+  
+  try {
+    // Check if performance.memory is available (Chrome/Edge)
+    if (typeof window === 'undefined' || 
+        !window.performance || 
+        !(window.performance as any).memory) {
+      return defaultResponse;
+    }
+    
+    const { 
+      usedJSHeapSize, 
+      totalJSHeapSize 
+    } = (window.performance as any).memory;
+    
+    // Convert to MB for readability
+    const usedMemoryMB = Math.round(usedJSHeapSize / (1024 * 1024));
+    const totalMemoryMB = Math.round(totalJSHeapSize / (1024 * 1024));
+    const usagePercentage = usedJSHeapSize / totalJSHeapSize;
+    
+    // Determine status based on thresholds
+    let status: 'normal' | 'warning' | 'critical' = 'normal';
+    
+    if (usagePercentage >= criticalThreshold) {
+      status = 'critical';
+      console.warn(`Memory usage critical: ${usedMemoryMB}MB / ${totalMemoryMB}MB (${Math.round(usagePercentage * 100)}%)`);
+    } else if (usagePercentage >= warningThreshold) {
+      status = 'warning';
+      console.info(`Memory usage high: ${usedMemoryMB}MB / ${totalMemoryMB}MB (${Math.round(usagePercentage * 100)}%)`);
+    }
+    
+    return {
+      status,
+      usedMemoryMB,
+      totalMemoryMB,
+      usagePercentage,
+      isSupported: true
+    };
+  } catch (error) {
+    console.warn('Error monitoring memory usage:', error);
+    return defaultResponse;
+  }
+}
+
+/**
+ * Check if the device supports modern graphics rendering features
+ * @returns Object with graphics capability information
+ */
+export function getGraphicsCapabilities(): {
+  webGL2Support: boolean;
+  maxTextureSize: number;
+  antialiasing: boolean;
+  hardwareAcceleration: boolean;
+  isMobile: boolean;
+} {
+  const defaultCapabilities = {
+    webGL2Support: false,
+    maxTextureSize: 2048, // Conservative default
+    antialiasing: false,
+    hardwareAcceleration: false,
+    isMobile: false
+  };
+  
+  try {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined') return defaultCapabilities;
+    
+    // Check for WebGL2 support
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2') || 
+               canvas.getContext('webgl') || 
+               canvas.getContext('experimental-webgl');
+    
+    if (!gl) return defaultCapabilities;
+    
+    // Determine if this is WebGL2
+    const webGL2Support = gl.getParameter(gl.VERSION).indexOf('WebGL 2.0') !== -1;
+    
+    // Get max texture size
+    const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    
+    // Check for antialiasing
+    const antialiasing = gl.getContextAttributes()?.antialias || false;
+    
+    // Check for hardware acceleration (indirect check)
+    const hardwareAcceleration = !!(gl.getExtension('WEBGL_lose_context'));
+    
+    // Check if mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    return {
+      webGL2Support,
+      maxTextureSize,
+      antialiasing,
+      hardwareAcceleration,
+      isMobile
+    };
+  } catch (error) {
+    console.warn('Error detecting graphics capabilities:', error);
+    return defaultCapabilities;
+  }
+}
+
+/**
+ * Determine the optimal image quality to use based on device capabilities
+ * @param srcSet Object containing image paths for different quality levels
+ * @returns The most appropriate image source for the current device
+ */
+export function getOptimalImageSource(
+  srcSet: { low: string; medium: string; high: string }
+): string {
+  const performanceCategory = getPerformanceCategory();
+  const capabilities = getDeviceCapabilities();
+  const connection = (navigator as any).connection?.effectiveType || 'unknown';
+  
+  // Use low quality images for:
+  // - Low-end devices
+  // - Slow connections (2g, 3g)
+  // - Low power mode
+  if (
+    performanceCategory === 'low' || 
+    capabilities.isLowPowerMode || 
+    ['slow-2g', '2g', '3g'].includes(connection)
+  ) {
+    return srcSet.low;
+  }
+  
+  // Use high quality images for:
+  // - High-end devices
+  // - Good connections (4g, wifi)
+  // - Not in low power mode
+  if (
+    performanceCategory === 'high' && 
+    ['4g', 'wifi'].includes(connection) && 
+    !capabilities.isLowPowerMode
+  ) {
+    return srcSet.high;
+  }
+  
+  // Default to medium quality
+  return srcSet.medium;
+}
