@@ -1,124 +1,91 @@
 
+import { z } from 'zod';
 import { AchievementData } from './types';
-import { createValidator, ValidationSeverity } from '@/utils/typeValidation';
-import { isNonEmptyString, isOneOf, isValidNumber } from '@/utils/typeGuards';
-
-// Sample achievement object with correct types for validation
-const achievementSchema: AchievementData = {
-  id: '',
-  title: '',
-  description: '',
-  iconName: '',
-  level: 'beginner',
-  category: '',
-  points: 0,
-  unlockRequirement: '',
-  progress: {
-    current: 0,
-    required: 0
-  },
-  isSecret: false,
-  unlocked: false,
-  dateUnlocked: '',
-  icon: '',
-  type: 'discovery',
-  requiredStep: '',
-  requiredSteps: [],
-  requiredInteraction: '',
-  streakDays: 0,
-  progressThreshold: 0,
-  trackedValue: '',
-  tieredLevels: [],
-  pointsPerTier: [],
-  basePoints: 0,
-  tier: 0,
-};
-
-// Achievement validator using the schema
-export const validateAchievement = createValidator<AchievementData>(
-  achievementSchema,
-  { 
-    severity: ValidationSeverity.WARNING,
-    allowPartial: true, // Allow partial achievements
-    logToConsole: true,
-    showToast: false
-  }
-);
+import { validateData } from '@/utils/typeValidation';
 
 /**
- * Additional custom validation for achievements
+ * Achievement validator schema using Zod
  */
-export function validateAchievementBusiness(achievement: AchievementData): string[] {
-  const errors: string[] = [];
-  
-  // Business rules validation
-  if (!isNonEmptyString(achievement.id)) {
-    errors.push('Achievement ID must be non-empty');
-  }
-  
-  if (!isNonEmptyString(achievement.title)) {
-    errors.push('Achievement title must be non-empty');
-  }
-  
-  if (!isNonEmptyString(achievement.description)) {
-    errors.push('Achievement description must be non-empty');
-  }
-  
-  if (achievement.level && !isOneOf(achievement.level, ['beginner', 'intermediate', 'advanced'] as const)) {
-    errors.push('Achievement level must be one of: beginner, intermediate, advanced');
-  }
-  
-  if (achievement.type && !isOneOf(achievement.type, [
-    'discovery', 'completion', 'interaction', 'streak', 'progressive', 'milestone'
-  ] as const)) {
-    errors.push('Achievement type must be valid');
-  }
-  
-  if (achievement.points !== undefined && !isValidNumber(achievement.points)) {
-    errors.push('Achievement points must be a valid number');
-  }
-  
-  if (achievement.progress) {
-    if (!isValidNumber(achievement.progress.current)) {
-      errors.push('Achievement progress.current must be a valid number');
-    }
-    
-    if (!isValidNumber(achievement.progress.required)) {
-      errors.push('Achievement progress.required must be a valid number');
-    }
-    
-    if (achievement.progress.current > achievement.progress.required) {
-      errors.push('Achievement progress.current must not exceed progress.required');
-    }
-  }
-  
-  return errors;
+export const achievementSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  iconName: z.string().optional(),
+  level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  category: z.string().optional(),
+  points: z.number().optional(),
+  unlockRequirement: z.string().optional(),
+  progress: z.object({
+    current: z.number(),
+    required: z.number()
+  }).optional(),
+  isSecret: z.boolean().optional(),
+  unlocked: z.boolean().optional(),
+  dateUnlocked: z.string().optional(),
+  icon: z.string().optional(),
+  type: z.enum(['discovery', 'completion', 'interaction', 'streak', 'progressive', 'milestone']).optional(),
+  requiredStep: z.string().optional(),
+  requiredSteps: z.array(z.string()).optional(),
+  requiredInteraction: z.string().optional(),
+  streakDays: z.number().optional(),
+  progressThreshold: z.number().optional(),
+  trackedValue: z.string().optional(),
+  tieredLevels: z.array(z.number()).optional(),
+  pointsPerTier: z.array(z.number()).optional(),
+  basePoints: z.number().optional(),
+  tier: z.number().optional()
+});
+
+/**
+ * Validates an achievement using Zod schema
+ * Returns the achievement if valid, null if invalid
+ */
+export function validateAchievement(achievement: unknown): AchievementData | null {
+  return validateData(achievement, achievementSchema, 'Achievement Validation');
 }
 
 /**
- * Check if an achievement is complete
+ * Validates an array of achievements
+ * Returns only the valid achievements
  */
-export function isAchievementComplete(achievement: AchievementData): boolean {
-  if (achievement.unlocked) return true;
-  
-  if (achievement.progress) {
-    return achievement.progress.current >= achievement.progress.required;
-  }
-  
-  return false;
+export function validateAchievements(achievements: unknown[]): AchievementData[] {
+  return achievements
+    .map(achievement => validateAchievement(achievement))
+    .filter((achievement): achievement is AchievementData => achievement !== null);
 }
 
 /**
- * Calculate achievement progress percentage
+ * Achievement state schema for validating the state structure
  */
-export function getAchievementProgress(achievement: AchievementData): number {
-  if (achievement.unlocked) return 100;
+export const achievementStateSchema = z.object({
+  unlocked: z.array(achievementSchema),
+  inProgress: z.array(achievementSchema),
+  recent: z.array(achievementSchema)
+});
+
+/**
+ * Validates achievement progress
+ */
+export const achievementProgressSchema = z.object({
+  achievementId: z.string(),
+  progress: z.number(),
+  total: z.number(),
+  completed: z.boolean()
+});
+
+/**
+ * Checks if an achievement is valid for display
+ * This helps prevent rendering invalid achievements in the UI
+ */
+export function isValidForDisplay(achievement: unknown): achievement is AchievementData {
+  if (!achievement || typeof achievement !== 'object') return false;
   
-  if (achievement.progress) {
-    const { current, required } = achievement.progress;
-    if (required === 0) return 0;
-    return Math.min(100, Math.floor((current / required) * 100));
-  }
+  const obj = achievement as Record<string, unknown>;
   
-  return 0;
+  // Minimal checks for display - must have id, title and description
+  return (
+    typeof obj.id === 'string' && 
+    typeof obj.title === 'string' && 
+    typeof obj.description === 'string'
+  );
 }

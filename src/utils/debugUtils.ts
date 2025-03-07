@@ -1,135 +1,164 @@
 
 /**
- * Utilities for debugging type issues at runtime
+ * Development debugging utilities
+ * These utilities are automatically disabled in production builds
  */
 
 /**
- * Logs the type and structure of an object for debugging
- * 
- * @param value The value to inspect
- * @param label Optional label for the log
- * @param depth Maximum depth to recurse into the object
+ * Enhanced console logging that only works in development mode
+ * Automatically adds context information and pretty formatting
  */
-export function inspectType(
-  value: unknown, 
-  label = 'Type Inspection', 
-  depth = 2
-): void {
-  console.group(label);
+export const devLogger = {
+  log: (context: string, ...args: any[]): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.log(`[${context}]`, ...args);
+  },
   
-  if (value === null) {
-    console.log('Type: null');
-  } else if (value === undefined) {
-    console.log('Type: undefined');
-  } else if (Array.isArray(value)) {
-    console.log('Type: Array');
-    console.log('Length:', value.length);
+  info: (context: string, ...args: any[]): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.info(`%c[${context}]`, 'color: #2563eb; font-weight: bold;', ...args);
+  },
+  
+  warn: (context: string, ...args: any[]): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.warn(`%c[${context}]`, 'color: #d97706; font-weight: bold;', ...args);
+  },
+  
+  error: (context: string, ...args: any[]): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.error(`%c[${context}]`, 'color: #dc2626; font-weight: bold;', ...args);
+  },
+  
+  group: (context: string, ...args: any[]): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.group(`[${context}]`, ...args);
+  },
+  
+  groupEnd: (): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.groupEnd();
+  },
+  
+  table: (context: string, tabularData: any): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.log(`[${context}]`);
+    console.table(tabularData);
+  },
+  
+  trace: (context: string, ...args: any[]): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    console.log(`[${context} Trace]`, ...args);
+    console.trace();
+  }
+};
+
+/**
+ * Component rendering tracker to detect excessive re-renders
+ * @param componentName Name of the component to track
+ * @param props Component props (optional)
+ * @param limit Maximum number of renders before warning
+ */
+export function trackRenders(
+  componentName: string, 
+  props?: Record<string, any>,
+  limit: number = 5
+): (() => void) {
+  if (process.env.NODE_ENV !== 'development') {
+    return () => {}; // No-op in production
+  }
+  
+  const renderCount = { current: 1 };
+  const startTime = performance.now();
+  
+  devLogger.log(`Render Tracker`, `${componentName} rendered (count: ${renderCount.current})`);
+  
+  if (props) {
+    devLogger.log(`Render Tracker`, `${componentName} props:`, props);
+  }
+  
+  return () => {
+    if (process.env.NODE_ENV !== 'development') return;
     
-    if (value.length > 0) {
-      console.log('First item type:', getDetailedType(value[0]));
-      
-      if (depth > 0 && typeof value[0] === 'object' && value[0] !== null) {
-        console.log('First item structure:');
-        inspectType(value[0], 'Array item', depth - 1);
-      }
-    }
-  } else {
-    console.log('Type:', getDetailedType(value));
+    renderCount.current++;
     
-    if (typeof value === 'object' && value !== null) {
-      console.log('Keys:', Object.keys(value));
-      
-      if (depth > 0) {
-        console.log('Structure:');
-        
-        for (const [key, propValue] of Object.entries(value)) {
-          console.log(`${key}:`, getDetailedType(propValue));
-          
-          if (depth > 1 && typeof propValue === 'object' && propValue !== null) {
-            inspectType(propValue, `Property: ${key}`, depth - 1);
-          }
-        }
-      }
-    }
-  }
-  
-  console.groupEnd();
-}
-
-/**
- * Gets a detailed type description of a value
- */
-function getDetailedType(value: unknown): string {
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  
-  const baseType = typeof value;
-  
-  if (baseType !== 'object') {
-    return baseType;
-  }
-  
-  if (Array.isArray(value)) {
-    return `Array<${value.length > 0 ? getDetailedType(value[0]) : 'unknown'}>`;
-  }
-  
-  if (value instanceof Date) {
-    return 'Date';
-  }
-  
-  if (value instanceof RegExp) {
-    return 'RegExp';
-  }
-  
-  if (value instanceof Map) {
-    return 'Map';
-  }
-  
-  if (value instanceof Set) {
-    return 'Set';
-  }
-  
-  const constructor = Object.getPrototypeOf(value)?.constructor?.name;
-  return constructor && constructor !== 'Object' ? constructor : 'Object';
-}
-
-/**
- * Creates a typed assertion that will throw if the condition is false
- */
-export function assertType<T>(
-  value: unknown, 
-  check: (val: unknown) => val is T, 
-  message = 'Type assertion failed'
-): asserts value is T {
-  if (!check(value)) {
-    throw new TypeError(message);
-  }
-}
-
-/**
- * Creates a debug wrapper that logs function inputs and outputs with type information
- */
-export function debugFunction<Args extends unknown[], Return>(
-  fn: (...args: Args) => Return,
-  fnName = 'debugged function'
-): (...args: Args) => Return {
-  return (...args: Args): Return => {
-    console.group(`Debug: ${fnName}`);
-    console.log('Arguments:');
-    args.forEach((arg, i) => {
-      inspectType(arg, `Argument ${i}`, 1);
-    });
-    
-    try {
-      const result = fn(...args);
-      console.log('Result:');
-      inspectType(result, 'Return value', 1);
-      console.groupEnd();
-      return result;
-    } catch (error) {
-      console.error('Function threw an error:', error);
-      console.groupEnd();
-      throw error;
+    if (renderCount.current > limit) {
+      devLogger.warn(
+        `Render Tracker`,
+        `${componentName} has rendered ${renderCount.current} times in ${Math.round(performance.now() - startTime)}ms! This may indicate a performance issue.`
+      );
     }
   };
+}
+
+/**
+ * Performance measurement utility
+ */
+export const measure = {
+  /**
+   * Start measuring a performance metric
+   */
+  start: (label: string): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    performance.mark(`${label}-start`);
+  },
+  
+  /**
+   * End measuring a performance metric and log the result
+   */
+  end: (label: string, logThreshold: number = 0): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    
+    performance.mark(`${label}-end`);
+    performance.measure(label, `${label}-start`, `${label}-end`);
+    
+    const measurement = performance.getEntriesByName(label, 'measure')[0];
+    const duration = measurement.duration;
+    
+    // Only log if duration exceeds threshold
+    if (duration > logThreshold) {
+      devLogger.info(
+        'Performance',
+        `${label}: ${duration.toFixed(2)}ms ${duration > 100 ? '⚠️' : ''}`
+      );
+    }
+    
+    // Clean up
+    performance.clearMarks(`${label}-start`);
+    performance.clearMarks(`${label}-end`);
+    performance.clearMeasures(label);
+  }
+};
+
+/**
+ * Creates a development-only lifecycle hook marker
+ * Helps track component lifecycle events during development
+ */
+export function devLifecycle(componentName: string): {
+  mount: () => void;
+  update: (props?: Record<string, any>) => void;
+  unmount: () => void;
+} {
+  return {
+    mount: () => {
+      if (process.env.NODE_ENV !== 'development') return;
+      devLogger.info('Lifecycle', `${componentName} mounted`);
+    },
+    update: (props?: Record<string, any>) => {
+      if (process.env.NODE_ENV !== 'development') return;
+      devLogger.info('Lifecycle', `${componentName} updated`, props ? { props } : '');
+    },
+    unmount: () => {
+      if (process.env.NODE_ENV !== 'development') return;
+      devLogger.info('Lifecycle', `${componentName} unmounted`);
+    }
+  };
+}
+
+/**
+ * Logs when a component doesn't have proper type information
+ */
+export function logTypeIssue(componentName: string, message: string): void {
+  if (process.env.NODE_ENV !== 'development') return;
+  
+  devLogger.warn('Type Safety', `${componentName}: ${message}`);
 }

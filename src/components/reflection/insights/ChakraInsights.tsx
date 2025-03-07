@@ -1,12 +1,30 @@
 
 import React from 'react';
 import { ChakraInsight } from './useChakraInsights';
+import { useComponentValidation } from '@/hooks/useComponentValidation';
+import { documented } from '@/utils/componentDoc';
+import { devLogger } from '@/utils/debugUtils';
 
 interface ChakraInsightsProps {
   insights: ChakraInsight[];
 }
 
+/**
+ * Displays chakra insights from reflection analysis
+ */
 const ChakraInsights: React.FC<ChakraInsightsProps> = ({ insights }) => {
+  // Validate props in development mode
+  useComponentValidation('ChakraInsights', { insights });
+  
+  // Log mount in development
+  React.useEffect(() => {
+    devLogger.info('ChakraInsights', 'Component mounted');
+    
+    return () => {
+      devLogger.info('ChakraInsights', 'Component unmounted');
+    };
+  }, []);
+  
   if (!insights || insights.length === 0) {
     return (
       <div className="text-muted-foreground text-sm italic">
@@ -41,4 +59,50 @@ const ChakraInsights: React.FC<ChakraInsightsProps> = ({ insights }) => {
   );
 };
 
-export default ChakraInsights;
+// Register component documentation
+export default documented(ChakraInsights, {
+  description: 'A component that displays chakra insights from reflection analysis',
+  props: {
+    insights: {
+      type: 'ChakraInsight[]',
+      required: true,
+      description: 'Array of chakra insights to display',
+      example: [{ 
+        message: 'Your heart chakra shows strong activity',
+        chakraIds: [3],
+        confidence: 0.8
+      }]
+    }
+  },
+  examples: [
+    {
+      name: 'Basic Usage',
+      description: 'Basic usage with an array of insights',
+      code: `
+import { ChakraInsight } from './useChakraInsights';
+
+const insights: ChakraInsight[] = [
+  {
+    message: 'Your heart chakra shows strong activity',
+    chakraIds: [3],
+    confidence: 0.8
+  }
+];
+
+<ChakraInsights insights={insights} />
+      `
+    },
+    {
+      name: 'Empty State',
+      description: 'How the component looks with no insights',
+      code: `
+<ChakraInsights insights={[]} />
+      `
+    }
+  ],
+  notes: [
+    'This component renders a list of chakra insights with proper styling',
+    'Each insight can have associated chakra IDs that will be displayed as tags',
+    'If no insights are available, a placeholder message is shown'
+  ]
+});

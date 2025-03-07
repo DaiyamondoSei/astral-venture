@@ -8,7 +8,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   { ignores: ["dist"] },
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended, ...tseslint.configs.strictTypeChecking],
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
@@ -74,6 +74,15 @@ export default tseslint.config(
       "@typescript-eslint/prefer-function-type": "error",
       "@typescript-eslint/prefer-includes": "error",
       "@typescript-eslint/prefer-string-starts-ends-with": "error",
+      // New enhanced rules
+      "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports" }],
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/await-thenable": "error",
+      "@typescript-eslint/restrict-template-expressions": ["warn", { allowNumber: true, allowBoolean: true }],
+      "@typescript-eslint/prefer-ts-expect-error": "warn",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/unbound-method": "warn"
     },
   }
 );
