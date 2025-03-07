@@ -1,227 +1,191 @@
 
 /**
- * Enhanced utility for preloading critical assets
- * With proper resource hints, priority signaling, and sequential loading
+ * Asset preloading utility
+ * Used to strategically preload and cache images, fonts, and other assets
  */
 
-import { getPerformanceCategory } from './performanceUtils';
+// Define asset categories for better organization
+type AssetType = 'image' | 'font' | 'script' | 'json' | 'styles';
 
-// Asset types for better type safety
-type AssetType = 'image' | 'font' | 'style' | 'script';
-
-interface PreloadOptions {
-  priority: 'high' | 'medium' | 'low';
-  type?: string;
-  crossOrigin?: 'anonymous' | 'use-credentials';
-  fetchPriority?: 'high' | 'low' | 'auto';
-  display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional';
+// Asset with metadata for advanced preloading
+interface Asset {
+  url: string;
+  type: AssetType;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  loadAfter?: string; // URL of another asset that must be loaded first
+  mediaQuery?: string; // Only load if media query matches
+  loadCondition?: () => boolean; // Function to determine if asset should be loaded
 }
 
-/**
- * Preload an individual asset with enhanced options
- */
-export const preloadAsset = (
-  src: string, 
-  assetType: AssetType,
-  options: PreloadOptions
-): Promise<HTMLElement> => {
-  return new Promise((resolve, reject) => {
-    // Create appropriate element based on asset type
-    let element: HTMLElement;
-    
-    switch (assetType) {
-      case 'image':
-        const img = new Image();
-        
-        // Set fetchpriority attribute for resource prioritization
-        if ('fetchPriority' in img && options.fetchPriority) {
-          // @ts-ignore - fetchPriority is not in all TypeScript definitions yet
-          img.fetchPriority = options.fetchPriority;
-        }
-        
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        
-        if (options.crossOrigin) {
-          img.crossOrigin = options.crossOrigin;
-        }
-        
-        img.src = src;
-        element = img;
-        break;
-        
-      case 'font':
-      case 'style':
-      case 'script':
-        const link = document.createElement('link');
-        link.rel = 'preload';
-        link.href = src;
-        
-        if (assetType === 'font') {
-          link.as = 'font';
-          if (options.type) link.type = options.type;
-          link.crossOrigin = options.crossOrigin || 'anonymous';
-          
-          // Also add a font-face declaration with font-display strategy
-          if (options.display) {
-            const style = document.createElement('style');
-            style.textContent = `
-              @font-face {
-                font-family: 'PreloadedFont';
-                src: url('${src}') format('${options.type?.split('/')[1] || 'woff2'}');
-                font-display: ${options.display};
-              }
-            `;
-            document.head.appendChild(style);
-          }
-        } else if (assetType === 'style') {
-          link.as = 'style';
-        } else {
-          link.as = 'script';
-        }
-        
-        // Set fetchpriority if high priority
-        if (options.priority === 'high') {
-          link.setAttribute('fetchpriority', 'high');
-        }
-        
-        link.onload = () => resolve(link);
-        link.onerror = reject;
-        
-        document.head.appendChild(link);
-        element = link;
-        break;
-        
-      default:
-        reject(new Error(`Unsupported asset type: ${assetType}`));
-        return;
-    }
-  });
+// Define assets to preload for each route
+const routeAssets: Record<string, Asset[]> = {
+  'index': [
+    { url: '/cosmic-human.svg', type: 'image', priority: 'critical' },
+    { url: '/fonts/main-font.woff2', type: 'font', priority: 'high' },
+    { url: '/images/chakra-colors.svg', type: 'image', priority: 'medium' },
+  ],
+  'dream-capture': [
+    { url: '/images/dream-bg.jpg', type: 'image', priority: 'critical' },
+    { url: '/fonts/main-font.woff2', type: 'font', priority: 'high' },
+  ],
+  'profile': [
+    { url: '/images/profile-bg.jpg', type: 'image', priority: 'high' },
+    { url: '/fonts/main-font.woff2', type: 'font', priority: 'high' },
+  ],
+  // Add more routes as needed
 };
 
-/**
- * Sequentially preload assets in order of priority
- */
-export const preloadAssetsSequentially = async (
-  assets: Array<{
-    src: string;
-    type: AssetType;
-    priority: 'high' | 'medium' | 'low';
-    options?: Partial<PreloadOptions>;
-  }>
-): Promise<void> => {
-  // Sort assets by priority
-  const sortedAssets = [...assets].sort((a, b) => {
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
-  });
-  
-  // Load high priority assets first
-  const highPriorityAssets = sortedAssets.filter(asset => asset.priority === 'high');
-  
-  try {
-    // Load high priority assets in parallel
-    await Promise.all(
-      highPriorityAssets.map(asset => 
-        preloadAsset(asset.src, asset.type, { 
-          priority: asset.priority, 
-          fetchPriority: 'high',
-          ...asset.options 
-        })
-      )
-    );
-    
-    // Then load medium and low priority assets
-    const otherAssets = sortedAssets.filter(asset => asset.priority !== 'high');
-    
-    // Load in smaller batches to avoid overwhelming the browser
-    const batchSize = 3;
-    for (let i = 0; i < otherAssets.length; i += batchSize) {
-      const batch = otherAssets.slice(i, i + batchSize);
-      await Promise.all(
-        batch.map(asset => 
-          preloadAsset(asset.src, asset.type, { 
-            priority: asset.priority,
-            fetchPriority: asset.priority === 'medium' ? 'auto' : 'low',
-            ...asset.options 
-          })
-        )
-      );
-    }
-  } catch (error) {
-    console.warn('Error preloading assets:', error);
-  }
-};
+// Global cache to track loaded assets
+const loadedAssets = new Set<string>();
 
-/**
- * Preload critical assets based on the current route and device capability
- */
-export const preloadCriticalAssets = async (route: string): Promise<void> => {
-  const deviceCapability = getPerformanceCategory();
-  
-  // Base critical assets always loaded
-  const criticalAssets = [
-    { 
-      src: '/cosmic-human.svg', 
-      type: 'image' as AssetType, 
-      priority: 'high' as const,
-      options: { 
-        crossOrigin: 'anonymous',
-        fetchPriority: 'high'
-      } 
-    },
-    { 
-      src: '/placeholder.svg', 
-      type: 'image' as AssetType, 
-      priority: 'medium' as const,
-      options: { crossOrigin: 'anonymous' }
-    }
-  ];
-  
-  // Route-specific assets
-  if (route === 'index' || route === '/') {
-    criticalAssets.push(
-      { 
-        src: '/lovable-uploads/cosmic-human.png', 
-        type: 'image' as AssetType, 
-        priority: 'high' as const,
-        options: { 
-          crossOrigin: 'anonymous',
-          fetchPriority: 'high'
-        }
-      }
-    );
-  }
-  
-  // Add more assets based on device capability
-  if (deviceCapability !== 'low') {
-    criticalAssets.push(
-      { 
-        src: '/og-image.png', 
-        type: 'image' as AssetType, 
-        priority: 'low' as const,
-        options: { crossOrigin: 'anonymous' }
-      }
-    );
-  }
-  
-  try {
-    // Preload everything sequentially
-    await preloadAssetsSequentially(criticalAssets);
-    console.log(`Preloaded ${criticalAssets.length} assets for route: ${route}`);
-  } catch (error) {
-    console.warn('Error preloading assets:', error);
-  }
-};
-
-// Initialize preloading for the current route
+// Preload critical assets for a specific route
 export const initRoutePreloading = (route: string): void => {
-  if (typeof window === 'undefined') return;
+  const assets = routeAssets[route] || [];
   
-  // Defer preloading slightly to prioritize initial render
-  setTimeout(() => {
-    preloadCriticalAssets(route).catch(err => {
-      console.warn('Asset preloading error:', err);
+  if (assets.length === 0) {
+    console.debug(`No predefined assets to preload for route: ${route}`);
+    return;
+  }
+  
+  // Group assets by priority
+  const criticalAssets = assets.filter(a => a.priority === 'critical');
+  const highPriorityAssets = assets.filter(a => a.priority === 'high');
+  const mediumPriorityAssets = assets.filter(a => a.priority === 'medium');
+  const lowPriorityAssets = assets.filter(a => a.priority === 'low');
+  
+  // Load critical assets immediately
+  criticalAssets.forEach(asset => preloadAsset(asset));
+  
+  // Load high priority assets with a small delay
+  if (highPriorityAssets.length > 0) {
+    setTimeout(() => {
+      highPriorityAssets.forEach(asset => preloadAsset(asset));
+    }, 100);
+  }
+  
+  // Load medium priority assets after initial render
+  if (mediumPriorityAssets.length > 0) {
+    setTimeout(() => {
+      mediumPriorityAssets.forEach(asset => preloadAsset(asset));
+    }, 1000);
+  }
+  
+  // Load low priority assets during idle time
+  if (lowPriorityAssets.length > 0 && 'requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(() => {
+      lowPriorityAssets.forEach(asset => preloadAsset(asset));
     });
-  }, 300);
+  } else if (lowPriorityAssets.length > 0) {
+    // Fallback for browsers that don't support requestIdleCallback
+    setTimeout(() => {
+      lowPriorityAssets.forEach(asset => preloadAsset(asset));
+    }, 2000);
+  }
+};
+
+// Preload a single asset with appropriate technique based on type
+const preloadAsset = (asset: Asset): void => {
+  // Skip if already loaded
+  if (loadedAssets.has(asset.url)) {
+    return;
+  }
+  
+  // Check load conditions if specified
+  if (asset.loadCondition && !asset.loadCondition()) {
+    return;
+  }
+  
+  // Check media query if specified
+  if (asset.mediaQuery && !window.matchMedia(asset.mediaQuery).matches) {
+    return;
+  }
+  
+  // Preload based on asset type
+  switch (asset.type) {
+    case 'image':
+      preloadImage(asset.url);
+      break;
+    case 'font':
+      preloadFont(asset.url);
+      break;
+    case 'script':
+      preloadScript(asset.url);
+      break;
+    case 'styles':
+      preloadStylesheet(asset.url);
+      break;
+    case 'json':
+      preloadData(asset.url);
+      break;
+  }
+  
+  // Mark as loaded
+  loadedAssets.add(asset.url);
+};
+
+// Preload an image
+const preloadImage = (url: string): void => {
+  const img = new Image();
+  img.src = url;
+};
+
+// Preload a font
+const preloadFont = (url: string): void => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'font';
+  link.href = url;
+  link.type = url.endsWith('.woff2') ? 'font/woff2' : 'font/woff';
+  link.crossOrigin = 'anonymous';
+  document.head.appendChild(link);
+};
+
+// Preload a script
+const preloadScript = (url: string): void => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'script';
+  link.href = url;
+  document.head.appendChild(link);
+};
+
+// Preload a stylesheet
+const preloadStylesheet = (url: string): void => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'style';
+  link.href = url;
+  document.head.appendChild(link);
+};
+
+// Preload JSON data
+const preloadData = (url: string): void => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'fetch';
+  link.href = url;
+  link.crossOrigin = 'anonymous';
+  document.head.appendChild(link);
+};
+
+// Function to check if an asset is already loaded
+export const isAssetLoaded = (url: string): boolean => {
+  return loadedAssets.has(url);
+};
+
+// Manually preload a specific asset
+export const preload = (url: string, type: AssetType): void => {
+  preloadAsset({ url, type, priority: 'high' });
+};
+
+// Preload assets for the next route in anticipation of navigation
+export const preloadNextRoute = (route: string): void => {
+  if (routeAssets[route]) {
+    // Only preload critical and high priority assets from the next route
+    const assetsToPreload = routeAssets[route].filter(
+      asset => asset.priority === 'critical' || asset.priority === 'high'
+    );
+    
+    assetsToPreload.forEach(asset => preloadAsset(asset));
+  }
 };

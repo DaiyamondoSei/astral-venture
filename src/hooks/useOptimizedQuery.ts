@@ -1,99 +1,106 @@
 
 import { useQuery, UseQueryOptions, UseQueryResult } from '@tanstack/react-query';
-import { useCallback, useRef } from 'react';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { useEffect, useRef } from 'react';
+import { throttle } from '@/utils/performanceUtils';
 
-// Define the available cache strategies
-type CacheStrategy = 'aggressive' | 'balanced' | 'minimal';
-
-// Config object for the optimized query
-interface OptimizedQueryConfig<TData, TError> extends Omit<UseQueryOptions<TData, TError>, 'queryKey' | 'queryFn'> {
-  cacheStrategy?: CacheStrategy;
-  offlineSupport?: boolean;
-  adaptToPerformance?: boolean;
+/**
+ * Enhanced version of useQuery with performance optimizations
+ * - Provides smarter caching strategies
+ * - Implements stale-while-revalidate pattern effectively
+ * - Adds performance monitoring
+ * - Throttles background refetches for performance
+ */
+export function useOptimizedQuery<
+  TQueryFnData = unknown,
+  TError = unknown,
+  TData = TQueryFnData,
+>(
+  options: UseQueryOptions<TQueryFnData, TError, TData>,
+  monitorLabel?: string,
+  throttleInterval = 3000
+): UseQueryResult<TData, TError> {
+  // Track query execution time
+  const startTimeRef = useRef<number>(0);
+  const queryCountRef = useRef<number>(0);
+  
+  // Create throttled refetch for background updates
+  const throttledRefetch = useRef(
+    throttle((refetchFn: () => void) => {
+      refetchFn();
+    }, throttleInterval)
+  ).current;
+  
+  // Extend options with optimized defaults if not specified
+  const optimizedOptions: UseQueryOptions<TQueryFnData, TError, TData> = {
+    // Default caching strategy
+    staleTime: 60 * 1000, // 1 minute
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000),
+    ...options,
+  };
+  
+  // Use query with enhanced options
+  const queryResult = useQuery<TQueryFnData, TError, TData>(optimizedOptions);
+  
+  // Performance monitoring
+  useEffect(() => {
+    if (queryResult.isLoading && !startTimeRef.current) {
+      startTimeRef.current = performance.now();
+      queryCountRef.current++;
+    }
+    
+    if (startTimeRef.current && !queryResult.isLoading) {
+      const queryTime = performance.now() - startTimeRef.current;
+      if (process.env.NODE_ENV !== 'production' && monitorLabel) {
+        console.debug(
+          `[useOptimizedQuery] ${monitorLabel} completed in ${queryTime.toFixed(1)}ms (fetch #${queryCountRef.current})`
+        );
+      }
+      startTimeRef.current = 0;
+    }
+  }, [queryResult.isLoading, monitorLabel]);
+  
+  // Throttle background refetches to prevent performance issues
+  const { refetch, isLoading } = queryResult;
+  const optimizedRefetch = () => {
+    if (isLoading) return;
+    
+    if (document.visibilityState === 'visible') {
+      refetch();
+    } else {
+      throttledRefetch(() => refetch());
+    }
+  };
+  
+  return {
+    ...queryResult,
+    refetch: optimizedRefetch
+  };
 }
 
 /**
- * Hook that provides optimized React Query functionality with:
- * - Performance-based caching strategies
- * - Offline support options
- * - Automatic stale time adjustments
+ * Hook for queries that need to be cached indefinitely
+ * Useful for reference data that rarely changes
  */
-export function useOptimizedQuery<TData = unknown, TError = Error>(
-  queryKey: string[],
-  queryFn: () => Promise<TData>,
-  config: OptimizedQueryConfig<TData, TError> = {}
+export function useCachedQuery<
+  TQueryFnData = unknown,
+  TError = unknown,
+  TData = TQueryFnData,
+>(
+  options: UseQueryOptions<TQueryFnData, TError, TData>,
+  monitorLabel?: string
 ): UseQueryResult<TData, TError> {
-  const {
-    cacheStrategy = 'balanced',
-    offlineSupport = false,
-    adaptToPerformance = true,
-    ...restConfig
-  } = config;
+  const cachedOptions: UseQueryOptions<TQueryFnData, TError, TData> = {
+    staleTime: Infinity, // Never becomes stale
+    cacheTime: Infinity, // Never removed from cache
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    ...options,
+  };
   
-  // Track if we're using cached data while offline
-  const isUsingOfflineCache = useRef(false);
-  
-  // Determine optimal stale/cache times based on strategy and device
-  const getOptimizedCacheConfig = useCallback(() => {
-    // Base values for different strategies
-    const cacheConfigs = {
-      aggressive: { staleTime: 10 * 60 * 1000, cacheTime: 60 * 60 * 1000 }, // 10min stale, 1hr cache
-      balanced: { staleTime: 5 * 60 * 1000, cacheTime: 30 * 60 * 1000 }, // 5min stale, 30min cache
-      minimal: { staleTime: 1 * 60 * 1000, cacheTime: 10 * 60 * 1000 }, // 1min stale, 10min cache
-    };
-    
-    // Get base config from selected strategy
-    let { staleTime, cacheTime } = cacheConfigs[cacheStrategy];
-    
-    // Adjust based on device capability if enabled
-    if (adaptToPerformance) {
-      const deviceCapability = getPerformanceCategory();
-      
-      if (deviceCapability === 'low') {
-        // More aggressive caching for low-end devices
-        staleTime *= 2;
-        cacheTime *= 1.5;
-      } else if (deviceCapability === 'high') {
-        // Less caching for high-end devices for fresher data
-        staleTime = Math.max(staleTime * 0.7, 30000); // Min 30s
-      }
-    }
-    
-    return { staleTime, cacheTime };
-  }, [cacheStrategy, adaptToPerformance]);
-  
-  // Apply optimized cache config
-  const { staleTime, cacheTime } = getOptimizedCacheConfig();
-  
-  // Create wrapper around query function for offline support
-  const enhancedQueryFn = useCallback(async () => {
-    try {
-      return await queryFn();
-    } catch (error) {
-      // If we're requesting offline support and hit an error
-      if (offlineSupport && error instanceof Error && 
-          (error.message.includes('network') || error.message.includes('offline'))) {
-        
-        isUsingOfflineCache.current = true;
-        console.log(`Using cached data for ${queryKey.join('/')} during offline/network error`);
-        
-        // Let react-query use the cached data by returning undefined
-        // This prevents the query from going to error state
-        return undefined;
-      }
-      
-      // Re-throw for other errors
-      throw error;
-    }
-  }, [queryFn, queryKey, offlineSupport]);
-  
-  // Return the optimized query
-  return useQuery({
-    queryKey,
-    queryFn: enhancedQueryFn,
-    staleTime,
-    gcTime: cacheTime,
-    ...restConfig
-  });
+  return useOptimizedQuery(cachedOptions, monitorLabel);
 }

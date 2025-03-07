@@ -1,58 +1,56 @@
+
+import { WorkerTask, WorkerResult } from '@/utils/workerManager';
+
 /**
- * Web Worker for heavy calculations
- * Handles particle physics, fractal generation, and data processing
+ * Worker thread for offloading heavy calculations
+ * Handles different types of calculations based on task type
  */
-
-// Import any shared utilities and types
-import type { WorkerTask, WorkerResult, WorkerTaskType } from '../utils/workerManager';
-
-// Register task handlers
-const taskHandlers: Record<WorkerTaskType, (data: any) => any> = {
-  particles: calculateParticles,
-  fractalGeneration: generateFractal,
-  geometryCalculation: calculateGeometry,
-  dataProcessing: processData
-};
-
-// Listen for messages from the main thread
-self.onmessage = (event) => {
-  const task = event.data as WorkerTask;
+self.onmessage = (event: MessageEvent<WorkerTask>) => {
+  const task = event.data;
   const startTime = performance.now();
   
   try {
-    // Get the appropriate handler for this task type
-    const handler = taskHandlers[task.type];
+    let result: any;
     
-    if (!handler) {
-      throw new Error(`No handler registered for task type: ${task.type}`);
+    // Process different task types
+    switch (task.type) {
+      case 'particles':
+        result = calculateParticlePositions(task.data);
+        break;
+      case 'fractalGeneration':
+        result = generateFractalPattern(task.data);
+        break;
+      case 'geometryCalculation':
+        result = calculateGeometryPoints(task.data);
+        break;
+      case 'dataProcessing':
+        result = processData(task.data);
+        break;
+      default:
+        throw new Error(`Unknown task type: ${task.type}`);
     }
     
-    // Process the task
-    const result = handler(task.data);
+    // Send successful result back
+    const processingTime = performance.now() - startTime;
     
-    // Send back the result
-    const response: WorkerResult = {
+    const workerResponse: WorkerResult = {
       id: task.id,
       type: task.type,
       data: result,
       timing: {
-        queueTime: 0, // We don't know queue time in the worker
-        processingTime: performance.now() - startTime
+        queueTime: 0, // Filled in by manager
+        processingTime
       }
     };
     
-    self.postMessage(response);
+    self.postMessage(workerResponse);
   } catch (error) {
-    // Send back the error
+    // Send error back
     const errorResponse: WorkerResult = {
       id: task.id,
       type: task.type,
       data: null,
-      error: error instanceof Error ? error.message : String(error),
-      timing: {
-        queueTime: 0,
-        processingTime: performance.now() - startTime
-      }
+      error: error instanceof Error ? error.message : String(error)
     };
     
     self.postMessage(errorResponse);
@@ -60,89 +58,66 @@ self.onmessage = (event) => {
 };
 
 /**
- * Calculate particle positions and interactions
+ * Calculate next positions for quantum particles
  */
-function calculateParticles(data: {
-  particles: Array<{
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    mass: number;
-  }>;
-  bounds: { width: number; height: number };
-  mousePosition?: { x: number; y: number };
-  interactions: {
-    repulsion: number;
-    attraction: number;
-    bounds: number;
-    mouse: number;
-  };
-  deltaTime: number;
-}) {
-  const { particles, bounds, mousePosition, interactions, deltaTime } = data;
+function calculateParticlePositions(data: any) {
+  const { particles, dimensions, mousePosition, dx, dy } = data;
   
-  // Cap delta time to prevent large jumps
-  const dt = Math.min(deltaTime, 32) / 16;
+  if (!particles || !dimensions) {
+    return particles;
+  }
   
   // Process each particle
-  const updatedParticles = particles.map((p, i) => {
-    let fx = 0, fy = 0;
+  const updatedParticles = particles.map((particle: any) => {
+    // Basic particle movement logic
+    let { x, y, vx, vy, color, size } = particle;
     
-    // Particle interactions (simplified physics)
-    particles.forEach((p2, j) => {
-      if (i === j) return;
-      
-      const dx = p2.x - p.x;
-      const dy = p2.y - p.y;
-      const distSq = dx * dx + dy * dy;
-      const dist = Math.sqrt(distSq) || 0.001;
-      
-      // Combined attraction/repulsion force
-      const force = interactions.repulsion / (distSq * p.mass) - interactions.attraction / dist;
-      
-      fx += dx / dist * force;
-      fy += dy / dist * force;
-    });
+    // Apply current velocity
+    x += vx;
+    y += vy;
     
-    // Boundary forces (keep particles in bounds)
-    const boundaryForce = interactions.bounds;
-    if (p.x < 0) fx += boundaryForce * -p.x;
-    if (p.x > bounds.width) fx += boundaryForce * (bounds.width - p.x);
-    if (p.y < 0) fy += boundaryForce * -p.y;
-    if (p.y > bounds.height) fy += boundaryForce * (bounds.height - p.y);
+    // Bounce off edges
+    if (x <= 0 || x >= dimensions.width) {
+      vx = -vx;
+      x = x <= 0 ? 0 : dimensions.width;
+    }
     
-    // Mouse interaction force
+    if (y <= 0 || y >= dimensions.height) {
+      vy = -vy;
+      y = y <= 0 ? 0 : dimensions.height;
+    }
+    
+    // Process mouse interaction if available
     if (mousePosition) {
-      const dx = mousePosition.x - p.x;
-      const dy = mousePosition.y - p.y;
-      const distSq = dx * dx + dy * dy;
-      const dist = Math.sqrt(distSq) || 0.001;
+      const { x: mouseX, y: mouseY } = mousePosition;
       
-      if (dist < 150) {
-        const force = interactions.mouse / dist;
-        fx += dx / dist * force;
-        fy += dy / dist * force;
+      // Calculate distance to mouse
+      const dx = mouseX - x;
+      const dy = mouseY - y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Apply interaction force (repel/attract)
+      if (distance < 100) {
+        const force = -0.05; // Repel
+        const directionX = dx / distance;
+        const directionY = dy / distance;
+        vx += directionX * force * (1 - distance / 100);
+        vy += directionY * force * (1 - distance / 100);
       }
     }
     
-    // Update velocity with forces (simplified physics)
-    const vx = p.vx + fx * dt;
-    const vy = p.vy + fy * dt;
+    // Limit max velocity
+    const maxVelocity = 2;
+    vx = Math.max(-maxVelocity, Math.min(maxVelocity, vx));
+    vy = Math.max(-maxVelocity, Math.min(maxVelocity, vy));
     
-    // Add damping to prevent eternal motion
-    const damping = 0.98;
-    
-    // Update position with velocity
-    const x = p.x + vx * dt;
-    const y = p.y + vy * dt;
-    
+    // Return updated particle
     return {
+      ...particle,
       x,
       y,
-      vx: vx * damping,
-      vy: vy * damping,
-      mass: p.mass
+      vx,
+      vy
     };
   });
   
@@ -150,126 +125,217 @@ function calculateParticles(data: {
 }
 
 /**
- * Generate fractal geometry
+ * Generate fractal patterns using L-systems or other algorithms
  */
-function generateFractal(data: {
-  type: 'mandelbrot' | 'julia' | 'sierpinski';
-  dimensions: { width: number; height: number };
-  params: {
-    maxIterations: number;
-    escapeRadius: number;
-    juliaConstant?: { x: number; y: number };
-  };
-}) {
-  const { type, dimensions, params } = data;
-  const { width, height } = dimensions;
-  const { maxIterations, escapeRadius, juliaConstant } = params;
+function generateFractalPattern(data: any) {
+  const { pattern, iterations, angle, startingPosition } = data;
   
-  // Create ImageData for the fractal
-  const fractalData = new Uint8ClampedArray(width * height * 4);
+  // Simple L-system implementation for demonstration
+  let currentPattern = pattern;
   
-  // Generate different fractal types
-  switch (type) {
-    case 'mandelbrot':
-      // Mandelbrot set calculation
-      for (let x = 0; x < width; x++) {
-        for (let y = 0; y < height; y++) {
-          // Map pixel coordinates to complex plane
-          const a = 3.0 * (x - width / 2) / width;
-          const b = 2.0 * (y - height / 2) / height;
-          
-          let ca = a;
-          let cb = b;
-          
-          let n = 0;
-          let z = 0;
-          let aa = 0;
-          let bb = 0;
-          
-          // Iterate until escape or max iterations
-          while (n < maxIterations && aa + bb <= escapeRadius * escapeRadius) {
-            cb = 2 * ca * cb + b;
-            ca = aa - bb + a;
-            aa = ca * ca;
-            bb = cb * cb;
-            n++;
-          }
-          
-          // Calculate color based on iteration count
-          const bright = n === maxIterations ? 0 : 255 * Math.sqrt(n / maxIterations);
-          
-          // Set pixel in ImageData
-          const pix = (y * width + x) * 4;
-          fractalData[pix] = bright;
-          fractalData[pix + 1] = bright;
-          fractalData[pix + 2] = bright;
-          fractalData[pix + 3] = 255;
-        }
-      }
-      break;
-      
-    case 'julia':
-      // Julia set calculation
-      const jx = juliaConstant?.x || -0.7;
-      const jy = juliaConstant?.y || 0.27;
-      
-      for (let x = 0; x < width; x++) {
-        for (let y = 0; y < height; y++) {
-          // Map pixel coordinates to complex plane
-          let zx = 3.0 * (x - width / 2) / width;
-          let zy = 2.0 * (y - height / 2) / height;
-          
-          let n = 0;
-          
-          // Iterate until escape or max iterations
-          while (n < maxIterations && zx * zx + zy * zy < escapeRadius * escapeRadius) {
-            const tmp = zx * zx - zy * zy + jx;
-            zy = 2.0 * zx * zy + jy;
-            zx = tmp;
-            n++;
-          }
-          
-          // Calculate color based on iteration count
-          const bright = n === maxIterations ? 0 : 255 * Math.sqrt(n / maxIterations);
-          
-          // Set pixel in ImageData
-          const pix = (y * width + x) * 4;
-          fractalData[pix] = bright;
-          fractalData[pix + 1] = bright;
-          fractalData[pix + 2] = bright;
-          fractalData[pix + 3] = 255;
-        }
-      }
-      break;
-      
-    default:
-      // Default simple pattern
-      for (let i = 0; i < width * height * 4; i += 4) {
-        fractalData[i] = 0;
-        fractalData[i + 1] = 0;
-        fractalData[i + 2] = 0;
-        fractalData[i + 3] = 255;
-      }
+  // Apply rules for the specified number of iterations
+  for (let i = 0; i < iterations; i++) {
+    currentPattern = currentPattern
+      .replace(/F/g, 'FF+[+F-F-F]-[-F+F+F]')
+      .replace(/A/g, 'B-A-B')
+      .replace(/B/g, 'A+B+A');
   }
   
-  return { fractalData, width, height };
+  // Calculate points by interpreting the L-system
+  const points = [];
+  let x = startingPosition?.x || 0;
+  let y = startingPosition?.y || 0;
+  let direction = 0;
+  const stack = [];
+  
+  for (let i = 0; i < currentPattern.length; i++) {
+    const char = currentPattern[i];
+    const step = 5 / (iterations + 1); // Step size decreases with iterations
+    
+    switch (char) {
+      case 'F':
+      case 'A':
+      case 'B':
+        // Move forward
+        x += Math.cos(direction) * step;
+        y += Math.sin(direction) * step;
+        points.push({ x, y });
+        break;
+      case '+':
+        // Turn right
+        direction += angle * Math.PI / 180;
+        break;
+      case '-':
+        // Turn left
+        direction -= angle * Math.PI / 180;
+        break;
+      case '[':
+        // Save position and direction
+        stack.push({ x, y, direction });
+        break;
+      case ']':
+        // Restore position and direction
+        if (stack.length > 0) {
+          const state = stack.pop();
+          if (state) {
+            x = state.x;
+            y = state.y;
+            direction = state.direction;
+          }
+        }
+        break;
+    }
+  }
+  
+  return points;
 }
 
 /**
- * Calculate complex geometry for sacred geometry visualizations
+ * Calculate sacred geometry points and patterns
  */
-function calculateGeometry(data: any) {
-  // Implement geometry calculations here
-  return data;
+function calculateGeometryPoints(data: any) {
+  const { type, centerX, centerY, radius, points } = data;
+  const results = [];
+  
+  switch (type) {
+    case 'circle':
+      // Generate a circle
+      for (let i = 0; i < points; i++) {
+        const angle = (i / points) * Math.PI * 2;
+        results.push({
+          x: centerX + Math.cos(angle) * radius,
+          y: centerY + Math.sin(angle) * radius
+        });
+      }
+      break;
+      
+    case 'flowerOfLife':
+      // Generate Flower of Life pattern
+      const circles = [];
+      // First circle at center
+      circles.push({ x: centerX, y: centerY, radius });
+      
+      // Six circles around the center
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        circles.push({
+          x: centerX + Math.cos(angle) * radius,
+          y: centerY + Math.sin(angle) * radius,
+          radius
+        });
+      }
+      
+      // Outer ring of circles
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2 + (Math.PI / 12);
+        circles.push({
+          x: centerX + Math.cos(angle) * radius * 2,
+          y: centerY + Math.sin(angle) * radius * 2,
+          radius
+        });
+      }
+      
+      return circles;
+      
+    case 'metatron':
+      // Generate Metatron's Cube points
+      // Center point
+      results.push({ x: centerX, y: centerY });
+      
+      // Inner hexagon
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        results.push({
+          x: centerX + Math.cos(angle) * radius,
+          y: centerY + Math.sin(angle) * radius
+        });
+      }
+      
+      // Outer hexagon
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 + (Math.PI / 6);
+        results.push({
+          x: centerX + Math.cos(angle) * radius * 2,
+          y: centerY + Math.sin(angle) * radius * 2
+        });
+      }
+      break;
+  }
+  
+  return results;
 }
 
 /**
- * Process large datasets
+ * Process large datasets efficiently
  */
 function processData(data: any) {
-  // Implement data processing here
-  return data;
+  const { dataset, operation, parameters } = data;
+  
+  if (!dataset || !operation) {
+    return null;
+  }
+  
+  switch (operation) {
+    case 'filter':
+      return dataset.filter((item: any) => {
+        // Apply filter criteria
+        for (const key in parameters) {
+          if (item[key] !== parameters[key]) {
+            return false;
+          }
+        }
+        return true;
+      });
+      
+    case 'aggregate':
+      const result: Record<string, any> = {};
+      
+      for (const item of dataset) {
+        const groupKey = item[parameters.groupBy];
+        
+        if (!result[groupKey]) {
+          result[groupKey] = {
+            count: 0,
+            sum: 0,
+            min: Infinity,
+            max: -Infinity,
+            items: []
+          };
+        }
+        
+        const group = result[groupKey];
+        group.count++;
+        
+        if (parameters.valueField) {
+          const value = item[parameters.valueField];
+          if (typeof value === 'number') {
+            group.sum += value;
+            group.min = Math.min(group.min, value);
+            group.max = Math.max(group.max, value);
+          }
+        }
+        
+        if (parameters.includeItems) {
+          group.items.push(item);
+        }
+      }
+      
+      return result;
+      
+    case 'sort':
+      return [...dataset].sort((a: any, b: any) => {
+        const field = parameters.field;
+        const direction = parameters.direction === 'desc' ? -1 : 1;
+        
+        if (a[field] < b[field]) return -1 * direction;
+        if (a[field] > b[field]) return 1 * direction;
+        return 0;
+      });
+      
+    default:
+      return dataset;
+  }
 }
 
-// Notify main thread that worker is ready
-self.postMessage({ type: 'ready' });
+// This ensures TypeScript recognizes this as a module
+export {};
