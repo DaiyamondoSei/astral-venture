@@ -58,6 +58,22 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-member-access": "warn",
       "@typescript-eslint/no-unsafe-call": "warn",
       "@typescript-eslint/no-unsafe-return": "warn",
+      // Additional strict rules for better type safety
+      "@typescript-eslint/array-type": ["error", { default: "array-simple" }],
+      "@typescript-eslint/ban-types": "error",
+      "@typescript-eslint/consistent-type-assertions": [
+        "error",
+        { assertionStyle: "as", objectLiteralTypeAssertions: "never" }
+      ],
+      "@typescript-eslint/explicit-member-accessibility": ["error", { accessibility: "no-public" }],
+      "@typescript-eslint/method-signature-style": ["error", "property"],
+      "@typescript-eslint/no-confusing-non-null-assertion": "error",
+      "@typescript-eslint/no-redundant-type-constituents": "error",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "error",
+      "@typescript-eslint/prefer-for-of": "error",
+      "@typescript-eslint/prefer-function-type": "error",
+      "@typescript-eslint/prefer-includes": "error",
+      "@typescript-eslint/prefer-string-starts-ends-with": "error",
     },
   }
 );

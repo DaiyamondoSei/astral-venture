@@ -1,206 +1,161 @@
 
-import type { AchievementData, FeatureTooltipData, GuidedTourData } from '@/components/onboarding/data/types';
+import { toast } from '@/components/ui/use-toast';
 
 /**
- * Type validation utility
- * 
- * This utility provides functions to validate data structures against TypeScript interfaces
- * at runtime, which can help catch type-related issues early.
+ * Type validation severity levels
  */
-
-// Type guard for AchievementData
-export function isAchievementData(obj: unknown): obj is AchievementData {
-  if (!obj || typeof obj !== 'object') return false;
-  
-  const achievement = obj as Partial<AchievementData>;
-  
-  const requiredProps = ['id', 'title', 'description'];
-  for (const prop of requiredProps) {
-    if (!(prop in achievement) || typeof achievement[prop as keyof AchievementData] !== 'string') {
-      console.warn(`Invalid AchievementData: missing required property "${prop}"`);
-      return false;
-    }
-  }
-  
-  return true;
+export enum ValidationSeverity {
+  WARNING = 'warning',
+  ERROR = 'error',
+  SILENT = 'silent'
 }
 
-// Type guard for FeatureTooltipData
-export function isFeatureTooltipData(obj: unknown): obj is FeatureTooltipData {
-  if (!obj || typeof obj !== 'object') return false;
-  
-  const tooltip = obj as Partial<FeatureTooltipData>;
-  
-  const requiredProps = ['id', 'targetSelector', 'title', 'description', 'position', 'order'];
-  for (const prop of requiredProps) {
-    if (!(prop in tooltip)) {
-      console.warn(`Invalid FeatureTooltipData: missing required property "${prop}"`);
-      return false;
-    }
-  }
-  
-  // Validate position values
-  const validPositions = ['top', 'bottom', 'left', 'right'];
-  if (!validPositions.includes(tooltip.position as string)) {
-    console.warn(`Invalid position value: ${tooltip.position}. Must be one of: ${validPositions.join(', ')}`);
-    return false;
-  }
-  
-  return true;
+/**
+ * Options for type validation
+ */
+export interface TypeValidationOptions {
+  severity?: ValidationSeverity;
+  showToast?: boolean;
+  logToConsole?: boolean;
+  allowPartial?: boolean;
+  extraValidation?: (data: unknown) => boolean;
 }
 
-// Type guard for GuidedTourData
-export function isGuidedTourData(obj: unknown): obj is GuidedTourData {
-  if (!obj || typeof obj !== 'object') return false;
-  
-  const tour = obj as Partial<GuidedTourData>;
-  
-  const requiredProps = ['id', 'title', 'description', 'steps'];
-  for (const prop of requiredProps) {
-    if (!(prop in tour)) {
-      console.warn(`Invalid GuidedTourData: missing required property "${prop}"`);
-      return false;
-    }
-  }
-  
-  // Validate steps
-  if (!Array.isArray(tour.steps)) {
-    console.warn('Invalid GuidedTourData: steps must be an array');
-    return false;
-  }
-  
-  return true;
-}
+/**
+ * Validates data against a TypeScript interface at runtime
+ * 
+ * @param data The data to validate
+ * @param schemaObject A sample object with the expected shape (used for validation)
+ * @param options Validation options
+ * @returns Whether the data is valid according to the expected schema
+ */
+export function validateType<T>(
+  data: unknown,
+  schemaObject: T,
+  options: TypeValidationOptions = {}
+): boolean {
+  const {
+    severity = ValidationSeverity.WARNING,
+    showToast = severity === ValidationSeverity.ERROR,
+    logToConsole = true,
+    allowPartial = false,
+    extraValidation
+  } = options;
 
-// Function to validate a collection of items against a type guard
-export function validateCollection<T>(
-  items: unknown[],
-  typeGuard: (item: unknown) => item is T,
-  collectionName: string
-): T[] {
-  const validItems: T[] = [];
-  const invalidIndices: number[] = [];
-  
-  items.forEach((item, index) => {
-    if (typeGuard(item)) {
-      validItems.push(item);
-    } else {
-      invalidIndices.push(index);
-    }
-  });
-  
-  if (invalidIndices.length > 0) {
-    console.warn(
-      `Found ${invalidIndices.length} invalid items in ${collectionName} at indices: ${invalidIndices.join(', ')}`
+  if (data === null || data === undefined) {
+    handleValidationIssue(
+      'Data is null or undefined',
+      severity,
+      showToast,
+      logToConsole
     );
+    return false;
   }
-  
-  return validItems;
-}
 
-// Main validation function that can be called during development or at runtime
-export function validateTypeConsistency(): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
+  if (typeof data !== 'object') {
+    handleValidationIssue(
+      `Expected object, got ${typeof data}`,
+      severity,
+      showToast,
+      logToConsole
+    );
+    return false;
+  }
+
+  // Check if all required properties exist and have the correct type
+  const issues: string[] = [];
+  const schemaKeys = Object.keys(schemaObject as object);
   
-  try {
-    // Import data files dynamically
-    const achievementsModule = require('@/components/onboarding/data/achievements');
-    const tooltipsModule = require('@/components/onboarding/data/tooltips');
-    const toursModule = require('@/components/onboarding/data/tours');
+  for (const key of schemaKeys) {
+    const schemaValue = (schemaObject as any)[key];
+    const dataValue = (data as any)[key];
     
-    // Validate achievements
-    const achievements = achievementsModule.onboardingAchievements;
-    if (achievements) {
-      const validAchievements = validateCollection(
-        achievements,
-        isAchievementData,
-        'onboardingAchievements'
-      );
-      
-      if (validAchievements.length !== achievements.length) {
-        errors.push(`Found ${achievements.length - validAchievements.length} invalid achievements`);
-      }
+    // Skip if property is missing but we allow partial matches
+    if (dataValue === undefined && allowPartial) {
+      continue;
     }
     
-    // Validate tooltips
-    const tooltips = tooltipsModule.featureTooltips;
-    if (tooltips) {
-      const validTooltips = validateCollection(
-        tooltips,
-        isFeatureTooltipData,
-        'featureTooltips'
-      );
-      
-      if (validTooltips.length !== tooltips.length) {
-        errors.push(`Found ${tooltips.length - validTooltips.length} invalid tooltips`);
-      }
+    // Check if property exists
+    if (dataValue === undefined) {
+      issues.push(`Missing required property: ${key}`);
+      continue;
     }
     
-    // Validate tours
-    const tours = toursModule.guidedTours;
-    if (tours) {
-      const validTours = validateCollection(
-        tours,
-        isGuidedTourData,
-        'guidedTours'
-      );
-      
-      if (validTours.length !== tours.length) {
-        errors.push(`Found ${tours.length - validTours.length} invalid tours`);
+    // Check type compatibility
+    const schemaType = typeof schemaValue;
+    const dataType = typeof dataValue;
+    
+    if (dataType !== schemaType) {
+      // Special case for arrays which are technically objects
+      if (Array.isArray(schemaValue) && !Array.isArray(dataValue)) {
+        issues.push(`Property ${key} should be an array, got ${dataType}`);
+      } else if (dataType !== schemaType) {
+        issues.push(`Property ${key} has wrong type: expected ${schemaType}, got ${dataType}`);
       }
     }
-    
-  } catch (error) {
-    errors.push(`Error during type validation: ${error instanceof Error ? error.message : String(error)}`);
   }
   
-  return {
-    valid: errors.length === 0,
-    errors
-  };
+  // Run extra validation if provided
+  if (extraValidation && !extraValidation(data)) {
+    issues.push('Failed custom validation rules');
+  }
+  
+  // Handle any found issues
+  if (issues.length > 0) {
+    handleValidationIssue(
+      `Type validation failed:\n- ${issues.join('\n- ')}`,
+      severity,
+      showToast,
+      logToConsole
+    );
+    return false;
+  }
+  
+  return true;
 }
 
-// Function to run the validation from the CLI or scripts
-export function runTypeValidationCLI(): void {
-  const result = validateTypeConsistency();
+/**
+ * Handle a validation issue based on severity
+ */
+function handleValidationIssue(
+  message: string,
+  severity: ValidationSeverity,
+  showToast: boolean,
+  logToConsole: boolean
+): void {
+  // Log to console if enabled
+  if (logToConsole) {
+    if (severity === ValidationSeverity.ERROR) {
+      console.error('Type validation error:', message);
+    } else if (severity === ValidationSeverity.WARNING) {
+      console.warn('Type validation warning:', message);
+    } else {
+      console.info('Type validation info:', message);
+    }
+  }
   
-  if (result.valid) {
-    console.log('✅ Type validation passed successfully');
-  } else {
-    console.error('❌ Type validation failed with the following errors:');
-    result.errors.forEach(error => console.error(`  - ${error}`));
-    process.exit(1); // Exit with error code for CI pipelines
+  // Show toast if enabled
+  if (showToast) {
+    toast({
+      title: severity === ValidationSeverity.ERROR 
+        ? 'Type Validation Error' 
+        : 'Type Validation Warning',
+      description: message.length > 100 
+        ? `${message.substring(0, 100)}...` 
+        : message,
+      variant: severity === ValidationSeverity.ERROR ? 'destructive' : 'default'
+    });
   }
 }
 
-// Add runtime type checking decorator
-export function validateTypes<T>(typeGuard: (value: unknown) => value is T) {
-  return function(
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
-    const originalMethod = descriptor.value;
-    
-    descriptor.value = function(...args: any[]) {
-      // Validate input arguments
-      args.forEach((arg, index) => {
-        if (!typeGuard(arg)) {
-          console.warn(`Type validation failed for argument ${index} in ${propertyKey}`);
-        }
-      });
-      
-      // Call the original method
-      const result = originalMethod.apply(this, args);
-      
-      // Validate return value if applicable
-      if (result !== undefined && !typeGuard(result)) {
-        console.warn(`Type validation failed for return value of ${propertyKey}`);
-      }
-      
-      return result;
-    };
-    
-    return descriptor;
+/**
+ * Helper function to create a strongly typed validator for a specific interface
+ */
+export function createValidator<T>(
+  schemaObject: T,
+  defaultOptions: TypeValidationOptions = {}
+) {
+  return (data: unknown, options: TypeValidationOptions = {}): data is T => {
+    return validateType(data, schemaObject, { ...defaultOptions, ...options });
   };
 }
