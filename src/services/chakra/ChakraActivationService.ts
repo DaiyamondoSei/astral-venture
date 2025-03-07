@@ -1,25 +1,49 @@
 
-import { supabase, incrementEnergyPoints } from '@/integrations/supabase/client';
-import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
-
 /**
  * Service responsible for handling chakra activation and recalibration operations
  */
+import { supabase, incrementEnergyPoints } from '@/integrations/supabase/client';
+import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
+import { handleError } from '@/utils/errorHandling';
+
+// Improved typings for better code quality and prevention of bugs
+interface ChakraActivationResult {
+  success: boolean;
+  alreadyActivated?: boolean;
+  chakraName?: string;
+  pointsEarned?: number;
+  newPoints?: number;
+  newActivatedChakras: number[];
+}
+
+interface ChakraRecalibrationResult {
+  success: boolean;
+  noRecalibrationNeeded?: boolean;
+  recalibratedDays?: number[];
+  pointsEarned?: number;
+  newPoints?: number;
+  newActivatedChakras: number[];
+  newStreak?: number;
+}
+
 export class ChakraActivationService {
   /**
    * Activates a specific chakra for a user
-   * 
-   * @param userId User ID
-   * @param chakraIndex Chakra index to activate
-   * @param currentActivatedChakras Currently activated chakras
-   * @returns Object with success status, new activation status, and earned points
    */
   static async activateChakra(
     userId: string,
     chakraIndex: number,
     currentActivatedChakras: number[]
-  ) {
+  ): Promise<ChakraActivationResult> {
     try {
+      // Validate inputs to prevent errors
+      if (!userId || chakraIndex < 0 || chakraIndex >= CHAKRA_NAMES.length) {
+        return {
+          success: false,
+          newActivatedChakras: [...currentActivatedChakras]
+        };
+      }
+      
       // Check if this chakra was already activated today
       const today = new Date();
       const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
@@ -42,11 +66,11 @@ export class ChakraActivationService {
           success: false,
           alreadyActivated: true,
           chakraName: CHAKRA_NAMES[chakraIndex],
-          newActivatedChakras: currentActivatedChakras
+          newActivatedChakras: [...currentActivatedChakras]
         };
       }
       
-      // Insert new activation
+      // Insert new activation with error handling
       const { error } = await supabase
         .from('user_progress')
         .insert({
@@ -78,25 +102,28 @@ export class ChakraActivationService {
         newActivatedChakras
       };
     } catch (error) {
-      console.error('Error activating chakra:', error);
+      handleError(error, 'ChakraActivationService.activateChakra', false);
       throw error;
     }
   }
   
   /**
    * Recalibrates missed chakra activations
-   * 
-   * @param userId User ID
-   * @param activatedChakras Currently activated chakras
-   * @param reflection User's reflection for recalibration
-   * @returns Object with success status and recalibration results
    */
   static async recalibrateChakras(
     userId: string,
     activatedChakras: number[],
     reflection: string
-  ) {
+  ): Promise<ChakraRecalibrationResult> {
     try {
+      // Validate inputs to prevent errors
+      if (!userId || !reflection || reflection.length < 5) {
+        return {
+          success: false,
+          newActivatedChakras: [...activatedChakras]
+        };
+      }
+      
       const today = new Date();
       const currentDay = today.getDay();
       const allDays = Array.from({ length: currentDay + 1 }, (_, i) => i);
@@ -106,7 +133,7 @@ export class ChakraActivationService {
         return {
           success: false,
           noRecalibrationNeeded: true,
-          newActivatedChakras: activatedChakras
+          newActivatedChakras: [...activatedChakras]
         };
       }
       
@@ -130,7 +157,7 @@ export class ChakraActivationService {
           continue;
         }
         
-        await supabase
+        const { error } = await supabase
           .from('user_progress')
           .insert({
             user_id: userId,
@@ -140,6 +167,8 @@ export class ChakraActivationService {
             reflection
           });
           
+        if (error) throw error;
+        
         recalibratedDays.push(missedDay);
       }
       
@@ -167,7 +196,7 @@ export class ChakraActivationService {
         newStreak
       };
     } catch (error) {
-      console.error('Error completing recalibration:', error);
+      handleError(error, 'ChakraActivationService.recalibrateChakras', false);
       throw error;
     }
   }
