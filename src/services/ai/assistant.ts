@@ -20,7 +20,8 @@ export async function askAIAssistant(
     // Check for offline mode
     if (!navigator.onLine) {
       console.log("Device is offline, using fallback response");
-      return createFallbackResponse(questionData.question, true);
+      // Fix: Call with only one argument
+      return createFallbackResponse(questionData.question);
     }
     
     // For non-streaming requests, check for cached response first

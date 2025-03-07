@@ -138,17 +138,23 @@ export function findFallbackResponse(question: string): {answer: string; practic
  * Create a fallback response when the AI service fails
  * 
  * @param question Original user question
+ * @param isOffline Optional flag to indicate if the fallback is due to offline status
  * @returns Fallback AI response
  */
-export function createFallbackResponse(question: string): AIResponse {
+export function createFallbackResponse(question: string, isOffline?: boolean): AIResponse {
   const fallback = findFallbackResponse(question);
   
+  // Create appropriate message based on whether we're offline or experiencing an error
+  const prefixMessage = isOffline 
+    ? "You're currently offline. " 
+    : "I'm sorry, I couldn't process your question at this time. ";
+  
   return {
-    answer: `I'm sorry, I couldn't process your question at this time. ${fallback.answer}`,
+    answer: `${prefixMessage}${fallback.answer}`,
     relatedInsights: [],
     suggestedPractices: fallback.practices,
     meta: {
-      model: "fallback",
+      model: isOffline ? "offline" : "fallback",
       tokenUsage: 0,
       processingTime: 0
     }
