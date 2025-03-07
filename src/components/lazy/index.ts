@@ -1,64 +1,75 @@
 
 import React from 'react';
+import LazyLoadWrapper from '../LazyLoadWrapper';
 
 // Lazy load heavy visualization components
-export const LazyQuantumParticles = React.lazy(() => 
+const LazyQuantumParticles = React.lazy(() => 
   import('../effects/quantum-particles/QuantumParticles')
 );
 
-export const LazyInteractiveEnergyField = React.lazy(() => 
+const LazyInteractiveEnergyField = React.lazy(() => 
   import('../effects/energy-field/InteractiveEnergyField')
 );
 
-export const LazyInteractiveMetatronsPortal = React.lazy(() =>
+const LazyInteractiveMetatronsPortal = React.lazy(() =>
   import('../sacred-geometry/components/InteractiveMetatronsPortal')
 );
 
-export const LazyVisualizationTabs = React.lazy(() =>
+const LazyVisualizationTabs = React.lazy(() =>
   import('../astral-body-demo/VisualizationTabs')
 );
 
-export const LazyCosmicAstralBody = React.lazy(() =>
+const LazyCosmicAstralBody = React.lazy(() =>
   import('../entry-animation/CosmicAstralBody')
 );
 
-export const LazyAstralBody = React.lazy(() =>
+const LazyAstralBody = React.lazy(() =>
   import('../entry-animation/AstralBody')
 );
 
 // Export wrapped versions with optimized loading states
 export const QuantumParticles = (props: any) => (
-  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+  <LazyLoadWrapper>
     <LazyQuantumParticles {...props} />
-  </React.Suspense>
+  </LazyLoadWrapper>
 );
 
 export const InteractiveEnergyField = (props: any) => (
-  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+  <LazyLoadWrapper>
     <LazyInteractiveEnergyField {...props} />
-  </React.Suspense>
+  </LazyLoadWrapper>
 );
 
 export const InteractiveMetatronsPortal = (props: any) => (
-  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+  <LazyLoadWrapper>
     <LazyInteractiveMetatronsPortal {...props} />
-  </React.Suspense>
+  </LazyLoadWrapper>
 );
 
 export const VisualizationTabs = (props: any) => (
-  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+  <LazyLoadWrapper>
     <LazyVisualizationTabs {...props} />
-  </React.Suspense>
+  </LazyLoadWrapper>
 );
 
 export const CosmicAstralBody = (props: any) => (
-  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+  <LazyLoadWrapper>
     <LazyCosmicAstralBody {...props} />
-  </React.Suspense>
+  </LazyLoadWrapper>
 );
 
 export const AstralBody = (props: any) => (
-  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+  <LazyLoadWrapper>
     <LazyAstralBody {...props} />
-  </React.Suspense>
+  </LazyLoadWrapper>
 );
+
+// Also export the raw lazy components for advanced usage scenarios
+export {
+  LazyQuantumParticles,
+  LazyInteractiveEnergyField,
+  LazyInteractiveMetatronsPortal,
+  LazyVisualizationTabs,
+  LazyCosmicAstralBody,
+  LazyAstralBody
+};
