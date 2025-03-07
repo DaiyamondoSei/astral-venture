@@ -2,7 +2,7 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 
 interface DashboardContextType {
-  onOpenAIAssistant: () => void;
+  onOpenAIAssistant: (reflectionId?: string, reflectionContent?: string) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType>({
@@ -13,7 +13,7 @@ export const useDashboardContext = () => useContext(DashboardContext);
 
 interface DashboardProviderProps {
   children: ReactNode;
-  onOpenAIAssistant: () => void;
+  onOpenAIAssistant: (reflectionId?: string, reflectionContent?: string) => void;
 }
 
 export const DashboardProvider: React.FC<DashboardProviderProps> = ({ 
