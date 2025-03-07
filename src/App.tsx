@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -5,7 +6,6 @@ import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from '@/components/ui/toaster';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import QuantumParticles from '@/components/effects/QuantumParticles';
 import { PerformanceProvider } from './contexts/PerformanceContext';
 import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
 
@@ -57,7 +57,11 @@ function App() {
               <ErrorBoundary fallback={
                 <div className="absolute inset-0 bg-gradient-to-br from-black via-quantum-950 to-black" />
               }>
-                <QuantumParticles count={40} speed={0.8} />
+                <div className="absolute inset-0 z-0">
+                  <Suspense fallback={null}>
+                    <lazy.QuantumParticles count={40} speed={0.8} />
+                  </Suspense>
+                </div>
               </ErrorBoundary>
               
               <BrowserRouter>
