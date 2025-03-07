@@ -78,7 +78,7 @@ export function handleError(
       variant: severity === ErrorSeverity.INFO 
         ? "default" 
         : severity === ErrorSeverity.WARNING 
-          ? "default" // Changed from "warning" to "default" as it's an allowed variant
+          ? "default" 
           : "destructive"
     });
   }

@@ -7,7 +7,6 @@ import { Sparkles, Trophy, Zap, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AchievementData } from './data/types';
 import { getProgressColor } from './hooks/achievement';
-import { achievementService } from '@/services/achievements';
 
 interface AchievementProgressTrackerProps {
   progressPercentage: number;
@@ -42,7 +41,7 @@ const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
 
   // Calculate achievement progress if available
   const achievementProgress = nextAchievement ? 
-    achievementService.calculateProgress(nextAchievement, 0) : 0;
+    (nextAchievement.currentProgress ?? 0) / (nextAchievement.requiredProgress ?? 100) * 100 : 0;
 
   return (
     <motion.div 

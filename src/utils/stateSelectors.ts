@@ -1,48 +1,91 @@
 
-import { useCallback, useRef } from 'react';
-import isEqual from 'lodash/isEqual';
-
 /**
- * Creates a memoized selector function that only triggers rerenders when
- * the selected portion of state changes
- * 
- * @param state The complete state object
- * @param selector Function that extracts a portion of the state
- * @returns The selected portion of state, memoized by deep comparison
+ * Utility for deep comparison of objects
+ * Used by memoization utilities
  */
-export function createSelector<State, Selected>(
-  state: State,
-  selector: (state: State) => Selected
-): Selected {
-  const prevStateRef = useRef<State>(state);
-  const prevSelectedRef = useRef<Selected>(selector(state));
+export function deepEqual(a: any, b: any): boolean {
+  if (a === b) return true;
   
-  // Only recalculate if state reference has changed
-  if (state !== prevStateRef.current) {
-    const newSelected = selector(state);
-    
-    // Only update if the selected value has actually changed
-    if (!isEqual(newSelected, prevSelectedRef.current)) {
-      prevSelectedRef.current = newSelected;
-    }
-    
-    prevStateRef.current = state;
+  if (
+    typeof a !== 'object' || 
+    a === null || 
+    typeof b !== 'object' || 
+    b === null
+  ) {
+    return false;
   }
   
-  return prevSelectedRef.current;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  
+  if (keysA.length !== keysB.length) return false;
+  
+  for (const key of keysA) {
+    if (!keysB.includes(key)) return false;
+    
+    if (!deepEqual(a[key], b[key])) return false;
+  }
+  
+  return true;
 }
 
 /**
- * A hook that creates a memoized selector function
- * 
- * @param selectorFn The selector function to memoize
- * @returns A memoized selector function that can be used with any state
+ * Creates a selector function that memoizes its result
+ * and only recalculates when dependencies change
  */
-export function useMemoizedSelector<State, Selected>(
-  selectorFn: (state: State) => Selected
-) {
-  return useCallback(
-    (state: State) => createSelector(state, selectorFn),
-    [selectorFn]
+export function createSelector<State, Result>(
+  dependencies: ((state: State) => any)[],
+  selector: (...deps: any[]) => Result
+): (state: State) => Result {
+  let cachedResult: Result;
+  let cachedDeps: any[] = [];
+  let initialized = false;
+  
+  return (state: State) => {
+    const currentDeps = dependencies.map(dep => dep(state));
+    
+    // Check if dependencies have changed
+    const shouldRecalculate = !initialized || !depsEqual(currentDeps, cachedDeps);
+    
+    if (shouldRecalculate) {
+      cachedResult = selector(...currentDeps);
+      cachedDeps = currentDeps;
+      initialized = true;
+    }
+    
+    return cachedResult;
+  };
+}
+
+// Helper to compare dependency arrays
+function depsEqual(newDeps: any[], oldDeps: any[]): boolean {
+  if (newDeps.length !== oldDeps.length) return false;
+  
+  for (let i = 0; i < newDeps.length; i++) {
+    if (!deepEqual(newDeps[i], oldDeps[i])) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Creates a selector that extracts a specific property
+ */
+export function createPropertySelector<State, Prop extends keyof State>(prop: Prop) {
+  return (state: State) => state[prop];
+}
+
+/**
+ * Creates a filtered selector that applies a filter function to an array
+ */
+export function createFilteredSelector<State, Item>(
+  arraySelector: (state: State) => Item[],
+  filterFn: (item: Item) => boolean
+): (state: State) => Item[] {
+  return createSelector(
+    [arraySelector],
+    (items) => items.filter(filterFn)
   );
 }

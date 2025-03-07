@@ -1,220 +1,366 @@
-import { getPerformanceCategory } from '../performanceUtils';
+/**
+ * Performance monitoring utilities for tracking and optimizing application performance
+ */
 
-type PerformanceMetric = {
-  fps: number;
-  timestamp: number;
-  memoryUsage?: number;
-  cpuUsage?: number;
-  deviceCategory: string;
-  routeName: string;
+// Performance thresholds for different metrics
+const THRESHOLDS = {
+  FPS: {
+    LOW: 30,
+    MEDIUM: 45,
+    HIGH: 55
+  },
+  MEMORY: {
+    LOW: 50 * 1024 * 1024, // 50MB
+    MEDIUM: 150 * 1024 * 1024, // 150MB
+    HIGH: 300 * 1024 * 1024 // 300MB
+  },
+  LOAD_TIME: {
+    FAST: 1000, // 1s
+    MEDIUM: 2500, // 2.5s
+    SLOW: 5000 // 5s
+  },
+  INTERACTION: {
+    FAST: 100, // 100ms
+    MEDIUM: 300, // 300ms
+    SLOW: 500 // 500ms
+  }
 };
 
+// Store for performance metrics
+const performanceStore = {
+  fps: {
+    current: 60,
+    average: 60,
+    samples: [] as number[],
+    lowFpsEvents: 0
+  },
+  memory: {
+    current: 0,
+    peak: 0,
+    snapshots: [] as number[]
+  },
+  loadTime: {
+    navigationStart: 0,
+    firstContentfulPaint: 0,
+    domInteractive: 0,
+    domComplete: 0
+  },
+  interactions: {
+    events: [] as InteractionEvent[],
+    longEvents: 0
+  },
+  errors: {
+    count: 0,
+    messages: [] as string[]
+  }
+};
+
+// Interface for interaction events
+interface InteractionEvent {
+  type: string;
+  timestamp: number;
+  duration: number;
+  target?: string;
+}
+
 /**
- * Enhanced performance monitoring utility
- * Collects real-time performance metrics for analysis
+ * Initializes the performance monitoring system
  */
-export class PerformanceMonitor {
-  private static instance: PerformanceMonitor;
-  private metrics: PerformanceMetric[] = [];
-  private isMonitoring = false;
-  private frameCountPerSecond = 0;
-  private lastSecondTimestamp = 0;
-  private monitoringIntervalId?: number;
-  private animationFrameId?: number;
-  private currentRoute = 'unknown';
+export function initPerformanceMonitoring(options: {
+  enableFpsMonitoring?: boolean;
+  enableMemoryMonitoring?: boolean;
+  enableInteractionMonitoring?: boolean;
+  enableLoadTimeMonitoring?: boolean;
+  reportingInterval?: number;
+} = {}) {
+  const {
+    enableFpsMonitoring = true,
+    enableMemoryMonitoring = true,
+    enableInteractionMonitoring = true,
+    enableLoadTimeMonitoring = true,
+    reportingInterval = 10000 // 10s
+  } = options;
   
-  // Maximum number of metrics to store
-  private maxMetricsLength = 100;
-  
-  private constructor() {
-    // Private constructor for singleton
+  // Track navigation timing metrics
+  if (enableLoadTimeMonitoring && performance && performance.timing) {
+    trackLoadTimeMetrics();
   }
   
-  public static getInstance(): PerformanceMonitor {
-    if (!PerformanceMonitor.instance) {
-      PerformanceMonitor.instance = new PerformanceMonitor();
+  // Start FPS monitoring
+  if (enableFpsMonitoring) {
+    startFpsMonitoring();
+  }
+  
+  // Start memory monitoring if available
+  if (enableMemoryMonitoring && (performance as any).memory) {
+    startMemoryMonitoring();
+  }
+  
+  // Track interaction events
+  if (enableInteractionMonitoring) {
+    startInteractionMonitoring();
+  }
+  
+  // Periodically report performance metrics
+  setInterval(() => {
+    reportPerformanceMetrics();
+  }, reportingInterval);
+  
+  // Log initial setup
+  console.log('Performance monitoring initialized', options);
+}
+
+/**
+ * Tracks page load time metrics
+ */
+function trackLoadTimeMetrics() {
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      if (performance.timing) {
+        const timing = performance.timing;
+        
+        performanceStore.loadTime = {
+          navigationStart: timing.navigationStart,
+          firstContentfulPaint: 0, // Needs PerformanceObserver
+          domInteractive: timing.domInteractive - timing.navigationStart,
+          domComplete: timing.domComplete - timing.navigationStart
+        };
+        
+        // Get First Contentful Paint if available
+        const paintEntries = performance.getEntriesByType('paint');
+        const fcpEntry = paintEntries.find(entry => entry.name === 'first-contentful-paint');
+        
+        if (fcpEntry) {
+          performanceStore.loadTime.firstContentfulPaint = fcpEntry.startTime;
+        }
+        
+        // Log load time metrics
+        console.log('Load time metrics:', performanceStore.loadTime);
+        
+        // Check if load time is concerning
+        if (performanceStore.loadTime.domComplete > THRESHOLDS.LOAD_TIME.SLOW) {
+          console.warn(`Slow page load: ${performanceStore.loadTime.domComplete}ms`);
+        }
+      }
+    }, 0);
+  });
+}
+
+/**
+ * Starts monitoring frames per second (FPS)
+ */
+function startFpsMonitoring() {
+  let lastTime = performance.now();
+  let frames = 0;
+  const sampleSize = 60; // Number of samples to keep for average
+  
+  function measureFps(timestamp: number) {
+    frames++;
+    
+    const elapsed = timestamp - lastTime;
+    
+    // Calculate FPS approximately every second
+    if (elapsed >= 1000) {
+      const currentFps = Math.round((frames * 1000) / elapsed);
+      
+      // Store current FPS
+      performanceStore.fps.current = currentFps;
+      
+      // Add to samples for calculating average
+      performanceStore.fps.samples.push(currentFps);
+      
+      // Keep only the last N samples
+      if (performanceStore.fps.samples.length > sampleSize) {
+        performanceStore.fps.samples.shift();
+      }
+      
+      // Calculate average FPS
+      const sum = performanceStore.fps.samples.reduce((a, b) => a + b, 0);
+      performanceStore.fps.average = Math.round(sum / performanceStore.fps.samples.length);
+      
+      // Check if FPS is low
+      if (currentFps < THRESHOLDS.FPS.LOW) {
+        performanceStore.fps.lowFpsEvents++;
+        console.warn(`Low FPS detected: ${currentFps.toFixed(1)} FPS`);
+      }
+      
+      // Reset for next measurement
+      frames = 0;
+      lastTime = timestamp;
     }
-    return PerformanceMonitor.instance;
+    
+    // Continue measuring
+    requestAnimationFrame(measureFps);
   }
   
-  /**
-   * Start monitoring performance
-   */
-  public startMonitoring(): void {
-    if (this.isMonitoring) return;
-    this.isMonitoring = true;
-    
-    // Reset metrics
-    this.metrics = [];
-    this.frameCountPerSecond = 0;
-    this.lastSecondTimestamp = performance.now();
-    
-    // Count frames
-    const countFrame = () => {
-      this.frameCountPerSecond++;
-      if (this.isMonitoring) {
-        this.animationFrameId = requestAnimationFrame(countFrame);
+  // Start the measurement loop
+  requestAnimationFrame(measureFps);
+}
+
+/**
+ * Starts monitoring memory usage if available
+ */
+function startMemoryMonitoring() {
+  if (!(performance as any).memory) {
+    console.warn('Memory monitoring not supported in this browser');
+    return;
+  }
+  
+  const memoryCheckInterval = 5000; // Check every 5 seconds
+  
+  function checkMemory() {
+    try {
+      const memoryInfo = (performance as any).memory;
+      
+      if (memoryInfo) {
+        const memoryUsed = memoryInfo.usedJSHeapSize;
+        
+        // Update current and peak memory usage
+        performanceStore.memory.current = memoryUsed;
+        performanceStore.memory.peak = Math.max(performanceStore.memory.peak, memoryUsed);
+        
+        // Add to snapshots
+        performanceStore.memory.snapshots.push(memoryUsed);
+        
+        // Keep only recent snapshots (last 100)
+        if (performanceStore.memory.snapshots.length > 100) {
+          performanceStore.memory.snapshots.shift();
+        }
+        
+        // Log warning if memory usage is high
+        if (memoryUsed > THRESHOLDS.MEMORY.HIGH) {
+          console.warn(`High memory usage: ${(memoryUsed / (1024 * 1024)).toFixed(1)} MB`);
+        }
       }
-    };
+    } catch (e) {
+      console.error('Error monitoring memory usage:', e);
+    }
     
-    // Start frame counting
-    this.animationFrameId = requestAnimationFrame(countFrame);
-    
-    // Collect metrics every second
-    this.monitoringIntervalId = window.setInterval(() => {
-      const now = performance.now();
-      const elapsed = now - this.lastSecondTimestamp;
+    setTimeout(checkMemory, memoryCheckInterval);
+  }
+  
+  // Start checking memory
+  checkMemory();
+}
+
+/**
+ * Starts monitoring user interactions
+ */
+function startInteractionMonitoring() {
+  const interactionEvents = [
+    'click',
+    'keydown',
+    'scroll',
+    'touchstart',
+    'touchmove',
+    'touchend'
+  ];
+  
+  interactionEvents.forEach(eventType => {
+    document.addEventListener(eventType, (event) => {
+      const startTime = performance.now();
       
-      // Calculate FPS
-      const fps = Math.round((this.frameCountPerSecond * 1000) / elapsed);
-      
-      // Get memory usage if available
-      let memoryUsage;
-      if (performance && (performance as any).memory) {
-        memoryUsage = (performance as any).memory.usedJSHeapSize / (1024 * 1024); // MB
-      }
-      
-      // Store metric
-      this.addMetric({
-        fps,
-        timestamp: now,
-        memoryUsage,
-        deviceCategory: getPerformanceCategory(),
-        routeName: this.currentRoute
+      // Use requestAnimationFrame to measure when the browser responds
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const endTime = performance.now();
+          const duration = endTime - startTime;
+          
+          // Record the interaction
+          const target = event.target as HTMLElement;
+          const targetDescription = target ? 
+            (target.id || target.tagName || 'unknown') : 
+            'unknown';
+          
+          const interactionEvent: InteractionEvent = {
+            type: eventType,
+            timestamp: startTime,
+            duration,
+            target: targetDescription
+          };
+          
+          performanceStore.interactions.events.push(interactionEvent);
+          
+          // Keep only recent events (last 50)
+          if (performanceStore.interactions.events.length > 50) {
+            performanceStore.interactions.events.shift();
+          }
+          
+          // Check if interaction was slow
+          if (duration > THRESHOLDS.INTERACTION.SLOW) {
+            performanceStore.interactions.longEvents++;
+            console.warn(`Slow interaction: ${eventType} took ${duration.toFixed(1)}ms`);
+          }
+        });
       });
-      
-      // Log warning if FPS is low
-      if (fps < 30) {
-        console.warn(`[Performance Monitor] Low FPS detected: ${fps} FPS on route ${this.currentRoute}`);
-      }
-      
-      // Reset counters
-      this.frameCountPerSecond = 0;
-      this.lastSecondTimestamp = now;
-    }, 1000);
-  }
-  
-  /**
-   * Stop monitoring performance
-   */
-  public stopMonitoring(): void {
-    this.isMonitoring = false;
-    
-    if (this.monitoringIntervalId) {
-      clearInterval(this.monitoringIntervalId);
-      this.monitoringIntervalId = undefined;
+    }, { passive: true });
+  });
+}
+
+/**
+ * Reports current performance metrics
+ */
+function reportPerformanceMetrics() {
+  // In a real app, you might send these to an analytics service
+  const metrics = {
+    fps: {
+      current: performanceStore.fps.current,
+      average: performanceStore.fps.average,
+      lowFpsEvents: performanceStore.fps.lowFpsEvents
+    },
+    memory: {
+      current: performanceStore.memory.current / (1024 * 1024), // MB
+      peak: performanceStore.memory.peak / (1024 * 1024) // MB
+    },
+    interactions: {
+      longEvents: performanceStore.interactions.longEvents
+    },
+    errors: {
+      count: performanceStore.errors.count
     }
+  };
+  
+  console.debug('Performance metrics:', metrics);
+  
+  // Here you would typically send the metrics to your monitoring service
+}
+
+/**
+ * Tracks the loading time for a specific resource
+ */
+export function trackResourceTiming(resourceUrl: string) {
+  try {
+    const entries = performance.getEntriesByType('resource');
+    const resourceEntry = entries.find(entry => entry.name === resourceUrl);
     
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = undefined;
+    if (resourceEntry) {
+      console.log(`Resource timing for ${resourceUrl}:`, {
+        duration: resourceEntry.duration,
+        transferSize: (resourceEntry as any).transferSize,
+        decodedBodySize: (resourceEntry as any).decodedBodySize
+      });
     }
-  }
-  
-  /**
-   * Set current route for better metric tracking
-   */
-  public setCurrentRoute(routeName: string): void {
-    this.currentRoute = routeName;
-  }
-  
-  /**
-   * Add a performance metric to the collection
-   */
-  private addMetric(metric: PerformanceMetric): void {
-    this.metrics.push(metric);
-    
-    // Keep metrics array from growing too large
-    if (this.metrics.length > this.maxMetricsLength) {
-      this.metrics = this.metrics.slice(-this.maxMetricsLength);
-    }
-  }
-  
-  /**
-   * Get collected metrics
-   */
-  public getMetrics(): PerformanceMetric[] {
-    return [...this.metrics];
-  }
-  
-  /**
-   * Get average FPS from collected metrics
-   */
-  public getAverageFPS(): number {
-    if (this.metrics.length === 0) return 0;
-    
-    const sum = this.metrics.reduce((acc, metric) => acc + metric.fps, 0);
-    return Math.round(sum / this.metrics.length);
-  }
-  
-  /**
-   * Get FPS stability percentage (% of measurements above 30 FPS)
-   */
-  public getFPSStability(): number {
-    if (this.metrics.length === 0) return 100;
-    
-    const goodFrames = this.metrics.filter(metric => metric.fps >= 30).length;
-    return Math.round((goodFrames / this.metrics.length) * 100);
-  }
-  
-  /**
-   * Check if current device is struggling with performance
-   */
-  public isPerformanceStruggling(): boolean {
-    // Get last 5 metrics
-    const recentMetrics = this.metrics.slice(-5);
-    if (recentMetrics.length < 5) return false;
-    
-    // Calculate average recent FPS
-    const avgFPS = recentMetrics.reduce((sum, m) => sum + m.fps, 0) / recentMetrics.length;
-    
-    // Thresholds based on device capability
-    const deviceCategory = getPerformanceCategory();
-    const thresholds = {
-      low: 20,
-      medium: 30,
-      high: 45
-    };
-    
-    return avgFPS < thresholds[deviceCategory];
+  } catch (e) {
+    console.error('Error tracking resource timing:', e);
   }
 }
 
-// Export singleton instance
-export const performanceMonitor = PerformanceMonitor.getInstance();
+/**
+ * Records an error for performance monitoring
+ */
+export function recordError(message: string) {
+  performanceStore.errors.count++;
+  performanceStore.errors.messages.push(message);
+  
+  // Keep error messages list manageable
+  if (performanceStore.errors.messages.length > 50) {
+    performanceStore.errors.messages.shift();
+  }
+}
 
 /**
- * Hook up performance monitor to route changes
+ * Gets the current performance metrics
  */
-export const initPerformanceMonitoring = (): () => void => {
-  if (typeof window === 'undefined') return () => {};
-  
-  // Only enable in development or if explicitly enabled
-  const shouldMonitor = process.env.NODE_ENV === 'development' || 
-                        localStorage.getItem('enablePerformanceMonitoring') === 'true';
-  
-  if (shouldMonitor) {
-    performanceMonitor.startMonitoring();
-    
-    // Update route on navigation
-    const originalPushState = history.pushState;
-    history.pushState = function(state, title, url) {
-      originalPushState.call(this, state, title, url);
-      performanceMonitor.setCurrentRoute(url || 'unknown');
-    };
-    
-    window.addEventListener('popstate', () => {
-      performanceMonitor.setCurrentRoute(window.location.pathname);
-    });
-    
-    // Set initial route
-    performanceMonitor.setCurrentRoute(window.location.pathname);
-    
-    return () => {
-      performanceMonitor.stopMonitoring();
-      history.pushState = originalPushState;
-    };
-  }
-  
-  return () => {};
-};
+export function getPerformanceMetrics() {
+  return { ...performanceStore };
+}

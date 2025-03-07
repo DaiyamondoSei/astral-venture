@@ -2,29 +2,48 @@
 import { renderHook, act } from '@testing-library/react';
 import { useAssistantState } from '@/components/ai-assistant/hooks/useAssistantState';
 
-describe('useAssistantState Hook', () => {
+// Mock for the AIResponse type
+interface AIResponse {
+  answer: string;
+  source: string;
+  meta: {
+    model: string;
+    tokenUsage: number;
+  };
+}
+
+describe('useAssistantState', () => {
   it('should initialize with default values', () => {
     const { result } = renderHook(() => useAssistantState());
     
-    expect(result.current.question).toBe('');
-    expect(result.current.response).toBeNull();
+    expect(result.current.isOpen).toBe(false);
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBeNull();
-    expect(result.current.streamingResponse).toBeNull();
-    expect(result.current.modelInfo).toBeNull();
+    expect(result.current.assistantResponse).toBeNull();
+    expect(result.current.errorMessage).toBeNull();
+    expect(typeof result.current.setIsOpen).toBe('function');
+    expect(typeof result.current.setLoading).toBe('function');
+    expect(typeof result.current.setAssistantResponse).toBe('function');
+    expect(typeof result.current.setErrorMessage).toBe('function');
+    expect(typeof result.current.reset).toBe('function');
   });
-
-  it('should update question state correctly', () => {
+  
+  it('should update isOpen state', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setQuestion('What is the meaning of life?');
+      result.current.setIsOpen(true);
     });
     
-    expect(result.current.question).toBe('What is the meaning of life?');
+    expect(result.current.isOpen).toBe(true);
+    
+    act(() => {
+      result.current.setIsOpen(false);
+    });
+    
+    expect(result.current.isOpen).toBe(false);
   });
-
-  it('should update loading state correctly', () => {
+  
+  it('should update loading state', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
@@ -32,78 +51,70 @@ describe('useAssistantState Hook', () => {
     });
     
     expect(result.current.loading).toBe(true);
-  });
-
-  it('should update error state correctly', () => {
-    const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setError('Something went wrong');
+      result.current.setLoading(false);
     });
     
-    expect(result.current.error).toBe('Something went wrong');
+    expect(result.current.loading).toBe(false);
   });
-
-  it('should update response state correctly', () => {
+  
+  it('should update assistantResponse state', () => {
     const { result } = renderHook(() => useAssistantState());
-    const mockResponse = { 
-      text: 'This is a response',
-      source: 'ai',
-      meta: { model: 'test-model', tokenUsage: 42 }
+    
+    const mockResponse: AIResponse = {
+      answer: 'This is a test response',
+      source: 'test-source',
+      meta: {
+        model: 'test-model',
+        tokenUsage: 100
+      }
     };
     
     act(() => {
-      result.current.setResponse(mockResponse);
+      result.current.setAssistantResponse(mockResponse);
     });
     
-    expect(result.current.response).toEqual(mockResponse);
+    expect(result.current.assistantResponse).toEqual(mockResponse);
   });
-
-  it('should update streaming response state correctly', () => {
+  
+  it('should update errorMessage state', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setStreamingResponse('Partial response...');
+      result.current.setErrorMessage('Test error message');
     });
     
-    expect(result.current.streamingResponse).toBe('Partial response...');
+    expect(result.current.errorMessage).toBe('Test error message');
   });
-
-  it('should update model info state correctly', () => {
-    const { result } = renderHook(() => useAssistantState());
-    const mockModelInfo = { model: 'gpt-4', tokens: 320 };
-    
-    act(() => {
-      result.current.setModelInfo(mockModelInfo);
-    });
-    
-    expect(result.current.modelInfo).toEqual(mockModelInfo);
-  });
-
-  it('should reset all states correctly', () => {
+  
+  it('should reset all state values', () => {
     const { result } = renderHook(() => useAssistantState());
     
-    // First, set some values
+    // Set some initial values
     act(() => {
-      result.current.setQuestion('Test question');
+      result.current.setIsOpen(true);
       result.current.setLoading(true);
-      result.current.setError('Test error');
-      result.current.setResponse({ text: 'Test response', source: 'ai' });
-      result.current.setStreamingResponse('Test streaming');
-      result.current.setModelInfo({ model: 'test-model', tokens: 123 });
+      result.current.setAssistantResponse({
+        answer: 'Test response',
+        source: 'test-source',
+        meta: {
+          model: 'test-model',
+          tokenUsage: 100
+        }
+      });
+      result.current.setErrorMessage('Test error');
     });
     
-    // Then reset
+    // Reset all values
     act(() => {
       result.current.reset();
     });
     
-    // Verify all states are reset
-    expect(result.current.question).toBe('');
-    expect(result.current.response).toBeNull();
+    // Check that values are reset to defaults
+    expect(result.current.isOpen).toBe(false);
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBeNull();
-    expect(result.current.streamingResponse).toBeNull();
-    expect(result.current.modelInfo).toBeNull();
+    expect(result.current.assistantResponse).toBeNull();
+    expect(result.current.errorMessage).toBeNull();
   });
 });

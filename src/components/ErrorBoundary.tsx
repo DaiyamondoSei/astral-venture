@@ -1,6 +1,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ErrorFallback from './error-handling/ErrorFallback';
+import { Button } from './ui/button';
 
 interface Props {
   children: ReactNode;
@@ -62,15 +63,5 @@ class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-// Import Button here to avoid circular reference issues
-const Button: React.FC<{ onClick: () => void; children: ReactNode }> = ({ onClick, children }) => (
-  <button
-    onClick={onClick}
-    className="px-4 py-2 bg-quantum-600 hover:bg-quantum-500 text-white rounded-md transition-colors"
-  >
-    {children}
-  </button>
-);
 
 export default ErrorBoundary;
