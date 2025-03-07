@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUserStreak } from '@/hooks/useUserStreak';
@@ -18,65 +18,64 @@ const DashboardContent = ({ userId }: { userId: string }) => {
   const { userStreak, activatedChakras, isLoading: isStreakLoading, error: streakError } = useUserStreak(userId);
   const [levelInfo, setLevelInfo] = useState({ level: 1, nextLevelXP: 100, progress: 0 });
 
-  useEffect(() => {
-    let isMounted = true; // For handling async effects safely
-    
-    const fetchUserProfile = async () => {
-      if (!userId) return; // Skip if no userId
+  const fetchUserProfile = useCallback(async () => {
+    if (!userId) return; // Skip if no userId
 
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-        if (error) {
-          console.error('Error fetching user profile:', error);
-          if (isMounted) {
-            setError(error);
-            toast({
-              title: "Error fetching profile",
-              description: "Could not load your profile data.",
-              variant: "destructive"
-            });
-          }
-        } else if (isMounted) {
-          setProfile(data);
-          const level = calculateAstralLevel(data.energy_points || 0);
-          const nextLevelXP = calculateNextLevelXP(level);
-          const progress = calculateLevelProgress(data.energy_points || 0, level);
-          setLevelInfo({ level, nextLevelXP, progress });
-        }
-      } catch (err) {
-        console.error('Error in fetchUserProfile:', err);
-        if (isMounted) {
-          setError(err instanceof Error ? err : new Error('Unknown error occurred'));
-          toast({
-            title: "Unexpected error",
-            description: "An unexpected error occurred while loading your profile.",
-            variant: "destructive"
-          });
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        setError(error);
+        toast({
+          title: "Error fetching profile",
+          description: "Could not load your profile data.",
+          variant: "destructive"
+        });
+      } else {
+        setProfile(data);
+        const level = calculateAstralLevel(data.energy_points || 0);
+        const nextLevelXP = calculateNextLevelXP(level);
+        const progress = calculateLevelProgress(data.energy_points || 0, level);
+        setLevelInfo({ level, nextLevelXP, progress });
       }
-    };
+    } catch (err) {
+      console.error('Error in fetchUserProfile:', err);
+      setError(err instanceof Error ? err : new Error('Unknown error occurred'));
+      toast({
+        title: "Unexpected error",
+        description: "An unexpected error occurred while loading your profile.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
 
-    fetchUserProfile();
+  useEffect(() => {
+    let isMounted = true;
     
-    // Cleanup function to prevent state updates after unmount
+    const loadProfile = async () => {
+      if (!isMounted) return;
+      await fetchUserProfile();
+    };
+    
+    loadProfile();
+    
     return () => {
       isMounted = false;
     };
-  }, [userId]);
+  }, [fetchUserProfile]);
   
-  const handleOpenAIAssistant = () => {
+  const handleOpenAIAssistant = useCallback(() => {
+    console.log("Opening AI Assistant from Dashboard");
     onOpenAIAssistant();
-  };
+  }, [onOpenAIAssistant]);
 
   return (
     <div className="container mx-auto p-4">

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { AIResponse } from '@/services/ai/aiService';
 
 export function useAssistantState() {
@@ -10,13 +10,14 @@ export function useAssistantState() {
   const [streamingResponse, setStreamingResponse] = useState<string | null>(null);
   const [modelInfo, setModelInfo] = useState<{model: string; tokens: number} | null>(null);
   
-  const reset = () => {
+  const reset = useCallback(() => {
     setQuestion('');
     setResponse(null);
     setError(null);
     setStreamingResponse(null);
     setModelInfo(null);
-  };
+    setLoading(false);
+  }, []);
   
   return {
     question,

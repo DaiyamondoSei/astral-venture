@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 interface InteractiveEnergyFieldProps {
@@ -44,9 +44,17 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
     };
     
     updateDimensions();
-    window.addEventListener('resize', updateDimensions);
+    const resizeObserver = new ResizeObserver(updateDimensions);
     
-    return () => window.removeEventListener('resize', updateDimensions);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.disconnect();
+      }
+    };
   }, []);
   
   // Create particles when dimensions change or energy points update
@@ -71,7 +79,7 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
     }
     
     setParticles(newParticles);
-  }, [dimensions, energyPoints, colors, particleDensity]);
+  }, [dimensions.width, dimensions.height, energyPoints, colors, particleDensity]);
   
   // Track mouse movement
   useEffect(() => {
@@ -113,13 +121,15 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
     return () => window.removeEventListener('click', handleClick);
   }, [reactToClick]);
   
-  // Update particle positions
+  // Update particle positions with a more efficient approach
   useEffect(() => {
     if (particles.length === 0) return;
     
-    const updatePositions = () => {
-      setParticles(prevParticles => 
-        prevParticles.map(particle => {
+    let animationFrameId: number;
+    
+    const updateParticles = () => {
+      setParticles(prevParticles => {
+        return prevParticles.map(particle => {
           let { x, y, vx, vy } = particle;
           
           // Apply mouse influence if nearby
@@ -152,13 +162,30 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
             ...particle,
             x, y, vx, vy
           };
-        })
-      );
+        });
+      });
+      
+      animationFrameId = requestAnimationFrame(updateParticles);
     };
     
-    const animationId = requestAnimationFrame(updatePositions);
-    return () => cancelAnimationFrame(animationId);
-  }, [particles, mousePosition, dimensions]);
+    animationFrameId = requestAnimationFrame(updateParticles);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [particles.length, dimensions, mousePosition]);
+  
+  // Memoize the background glow to prevent re-renders
+  const backgroundGlow = useMemo(() => {
+    return (
+      <div 
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none"
+        style={{
+          width: Math.min(dimensions.width, dimensions.height) * 0.5,
+          height: Math.min(dimensions.width, dimensions.height) * 0.5,
+          opacity: 0.15,
+          background: `radial-gradient(circle, ${colors[0]} 0%, rgba(0,0,0,0) 70%)`,
+        }}
+      />
+    );
+  }, [dimensions, colors]);
   
   return (
     <div 
@@ -212,17 +239,9 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
       )}
       
       {/* Add subtle glow effect in the center */}
-      <div 
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none"
-        style={{
-          width: Math.min(dimensions.width, dimensions.height) * 0.5,
-          height: Math.min(dimensions.width, dimensions.height) * 0.5,
-          opacity: 0.15,
-          background: `radial-gradient(circle, ${colors[0]} 0%, rgba(0,0,0,0) 70%)`,
-        }}
-      />
+      {backgroundGlow}
     </div>
   );
 };
 
-export default InteractiveEnergyField;
+export default React.memo(InteractiveEnergyField);

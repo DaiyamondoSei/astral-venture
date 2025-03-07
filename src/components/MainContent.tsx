@@ -28,7 +28,10 @@ const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => 
   };
 
   const handleOpenAiAssistant = (reflectionId?: string, reflectionContent?: string) => {
-    setSelectedReflection({ id: reflectionId, content: reflectionContent });
+    setSelectedReflection({ 
+      id: reflectionId || undefined, 
+      content: reflectionContent || undefined 
+    });
     setAiDialogOpen(true);
   };
 
