@@ -74,8 +74,10 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
     container.addEventListener('mouseleave', resetMousePosition);
     
     return () => {
-      container.removeEventListener('mousemove', updateMousePosition);
-      container.removeEventListener('mouseleave', resetMousePosition);
+      if (container) {
+        container.removeEventListener('mousemove', updateMousePosition);
+        container.removeEventListener('mouseleave', resetMousePosition);
+      }
     };
   }, [interactive]);
   
@@ -85,9 +87,9 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
       className={`relative overflow-hidden w-full h-full ${className}`}
       aria-hidden="true"
     >
-      {particles.map(particle => (
+      {particles.map((particle, index) => (
         <Particle
-          key={`quantum-particle-${particle.x}-${particle.y}-${particle.size}`}
+          key={`quantum-particle-${index}-${particle.size}`}
           particle={particle}
           dx={dx}
           dy={dy}

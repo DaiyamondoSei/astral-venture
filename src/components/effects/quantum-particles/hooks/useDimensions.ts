@@ -23,7 +23,9 @@ export function useDimensions(
       height: containerRef.current.offsetHeight
     };
     
-    setDimensions(newDimensions);
+    if (isMounted.current) {
+      setDimensions(newDimensions);
+    }
   };
   
   // Handle responsive resizing

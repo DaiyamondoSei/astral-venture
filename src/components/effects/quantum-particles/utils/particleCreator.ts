@@ -13,6 +13,9 @@ export function createParticles(
 ): QuantumParticle[] {
   const particles: QuantumParticle[] = [];
   
+  // Ensure we have at least one color
+  const safeColors = colors.length > 0 ? colors : ['#8b5cf6'];
+  
   for (let i = 0; i < count; i++) {
     particles.push({
       x: Math.random() * 100, // Use percentage for responsive positioning
@@ -20,7 +23,7 @@ export function createParticles(
       vx: (Math.random() - 0.5) * 0.2 * speed,
       vy: (Math.random() - 0.5) * 0.2 * speed,
       size: Math.random() * maxSize + 1,
-      color: colors[Math.floor(Math.random() * colors.length)],
+      color: safeColors[Math.floor(Math.random() * safeColors.length)],
       opacity: Math.random() * 0.5 + 0.2,
       duration: Math.random() * 3 + 2,
       delay: Math.random() * 2
