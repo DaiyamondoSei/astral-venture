@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import AuthStateManager from '@/components/AuthStateManager';
 import OnboardingManager from '@/components/onboarding/OnboardingManager';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 // Lazy load components that aren't needed for initial render
 const UserDashboardView = lazy(() => import('@/components/UserDashboardView'));
@@ -25,6 +26,7 @@ const Index = () => {
   const [authState, setAuthState] = useState<any>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isLowPerformance } = usePerformance();
 
   // Debug logging
   useEffect(() => {
@@ -55,13 +57,20 @@ const Index = () => {
     }
   };
 
+  // Adjust the suspense fallback based on performance
+  const SuspenseFallback = () => (
+    <div className={`min-h-[70vh] flex items-center justify-center ${isLowPerformance ? '' : 'animate-pulse'}`}>
+      <div className="text-white/70">Loading view...</div>
+    </div>
+  );
+
   return (
     <Layout>
       <ErrorBoundary>
         <AuthStateManager onLoadingComplete={handleAuthStateLoaded} />
         
         {authState && (
-          <Suspense fallback={<LoadingFallback />}>
+          <Suspense fallback={<SuspenseFallback />}>
             {showEntryAnimation ? (
               <EntryAnimationView 
                 user={authState.user}

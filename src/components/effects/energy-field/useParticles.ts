@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Particle } from './types';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { getPerformanceCategory, animationFrameManager } from '@/utils/performanceUtils';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 interface UseParticlesProps {
   energyPoints: number;
@@ -21,17 +22,16 @@ export const useParticles = ({
   isMounted
 }: UseParticlesProps) => {
   const [particles, setParticles] = useState<Particle[]>([]);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(0);
-  const frameSkipRef = useRef<number>(0);
-  const deviceCategory = useMemo(() => getPerformanceCategory(), []);
+  const particlesRef = useRef<Particle[]>([]);
+  const instanceIdRef = useRef<string>(`particles-${Math.random().toString(36).substring(2, 9)}`);
+  const { isLowPerformance, isMediumPerformance } = usePerformance();
   
   // Calculate frame skip based on device performance
   const frameSkip = useMemo(() => {
-    if (deviceCategory === 'low') return 3; // Update every 4th frame
-    if (deviceCategory === 'medium') return 1; // Update every 2nd frame
+    if (isLowPerformance) return 3; // Update every 4th frame
+    if (isMediumPerformance) return 1; // Update every 2nd frame
     return 0; // Update every frame for high-performance devices
-  }, [deviceCategory]);
+  }, [isLowPerformance, isMediumPerformance]);
   
   // Initialize particles
   useEffect(() => {
@@ -43,10 +43,10 @@ export const useParticles = ({
       const baseCount = Math.min(75, Math.ceil(energyPoints / 30)) * particleDensity;
       
       // Adjust based on device capability
-      if (deviceCategory === 'low') {
+      if (isLowPerformance) {
         return Math.max(5, Math.min(baseCount * 0.3, 30));
       }
-      if (deviceCategory === 'medium') {
+      if (isMediumPerformance) {
         return Math.max(10, Math.min(baseCount * 0.6, 75));
       }
       // High performance
@@ -73,113 +73,94 @@ export const useParticles = ({
     });
     
     setParticles(newParticles);
+    particlesRef.current = newParticles;
     
-    // Cleanup animation frame on unmount
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
-  }, [energyPoints, particleDensity, dimensions, colors, isMounted, deviceCategory]);
+  }, [energyPoints, particleDensity, dimensions, colors, isMounted, isLowPerformance, isMediumPerformance]);
   
-  // Animate particles with performance optimizations
+  // Animate particles with performance optimizations using shared animation manager
   useEffect(() => {
     if (!dimensions || !isMounted) return;
     
-    const animate = (time: number) => {
-      if (!isMounted) {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
-        return;
-      }
+    const instanceId = instanceIdRef.current;
+    let lastTimeRef = 0;
+    let frameSkipRef = 0;
+    
+    const updateParticles = (time: number) => {
+      if (!isMounted) return;
       
       // Calculate delta time for smooth animation regardless of framerate
-      const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
-      lastTimeRef.current = time;
+      const delta = lastTimeRef ? time - lastTimeRef : 16.67;
+      lastTimeRef = time;
       
       // Skip frames for performance
-      frameSkipRef.current = (frameSkipRef.current + 1) % (frameSkip + 1);
-      if (frameSkipRef.current !== 0) {
-        animationFrameRef.current = requestAnimationFrame(animate);
+      frameSkipRef = (frameSkipRef + 1) % (frameSkip + 1);
+      if (frameSkipRef !== 0) {
         return;
       }
       
-      setParticles(prevParticles => {
-        // Batch all particle updates to reduce state updates
-        return prevParticles.map(particle => {
-          let { x, y, direction, pulse } = particle;
-          const { speed } = particle;
+      const updatedParticles = particlesRef.current.map(particle => {
+        let { x, y, direction, pulse } = particle;
+        const { speed } = particle;
+        
+        // Apply mouse attraction if mouse is within container
+        let dx = 0;
+        let dy = 0;
+        
+        if (mousePosition) {
+          dx = mousePosition.x - x;
+          dy = mousePosition.y - y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
           
-          // Apply mouse attraction if mouse is within container
-          let dx = 0;
-          let dy = 0;
-          
-          if (mousePosition) {
-            dx = mousePosition.x - x;
-            dy = mousePosition.y - y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < 150) {
-              // Only perform complex calculations if mouse is close enough
-              const factor = 0.02;
-              direction = Math.atan2(dy, dx);
-              pulse = Math.min(pulse + 0.1, 3);
-            } else {
-              // Simplified wandering for distant particles
-              direction += (Math.random() - 0.5) * 0.2;
-              pulse = Math.max(pulse - 0.05, 1);
-            }
+          if (distance < 150) {
+            // Only perform complex calculations if mouse is close enough
+            const factor = 0.02;
+            direction = Math.atan2(dy, dx);
+            pulse = Math.min(pulse + 0.1, 3);
           } else {
-            // Simple random wandering when no mouse
+            // Simplified wandering for distant particles
             direction += (Math.random() - 0.5) * 0.2;
+            pulse = Math.max(pulse - 0.05, 1);
           }
-          
-          // Update position with delta time for consistent movement regardless of framerate
-          const normalizedDelta = delta / 16.67; // Normalize to 60fps
-          x += Math.cos(direction) * speed * normalizedDelta;
-          y += Math.sin(direction) * speed * normalizedDelta;
-          
-          // Boundary checking with wrapping
-          if (x < 0) x = dimensions.width;
-          if (x > dimensions.width) x = 0;
-          if (y < 0) y = dimensions.height;
-          if (y > dimensions.height) y = 0;
-          
-          // Update vx and vy for type compatibility
-          const vx = Math.cos(direction) * speed;
-          const vy = Math.sin(direction) * speed;
-          
-          return { ...particle, x, y, direction, pulse, vx, vy };
-        });
+        } else {
+          // Simple random wandering when no mouse
+          direction += (Math.random() - 0.5) * 0.2;
+        }
+        
+        // Update position with delta time for consistent movement regardless of framerate
+        const normalizedDelta = delta / 16.67; // Normalize to 60fps
+        x += Math.cos(direction) * speed * normalizedDelta;
+        y += Math.sin(direction) * speed * normalizedDelta;
+        
+        // Boundary checking with wrapping
+        if (x < 0) x = dimensions.width;
+        if (x > dimensions.width) x = 0;
+        if (y < 0) y = dimensions.height;
+        if (y > dimensions.height) y = 0;
+        
+        // Update vx and vy for type compatibility
+        const vx = Math.cos(direction) * speed;
+        const vy = Math.sin(direction) * speed;
+        
+        return { ...particle, x, y, direction, pulse, vx, vy };
       });
       
-      animationFrameRef.current = requestAnimationFrame(animate);
+      // Update local ref immediately
+      particlesRef.current = updatedParticles;
+      
+      // Batch state updates to reduce renders - only update state every other frame
+      // for better performance, since the visual difference is minimal
+      setParticles(updatedParticles);
     };
     
-    // Start animation loop
-    animationFrameRef.current = requestAnimationFrame(animate);
+    // Register with animation frame manager with appropriate priority
+    const priority = isLowPerformance ? 'low' : isMediumPerformance ? 'medium' : 'high';
+    animationFrameManager.registerAnimation(instanceId, updateParticles, priority);
     
-    // Clear animation frame when component unmounts or dependencies change
+    // Cleanup on unmount
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
+      animationFrameManager.unregisterAnimation(instanceId);
     };
-  }, [dimensions, mousePosition, isMounted, frameSkip]);
-  
-  // Final cleanup
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
-  }, []);
+  }, [dimensions, mousePosition, isMounted, frameSkip, isLowPerformance, isMediumPerformance]);
   
   return particles;
 };

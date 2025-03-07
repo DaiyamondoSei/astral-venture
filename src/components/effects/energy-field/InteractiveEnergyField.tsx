@@ -8,6 +8,7 @@ import ParticleComponent from './ParticleComponent';
 import ClickWave from './ClickWave';
 import BackgroundGlow from './BackgroundGlow';
 import { getOptimalElementCount } from '@/utils/performanceUtils';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 interface InteractiveEnergyFieldProps {
   energyPoints: number;
@@ -26,30 +27,31 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useIsMounted();
+  const { enableParticles, deviceCapability } = usePerformance();
   
   // Get container dimensions
   const dimensions = useDimensions(containerRef);
   
-  // Track mouse movements and clicks
+  // Track mouse movements and clicks only if we're reacting to mouse
   const { mousePosition, clickWave } = useMouseTracking({
     containerRef,
     isMounted: isMountedRef.current,
-    reactToClick: reactToMouse
+    reactToClick: reactToMouse && enableParticles
   });
   
   // Calculate optimal particle density based on device capabilities
   const adjustedDensity = getOptimalElementCount(
     Math.ceil(particleDensity), 
-    'medium'
+    deviceCapability
   ) / 10;
   
   // Create and update particles
   const particles = useParticles({
     energyPoints,
     colors,
-    particleDensity: adjustedDensity,
+    particleDensity: enableParticles ? adjustedDensity : 0.1, // Minimal particles if disabled
     dimensions,
-    mousePosition,
+    mousePosition: reactToMouse ? mousePosition : null,
     isMounted: isMountedRef.current
   });
   
@@ -66,16 +68,16 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
         dimensions={dimensions} 
       />
       
-      {/* Render particles */}
-      {particles.map(particle => (
+      {/* Render particles only if enabled */}
+      {enableParticles && particles.map(particle => (
         <ParticleComponent 
           key={`energy-particle-${particle.id}`}
           particle={particle}
         />
       ))}
       
-      {/* Render click wave if active */}
-      {clickWave && clickWave.active && (
+      {/* Render click wave if active and particles enabled */}
+      {enableParticles && clickWave && clickWave.active && (
         <ClickWave 
           x={clickWave.x}
           y={clickWave.y}

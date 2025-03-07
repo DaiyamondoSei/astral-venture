@@ -1,6 +1,6 @@
 
-import { useEffect, useMemo, useState } from 'react';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { useEffect, useMemo } from 'react';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 interface AnimationConfig {
   animateX?: number[];
@@ -30,42 +30,46 @@ interface AnimationResult {
  * Hook that provides throttled animations based on device performance
  */
 export function useThrottledAnimation(config: AnimationConfig): AnimationResult {
-  const deviceCapability = getPerformanceCategory();
-  const [throttled, setThrottled] = useState(false);
-  
-  // Determine if we should throttle based on device capability
-  useEffect(() => {
-    setThrottled(deviceCapability === 'low');
-  }, [deviceCapability]);
+  const { isLowPerformance, isMediumPerformance, enableComplexAnimations } = usePerformance();
   
   // Calculate adjusted animation parameters
   return useMemo(() => {
     // Determine if animations should be simplified
-    const shouldSimplify = throttled;
+    const shouldSimplify = isLowPerformance || !enableComplexAnimations;
     
     // Create simplified or full animations
     const animateObj: AnimationResult['animate'] = {};
     
     if (config.animateX) {
-      animateObj.x = shouldSimplify ? [config.animateX[0], config.animateX[config.animateX.length - 1]] : config.animateX;
+      animateObj.x = shouldSimplify 
+        ? [config.animateX[0], config.animateX[config.animateX.length - 1]] 
+        : config.animateX;
     }
     
     if (config.animateY) {
-      animateObj.y = shouldSimplify ? [config.animateY[0], config.animateY[config.animateY.length - 1]] : config.animateY;
+      animateObj.y = shouldSimplify 
+        ? [config.animateY[0], config.animateY[config.animateY.length - 1]] 
+        : config.animateY;
     }
     
     if (config.animateScale) {
-      animateObj.scale = shouldSimplify ? [config.animateScale[0]] : config.animateScale;
+      animateObj.scale = shouldSimplify 
+        ? [config.animateScale[0]] 
+        : config.animateScale;
     }
     
     if (config.animateOpacity) {
-      animateObj.opacity = shouldSimplify ? [config.animateOpacity[0]] : config.animateOpacity;
+      animateObj.opacity = shouldSimplify 
+        ? [config.animateOpacity[0]] 
+        : config.animateOpacity;
     }
     
     // Adjust duration based on device capability
     let adjustedDuration = config.duration || 2.0;
     if (shouldSimplify) {
       adjustedDuration = Math.max(0.3, adjustedDuration * 0.6);
+    } else if (isMediumPerformance) {
+      adjustedDuration = Math.max(0.5, adjustedDuration * 0.8);
     }
     
     return {
@@ -77,5 +81,5 @@ export function useThrottledAnimation(config: AnimationConfig): AnimationResult 
         repeatType: "mirror"
       }
     };
-  }, [throttled, config]);
+  }, [isLowPerformance, isMediumPerformance, enableComplexAnimations, config]);
 }

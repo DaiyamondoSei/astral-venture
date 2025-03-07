@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -7,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from '@/components/ui/toaster';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import QuantumParticles from '@/components/effects/QuantumParticles';
+import { PerformanceProvider } from './contexts/PerformanceContext';
+import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
 
 // Lazy load the pages for better performance
 const Index = lazy(() => import('@/pages/index'));
@@ -47,101 +48,104 @@ const PageLoader = () => (
  */
 function App() {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <OnboardingProvider>
-          <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-quantum-950 to-black">
-            {/* Quantum particles background effect wrapped in its own ErrorBoundary */}
-            <ErrorBoundary fallback={
-              <div className="absolute inset-0 bg-gradient-to-br from-black via-quantum-950 to-black" />
-            }>
-              <QuantumParticles count={40} speed={0.8} />
-            </ErrorBoundary>
-            
-            <BrowserRouter>
-              <AnimatePresence mode="wait">
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <Index />
-                      </motion.div>
-                    } />
-                    <Route path="/login" element={
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <Login />
-                      </motion.div>
-                    } />
-                    <Route path="/entry-animation" element={
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.8 }}
-                      >
-                        <EntryAnimationPage />
-                      </motion.div>
-                    } />
-                    <Route path="/dream-capture" element={
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <DreamCapture />
-                      </motion.div>
-                    } />
-                    <Route path="/astral-body-demo" element={
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <AstralBodyDemo />
-                      </motion.div>
-                    } />
-                    <Route path="/dashboard" element={
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <Dashboard />
-                      </motion.div>
-                    } />
-                    <Route path="/preferences" element={
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <PersonalizationPage />
-                      </motion.div>
-                    } />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
-              </AnimatePresence>
-            </BrowserRouter>
-            <Toaster />
-          </div>
-        </OnboardingProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+    <PerformanceProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <OnboardingProvider>
+            <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-quantum-950 to-black">
+              {/* Quantum particles background effect wrapped in its own ErrorBoundary */}
+              <ErrorBoundary fallback={
+                <div className="absolute inset-0 bg-gradient-to-br from-black via-quantum-950 to-black" />
+              }>
+                <QuantumParticles count={40} speed={0.8} />
+              </ErrorBoundary>
+              
+              <BrowserRouter>
+                <AnimatePresence mode="wait">
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      <Route path="/" element={
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.5 }}
+                        >
+                          <Index />
+                        </motion.div>
+                      } />
+                      <Route path="/login" element={
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.5 }}
+                        >
+                          <Login />
+                        </motion.div>
+                      } />
+                      <Route path="/entry-animation" element={
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.8 }}
+                        >
+                          <EntryAnimationPage />
+                        </motion.div>
+                      } />
+                      <Route path="/dream-capture" element={
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.98 }}
+                          transition={{ duration: 0.5 }}
+                        >
+                          <DreamCapture />
+                        </motion.div>
+                      } />
+                      <Route path="/astral-body-demo" element={
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.5 }}
+                        >
+                          <AstralBodyDemo />
+                        </motion.div>
+                      } />
+                      <Route path="/dashboard" element={
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.5 }}
+                        >
+                          <Dashboard />
+                        </motion.div>
+                      } />
+                      <Route path="/preferences" element={
+                        <motion.div
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.5 }}
+                        >
+                          <PersonalizationPage />
+                        </motion.div>
+                      } />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </AnimatePresence>
+              </BrowserRouter>
+              <Toaster />
+            </div>
+          </OnboardingProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+      <PerformanceMonitor />
+    </PerformanceProvider>
   );
 }
 

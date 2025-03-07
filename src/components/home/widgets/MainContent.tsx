@@ -7,7 +7,7 @@ import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometr
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import GlassmorphicContainer from '@/components/background/GlassmorphicContainer';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 interface MainContentProps {
   userId?: string;
@@ -23,7 +23,13 @@ const MainContent: React.FC<MainContentProps> = ({
   className
 }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const performanceCategory = getPerformanceCategory();
+  const { 
+    deviceCapability, 
+    isLowPerformance, 
+    enableComplexAnimations, 
+    enableBlur,
+    enableShadows 
+  } = usePerformance();
   
   const fadeInUpVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
@@ -36,8 +42,8 @@ const MainContent: React.FC<MainContentProps> = ({
 
   // Adjust particle density based on performance category
   const getParticleDensity = () => {
-    if (performanceCategory === 'low') return 0.1;
-    if (performanceCategory === 'medium') return 0.2;
+    if (isLowPerformance) return 0.1;
+    if (deviceCapability === 'medium') return 0.2;
     return isMobile ? 0.2 : 0.3;
   };
 
@@ -47,21 +53,25 @@ const MainContent: React.FC<MainContentProps> = ({
       variants={fadeInUpVariants}
       initial="hidden"
       animate="visible"
-      // Add layout=true to optimize Framer Motion's calculations
+      // Add layout=false to optimize Framer Motion's calculations
       layout={false}
     >
       <GlassmorphicContainer 
         variant={isMobile ? "subtle" : "medium"} 
-        blur={isMobile ? "light" : "medium"}
+        blur={enableBlur ? (isMobile ? "light" : "medium") : "none"}
         className="p-1 md:p-3 relative overflow-hidden rounded-full aspect-square max-w-3xl mx-auto"
-        animate={true}
-        motionProps={{
-          whileHover: performanceCategory !== 'low' ? { scale: 1.01 } : undefined,
-          transition: { duration: 0.3 }
-        }}
+        animate={enableComplexAnimations}
+        motionProps={
+          enableComplexAnimations && !isLowPerformance
+            ? {
+                whileHover: { scale: 1.01 },
+                transition: { duration: 0.3 }
+              }
+            : undefined
+        }
         centerContent={true}
-        glowEffect={performanceCategory !== 'low'}
-        shimmer={performanceCategory !== 'low'}
+        glowEffect={enableShadows && !isLowPerformance}
+        shimmer={enableComplexAnimations && !isLowPerformance}
       >
         {/* Reduced opacity for better cube visibility */}
         <div className="absolute inset-0 opacity-20">

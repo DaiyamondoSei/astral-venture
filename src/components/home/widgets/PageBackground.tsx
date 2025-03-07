@@ -3,8 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import MetatronsBackground from '@/components/sacred-geometry/components/MetatronsBackground';
 import QuantumParticles from '@/components/effects/QuantumParticles';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 interface PageBackgroundProps {
   energyPoints: number;
@@ -22,27 +22,33 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
   consciousnessLevel 
 }) => {
   const [orbs, setOrbs] = useState<{x: string, y: string, size: string, color: string, delay: number}[]>([]);
-  const performanceCategory = getPerformanceCategory();
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const { 
+    isLowPerformance, 
+    isMediumPerformance, 
+    enableComplexAnimations, 
+    enableParticles,
+    enableBlur
+  } = usePerformance();
   
   // Calculate particle count based on device performance and energy points
   const getParticleCount = () => {
     // Reduce particle count significantly to improve performance
     const baseCount = Math.min(Math.max(5, Math.floor(energyPoints / 150) + 5), 25);
     
-    if (performanceCategory === 'low') return Math.max(3, Math.floor(baseCount * 0.3));
-    if (performanceCategory === 'medium') return Math.max(5, Math.floor(baseCount * 0.5));
+    if (isLowPerformance) return Math.max(3, Math.floor(baseCount * 0.3));
+    if (isMediumPerformance) return Math.max(5, Math.floor(baseCount * 0.5));
     return baseCount;
   };
   
   // Calculate animation speed based on consciousness level and device performance
   const particleSpeed = Math.max(0.3, Math.min(0.8, 
-    consciousnessLevel * (performanceCategory === 'high' ? 0.15 : 0.10)
+    consciousnessLevel * (isLowPerformance ? 0.07 : isMediumPerformance ? 0.10 : 0.15)
   ));
   
   // Generate background orbs - reduced for better performance
   useEffect(() => {
-    if (performanceCategory === 'low') {
+    if (isLowPerformance || !enableComplexAnimations) {
       setOrbs([]);
       return;
     }
@@ -61,7 +67,7 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
     }
     
     setOrbs(newOrbs);
-  }, [consciousnessLevel, performanceCategory, isMobile]);
+  }, [consciousnessLevel, isLowPerformance, isMediumPerformance, isMobile, enableComplexAnimations]);
   
   // Get orb color based on index
   const getOrbColor = (index: number) => {
@@ -90,7 +96,7 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
             top: orb.y,
             width: orb.size,
             height: orb.size,
-            filter: 'blur(60px)',
+            filter: enableBlur ? 'blur(60px)' : 'blur(30px)',
             opacity: 0.25
           }}
           initial={{ opacity: 0 }}
@@ -118,18 +124,20 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
         <MetatronsBackground 
           consciousnessLevel={consciousnessLevel}
           opacity={0.25}
-          intensity={performanceCategory === 'low' ? "low" : "medium"}
-          animated={performanceCategory !== 'low'}
+          intensity={isLowPerformance ? "low" : isMediumPerformance ? "medium" : "high"}
+          animated={enableComplexAnimations && !isLowPerformance}
         />
       </motion.div>
       
       {/* Quantum particles with dynamic count based on energy - significantly reduced */}
-      <QuantumParticles 
-        count={getParticleCount()} 
-        interactive={performanceCategory !== 'low'}
-        className="z-0"
-        speed={particleSpeed}
-      />
+      {enableParticles && (
+        <QuantumParticles 
+          count={getParticleCount()} 
+          interactive={!isLowPerformance}
+          className="z-0"
+          speed={particleSpeed}
+        />
+      )}
     </div>
   );
 };

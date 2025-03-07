@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import BackgroundStars from './cosmic/BackgroundStars';
 import FractalPatterns from './cosmic/FractalPatterns';
 import CosmicCircles from './cosmic/CosmicCircles';
@@ -13,6 +13,7 @@ import { useStarsEffect } from './cosmic/hooks/useStarsEffect';
 import { useFractalEffect } from './cosmic/hooks/useFractalEffect';
 import { useChakraIntensity } from './cosmic/hooks/useChakraIntensity';
 import { EnergyProps } from './cosmic/types/energy-types';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 const CosmicAstralBody: React.FC<EnergyProps> = ({
   energyPoints = 0, 
@@ -24,6 +25,8 @@ const CosmicAstralBody: React.FC<EnergyProps> = ({
   showTranscendenceOverride,
   showInfinityOverride
 }) => {
+  const { isLowPerformance, enableComplexAnimations } = usePerformance();
+  
   // Extract visualization state based on energy and overrides
   const visualizationState = useVisualizationState({
     energyPoints,
@@ -37,11 +40,16 @@ const CosmicAstralBody: React.FC<EnergyProps> = ({
   // Generate stars based on energy level
   const stars = useStarsEffect(energyPoints, visualizationState);
   
-  // Generate fractal points for visualization
-  const fractalPoints = useFractalEffect(visualizationState);
+  // Generate fractal points for visualization - skip for low performance
+  const fractalPoints = !isLowPerformance 
+    ? useFractalEffect(visualizationState)
+    : useMemo(() => [], []);
   
   // Get chakra intensity calculator
   const getChakraIntensity = useChakraIntensity(energyPoints, activatedChakras);
+
+  // Optimize rendering for low performance devices
+  const shouldRenderComplexEffects = enableComplexAnimations && !isLowPerformance;
 
   return (
     <div className="relative w-full aspect-[9/16] max-w-md mx-auto overflow-hidden rounded-xl">
@@ -55,14 +63,16 @@ const CosmicAstralBody: React.FC<EnergyProps> = ({
         baseProgressPercentage={visualizationState.baseProgressPercentage}
       />
       
-      {/* Fractal patterns - visible at higher energy levels */}
-      <FractalPatterns 
-        fractalPoints={fractalPoints}
-        showFractal={visualizationState.showFractal}
-        showInfinity={visualizationState.showInfinity}
-        showTranscendence={visualizationState.showTranscendence}
-        showIllumination={visualizationState.showIllumination}
-      />
+      {/* Fractal patterns - visible at higher energy levels - skip for low performance */}
+      {shouldRenderComplexEffects && (
+        <FractalPatterns 
+          fractalPoints={fractalPoints}
+          showFractal={visualizationState.showFractal}
+          showInfinity={visualizationState.showInfinity}
+          showTranscendence={visualizationState.showTranscendence}
+          showIllumination={visualizationState.showIllumination}
+        />
+      )}
       
       {/* Cosmic Circles - more appear with higher energy */}
       <CosmicCircles 
@@ -74,11 +84,13 @@ const CosmicAstralBody: React.FC<EnergyProps> = ({
         showIllumination={visualizationState.showIllumination}
       />
       
-      {/* Transcendence Effect - only at highest levels */}
-      <TranscendenceEffect 
-        showTranscendence={visualizationState.showTranscendence}
-        showInfinity={visualizationState.showInfinity}
-      />
+      {/* Transcendence Effect - only at highest levels and skip for low performance */}
+      {shouldRenderComplexEffects && (
+        <TranscendenceEffect 
+          showTranscendence={visualizationState.showTranscendence}
+          showInfinity={visualizationState.showInfinity}
+        />
+      )}
       
       {/* Constellation lines - more complex with progress */}
       <ConstellationLines 
@@ -104,13 +116,15 @@ const CosmicAstralBody: React.FC<EnergyProps> = ({
         activatedChakras={activatedChakras}
       />
       
-      {/* Central and pulsing effects */}
-      <CentralEffects 
-        showInfinity={visualizationState.showInfinity}
-        showTranscendence={visualizationState.showTranscendence}
-        showIllumination={visualizationState.showIllumination}
-        baseProgressPercentage={visualizationState.baseProgressPercentage}
-      />
+      {/* Central and pulsing effects - skip some for low performance */}
+      {shouldRenderComplexEffects && (
+        <CentralEffects 
+          showInfinity={visualizationState.showInfinity}
+          showTranscendence={visualizationState.showTranscendence}
+          showIllumination={visualizationState.showIllumination}
+          baseProgressPercentage={visualizationState.baseProgressPercentage}
+        />
+      )}
       
       {/* Progress indicators */}
       <ProgressIndicators 
@@ -124,4 +138,4 @@ const CosmicAstralBody: React.FC<EnergyProps> = ({
   );
 };
 
-export default CosmicAstralBody;
+export default React.memo(CosmicAstralBody);

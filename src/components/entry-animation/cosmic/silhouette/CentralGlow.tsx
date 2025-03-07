@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 interface CentralGlowProps {
   showInfinity: boolean;
@@ -16,8 +16,8 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
   showIllumination,
   baseProgressPercentage
 }) => {
-  // Get device performance category
-  const performanceCategory = getPerformanceCategory();
+  // Get device performance from context
+  const { isLowPerformance, isMediumPerformance, enableBlur, enableShadows } = usePerformance();
   
   // Memoize gradient class to prevent recalculation
   const glowGradient = useMemo(() => {
@@ -33,21 +33,21 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
     return 'bg-gradient-to-t from-blue-500/25 via-cyan-400/20 to-indigo-400/20';
   }, [showInfinity, showTranscendence, showIllumination]);
 
-  // Skip complex animations for low-performance devices
-  const isLowPerformance = performanceCategory === 'low';
-  
   // Memoize ray count based on performance
   const rayCount = useMemo(() => {
     if (isLowPerformance) return 0;
-    if (performanceCategory === 'medium') return 8;
+    if (isMediumPerformance) return 8;
     return 12;
-  }, [performanceCategory, isLowPerformance]);
+  }, [isLowPerformance, isMediumPerformance]);
+
+  // Calculate blur class based on performance settings
+  const blurClass = enableBlur ? 'blur-xl' : 'blur-sm';
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       {/* Primary central glow with optimized animation */}
       <motion.div 
-        className={`w-1/2 h-1/2 rounded-full blur-xl ${glowGradient}`}
+        className={`w-1/2 h-1/2 rounded-full ${blurClass} ${glowGradient}`}
         initial={{ opacity: 0.3 }}
         animate={{ 
           opacity: [0.3, 0.3 + (baseProgressPercentage * 0.6), 0.3],
@@ -64,7 +64,7 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
       {/* Additional subtle glow layer - only render on medium/high performance devices */}
       {!isLowPerformance && (
         <motion.div 
-          className={`absolute w-1/3 h-1/3 rounded-full blur-2xl bg-white/10`}
+          className={`absolute w-1/3 h-1/3 rounded-full ${enableBlur ? 'blur-2xl' : 'blur-md'} bg-white/10`}
           animate={{ 
             opacity: [0.1, 0.3, 0.1],
             scale: [0.8, 1.2, 0.8],
@@ -110,7 +110,7 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
       )}
       
       {/* Special infinity state effect - only on high performance devices */}
-      {performanceCategory === 'high' && showInfinity && (
+      {!isLowPerformance && !isMediumPerformance && showInfinity && (
         <motion.div
           className="absolute w-2/3 h-2/3 rounded-full"
           style={{

@@ -1,7 +1,7 @@
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
-import { getPerformanceCategory } from '@/utils/performanceUtils'; 
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 // Lazy load the background component to improve initial load time
 const GeometryNetworkBackground = lazy(() => 
@@ -30,21 +30,24 @@ const Layout = ({
   removeBackground = false
 }: LayoutProps) => {
   const [isBackgroundLoaded, setIsBackgroundLoaded] = useState(false);
-  const [animationQuality, setAnimationQuality] = useState<'high' | 'medium' | 'low'>('high');
+  const { 
+    deviceCapability, 
+    isLowPerformance, 
+    isMediumPerformance, 
+    enableComplexAnimations, 
+    enableBlur
+  } = usePerformance();
 
-  // Detect device performance capabilities
+  // Load background with delay based on performance
   useEffect(() => {
-    const quality = getPerformanceCategory();
-    setAnimationQuality(quality);
-    
     // For medium and high-performance devices, load background after 100ms delay
     // For low-performance devices, wait 300ms to prioritize interactive elements
     const timer = setTimeout(() => {
       setIsBackgroundLoaded(true);
-    }, quality === 'low' ? 300 : 100);
+    }, isLowPerformance ? 300 : 100);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [isLowPerformance]);
 
   // Map content width options to appropriate max-width classes
   const getContentWidthClass = () => {
@@ -64,7 +67,7 @@ const Layout = ({
   
   // Background density based on performance capability
   const getBackgroundDensity = () => {
-    switch (animationQuality) {
+    switch (deviceCapability) {
       case 'low': return 15;
       case 'medium': return 25;
       case 'high': return 35;
@@ -80,8 +83,8 @@ const Layout = ({
           {/* Always show simple fallback immediately */}
           <SimpleFallbackBackground />
           
-          {/* Load the complex background only after initial render */}
-          {isBackgroundLoaded && (
+          {/* Load the complex background only after initial render and if not on low performance */}
+          {isBackgroundLoaded && !isLowPerformance && (
             <Suspense fallback={null}>
               <GeometryNetworkBackground 
                 density={getBackgroundDensity()} 
@@ -96,7 +99,7 @@ const Layout = ({
       {/* Simplified glass background layers with reduced animations */}
       <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
         {/* Reduced number of orbs and simplified animations based on device capability */}
-        {animationQuality !== 'low' && (
+        {enableComplexAnimations && !isLowPerformance && (
           <>
             <div className="orb w-[30vw] h-[30vw] -top-[10vw] -left-[10vw] from-quantum-300/20 to-quantum-500/5 animate-pulse-slow" />
             <div className="orb w-[25vw] h-[25vw] top-1/3 -right-[5vw] from-astral-300/15 to-astral-500/5 animate-float" 
@@ -105,11 +108,11 @@ const Layout = ({
         )}
         
         {/* More efficient wave animation - only shown on medium and high performance devices */}
-        {animationQuality !== 'low' && (
+        {enableComplexAnimations && !isLowPerformance && (
           <div className="wave-container">
             <div className="wave wave-1" style={{ willChange: 'transform' }} />
             <div className="wave wave-2" style={{ willChange: 'transform' }} />
-            {animationQuality === 'high' && (
+            {!isMediumPerformance && (
               <div className="wave wave-3" style={{ willChange: 'transform' }} />
             )}
           </div>
