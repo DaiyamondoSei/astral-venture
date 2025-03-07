@@ -1,11 +1,12 @@
 
 import React from 'react';
 import { motion, Variants } from 'framer-motion';
-import { GlassCard } from '@/components/ui/glass-card';
 import InteractiveEnergyField from '@/components/effects/InteractiveEnergyField';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import GlassmorphicContainer from '@/components/background/GlassmorphicContainer';
 
 interface MainContentProps {
   userId?: string;
@@ -20,6 +21,8 @@ const MainContent: React.FC<MainContentProps> = ({
   onNodeSelect,
   className
 }) => {
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  
   const fadeInUpVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -33,8 +36,19 @@ const MainContent: React.FC<MainContentProps> = ({
     <motion.div 
       className={cn("relative", className)}
       variants={fadeInUpVariants}
+      initial="hidden"
+      animate="visible"
     >
-      <GlassCard animate variant="default" className="p-0 md:p-2 relative overflow-hidden rounded-full aspect-square">
+      <GlassmorphicContainer 
+        variant="medium" 
+        blur={isMobile ? "light" : "medium"}
+        className="p-1 md:p-3 relative overflow-hidden rounded-full aspect-square"
+        animate={true}
+        motionProps={{
+          whileHover: { scale: 1.02 },
+          transition: { duration: 0.3 }
+        }}
+      >
         <div className="absolute inset-0 opacity-50">
           <InteractiveEnergyField 
             energyPoints={energyPoints} 
@@ -50,7 +64,7 @@ const MainContent: React.FC<MainContentProps> = ({
             onSelectNode={onNodeSelect}
           />
         </div>
-      </GlassCard>
+      </GlassmorphicContainer>
     </motion.div>
   );
 };

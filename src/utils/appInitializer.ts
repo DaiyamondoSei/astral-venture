@@ -1,68 +1,61 @@
 
-import { preloadCriticalAssets, preloadNonCriticalAssets } from './assetPreloader';
-import { getAnimationQualityLevel } from './performanceUtils';
+import { toast } from '@/components/ui/use-toast';
+import { getPerformanceCategory } from './performanceUtils';
 
 /**
- * Initialize the application with performance optimizations
+ * Initialize the application with necessary configurations
  */
-export const initializeApp = async (): Promise<void> => {
-  // Track initialization time
-  const startTime = performance.now();
-  
+export const initializeApp = async () => {
   try {
-    // Detect device capabilities early
-    const qualityLevel = getAnimationQualityLevel();
-    console.log(`Device performance level detected: ${qualityLevel}`);
+    // Detect device capabilities
+    const performanceCategory = getPerformanceCategory();
     
-    // Store quality level in localStorage for persistence
-    localStorage.setItem('app_quality_level', qualityLevel);
-    
-    // Preload critical assets before showing UI
-    await preloadCriticalAssets();
-    
-    // Schedule non-critical assets to load during idle time
-    preloadNonCriticalAssets();
-    
-    // Initialize performance monitoring in development mode
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Development mode: Performance monitoring enabled');
+    // Set app quality based on device capabilities
+    if (performanceCategory === 'low') {
+      console.info('Low performance device detected. Optimizing for better performance.');
+      // Adjust global settings for low-end devices
+      window.__APP_CONFIG = {
+        ...(window.__APP_CONFIG || {}),
+        animationQuality: 'minimal',
+        particleDensity: 0.3,
+        disableParallax: true,
+        reducedMotion: true
+      };
     }
     
-    // Log initialization complete
-    const initTime = Math.round(performance.now() - startTime);
-    console.log(`App initialized in ${initTime}ms`);
+    console.info(`App initialized with performance category: ${performanceCategory}`);
+    
+    return {
+      success: true
+    };
   } catch (error) {
-    console.error('Error during app initialization:', error);
+    console.error('Failed to initialize app:', error);
+    
+    // Show a non-blocking toast notification
+    toast({
+      title: 'Application Initialization',
+      description: 'Some features may be limited. Please refresh the page if you experience any issues.',
+      variant: 'destructive'
+    });
+    
+    return {
+      success: false,
+      error
+    };
   }
 };
 
-/**
- * Schedule expensive operations during idle time to avoid blocking the main thread
- */
-export const scheduleIdleTask = (
-  task: () => void, 
-  options: { timeout?: number } = {}
-): void => {
-  if (window.requestIdleCallback) {
-    window.requestIdleCallback(task, options);
-  } else {
-    // Fallback for browsers without requestIdleCallback
-    setTimeout(task, options.timeout || 50);
+// Declare global app configuration type
+declare global {
+  interface Window {
+    __APP_CONFIG?: {
+      animationQuality: 'minimal' | 'reduced' | 'standard' | 'enhanced';
+      particleDensity: number;
+      disableParallax: boolean;
+      reducedMotion: boolean;
+      [key: string]: any;
+    };
   }
-};
+}
 
-/**
- * Defer non-critical initialization to improve startup performance
- */
-export const deferInitialization = (): void => {
-  // Wait until after first paint
-  window.addEventListener('load', () => {
-    // Schedule tasks after initial page load
-    scheduleIdleTask(() => {
-      // Initialize non-critical features
-      console.log('Initializing deferred tasks...');
-      
-      // Additional initialization tasks here
-    }, { timeout: 2000 });
-  });
-};
+export default initializeApp;
