@@ -20,7 +20,7 @@ interface InitOptions {
 export const initializeApp = async (options: InitOptions = {}): Promise<void> => {
   const { 
     route = 'index', 
-    enableMonitoring = process.env.NODE_ENV !== 'production',
+    enableMonitoring = process.env.NODE_ENV === 'development',
     prioritizeLCP = true
   } = options;
   
@@ -29,6 +29,9 @@ export const initializeApp = async (options: InitOptions = {}): Promise<void> =>
   if (typeof window !== 'undefined') {
     (window as any).__deviceCapability = deviceCapability;
     (window as any).__appInitialized = false;
+    
+    // Set performance attributes on the documentElement for potential CSS optimizations
+    document.documentElement.dataset.performance = deviceCapability;
   }
   
   // Step 2: Initialize performance monitoring if enabled
@@ -61,8 +64,9 @@ export const initializeApp = async (options: InitOptions = {}): Promise<void> =>
     // Mark app as initialized
     if (typeof window !== 'undefined') {
       (window as any).__appInitialized = true;
+      console.log(`App initialized with device capability: ${deviceCapability}`);
     }
-  }, 500);
+  }, 300);
 };
 
 /**
@@ -99,6 +103,17 @@ function addResourceHints(deviceCapability: DeviceCapability): void {
       document.head.appendChild(link);
     });
   }
+  
+  // Add preload for critical CSS fonts
+  if (deviceCapability !== 'low') {
+    const fontPreload = document.createElement('link');
+    fontPreload.rel = 'preload';
+    fontPreload.as = 'font';
+    fontPreload.href = '/fonts/main-font.woff2';
+    fontPreload.type = 'font/woff2';
+    fontPreload.crossOrigin = 'anonymous';
+    document.head.appendChild(fontPreload);
+  }
 }
 
 /**
@@ -107,4 +122,9 @@ function addResourceHints(deviceCapability: DeviceCapability): void {
  */
 export const onRouteChange = (newRoute: string): void => {
   initRoutePreloading(newRoute);
+  
+  // Log route change for performance monitoring
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`Route changed to: ${newRoute}`);
+  }
 };

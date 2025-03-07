@@ -165,7 +165,10 @@ export const preloadCriticalAssets = async (route: string): Promise<void> => {
       src: '/cosmic-human.svg', 
       type: 'image' as AssetType, 
       priority: 'high' as const,
-      options: { crossOrigin: 'anonymous' } 
+      options: { 
+        crossOrigin: 'anonymous',
+        fetchPriority: 'high'
+      } 
     },
     { 
       src: '/placeholder.svg', 
@@ -182,7 +185,10 @@ export const preloadCriticalAssets = async (route: string): Promise<void> => {
         src: '/lovable-uploads/cosmic-human.png', 
         type: 'image' as AssetType, 
         priority: 'high' as const,
-        options: { crossOrigin: 'anonymous' }
+        options: { 
+          crossOrigin: 'anonymous',
+          fetchPriority: 'high'
+        }
       }
     );
   }
@@ -199,8 +205,13 @@ export const preloadCriticalAssets = async (route: string): Promise<void> => {
     );
   }
   
-  // Preload everything sequentially
-  await preloadAssetsSequentially(criticalAssets);
+  try {
+    // Preload everything sequentially
+    await preloadAssetsSequentially(criticalAssets);
+    console.log(`Preloaded ${criticalAssets.length} assets for route: ${route}`);
+  } catch (error) {
+    console.warn('Error preloading assets:', error);
+  }
 };
 
 // Initialize preloading for the current route

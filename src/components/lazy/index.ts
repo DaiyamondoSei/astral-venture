@@ -26,7 +26,7 @@ export const LazyAstralBody = React.lazy(() =>
   import('../entry-animation/AstralBody')
 );
 
-// Export wrapped versions for direct use
+// Export wrapped versions with optimized loading states
 export const QuantumParticles = (props: any) => (
   <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
     <LazyQuantumParticles {...props} />

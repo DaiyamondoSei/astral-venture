@@ -9,18 +9,31 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { usePerformance } from '@/contexts/PerformanceContext';
 import { initializeApp } from '@/utils/appInitializer';
 
+// Import lazy-loaded components using our optimized lazy loader
+import {
+  VisualizationTabs,
+  CosmicAstralBody,
+  AstralBody
+} from '@/components/lazy';
+
 // Lazy load components that aren't needed for initial render
 const UserDashboardView = lazy(() => import('@/components/UserDashboardView'));
 const LandingView = lazy(() => import('@/components/LandingView'));
 const EntryAnimationView = lazy(() => import('@/components/EntryAnimationView'));
 const ChallengeManager = lazy(() => import('@/components/ChallengeManager'));
 
-// Loading fallback components
-const LoadingFallback = () => (
-  <div className="min-h-[70vh] flex items-center justify-center">
-    <div className="animate-pulse text-white/70">Loading view...</div>
-  </div>
-);
+// Loading fallback components with performance adaptability
+const LoadingFallback = () => {
+  const { isLowPerformance } = usePerformance();
+  
+  return (
+    <div className="min-h-[70vh] flex items-center justify-center">
+      <div className={`${isLowPerformance ? '' : 'animate-pulse'} text-white/70`}>
+        Loading view...
+      </div>
+    </div>
+  );
+};
 
 const Index = () => {
   const [showEntryAnimation, setShowEntryAnimation] = useState(false);
@@ -31,12 +44,19 @@ const Index = () => {
 
   // Initialize app with performance optimizations
   useEffect(() => {
-    initializeApp({ route: 'index', prioritizeLCP: true });
+    initializeApp({ 
+      route: 'index', 
+      prioritizeLCP: true,
+      enableMonitoring: process.env.NODE_ENV === 'development'
+    });
   }, []);
 
-  // Debug logging
+  // Simplified debug logging
   useEffect(() => {
-    console.log("Index component - auth state:", { user: !!user, authState: !!authState });
+    console.log("Index component - auth state:", { 
+      user: !!user, 
+      authState: !!authState 
+    });
   }, [user, authState]);
 
   useEffect(() => {
@@ -63,7 +83,7 @@ const Index = () => {
     }
   };
 
-  // Adjust the suspense fallback based on performance
+  // Create a more adaptive fallback component based on performance
   const SuspenseFallback = () => (
     <div className={`min-h-[70vh] flex items-center justify-center ${isLowPerformance ? '' : 'animate-pulse'}`}>
       <div className="text-white/70">Loading view...</div>
@@ -76,41 +96,47 @@ const Index = () => {
         <AuthStateManager onLoadingComplete={handleAuthStateLoaded} />
         
         {authState && (
-          <Suspense fallback={<SuspenseFallback />}>
-            {showEntryAnimation ? (
-              <EntryAnimationView 
-                user={authState.user}
-                onComplete={handleEntryAnimationComplete}
-                showTestButton={false}
-              />
-            ) : (!authState.user ? (
-              <LandingView />
-            ) : (
-              <OnboardingManager userId={authState.user.id}>
-                <ChallengeManager
-                  userProfile={authState.userProfile}
-                  activatedChakras={authState.activatedChakras || []}
-                  updateUserProfile={authState.updateUserProfile}
-                  updateActivatedChakras={authState.updateActivatedChakras}
-                >
-                  {(handleChallengeComplete) => (
-                    <UserDashboardView
-                      user={authState.user}
-                      userProfile={authState.userProfile}
-                      todayChallenge={authState.todayChallenge}
-                      userStreak={authState.userStreak || { current: 0, longest: 0 }}
-                      activatedChakras={authState.activatedChakras || []}
-                      onLogout={authState.handleLogout}
-                      updateStreak={authState.updateStreak}
-                      updateActivatedChakras={authState.updateActivatedChakras}
-                      updateUserProfile={authState.updateUserProfile}
-                      onChallengeComplete={handleChallengeComplete}
-                    />
-                  )}
-                </ChallengeManager>
-              </OnboardingManager>
-            ))}
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense fallback={<SuspenseFallback />}>
+              {showEntryAnimation ? (
+                <EntryAnimationView 
+                  user={authState.user}
+                  onComplete={handleEntryAnimationComplete}
+                  showTestButton={false}
+                />
+              ) : (!authState.user ? (
+                <LandingView />
+              ) : (
+                <OnboardingManager userId={authState.user.id}>
+                  <ErrorBoundary>
+                    <Suspense fallback={<SuspenseFallback />}>
+                      <ChallengeManager
+                        userProfile={authState.userProfile}
+                        activatedChakras={authState.activatedChakras || []}
+                        updateUserProfile={authState.updateUserProfile}
+                        updateActivatedChakras={authState.updateActivatedChakras}
+                      >
+                        {(handleChallengeComplete) => (
+                          <UserDashboardView
+                            user={authState.user}
+                            userProfile={authState.userProfile}
+                            todayChallenge={authState.todayChallenge}
+                            userStreak={authState.userStreak || { current: 0, longest: 0 }}
+                            activatedChakras={authState.activatedChakras || []}
+                            onLogout={authState.handleLogout}
+                            updateStreak={authState.updateStreak}
+                            updateActivatedChakras={authState.updateActivatedChakras}
+                            updateUserProfile={authState.updateUserProfile}
+                            onChallengeComplete={handleChallengeComplete}
+                          />
+                        )}
+                      </ChallengeManager>
+                    </Suspense>
+                  </ErrorBoundary>
+                </OnboardingManager>
+              ))}
+            </Suspense>
+          </ErrorBoundary>
         )}
       </ErrorBoundary>
     </Layout>

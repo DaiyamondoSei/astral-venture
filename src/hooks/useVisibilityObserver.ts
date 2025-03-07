@@ -6,6 +6,7 @@ interface VisibilityObserverOptions {
   rootMargin?: string;
   threshold?: number | number[];
   skipWhenLowPerformance?: boolean;
+  enableOptimization?: boolean;
 }
 
 /**
@@ -15,10 +16,12 @@ interface VisibilityObserverOptions {
 export default function useVisibilityObserver({
   rootMargin = '0px',
   threshold = 0,
-  skipWhenLowPerformance = false
+  skipWhenLowPerformance = false,
+  enableOptimization = true
 }: VisibilityObserverOptions = {}) {
   const [isVisible, setIsVisible] = useState(false);
   const [intersectionRatio, setIntersectionRatio] = useState(0);
+  const [wasEverVisible, setWasEverVisible] = useState(false);
   const elementRef = useRef<Element | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const { isLowPerformance } = usePerformance();
@@ -36,19 +39,21 @@ export default function useVisibilityObserver({
     };
   }, []);
   
-  // Set up the intersection observer
+  // Set up the intersection observer with optimizations based on device capability
   useEffect(() => {
     // If we're skipping observation on low performance devices, 
     // just set elements as always visible
     if (shouldSkipObserver) {
       setIsVisible(true);
       setIntersectionRatio(1);
+      setWasEverVisible(true);
       return;
     }
     
     // Skip if IntersectionObserver is not supported
     if (!('IntersectionObserver' in window)) {
       setIsVisible(true); // Assume visible if not supported
+      setWasEverVisible(true);
       return;
     }
     
@@ -57,12 +62,30 @@ export default function useVisibilityObserver({
       observerRef.current.disconnect();
     }
     
-    // Create observer
+    // Create observer with performance optimization
     observerRef.current = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
+        
+        // Update visibility state
         setIsVisible(entry.isIntersecting);
         setIntersectionRatio(entry.intersectionRatio);
+        
+        // Track if element was ever visible (useful for one-time animations)
+        if (entry.isIntersecting && !wasEverVisible) {
+          setWasEverVisible(true);
+        }
+        
+        // Optimization: If element has been visible and we don't need to track when it becomes invisible,
+        // we can disconnect the observer to save resources
+        if (enableOptimization && entry.isIntersecting && !wasEverVisible) {
+          // For components that only need to be loaded once and don't need to be
+          // paused when scrolled out of view, we can disconnect after first visibility
+          if (observerRef.current && !enableOptimization) {
+            observerRef.current.disconnect();
+            observerRef.current = null;
+          }
+        }
       },
       { rootMargin, threshold }
     );
@@ -77,7 +100,7 @@ export default function useVisibilityObserver({
         observerRef.current.disconnect();
       }
     };
-  }, [rootMargin, threshold, shouldSkipObserver]);
+  }, [rootMargin, threshold, shouldSkipObserver, wasEverVisible, enableOptimization]);
   
   // Ref setter function that saves the element and sets up observation
   const setRef = useCallback((element: Element | null) => {
@@ -101,6 +124,7 @@ export default function useVisibilityObserver({
   return {
     setRef,
     isVisible: shouldSkipObserver ? true : isVisible,
+    wasEverVisible,
     intersectionRatio: shouldSkipObserver ? 1 : intersectionRatio,
     element: elementRef.current
   };
