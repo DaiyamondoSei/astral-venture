@@ -1,16 +1,11 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Particle from './Particle';
-import { QuantumParticle } from './types';
+import { QuantumParticle, QuantumParticlesProps } from './types';
 import { getAnimationQualityLevel } from '@/utils/performanceUtils';
+import { useParticleSystem } from './useParticleSystem';
 
-const QuantumParticles: React.FC<{
-  count?: number;
-  colors?: string[];
-  speed?: number;
-  maxSize?: number;
-  responsive?: boolean;
-}> = ({
+const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   count = 30,
   colors = ['#6366f1', '#8b5cf6', '#d946ef', '#64748b', '#0ea5e9'],
   speed = 1,
@@ -22,8 +17,7 @@ const QuantumParticles: React.FC<{
     ? count 
     : parseInt(String(count), 10) || 30;
   
-  // State for particles and container dimensions
-  const [particles, setParticles] = useState<QuantumParticle[]>([]);
+  // State for container dimensions
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   
   // Animation frame reference
@@ -35,50 +29,52 @@ const QuantumParticles: React.FC<{
   const lastTimeRef = useRef<number>(0);
   const frameCountRef = useRef<number>(0);
   const fpsRef = useRef<number>(60);
+  const throttleFramesRef = useRef<number>(1); // Only process every nth frame
+  const frameSkipCountRef = useRef<number>(0);
   
   // Quality level based on device
   const qualityLevel = useMemo(() => getAnimationQualityLevel(), []);
   
-  // Initialize particles
+  // Set throttle rate based on device performance
+  useEffect(() => {
+    if (qualityLevel === 'low') {
+      throttleFramesRef.current = 3; // Process every 3rd frame on low-end devices
+    } else if (qualityLevel === 'medium') {
+      throttleFramesRef.current = 2; // Process every 2nd frame on medium devices
+    } else {
+      throttleFramesRef.current = 1; // Process every frame on high-end devices
+    }
+  }, [qualityLevel]);
+  
+  // Setup dimensions on mount and handle resize
   useEffect(() => {
     if (!containerRef.current) return;
     
-    const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
-    setDimensions({ width: rect.width, height: rect.height });
-    
-    // Create initial particles
-    const newParticles = Array.from({ length: particleCount }).map((_, i) => createParticle(
-      rect.width, 
-      rect.height, 
-      colors, 
-      maxSize, 
-      speed, 
-      qualityLevel
-    ));
-    
-    setParticles(newParticles);
-    
-    // Handle resize
-    const handleResize = () => {
+    const updateDimensions = () => {
       if (responsive && containerRef.current) {
-        const newRect = containerRef.current.getBoundingClientRect();
-        setDimensions({ width: newRect.width, height: newRect.height });
+        const rect = containerRef.current.getBoundingClientRect();
+        setDimensions({ width: rect.width, height: rect.height });
       }
     };
     
-    window.addEventListener('resize', handleResize);
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', updateDimensions);
     };
-  }, [particleCount, colors, maxSize, speed, responsive, qualityLevel]);
+  }, [responsive]);
   
+  // Initialize particle system with dependencies
+  const { particles, updateParticles } = useParticleSystem(
+    dimensions.width,
+    dimensions.height,
+    { count: particleCount, colors, maxSize, speed }
+  );
+
   // Animation loop
   useEffect(() => {
-    // Skip if no particles or container
     if (particles.length === 0 || !containerRef.current) return;
-    
-    let animationFrameId: number;
     
     const animate = (time: number) => {
       if (!isMounted.current) return;
@@ -96,46 +92,27 @@ const QuantumParticles: React.FC<{
         }
       }
       
-      // Update particle positions
-      setParticles(prevParticles => 
-        prevParticles.map(particle => {
-          // Update position
-          let newX = particle.x + particle.vx;
-          let newY = particle.y + particle.vy;
-          
-          // Boundary check
-          if (newX < 0 || newX > 100) {
-            particle.vx *= -1;
-            newX = particle.x + particle.vx;
-          }
-          
-          if (newY < 0 || newY > 100) {
-            particle.vy *= -1;
-            newY = particle.y + particle.vy;
-          }
-          
-          return {
-            ...particle,
-            x: newX,
-            y: newY
-          };
-        })
-      );
+      // Apply throttling based on device performance
+      frameSkipCountRef.current = (frameSkipCountRef.current + 1) % throttleFramesRef.current;
+      if (frameSkipCountRef.current === 0) {
+        // Only update particles on throttled frames
+        updateParticles();
+      }
       
       // Request next frame using ref to avoid infinite loops
-      animationFrameId = requestAnimationFrame(animate);
+      requestRef.current = requestAnimationFrame(animate);
     };
     
     // Start animation
-    animationFrameId = requestAnimationFrame(animate);
+    requestRef.current = requestAnimationFrame(animate);
     
     // Cleanup
     return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
       }
     };
-  }, [dimensions, particles.length]); // Only re-run when dimensions or particle count changes
+  }, [particles.length, updateParticles]);
   
   // Component mount/unmount
   useEffect(() => {
@@ -167,37 +144,5 @@ const QuantumParticles: React.FC<{
     </div>
   );
 };
-
-// Helper function to create a particle
-function createParticle(
-  width: number, 
-  height: number, 
-  colors: string[], 
-  maxSize: number,
-  speed: number,
-  qualityLevel: 'low' | 'medium' | 'high'
-): QuantumParticle {
-  // Adjust particle complexity based on quality level
-  const sizeFactor = qualityLevel === 'low' ? 0.6 : 
-                    qualityLevel === 'medium' ? 0.8 : 1;
-  
-  // Adjust animation speed based on quality level
-  const speedFactor = qualityLevel === 'low' ? 0.5 : 
-                     qualityLevel === 'medium' ? 0.8 : 1;
-  
-  const size = (Math.random() * maxSize + 1) * sizeFactor;
-  
-  return {
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    vx: (Math.random() - 0.5) * 0.1 * speed * speedFactor,
-    vy: (Math.random() - 0.5) * 0.1 * speed * speedFactor,
-    size,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    opacity: Math.random() * 0.5 + 0.1,
-    duration: Math.random() * 3 + 2,
-    delay: Math.random() * 2
-  };
-}
 
 export default React.memo(QuantumParticles);

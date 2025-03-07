@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import OnboardingOverlay from './OnboardingOverlay';
 import FeatureDiscoveryLayer from './FeatureDiscoveryLayer';
 import AchievementLayer from './AchievementLayer';
+import WelcomePopup from './components/WelcomePopup';
 
 interface OnboardingManagerProps {
   userId: string;
@@ -16,9 +17,21 @@ const OnboardingManager: React.FC<OnboardingManagerProps> = ({ userId, children 
     completedSteps,
     stepInteractions
   } = useOnboarding();
+  
+  const [isWelcomeComplete, setIsWelcomeComplete] = useState(false);
+  
+  const handleWelcomeComplete = () => {
+    setIsWelcomeComplete(true);
+  };
 
   return (
     <>
+      {/* Welcome popup for first-time users */}
+      <WelcomePopup 
+        userId={userId} 
+        onComplete={handleWelcomeComplete} 
+      />
+      
       {/* Main onboarding overlay */}
       <OnboardingOverlay />
       

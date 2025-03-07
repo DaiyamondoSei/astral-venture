@@ -42,4 +42,14 @@ export interface QuantumParticlesProps {
    * Whether particles should respond to container resize (defaults to true)
    */
   responsive?: boolean;
+
+  /**
+   * Whether particles should respond to user interaction (defaults to false)
+   */
+  interactive?: boolean;
+  
+  /**
+   * Custom CSS class name
+   */
+  className?: string;
 }
