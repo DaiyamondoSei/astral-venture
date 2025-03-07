@@ -70,16 +70,18 @@ export function handleError(
   
   // Show toast if requested
   if (showToast) {
+    const variant = severity === ErrorSeverity.INFO
+      ? "default"
+      : severity === ErrorSeverity.WARNING
+        ? "default"
+        : "destructive";
+        
     toast({
       title: `Error in ${context}`,
       description: errorMessage.length > 100 
         ? `${errorMessage.substring(0, 100)}...` 
         : errorMessage,
-      variant: severity === ErrorSeverity.INFO 
-        ? "default" 
-        : severity === ErrorSeverity.WARNING 
-          ? "default" 
-          : "destructive"
+      variant
     });
   }
 }

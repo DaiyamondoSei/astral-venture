@@ -1,181 +1,119 @@
 
-import { useQuery, useQueryClient, QueryKey, UseQueryOptions } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useQuery, useMutation, QueryKey, UseQueryOptions, UseQueryResult } from '@tanstack/react-query';
+import { toast } from '@/components/ui/use-toast';
+import { getPerformanceCategory } from './performanceUtils';
 
-// Optimized query hook that adapts to network conditions
-export function useAdaptiveQuery<TData, TError>(
-  queryKey: QueryKey,
-  queryFn: () => Promise<TData>,
-  options?: Omit<UseQueryOptions<TData, TError, TData, QueryKey>, 'queryKey' | 'queryFn'>
-) {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [networkType, setNetworkType] = useState<string | undefined>(undefined);
-  const queryClient = useQueryClient();
-  
-  // Create optimized options based on network state
-  const adaptiveOptions = {
-    ...options,
-    gcTime: isOnline ? 
-      (networkType === '4g' ? 5 * 60 * 1000 : 10 * 60 * 1000) : // 5min for 4G, 10min otherwise
-      30 * 60 * 1000, // 30min when offline
-    staleTime: isOnline ? 
-      (networkType === '4g' ? 30 * 1000 : 2 * 60 * 1000) : // 30sec for 4G, 2min otherwise
-      Infinity, // Don't refetch when offline
-    retry: isOnline ? (options?.retry ?? 3) : 0, // No retries when offline
-    refetchOnWindowFocus: isOnline && (options?.refetchOnWindowFocus ?? true),
-    refetchOnReconnect: isOnline && (options?.refetchOnReconnect ?? true),
-  };
+type RetryValue<TError> = number | boolean | ((failureCount: number, error: TError) => boolean);
 
-  // Update online status
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Try to get network type if the API is available
-    if ('connection' in navigator && navigator.connection) {
-      try {
-        // Using type assertion since TS doesn't know about this API
-        const connection = (navigator as any).connection;
-        if (connection && connection.effectiveType) {
-          setNetworkType(connection.effectiveType);
-        }
-        
-        const handleChange = () => {
-          if (connection && connection.effectiveType) {
-            setNetworkType(connection.effectiveType);
-          }
-        };
-        
-        connection.addEventListener('change', handleChange);
-        return () => {
-          connection.removeEventListener('change', handleChange);
-          window.removeEventListener('online', handleOnline);
-          window.removeEventListener('offline', handleOffline);
-        };
-      } catch (e) {
-        console.warn('NetworkInformation API error:', e);
-      }
-    }
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-  
-  // Prevent unnecessary re-renders when network type doesn't affect behavior
-  const optimizedNetworkType = networkType === '4g' || networkType === 'wifi' ? 'fast' : 'slow';
-  
-  return useQuery({
-    queryKey,
-    queryFn,
-    ...adaptiveOptions
-  });
+interface OptimizedNetworkOptions {
+  /** Stale time for caching (ms) */
+  staleTime?: number;
+  /** Garbage collection time (ms) */
+  gcTime?: number;
+  /** Whether to refetch on window focus */
+  refetchOnFocus?: boolean;
+  /** Whether to retry failed queries */
+  retry?: boolean | number;
+  /** Whether to show error toasts automatically */
+  showErrorToasts?: boolean;
+  /** Context for error messages */
+  errorContext?: string;
 }
 
-// Prefetch URLs when network conditions are favorable
-export function useOptimizedPrefetch(urls: string[]) {
-  const [prefetchedUrls, setPrefetchedUrls] = useState<string[]>([]);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [isIdleCallbackSupported] = useState('requestIdleCallback' in window);
-  const [networkType, setNetworkType] = useState<string | undefined>(undefined);
+/**
+ * Creates an optimized query function that adapts to device performance capabilities
+ */
+export function createOptimizedQuery<TData = unknown, TError = Error, TQueryKey extends QueryKey = QueryKey>(
+  options: OptimizedNetworkOptions = {}
+) {
+  const {
+    staleTime = 5 * 60 * 1000, // 5 minutes default
+    gcTime = 10 * 60 * 1000, // 10 minutes default
+    refetchOnFocus = false,
+    retry = 1,
+    showErrorToasts = true,
+    errorContext = 'query'
+  } = options;
   
-  // Track which URLs have been prefetched
-  const prefetchTracker = useRef<Set<string>>(new Set());
+  // Get performance category (high, medium, low)
+  const deviceCapability = getPerformanceCategory();
+  
+  // Adjust settings based on device capability
+  const optimizedStaleTime = deviceCapability === 'low' ? staleTime * 2 : staleTime;
+  const optimizedGCTime = deviceCapability === 'low' ? gcTime * 2 : gcTime;
+  const optimizedRefetchOnFocus = deviceCapability === 'low' ? false : refetchOnFocus;
+  
+  // Create optimized query function
+  return function optimizedQuery<TQueryFnData = TData>(
+    queryKey: TQueryKey,
+    queryFn: () => Promise<TQueryFnData>,
+    customOptions: Partial<UseQueryOptions<TQueryFnData, TError, TQueryFnData, TQueryKey>> = {}
+  ): UseQueryResult<TQueryFnData, TError> {
+    const handleError = (error: TError) => {
+      console.error(`Error in ${errorContext}:`, error);
+      
+      if (showErrorToasts) {
+        toast({
+          title: `Error in ${errorContext}`,
+          description: error instanceof Error ? error.message : 'An unexpected error occurred',
+          variant: "destructive"
+        });
+      }
+      
+      return error;
+    };
+    
+    return useQuery({
+      gcTime: optimizedGCTime,
+      staleTime: optimizedStaleTime,
+      retry: retry as RetryValue<TError>,
+      refetchOnWindowFocus: optimizedRefetchOnFocus,
+      queryKey,
+      queryFn,
+      onError: handleError,
+      ...customOptions
+    });
+  };
+}
 
-  // Helper to prefetch a URL
-  const prefetchUrl = (url: string) => {
-    // Only prefetch if online and not already prefetched
-    if (isOnline && !prefetchTracker.current.has(url)) {
-      const link = document.createElement('link');
-      link.rel = 'prefetch';
-      link.href = url;
-      link.as = url.endsWith('.js') ? 'script' : 
-                url.endsWith('.css') ? 'style' : 
-                url.endsWith('.json') ? 'fetch' :
-                'document';
-      link.onload = () => {
-        prefetchTracker.current.add(url);
-        setPrefetchedUrls(prev => [...prev, url]);
-      };
-      document.head.appendChild(link);
-    }
-  };
+/**
+ * Creates optimized mutation options that adapt to device capabilities
+ */
+export function createOptimizedMutation(
+  options: {
+    showSuccessToasts?: boolean;
+    showErrorToasts?: boolean;
+    successMessage?: string;
+    errorContext?: string;
+  } = {}
+) {
+  const {
+    showSuccessToasts = true,
+    showErrorToasts = true,
+    successMessage = 'Operation completed successfully',
+    errorContext = 'mutation'
+  } = options;
   
-  // Determine if prefetching is appropriate based on network conditions
-  const shouldPrefetch = () => {
-    if (!isOnline) return false;
+  return {
+    onSuccess: () => {
+      if (showSuccessToasts) {
+        toast({
+          title: 'Success',
+          description: successMessage
+        });
+      }
+    },
     
-    // Prefetch on fast connections
-    if (networkType === '4g' || networkType === 'wifi' || networkType === 'fast') {
-      return true;
-    }
-    
-    // Don't prefetch on slow connections unless explicitly set
-    return false;
-  };
-  
-  // Update online status and network information
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Try to get network type if available
-    if ('connection' in navigator) {
-      try {
-        const connection = (navigator as any).connection;
-        if (connection && connection.effectiveType) {
-          setNetworkType(connection.effectiveType);
-        }
-        
-        const handleChange = () => {
-          if (connection && connection.effectiveType) {
-            setNetworkType(connection.effectiveType);
-          }
-        };
-        
-        connection.addEventListener('change', handleChange);
-        return () => {
-          connection.removeEventListener('change', handleChange);
-          window.removeEventListener('online', handleOnline);
-          window.removeEventListener('offline', handleOffline);
-        };
-      } catch (e) {
-        console.warn('NetworkInformation API error:', e);
+    onError: (error: Error) => {
+      console.error(`Error in ${errorContext}:`, error);
+      
+      if (showErrorToasts) {
+        toast({
+          title: `Error in ${errorContext}`,
+          description: error.message || 'An unexpected error occurred',
+          variant: "destructive"
+        });
       }
     }
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-  
-  // Start prefetching URLs when appropriate
-  useEffect(() => {
-    if (!shouldPrefetch() || urls.length === 0) return;
-    
-    const prefetchUrls = () => {
-      urls.forEach((url, index) => {
-        // Stagger prefetching to avoid network congestion
-        setTimeout(() => prefetchUrl(url), index * 300);
-      });
-    };
-    
-    // Use requestIdleCallback if supported
-    if (isIdleCallbackSupported) {
-      (window as any).requestIdleCallback(() => prefetchUrls(), { timeout: 2000 });
-    } else {
-      // Fall back to setTimeout
-      setTimeout(prefetchUrls, 1000);
-    }
-  }, [urls, isOnline, networkType, isIdleCallbackSupported]);
-  
-  return prefetchedUrls;
+  };
 }

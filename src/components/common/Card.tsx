@@ -1,90 +1,92 @@
 
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
-import { documentComponent } from '@/utils/componentDocs';
 
-/**
- * Card component props interface
- */
-export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Variant style for the card */
-  variant?: 'default' | 'glass' | 'outline' | 'interactive';
-  /** Whether the card should have a floating appearance */
-  floating?: boolean;
-  /** Whether the card has a hoverable effect */
+// Define the shape of the property documentation
+interface PropDocumentation {
+  name: string;
+  type: string;
+  description: string;
+  required?: boolean;
+  defaultValue?: string;
+}
+
+// Define the card variants
+type CardVariant = 'default' | 'outline' | 'transparent' | 'glass';
+
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: CardVariant;
   hoverable?: boolean;
-  /** Additional CSS classes */
+  clickable?: boolean;
+  padded?: boolean;
+  bordered?: boolean;
+  elevated?: boolean;
   className?: string;
-  /** Card content */
+  glassOpacity?: number;
+  glassBlur?: number;
   children: React.ReactNode;
 }
 
 /**
- * Card Header component props
+ * Card component that can be styled with different variants
  */
-export interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Whether to center the content */
-  centered?: boolean;
-  /** Additional CSS classes */
-  className?: string;
-  /** Header content */
-  children: React.ReactNode;
-}
+const Card = forwardRef<HTMLDivElement, CardProps>(
+  (
+    {
+      variant = 'default',
+      hoverable = false,
+      clickable = false,
+      padded = true,
+      bordered = true,
+      elevated = false,
+      glassOpacity = 0.2,
+      glassBlur = 8,
+      className,
+      children,
+      ...props
+    },
+    ref
+  ) => {
+    // Base classes that are always applied
+    const baseClasses = cn(
+      'rounded-lg transition-all duration-200',
+      padded && 'p-4',
+      bordered && 'border',
+      clickable && 'cursor-pointer',
+      elevated && 'shadow-md'
+    );
 
-/**
- * Card Title component props
- */
-export interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
-  /** Title size variant */
-  size?: 'sm' | 'md' | 'lg';
-  /** Additional CSS classes */
-  className?: string;
-  /** Title content */
-  children: React.ReactNode;
-  /** HTML element to render as (default: h3) */
-  as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
-}
+    // Variant-specific classes
+    const variantClasses = {
+      default: cn(
+        'bg-card text-card-foreground border-quantum-700/20',
+        hoverable && 'hover:border-quantum-500/50 hover:bg-card/90'
+      ),
+      outline: cn(
+        'bg-transparent border-quantum-700/20',
+        hoverable && 'hover:border-quantum-500/50 hover:bg-quantum-900/10'
+      ),
+      transparent: cn(
+        'bg-transparent border-transparent',
+        hoverable && 'hover:bg-quantum-900/10'
+      ),
+      glass: cn(
+        `bg-white/5 backdrop-blur-${glassBlur}px border-white/10`,
+        hoverable && 'hover:bg-white/10 hover:border-white/20'
+      ),
+    };
 
-/**
- * Card Content component props
- */
-export interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Additional CSS classes */
-  className?: string;
-  /** Card content */
-  children: React.ReactNode;
-}
+    // Combine all classes
+    const cardClasses = cn(
+      baseClasses,
+      variantClasses[variant],
+      className
+    );
 
-/**
- * Card Footer component props
- */
-export interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Additional CSS classes */
-  className?: string;
-  /** Footer content */
-  children: React.ReactNode;
-}
-
-/**
- * A flexible card component for displaying content in a contained area
- */
-const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ variant = 'default', floating = false, hoverable = false, className, children, ...props }, ref) => {
     return (
       <div
         ref={ref}
-        className={cn(
-          'rounded-lg overflow-hidden',
-          {
-            'bg-card text-card-foreground shadow': variant === 'default',
-            'bg-black/20 backdrop-blur-md border border-white/10': variant === 'glass',
-            'border border-border': variant === 'outline',
-            'bg-card text-card-foreground shadow hover:shadow-lg transition-shadow cursor-pointer': variant === 'interactive',
-            'shadow-lg': floating,
-            'hover:shadow-md transition-shadow': hoverable,
-          },
-          className
-        )}
+        className={cardClasses}
         {...props}
       >
         {children}
@@ -93,146 +95,123 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
   }
 );
 
-/**
- * Card Header component for containing title and description
- */
-const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(
-  ({ centered = false, className, children, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        'p-6 pb-3',
-        { 'text-center': centered },
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  )
-);
-
-/**
- * Card Title component
- */
-const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
-  ({ size = 'md', className, as: Component = 'h3', children, ...props }, ref) => (
-    <Component
-      ref={ref}
-      className={cn(
-        'font-semibold leading-none tracking-tight',
-        {
-          'text-lg': size === 'sm',
-          'text-2xl': size === 'md',
-          'text-3xl': size === 'lg',
-        },
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </Component>
-  )
-);
-
-/**
- * Card Content component
- */
-const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
-  ({ className, children, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn('p-6 pt-0', className)}
-      {...props}
-    >
-      {children}
-    </div>
-  )
-);
-
-/**
- * Card Footer component
- */
-const CardFooter = React.forwardRef<HTMLDivElement, CardFooterProps>(
-  ({ className, children, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn('p-6 pt-0 flex items-center', className)}
-      {...props}
-    >
-      {children}
-    </div>
-  )
-);
-
-// Add displayNames for better debugging
 Card.displayName = 'Card';
+
+// Documentation for the Card component properties
+const cardPropDocumentation: PropDocumentation[] = [
+  {
+    name: 'variant',
+    type: 'default | outline | transparent | glass',
+    description: 'The visual style variant of the card',
+    defaultValue: 'default'
+  },
+  {
+    name: 'hoverable',
+    type: 'boolean',
+    description: 'Adds hover effects to the card',
+    defaultValue: 'false'
+  },
+  {
+    name: 'clickable',
+    type: 'boolean',
+    description: 'Adds a pointer cursor on hover',
+    defaultValue: 'false'
+  },
+  {
+    name: 'padded',
+    type: 'boolean',
+    description: 'Adds padding inside the card',
+    defaultValue: 'true'
+  },
+  {
+    name: 'bordered',
+    type: 'boolean',
+    description: 'Adds a border around the card',
+    defaultValue: 'true'
+  },
+  {
+    name: 'elevated',
+    type: 'boolean',
+    description: 'Adds a shadow to the card',
+    defaultValue: 'false'
+  },
+  {
+    name: 'glassOpacity',
+    type: 'number',
+    description: 'Opacity level for glass variant (0-1)',
+    defaultValue: '0.2'
+  },
+  {
+    name: 'glassBlur',
+    type: 'number',
+    description: 'Blur level in pixels for glass variant',
+    defaultValue: '8'
+  }
+];
+
+// Card subcomponents
+const CardHeader = forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn('mb-2 flex flex-col space-y-1.5', className)}
+    {...props}
+  />
+));
 CardHeader.displayName = 'CardHeader';
+
+const CardTitle = forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h3
+    ref={ref}
+    className={cn('font-medium leading-none tracking-tight', className)}
+    {...props}
+  />
+));
 CardTitle.displayName = 'CardTitle';
+
+const CardDescription = forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <p
+    ref={ref}
+    className={cn('text-sm text-muted-foreground', className)}
+    {...props}
+  />
+));
+CardDescription.displayName = 'CardDescription';
+
+const CardContent = forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('', className)} {...props} />
+));
 CardContent.displayName = 'CardContent';
+
+const CardFooter = forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn('flex items-center mt-4 pt-2 border-t border-quantum-700/20', className)}
+    {...props}
+  />
+));
 CardFooter.displayName = 'CardFooter';
 
-// Document the Card component
-documentComponent(Card as any, {
-  displayName: 'Card',
-  description: 'A flexible card component for displaying content in a contained area',
-  category: 'Layout',
-  props: {
-    variant: {
-      type: '"default" | "glass" | "outline" | "interactive"',
-      description: 'Style variant for the card',
-      defaultValue: 'default'
-    },
-    floating: {
-      type: 'boolean',
-      description: 'Whether the card should have a floating appearance',
-      defaultValue: 'false'
-    },
-    hoverable: {
-      type: 'boolean',
-      description: 'Whether the card has a hoverable effect',
-      defaultValue: 'false'
-    },
-    className: {
-      type: 'string',
-      description: 'Additional CSS classes to apply'
-    },
-    children: {
-      type: 'React.ReactNode',
-      description: 'Card content',
-      required: true
-    }
-  },
-  examples: [
-    {
-      title: 'Basic Card',
-      description: 'A simple card with a title and content',
-      code: `
-<Card>
-  <CardHeader>
-    <CardTitle>Card Title</CardTitle>
-  </CardHeader>
-  <CardContent>
-    Card content goes here...
-  </CardContent>
-</Card>
-      `
-    },
-    {
-      title: 'Glass Card',
-      description: 'A card with a glassmorphic effect',
-      code: `
-<Card variant="glass">
-  <CardHeader>
-    <CardTitle>Glass Card</CardTitle>
-  </CardHeader>
-  <CardContent>
-    This card has a glass effect.
-  </CardContent>
-</Card>
-      `
-    }
-  ]
-});
-
-export { Card, CardHeader, CardTitle, CardContent, CardFooter };
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  cardPropDocumentation,
+};

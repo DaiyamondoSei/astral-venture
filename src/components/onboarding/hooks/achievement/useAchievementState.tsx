@@ -28,7 +28,7 @@ export function useAchievementState(props: AchievementTrackerProps): Achievement
       // Reset in case of corrupt data
       localStorage.removeItem(`achievements-${userId}`);
     }
-  }, [userId]);
+  }, [userId, props]);
 
   // Initialize and update progress tracking when values change
   const initializeProgressTracking = ({

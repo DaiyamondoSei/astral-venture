@@ -1,94 +1,81 @@
 
-import React from 'react';
+import React, { ComponentType, ReactNode, memo, useCallback, useState } from 'react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-/**
- * Creates a composed component by wrapping a component with multiple higher-order components
- * 
- * @param BaseComponent The base component to wrap
- * @param enhancers Array of higher-order components to apply
- * @returns The enhanced component
- */
-export function composeComponent<P>(
-  BaseComponent: React.ComponentType<P>,
-  ...enhancers: Array<(Component: React.ComponentType<any>) => React.ComponentType<any>>
-): React.ComponentType<P> {
-  return enhancers.reduceRight(
-    (EnhancedComponent, enhancer) => enhancer(EnhancedComponent),
-    BaseComponent
-  ) as React.ComponentType<P>;
+interface WithErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
 }
 
 /**
- * Creates a component with error boundary
- * 
- * @param Component The component to wrap with error boundary
- * @param FallbackComponent Optional custom error fallback component
- * @returns The component with error boundary
+ * Higher-order component that wraps a component in an ErrorBoundary
  */
-export function withErrorBoundary<P>(
-  Component: React.ComponentType<P>,
-  FallbackComponent?: React.ComponentType<{ error: Error }>
-): React.ComponentType<P> {
-  return function WithErrorBoundary(props: P) {
+export function withErrorBoundary<P extends object>(
+  Component: ComponentType<P>,
+  fallback?: ReactNode
+) {
+  return function WithErrorBoundaryComponent(props: P) {
     return (
-      <React.Suspense fallback={<div className="loading">Loading...</div>}>
-        {/* @ts-ignore - ErrorBoundary is imported elsewhere */}
-        <ErrorBoundary FallbackComponent={FallbackComponent}>
-          <Component {...props} />
-        </ErrorBoundary>
-      </React.Suspense>
+      <ErrorBoundary fallback={fallback}>
+        <Component {...props} />
+      </ErrorBoundary>
     );
   };
 }
 
 /**
- * Creates a component with lazy loading
- * 
- * @param importFn Function that imports the component
- * @param LoadingComponent Optional custom loading component
- * @returns The lazily loaded component
+ * Higher-order component that applies memoization to a component
  */
-export function createLazyComponent<P = {}>(
-  importFn: () => Promise<{ default: React.ComponentType<P> }>,
-  LoadingComponent: React.ComponentType = () => <div className="loading">Loading...</div>
-): React.LazyExoticComponent<React.ComponentType<P>> {
-  const LazyComponent = React.lazy(importFn);
-  
-  // Return the lazy component with suspense
-  return LazyComponent;
+export function withMemo<P extends object>(
+  Component: ComponentType<P>,
+  propsAreEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean
+) {
+  const MemoizedComponent = memo(Component, propsAreEqual);
+  return function WithMemoComponent(props: P) {
+    return <MemoizedComponent {...props} />;
+  };
 }
 
 /**
- * Higher-order component that adds performance tracking
- * 
- * @param Component The component to wrap
- * @param componentName Optional name for the component
- * @returns The wrapped component with performance tracking
+ * Higher-order component that combines multiple HOCs
  */
-export function withPerformanceTracking<P>(
-  Component: React.ComponentType<P>,
-  componentName?: string
-): React.ComponentType<P> {
-  const displayName = componentName || Component.displayName || Component.name || 'Component';
+export function compose<P extends object>(
+  ...hocs: Array<(Component: ComponentType<P>) => ComponentType<P>>
+): (Component: ComponentType<P>) => ComponentType<P> {
+  return (Component) => {
+    return hocs.reduceRight((acc, hoc) => hoc(acc), Component);
+  };
+}
+
+/**
+ * Creates a component with built-in error handling and performance optimization
+ */
+export function createOptimizedComponent<P extends object>(
+  Component: ComponentType<P>,
+  options: {
+    withErrorBoundary?: boolean;
+    errorFallback?: ReactNode;
+    withMemo?: boolean;
+    propsAreEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean;
+  } = {}
+) {
+  const {
+    withErrorBoundary: withErrorBoundaryOption = true,
+    errorFallback,
+    withMemo: withMemoOption = true,
+    propsAreEqual
+  } = options;
   
-  const WrappedComponent = React.memo((props: P) => {
-    React.useEffect(() => {
-      const startTime = performance.now();
-      
-      return () => {
-        const endTime = performance.now();
-        const renderTime = endTime - startTime;
-        
-        if (renderTime > 16) { // More than 1 frame (at 60fps)
-          console.warn(`Slow render detected for ${displayName}: ${renderTime.toFixed(2)}ms`);
-        }
-      };
-    }, []);
-    
-    return <Component {...props} />;
-  });
+  let OptimizedComponent = Component;
   
-  WrappedComponent.displayName = `WithPerformanceTracking(${displayName})`;
+  // Apply HOCs based on options
+  if (withMemoOption) {
+    OptimizedComponent = withMemo(OptimizedComponent, propsAreEqual);
+  }
   
-  return WrappedComponent;
+  if (withErrorBoundaryOption) {
+    OptimizedComponent = withErrorBoundary(OptimizedComponent, errorFallback);
+  }
+  
+  return OptimizedComponent;
 }
