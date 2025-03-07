@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useDimensions } from './useDimensions';
 import { useIsMounted } from './useIsMounted';
 import { useMouseTracking } from './useMouseTracking';
@@ -60,7 +60,11 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
       aria-hidden="true"
     >
       {/* Background glow */}
-      <BackgroundGlow energyPoints={energyPoints} />
+      <BackgroundGlow 
+        energyPoints={energyPoints} 
+        colors={colors} 
+        dimensions={dimensions} 
+      />
       
       {/* Render particles */}
       {particles.map(particle => (

@@ -1,29 +1,33 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ClickWaveProps } from './types';
 
-const ClickWave: React.FC<ClickWaveProps> = ({ clickWave }) => {
-  if (!clickWave || !clickWave.active) return null;
+export interface ClickWaveProps {
+  x: number;
+  y: number;
+  color: string;
+}
 
+const ClickWave: React.FC<ClickWaveProps> = ({ x, y, color }) => {
   return (
     <motion.div
       className="absolute rounded-full pointer-events-none"
       style={{
-        left: clickWave.x,
-        top: clickWave.y,
-        backgroundColor: 'transparent',
-        border: '2px solid rgba(255, 255, 255, 0.6)',
-        transform: 'translate(-50%, -50%)',
+        left: x,
+        top: y,
+        backgroundColor: color,
+        transformOrigin: 'center center',
       }}
-      initial={{ width: 0, height: 0, opacity: 1 }}
+      initial={{ width: 0, height: 0, opacity: 0.7 }}
       animate={{ 
-        width: 200, 
-        height: 200, 
+        width: 150, 
+        height: 150, 
         opacity: 0,
-        borderColor: ['rgba(255, 255, 255, 0.6)', 'rgba(138, 92, 246, 0)']
+        x: -75,
+        y: -75,
       }}
-      transition={{ duration: 1, ease: "easeOut" }}
+      transition={{ duration: 1, ease: 'easeOut' }}
+      exit={{ opacity: 0 }}
     />
   );
 };

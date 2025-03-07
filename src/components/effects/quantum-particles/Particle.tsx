@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, MotionStyle } from 'framer-motion';
 import { QuantumParticle } from './types';
 import { useThrottledAnimation } from './hooks/useThrottledAnimation';
 
@@ -33,11 +33,11 @@ const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
     height: `${particle.size}px`,
     backgroundColor: particle.color,
     opacity: particle.opacity,
-    willChange: 'transform, opacity', // Performance hint for browsers
-    position: 'absolute',
+    willChange: 'transform, opacity' as const, // Cast as const to satisfy MotionStyle
+    position: 'absolute' as const, // Cast as const to satisfy MotionStyle
     borderRadius: '50%',
-    pointerEvents: 'none',
-  }), [particle]);
+    pointerEvents: 'none' as const, // Cast as const to satisfy MotionStyle
+  }) as MotionStyle, [particle]);
   
   return (
     <motion.div

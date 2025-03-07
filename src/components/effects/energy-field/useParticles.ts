@@ -6,109 +6,124 @@ interface UseParticlesProps {
   energyPoints: number;
   colors: string[];
   particleDensity: number;
-  dimensions: {
-    width: number;
-    height: number;
-  };
-  mousePosition: { x: number, y: number } | null;
-  isMounted: React.MutableRefObject<boolean>;
+  dimensions: { width: number; height: number } | null;
+  mousePosition: { x: number; y: number } | null;
+  isMounted: boolean;
 }
 
-export const useParticles = ({
+export function useParticles({
   energyPoints,
   colors,
   particleDensity,
   dimensions,
   mousePosition,
   isMounted
-}: UseParticlesProps) => {
+}: UseParticlesProps) {
+  // Store particles in state
   const [particles, setParticles] = useState<Particle[]>([]);
-  const animationFrameIdRef = useRef<number | null>(null);
-  const particlesRef = useRef<Particle[]>([]);
   
-  // Create particles when dimensions change or energy points update
+  // Use ref to track previous dimensions to avoid unnecessary recreations
+  const prevDimensionsRef = useRef<{ width: number; height: number } | null>(null);
+  
+  // Use ref to track dependency changes that should trigger particle recreation
+  const particleConfigRef = useRef({
+    energyPoints,
+    colors,
+    particleDensity
+  });
+  
+  // Create particles once dimensions are available or when particle configuration changes significantly
   useEffect(() => {
-    if (dimensions.width === 0 || dimensions.height === 0 || !isMounted.current) return;
+    // Skip if we don't have dimensions yet or if component is not mounted
+    if (!dimensions || !isMounted) return;
     
-    // Calculate number of particles based on energy and density
-    const particleCount = Math.min(Math.floor((energyPoints / 100) * particleDensity * 10), 100);
+    // Check if we need to recreate particles by comparing with previous config
+    const needsRecreation = 
+      particleConfigRef.current.energyPoints !== energyPoints ||
+      particleConfigRef.current.particleDensity !== particleDensity ||
+      particleConfigRef.current.colors.join() !== colors.join() ||
+      !prevDimensionsRef.current ||
+      dimensions.width !== prevDimensionsRef.current.width ||
+      dimensions.height !== prevDimensionsRef.current.height;
     
-    const newParticles = [];
+    if (!needsRecreation) return;
+    
+    // Update refs with current values
+    particleConfigRef.current = {
+      energyPoints,
+      colors,
+      particleDensity
+    };
+    prevDimensionsRef.current = dimensions;
+    
+    // Calculate number of particles based on energy points and density
+    const particleCount = Math.max(5, Math.min(50, Math.floor(energyPoints / 100) * particleDensity));
+    
+    // Create new particles
+    const newParticles: Particle[] = [];
     for (let i = 0; i < particleCount; i++) {
-      newParticles.push({
-        id: i,
-        x: Math.random() * dimensions.width,
-        y: Math.random() * dimensions.height,
-        size: Math.random() * 4 + 2,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        opacity: Math.random() * 0.5 + 0.3
-      });
+      newParticles.push(createParticle(i, dimensions, colors));
     }
     
-    particlesRef.current = newParticles;
     setParticles(newParticles);
-  }, [dimensions.width, dimensions.height, energyPoints, colors, particleDensity, isMounted]);
-  
-  // Update particle positions using requestAnimationFrame and refs to avoid infinite loops
-  useEffect(() => {
-    if (particles.length === 0) return;
     
-    const updateParticles = () => {
-      if (!isMounted.current) return;
-      
-      const updatedParticles = particlesRef.current.map(particle => {
-        let { x, y, vx, vy } = particle;
-        
-        // Apply mouse influence if nearby
-        if (mousePosition) {
-          const dx = mousePosition.x - x;
-          const dy = mousePosition.y - y;
+  }, [dimensions, energyPoints, colors, particleDensity, isMounted]);
+  
+  // Update particles based on mouse position
+  useEffect(() => {
+    if (!mousePosition || !dimensions || particles.length === 0) return;
+    
+    const mouseX = mousePosition.x;
+    const mouseY = mousePosition.y;
+    
+    // Skip updates if mouse is outside container
+    if (mouseX < 0 || mouseX > dimensions.width || mouseY < 0 || mouseY > dimensions.height) return;
+    
+    // Throttle mouse-based updates for performance
+    const updateInterval = window.requestAnimationFrame(() => {
+      setParticles(prevParticles => {
+        return prevParticles.map(particle => {
+          // Calculate distance from mouse
+          const dx = mouseX - (dimensions.width * (particle.x / 100));
+          const dy = mouseY - (dimensions.height * (particle.y / 100));
           const distance = Math.sqrt(dx * dx + dy * dy);
           
-          // Apply gentle attraction/repulsion based on distance
-          if (distance < 100) {
-            const force = 0.2 * (1 - distance / 100);
-            vx += dx * force * 0.01;
-            vy += dy * force * 0.01;
-          }
-        }
-        
-        // Update position
-        x += vx;
-        y += vy;
-        
-        // Bounce off walls
-        if (x < 0 || x > dimensions.width) vx = -vx * 0.8;
-        if (y < 0 || y > dimensions.height) vy = -vy * 0.8;
-        
-        // Apply friction
-        vx *= 0.99;
-        vy *= 0.99;
-        
-        return {
-          ...particle,
-          x, y, vx, vy
-        };
+          // Only update particles within interaction range
+          if (distance > 150) return particle;
+          
+          // Calculate repulsion force (stronger for closer particles)
+          const force = Math.max(0.1, 1 - distance / 150);
+          
+          // Update velocity based on force
+          const updatedVx = particle.vx - (dx / distance) * force * 0.2;
+          const updatedVy = particle.vy - (dy / distance) * force * 0.2;
+          
+          return {
+            ...particle,
+            vx: updatedVx,
+            vy: updatedVy
+          };
+        });
       });
-      
-      // Only update state if component is still mounted
-      if (isMounted.current) {
-        particlesRef.current = updatedParticles;
-        setParticles(updatedParticles);
-        animationFrameIdRef.current = requestAnimationFrame(updateParticles);
-      }
-    };
+    });
     
-    animationFrameIdRef.current = requestAnimationFrame(updateParticles);
-    return () => {
-      if (animationFrameIdRef.current !== null) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-        animationFrameIdRef.current = null;
-      }
+    // Clean up animation frame on unmount
+    return () => window.cancelAnimationFrame(updateInterval);
+  }, [mousePosition, dimensions, particles]);
+  
+  // Create a new particle with random properties
+  function createParticle(id: number, dimensions: {width: number, height: number}, colors: string[]): Particle {
+    return {
+      id,
+      x: Math.random() * 100, // percentage position
+      y: Math.random() * 100, // percentage position
+      size: Math.random() * 4 + 2,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 0.1,
+      vy: (Math.random() - 0.5) * 0.1,
+      opacity: Math.random() * 0.5 + 0.2
     };
-  }, [particles.length, dimensions, mousePosition, isMounted]);
+  }
   
   return particles;
-};
+}
