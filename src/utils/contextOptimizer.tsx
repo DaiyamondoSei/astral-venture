@@ -1,111 +1,177 @@
 
-import React, { createContext, useContext, useMemo, useCallback, useState, ReactNode } from 'react';
+import React, { 
+  createContext, 
+  useContext, 
+  useMemo, 
+  useCallback, 
+  useState, 
+  useSyncExternalStore,
+  ReactNode 
+} from 'react';
 
 /**
- * Creates an optimized context and provider with automatic memoization
- * to prevent unnecessary re-renders
+ * Context Optimizer
+ * 
+ * Creates optimized contexts that only re-render components
+ * when their specific selections change, not on every context update.
  */
-export function createOptimizedContext<T>(defaultValue: T) {
-  // Create the context
-  const Context = createContext<T>(defaultValue);
+
+type Listener = () => void;
+type Selector<T, S> = (state: T) => S;
+type EqualityFn<S> = (a: S, b: S) => boolean;
+
+// Default equality function
+const defaultCompare = <S,>(a: S, b: S): boolean => a === b;
+
+/**
+ * Creates an optimized context with selective updates
+ */
+export function createOptimizedContext<T>(initialState: T) {
+  // Internal store implementation
+  const listeners = new Set<Listener>();
+  let currentState = initialState;
   
-  // Create optimized provider
-  const OptimizedProvider = ({ 
-    children, 
-    value 
-  }: { 
-    children: ReactNode;
-    value: T;
-  }) => {
-    // Memoize the context value to prevent unnecessary re-renders
-    const memoizedValue = useMemo(() => value, [
-      // Use JSON stringify for complex objects comparison
-      // This is a performance tradeoff - slight CPU cost for fewer re-renders
-      JSON.stringify(value)
-    ]);
-    
-    return (
-      <Context.Provider value={memoizedValue}>
-        {children}
-      </Context.Provider>
-    );
+  const subscribe = (listener: Listener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   };
   
-  // Create selector hook to access only specific parts of context
-  const useContextSelector = <K extends keyof T>(selector: K): T[K] => {
-    const context = useContext(Context);
-    if (context === undefined) {
-      throw new Error('useContextSelector must be used within the Provider');
+  const getState = () => currentState;
+  
+  const setState = (
+    newState: T | ((prevState: T) => T),
+    options?: { batch?: boolean }
+  ) => {
+    const nextState = typeof newState === 'function'
+      ? (newState as ((prevState: T) => T))(currentState)
+      : newState;
+    
+    // Skip update if state is the same object
+    if (nextState === currentState) {
+      return;
     }
-    return context[selector];
-  };
-  
-  return {
-    Context,
-    Provider: OptimizedProvider,
-    useContext: () => useContext(Context),
-    useContextSelector
-  };
-}
-
-/**
- * Creates a state management context with optimized selectors
- * to prevent unnecessary re-renders
- */
-export function createStateContext<State, Actions>(
-  initialState: State,
-  actionsFactory: (state: State, setState: React.Dispatch<React.SetStateAction<State>>) => Actions
-) {
-  // Create context for both state and actions
-  const StateContext = createContext<State | undefined>(undefined);
-  const ActionsContext = createContext<Actions | undefined>(undefined);
-  
-  // Create the provider component
-  const Provider = ({ children }: { children: ReactNode }) => {
-    const [state, setState] = useState<State>(initialState);
     
-    // Memoize actions to prevent unnecessary re-renders
-    const actions = useMemo(
-      () => actionsFactory(state, setState),
-      [state]
-    );
+    // Update state
+    currentState = nextState;
+    
+    // Notify listeners
+    if (options?.batch) {
+      // In batched mode, schedule notifications
+      queueMicrotask(() => {
+        listeners.forEach(listener => listener());
+      });
+    } else {
+      // Immediately notify
+      listeners.forEach(listener => listener());
+    }
+  };
+  
+  // Create React context
+  const StateContext = createContext<T | undefined>(undefined);
+  
+  // Create provider component
+  const Provider = ({ children, value }: { children: ReactNode; value?: T }) => {
+    // If a value is provided, use it directly
+    const [store] = useState(() => {
+      if (value !== undefined) {
+        currentState = value;
+      }
+      return { getState, subscribe };
+    });
+    
+    // Create memoized context value
+    const contextValue = useMemo(() => {
+      return value !== undefined ? value : currentState;
+    }, [value]);
     
     return (
-      <StateContext.Provider value={state}>
-        <ActionsContext.Provider value={actions}>
-          {children}
-        </ActionsContext.Provider>
+      <StateContext.Provider value={contextValue}>
+        {children}
       </StateContext.Provider>
     );
   };
   
-  // Create hooks to access state and actions
-  const useState = () => {
-    const context = useContext(StateContext);
-    if (context === undefined) {
-      throw new Error('useState must be used within a Provider');
+  // Create selector hook
+  function useSelector<S>(
+    selector: Selector<T, S>,
+    equalityFn: EqualityFn<S> = defaultCompare
+  ): S {
+    const store = useContext(StateContext);
+    
+    if (store === undefined) {
+      throw new Error('useSelector must be used within a Provider');
     }
-    return context;
-  };
+    
+    // Get selected state using useSyncExternalStore
+    return useSyncExternalStore(
+      subscribe,
+      // Get snapshot of selected state
+      () => {
+        const state = getState();
+        return selector(state);
+      },
+      // Get server snapshot (for SSR)
+      () => selector(initialState),
+      // Custom equality function through memoization
+      equalityFn
+    );
+  }
   
-  const useActions = () => {
-    const context = useContext(ActionsContext);
-    if (context === undefined) {
-      throw new Error('useActions must be used within a Provider');
-    }
-    return context;
-  };
-  
-  // Create a selector hook for accessing only part of the state
-  const useStateSelector = <K extends keyof State>(selector: K): State[K] => {
-    const state = useState();
-    return state[selector];
+  // Create setter hook
+  const useSetState = () => {
+    return useCallback(setState, []);
   };
   
   return {
     Provider,
-    useState,
-    useActions,
-    useStateSelector
+    useSelector,
+    useSetState,
+    getState,
+    setState,
   };
+}
+
+/**
+ * Creates a performance-optimized store with selectors
+ * Similar to Redux but much lighter and integrated with React context
+ */
+export function createOptimizedStore<T>(initialState: T) {
+  const context = createOptimizedContext(initialState);
+  
+  return {
+    Provider: context.Provider,
+    useStore: <S,>(selector: Selector<T, S> = (state: T) => state as unknown as S) => {
+      return context.useSelector(selector);
+    },
+    useDispatch: () => context.useSetState(),
+    getState: context.getState,
+    dispatch: context.setState,
+  };
+}
+
+/**
+ * Deep equality comparison function for complex objects
+ * Use with selectors when full deep equality is needed
+ */
+export function deepEqual<T>(a: T, b: T): boolean {
+  if (a === b) return true;
+  
+  if (
+    typeof a !== 'object' || 
+    typeof b !== 'object' || 
+    a === null || 
+    b === null
+  ) {
+    return a === b;
+  }
+  
+  const keysA = Object.keys(a as object);
+  const keysB = Object.keys(b as object);
+  
+  if (keysA.length !== keysB.length) return false;
+  
+  return keysA.every(key => {
+    return Object.prototype.hasOwnProperty.call(b, key) && 
+      deepEqual((a as any)[key], (b as any)[key]);
+  });
 }

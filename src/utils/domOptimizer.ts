@@ -1,314 +1,220 @@
 
 /**
  * DOM Optimization Utilities
- * Tools to minimize reflows and repaints and improve scrolling performance
+ * Prevents layout thrashing and optimizes DOM operations
  */
 
-// Track elements with optimizations applied
-const optimizedElements = new WeakMap<Element, boolean>();
+type ReadTask = () => any;
+type WriteTask = () => void;
+
+// Batching DOM reads and writes to prevent layout thrashing
+class DOMBatchManager {
+  private readTasks: Array<{ task: ReadTask; resolve: (value: any) => void }> = [];
+  private writeTasks: Array<{ task: WriteTask; resolve: () => void }> = [];
+  private scheduled = false;
+  
+  /**
+   * Schedule a DOM read operation
+   * All reads are batched together and executed before writes
+   */
+  public read<T>(readTask: () => T): Promise<T> {
+    return new Promise(resolve => {
+      this.readTasks.push({ task: readTask, resolve });
+      this.scheduleFlush();
+    });
+  }
+  
+  /**
+   * Schedule a DOM write operation
+   * All writes are batched together and executed after reads
+   */
+  public write(writeTask: WriteTask): Promise<void> {
+    return new Promise(resolve => {
+      this.writeTasks.push({ task: writeTask, resolve });
+      this.scheduleFlush();
+    });
+  }
+  
+  /**
+   * Schedule flush of all tasks on next animation frame
+   */
+  private scheduleFlush(): void {
+    if (!this.scheduled) {
+      this.scheduled = true;
+      requestAnimationFrame(() => this.flush());
+    }
+  }
+  
+  /**
+   * Execute all scheduled tasks
+   */
+  private flush(): void {
+    // Execute all read tasks first
+    const reads = this.readTasks;
+    this.readTasks = [];
+    
+    // Get measurements from DOM
+    const readResults = reads.map(({ task }) => task());
+    
+    // Resolve read promises
+    reads.forEach(({ resolve }, i) => resolve(readResults[i]));
+    
+    // Then execute all write tasks
+    const writes = this.writeTasks;
+    this.writeTasks = [];
+    
+    // Perform DOM mutations
+    writes.forEach(({ task }) => task());
+    
+    // Resolve write promises
+    writes.forEach(({ resolve }) => resolve());
+    
+    // Reset scheduled flag
+    this.scheduled = false;
+    
+    // If new tasks were added during execution, schedule another flush
+    if (this.readTasks.length > 0 || this.writeTasks.length > 0) {
+      this.scheduleFlush();
+    }
+  }
+}
+
+// Singleton instance
+export const domBatchManager = new DOMBatchManager();
 
 /**
- * Apply performance optimizations to DOM elements
- * @param element The DOM element to optimize
- * @param options Configuration options
+ * Get element dimensions without causing layout thrashing
  */
-export function optimizeElement(
-  element: HTMLElement,
-  options: {
-    containContents?: boolean; // Use CSS contain property
-    accelerateLayer?: boolean; // Force GPU acceleration
-    disableAnimations?: boolean; // Disable animations for reduced motion
-    debounceResize?: boolean; // Apply resize debouncing
-    optimizeImages?: boolean; // Optimize images inside the element
-    optimizeScrolling?: boolean; // Optimize for scrolling performance
-  } = {}
-): void {
-  if (!element || optimizedElements.has(element)) return;
+export const getElementDimensions = (element: HTMLElement): Promise<DOMRect> => {
+  return domBatchManager.read(() => element.getBoundingClientRect());
+};
+
+/**
+ * Set element style properties efficiently
+ */
+export const setElementStyles = (
+  element: HTMLElement, 
+  styles: Partial<CSSStyleDeclaration>
+): Promise<void> => {
+  return domBatchManager.write(() => {
+    Object.entries(styles).forEach(([prop, value]) => {
+      (element.style as any)[prop] = value;
+    });
+  });
+};
+
+/**
+ * Optimized class name toggling that batches DOM writes
+ */
+export const toggleClasses = (
+  element: HTMLElement, 
+  classesToAdd: string[] = [], 
+  classesToRemove: string[] = []
+): Promise<void> => {
+  return domBatchManager.write(() => {
+    if (classesToRemove.length > 0) {
+      element.classList.remove(...classesToRemove);
+    }
+    if (classesToAdd.length > 0) {
+      element.classList.add(...classesToAdd);
+    }
+  });
+};
+
+/**
+ * Deferred content loading when element comes into view
+ * @returns Function to set the target element ref
+ */
+export const createLazyLoader = (
+  callback: () => void,
+  options: IntersectionObserverInit = {}
+): (element: HTMLElement | null) => void => {
+  let observer: IntersectionObserver | null = null;
   
-  const {
-    containContents = true,
-    accelerateLayer = true,
-    disableAnimations = false,
-    debounceResize = true,
-    optimizeImages = true,
-    optimizeScrolling = true
+  // Default options with reasonable values
+  const defaultOptions: IntersectionObserverInit = {
+    rootMargin: '200px',
+    threshold: 0,
+    ...options,
+  };
+  
+  return (element: HTMLElement | null) => {
+    // Disconnect previous observer if any
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
+    
+    // Exit if no element
+    if (!element) return;
+    
+    // Create new observer
+    observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        // Execute callback when element is visible
+        callback();
+        
+        // Cleanup observer after triggering
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+      }
+    }, defaultOptions);
+    
+    // Start observing
+    observer.observe(element);
+  };
+};
+
+/**
+ * Apply high-performance transitions to elements
+ * Use transform and opacity for best performance
+ */
+export const applyPerformantTransition = (
+  element: HTMLElement,
+  from: { x?: number; y?: number; scale?: number; opacity?: number },
+  to: { x?: number; y?: number; scale?: number; opacity?: number },
+  options: { duration?: number; easing?: string; onComplete?: () => void } = {}
+): Promise<void> => {
+  const { 
+    duration = 300, 
+    easing = 'cubic-bezier(0.4, 0, 0.2, 1)',
+    onComplete 
   } = options;
   
-  // Apply will-change judiciously
-  if (accelerateLayer) {
-    // Only apply GPU acceleration when needed for animations or transforms
-    if (element.classList.contains('animate') || 
-        getComputedStyle(element).transform !== 'none') {
-      element.style.willChange = 'transform';
-    }
-  }
-  
-  // Apply CSS containment for performance
-  if (containContents) {
-    element.style.contain = 'content';
-  }
-  
-  // Reduce motion if requested
-  if (disableAnimations && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    element.style.animationDuration = '0.0001s';
-    element.style.transitionDuration = '0.0001s';
-  }
-  
-  // Apply resize debouncing to prevent layout thrashing
-  if (debounceResize) {
-    applyResizeDebouncing(element);
-  }
-  
-  // Optimize images within the element
-  if (optimizeImages) {
-    optimizeChildImages(element);
-  }
-  
-  // Scrolling optimizations
-  if (optimizeScrolling && (
-    element.scrollHeight > element.clientHeight || 
-    element.scrollWidth > element.clientWidth
-  )) {
-    optimizeForScrolling(element);
-  }
-  
-  // Mark as optimized
-  optimizedElements.set(element, true);
-}
-
-/**
- * Apply resize debouncing to prevent layout thrashing during resize
- */
-function applyResizeDebouncing(element: HTMLElement): void {
-  let resizeTimeout: number;
-  const originalDisplay = element.style.display;
-  
-  window.addEventListener('resize', () => {
-    // Skip if element is no longer in DOM
-    if (!document.body.contains(element)) return;
+  return domBatchManager.write(() => {
+    // Force a reflow before starting animation
+    element.getBoundingClientRect();
     
-    if (!resizeTimeout) {
-      // Apply content-visibility to skip rendering during rapid resizes
-      element.style.contentVisibility = 'auto';
+    // Set initial styles
+    element.style.transition = 'none';
+    element.style.transform = `translate3d(${from.x || 0}px, ${from.y || 0}px, 0) scale(${from.scale || 1})`;
+    if (from.opacity !== undefined) {
+      element.style.opacity = from.opacity.toString();
     }
     
-    clearTimeout(resizeTimeout);
-    resizeTimeout = window.setTimeout(() => {
-      element.style.contentVisibility = '';
-      resizeTimeout = 0;
-    }, 100);
-  }, { passive: true });
-}
-
-/**
- * Optimize child images for performance
- */
-function optimizeChildImages(parentElement: HTMLElement): void {
-  const images = parentElement.querySelectorAll('img');
-  
-  images.forEach(img => {
-    // Skip already processed images
-    if (img.dataset.optimized === 'true') return;
+    // Force a reflow to apply initial styles
+    element.getBoundingClientRect();
     
-    // Mark as optimized
-    img.dataset.optimized = 'true';
+    // Set transition
+    element.style.transition = `transform ${duration}ms ${easing}, opacity ${duration}ms ${easing}`;
     
-    // Prevent reflow during image load
-    if (!img.getAttribute('width') && !img.getAttribute('height')) {
-      img.style.aspectRatio = '16/9'; // Default aspect ratio to prevent layout shift
+    // Set target styles
+    element.style.transform = `translate3d(${to.x || 0}px, ${to.y || 0}px, 0) scale(${to.scale || 1})`;
+    if (to.opacity !== undefined) {
+      element.style.opacity = to.opacity.toString();
     }
     
-    // Add loading="lazy" for images not in viewport
-    if (!img.hasAttribute('loading')) {
-      const rect = img.getBoundingClientRect();
-      const isInViewport = (
-        rect.top <= window.innerHeight &&
-        rect.bottom >= 0
-      );
-      
-      if (!isInViewport) {
-        img.loading = 'lazy';
-      }
-    }
-    
-    // Add decoding="async" for non-critical images
-    if (!img.hasAttribute('decoding') && !img.classList.contains('critical')) {
-      img.decoding = 'async';
-    }
-  });
-}
-
-/**
- * Apply optimization techniques for scrolling containers
- */
-function optimizeForScrolling(element: HTMLElement): void {
-  // Enable pointer events only on hover to improve scroll performance
-  element.addEventListener('mouseover', () => {
-    element.style.pointerEvents = 'auto';
-  });
-  
-  element.addEventListener('mouseleave', () => {
-    if (element.dataset.scrolling === 'true') {
-      element.style.pointerEvents = 'none';
-    }
-  });
-  
-  // Track scrolling state
-  let scrollTimeout: number;
-  
-  element.addEventListener('scroll', () => {
-    element.dataset.scrolling = 'true';
-    
-    // Disable pointer events during scroll for better performance
-    element.style.pointerEvents = 'none';
-    
-    // Disable non-essential animations during scroll
-    element.classList.add('optimize-scrolling');
-    
-    clearTimeout(scrollTimeout);
-    scrollTimeout = window.setTimeout(() => {
-      element.style.pointerEvents = 'auto';
-      element.classList.remove('optimize-scrolling');
-      element.dataset.scrolling = 'false';
-    }, 100);
-  }, { passive: true });
-  
-  // Add content-visibility for non-visible children in long scrolling containers
-  if ('contentVisibility' in document.documentElement.style && 
-      element.children.length > 20) {
-      
-    // Apply content-visibility: auto to children far from viewport
-    Array.from(element.children).forEach((child, index) => {
-      if (child instanceof HTMLElement) {
-        if (index > 10) {
-          child.style.contentVisibility = 'auto';
-          child.style.containIntrinsicSize = '0 100px'; // Prevent layout shift
+    // Handle completion
+    if (onComplete) {
+      const handleTransitionEnd = (event: TransitionEvent) => {
+        if (event.target === element) {
+          element.removeEventListener('transitionend', handleTransitionEnd);
+          onComplete();
         }
-      }
-    });
-  }
-}
-
-/**
- * Create and maintain a virtual scrolling system for large lists
- * Only renders items currently in or near the viewport
- */
-export class VirtualScrollManager {
-  private container: HTMLElement;
-  private itemHeight: number;
-  private totalItems: number;
-  private renderBuffer: number;
-  private scrollTop: number = 0;
-  private visibleItems: Map<number, HTMLElement> = new Map();
-  private renderCallback: (index: number) => HTMLElement;
-  private observer: IntersectionObserver;
-  
-  constructor(
-    container: HTMLElement,
-    options: {
-      itemHeight: number,
-      totalItems: number,
-      renderBuffer?: number,
-      renderItem: (index: number) => HTMLElement
+      };
+      element.addEventListener('transitionend', handleTransitionEnd);
     }
-  ) {
-    this.container = container;
-    this.itemHeight = options.itemHeight;
-    this.totalItems = options.totalItems;
-    this.renderBuffer = options.renderBuffer || 5;
-    this.renderCallback = options.renderItem;
-    
-    // Create intersection observer to monitor viewport
-    this.observer = new IntersectionObserver(
-      this.handleIntersection.bind(this),
-      { root: container, rootMargin: '200px 0px' }
-    );
-    
-    // Initialize virtual scroll
-    this.initialize();
-    
-    // Listen for scroll events
-    this.container.addEventListener('scroll', this.handleScroll.bind(this), { passive: true });
-  }
-  
-  private initialize(): void {
-    // Set container height to accommodate all items
-    this.container.style.position = 'relative';
-    this.container.style.height = `${this.totalItems * this.itemHeight}px`;
-    
-    // Initial render of visible items
-    this.updateVisibleItems();
-  }
-  
-  private handleScroll(): void {
-    this.scrollTop = this.container.scrollTop;
-    this.updateVisibleItems();
-  }
-  
-  private updateVisibleItems(): void {
-    const startIndex = Math.max(0, Math.floor(this.scrollTop / this.itemHeight) - this.renderBuffer);
-    const endIndex = Math.min(
-      this.totalItems - 1, 
-      Math.ceil((this.scrollTop + this.container.clientHeight) / this.itemHeight) + this.renderBuffer
-    );
-    
-    // Remove items that are no longer visible
-    this.visibleItems.forEach((element, index) => {
-      if (index < startIndex || index > endIndex) {
-        element.remove();
-        this.visibleItems.delete(index);
-      }
-    });
-    
-    // Add new visible items
-    for (let i = startIndex; i <= endIndex; i++) {
-      if (!this.visibleItems.has(i)) {
-        const element = this.renderCallback(i);
-        element.style.position = 'absolute';
-        element.style.top = `${i * this.itemHeight}px`;
-        element.style.height = `${this.itemHeight}px`;
-        element.style.width = '100%';
-        
-        this.container.appendChild(element);
-        this.visibleItems.set(i, element);
-        this.observer.observe(element);
-      }
-    }
-  }
-  
-  private handleIntersection(entries: IntersectionObserverEntry[]): void {
-    // Handle visibility changes
-    entries.forEach(entry => {
-      const element = entry.target as HTMLElement;
-      const index = Array.from(this.visibleItems.entries())
-        .find(([_, el]) => el === element)?.[0];
-      
-      if (index !== undefined) {
-        if (!entry.isIntersecting) {
-          // Optional: reduce details for non-visible items
-          element.classList.add('off-screen');
-        } else {
-          element.classList.remove('off-screen');
-        }
-      }
-    });
-  }
-  
-  // Public methods
-  public refresh(): void {
-    this.container.style.height = `${this.totalItems * this.itemHeight}px`;
-    this.visibleItems.clear();
-    this.container.innerHTML = '';
-    this.updateVisibleItems();
-  }
-  
-  public updateItemCount(count: number): void {
-    this.totalItems = count;
-    this.refresh();
-  }
-  
-  public dispose(): void {
-    this.observer.disconnect();
-    this.container.removeEventListener('scroll', this.handleScroll.bind(this));
-  }
-}
+  });
+};

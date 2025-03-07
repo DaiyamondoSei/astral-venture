@@ -1,7 +1,6 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -22,12 +21,10 @@ const bootstrap = () => {
   // Render the app
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <BrowserRouter>
-        <AdaptivePerformanceProvider>
-          <App />
-          <Toaster />
-        </AdaptivePerformanceProvider>
-      </BrowserRouter>
+      <AdaptivePerformanceProvider>
+        <App />
+        <Toaster />
+      </AdaptivePerformanceProvider>
     </React.StrictMode>
   );
   

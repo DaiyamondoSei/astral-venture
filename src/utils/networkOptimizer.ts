@@ -1,181 +1,125 @@
+
 /**
- * Network Optimizer - Provides utilities for optimizing network requests
- * and data fetching in the application
+ * Network optimization utilities
+ * Improves data fetching performance, caching, and bandwidth usage
  */
 
-// Track ongoing network requests to prevent redundant calls
-const activeRequests = new Map<string, Promise<any>>();
+import { QueryClient } from '@tanstack/react-query';
 
-// Deduplicates identical network requests that happen simultaneously
-export function deduplicateRequest<T>(
-  key: string,
-  requestFn: () => Promise<T>
-): Promise<T> {
-  // If this exact request is already in progress, return the existing promise
-  if (activeRequests.has(key)) {
-    return activeRequests.get(key) as Promise<T>;
-  }
-  
-  // Otherwise, make the new request and track it
-  const promise = requestFn()
-    .finally(() => {
-      // Remove from active requests when completed (whether success or error)
-      activeRequests.delete(key);
-    });
-  
-  activeRequests.set(key, promise);
-  return promise;
-}
-
-// Configures optimal settings for Tanstack Query
-export function getOptimalQueryConfig(priority: 'high' | 'medium' | 'low' = 'medium') {
-  // Base config that works well for most cases
-  const baseConfig = {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 15 * 60 * 1000, // 15 minutes
-    retry: 2,
-    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  };
-  
-  // Adjust based on priority
-  switch (priority) {
-    case 'high':
-      return {
-        ...baseConfig,
+// Create a globally optimized QueryClient
+export const createOptimizedQueryClient = () => {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        // Optimize for performance
         staleTime: 60 * 1000, // 1 minute
-        retry: 3,
-        refetchOnWindowFocus: true,
-      };
-    case 'low':
-      return {
-        ...baseConfig,
-        staleTime: 15 * 60 * 1000, // 15 minutes
-        cacheTime: 60 * 60 * 1000, // 1 hour
+        cacheTime: 5 * 60 * 1000, // 5 minutes
+        refetchOnWindowFocus: false, // Disable by default for better performance
+        retry: 1, // Limit retries to avoid excessive network requests
+        retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+        networkMode: 'online', // Only fetch when online
+      },
+      mutations: {
+        networkMode: 'online',
         retry: 1,
-        refetchOnWindowFocus: false,
-        refetchOnMount: false,
-      };
-    default:
-      return baseConfig;
-  }
-}
-
-// Preload data that will likely be needed soon
-export function preloadQueryData<T>(
-  queryClient: any,
-  queryKey: unknown[],
-  queryFn: () => Promise<T>
-): void {
-  // Only preload if network is not constrained
-  if (navigator.connection && 
-      (navigator.connection as any).saveData) {
-    console.log('Skipping preload due to saveData mode');
-    return;
-  }
-  
-  queryClient.prefetchQuery({
-    queryKey,
-    queryFn,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+      },
+    },
   });
-}
+};
 
-// Optimize image loading for network conditions
-export function getOptimizedImageUrl(
-  baseUrl: string,
-  options: {
-    width?: number;
-    quality?: number;
-    format?: 'webp' | 'avif' | 'jpg' | 'original';
-  } = {}
-): string {
-  // Default options
-  const { 
-    width = undefined,
-    quality = undefined,
-    format = undefined
-  } = options;
-  
-  // If no optimizations needed, return the original URL
-  if (!width && !quality && !format) {
-    return baseUrl;
-  }
-  
-  // Start building the optimized URL
-  const url = new URL(baseUrl, window.location.origin);
-  const params = new URLSearchParams(url.search);
-  
-  // Add optimization parameters
-  if (width) params.set('w', width.toString());
-  if (quality) params.set('q', quality.toString());
-  if (format && format !== 'original') params.set('fmt', format);
-  
-  // Apply connection-aware optimizations
-  if (navigator.connection) {
-    const connection = navigator.connection as any;
-    // For slow connections, reduce quality further
-    if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') {
-      params.set('q', '60');
-    }
-    // For save-data mode, use lowest acceptable quality
-    if (connection.saveData) {
-      params.set('q', '50');
-    }
-  }
-  
-  url.search = params.toString();
-  return url.toString();
-}
+// Optimized fetch function with smart defaults
+export const optimizedFetch = async (
+  url: string,
+  options?: RequestInit & { priority?: 'high' | 'low' | 'auto' }
+): Promise<Response> => {
+  // Set reasonable defaults
+  const defaultOptions: RequestInit = {
+    credentials: 'same-origin',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    // Include defaults from options
+    ...options,
+  };
 
-// Adapts fetch timeouts based on network conditions
-export async function adaptiveFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  let timeout = 30000; // Default 30 seconds
-  
-  // Adjust timeout based on connection quality
-  if (navigator.connection) {
-    const connection = navigator.connection as any;
-    if (connection.effectiveType === '4g') {
-      timeout = 10000; // 10 seconds for fast connections
-    } else if (connection.effectiveType === '3g') {
-      timeout = 20000; // 20 seconds for medium connections
-    } else {
-      timeout = 60000; // 60 seconds for slow connections
-    }
+  // Add fetch priority if supported
+  if (options?.priority && 'priority' in Request.prototype) {
+    (defaultOptions as any).priority = options.priority;
   }
-  
-  // Create abort controller for timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+
+  // Add performance timing for network monitoring
+  const startTime = performance.now();
   try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+    const response = await fetch(url, defaultOptions);
+    
+    // Log performance for development
+    if (process.env.NODE_ENV === 'development') {
+      const duration = performance.now() - startTime;
+      console.debug(`[Network] ${options?.method || 'GET'} ${url}: ${duration.toFixed(0)}ms`);
+    }
+    
     return response;
   } catch (error) {
-    clearTimeout(timeoutId);
+    console.error(`[Network] Error fetching ${url}:`, error);
     throw error;
   }
-}
+};
 
-// Export utility for creating optimal network-aware React Query hooks
-export function createNetworkAwareQueryHook(queryClient: any) {
-  return function useNetworkAwareQuery(queryKey: unknown[], queryFn: () => Promise<any>, options = {}) {
-    // Get network-optimized configuration
-    const connectionType = (navigator.connection as any)?.effectiveType || '4g';
-    const isSlowConnection = connectionType === 'slow-2g' || connectionType === '2g';
+// Preconnect to important domains (call at app start)
+export const preconnectToCriticalDomains = (domains: string[]) => {
+  if (typeof document === 'undefined') return;
+  
+  domains.forEach(domain => {
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = domain;
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  });
+};
+
+// Connection-aware fetch with network condition adaptations
+export const connectionAwareFetch = async (
+  url: string, 
+  options?: RequestInit,
+  lowBandwidthAlternative?: string
+): Promise<Response> => {
+  // Check for network conditions if available
+  if (navigator.connection) {
+    const connection = navigator.connection as any;
+    const isSlowConnection = connection.downlink < 1 || connection.saveData || connection.effectiveType === 'slow-2g';
     
-    const priority = isSlowConnection ? 'low' : 'medium';
-    const optimizedConfig = getOptimalQueryConfig(priority);
+    // Use lower quality alternative for slow connections
+    if (isSlowConnection && lowBandwidthAlternative) {
+      return optimizedFetch(lowBandwidthAlternative, options);
+    }
     
-    // Return configured query
-    return queryClient.useQuery({
-      queryKey,
-      queryFn,
-      ...optimizedConfig,
-      ...options
-    });
-  };
-}
+    // Adjust fetch parameters for connection speed
+    if (isSlowConnection) {
+      return optimizedFetch(url, {
+        ...options,
+        priority: 'low',
+        cache: 'force-cache',
+      });
+    }
+  }
+  
+  return optimizedFetch(url, options);
+};
+
+// Enable HTTP/2 Server Push hint for critical resources
+export const addResourceHint = (url: string, as: 'script' | 'style' | 'image' | 'font') => {
+  if (typeof document === 'undefined') return;
+  
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = as;
+  link.href = url;
+  
+  if (as === 'font') {
+    link.crossOrigin = 'anonymous';
+  }
+  
+  document.head.appendChild(link);
+};

@@ -1,51 +1,94 @@
 
-import { useRef, useMemo, useCallback } from 'react';
-import { isEqual } from 'lodash';
+import { useRef, useMemo, useEffect, DependencyList } from 'react';
 
 /**
- * A hook that performs a deep comparison of dependencies to prevent
- * unnecessary recalculations when the dependencies have the same values
- * but different references
- * 
- * @param factory The factory function to be memoized
- * @param deps The dependencies array for the factory function
+ * Deep comparison utility for complex objects
  */
-export function useDeepCompareMemo<T>(factory: () => T, deps: React.DependencyList): T {
-  // Store previous dependencies for comparison
-  const depsRef = useRef<React.DependencyList>([]);
-  
-  // Only update the stored dependencies when they've deeply changed
-  const depsChanged = !isEqual(depsRef.current, deps);
-  
-  if (depsChanged) {
-    depsRef.current = deps;
+function deepEqual(objA: any, objB: any): boolean {
+  if (objA === objB) {
+    return true;
   }
   
-  // Use stable dependency to only recalculate when the deps truly change
+  if (
+    typeof objA !== 'object' ||
+    typeof objB !== 'object' ||
+    objA === null ||
+    objB === null
+  ) {
+    return objA === objB;
+  }
+  
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
+  
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  
+  // Test for A's keys different from B.
+  for (const key of keysA) {
+    if (
+      !Object.prototype.hasOwnProperty.call(objB, key) ||
+      !deepEqual(objA[key], objB[key])
+    ) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Custom hook similar to React's useMemo but with deep comparison
+ * Useful for memoizing values that are complex objects or arrays
+ */
+export function useDeepCompareMemo<T>(factory: () => T, deps: DependencyList): T {
+  const depsRef = useRef<DependencyList>([]);
+  
+  // Check if deps have changed with deep comparison
+  const depsChanged = !deepEqual(deps, depsRef.current);
+  
+  // Update deps ref if they've changed
+  useEffect(() => {
+    if (depsChanged) {
+      depsRef.current = deps;
+    }
+  }, [deps, depsChanged]);
+  
+  // Only recompute value if deps have changed
   return useMemo(factory, [depsChanged]);
 }
 
 /**
- * A hook that creates a callback function that only changes when its
- * dependencies have deeply changed, not just when their references change
- * 
- * @param callback The callback function to memoize
- * @param deps The dependencies array for the callback
+ * Custom hook similar to React's useCallback but with deep comparison
+ * Useful for optimizing callbacks with complex object dependencies
  */
 export function useDeepCompareCallback<T extends (...args: any[]) => any>(
   callback: T,
-  deps: React.DependencyList
+  deps: DependencyList
 ): T {
-  // Store previous dependencies for comparison
-  const depsRef = useRef<React.DependencyList>([]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useDeepCompareMemo(() => callback, deps);
+}
+
+/**
+ * Custom hook similar to React's useEffect but with deep comparison
+ * Avoids running effects unnecessarily when complex objects appear to change but are actually the same
+ */
+export function useDeepCompareEffect(
+  effect: React.EffectCallback,
+  deps: DependencyList
+): void {
+  const depsRef = useRef<DependencyList>([]);
   
-  // Only update the stored dependencies when they've deeply changed
-  const depsChanged = !isEqual(depsRef.current, deps);
+  // Check if deps have changed with deep comparison
+  const hasChanged = !deepEqual(deps, depsRef.current);
   
-  if (depsChanged) {
-    depsRef.current = deps;
-  }
-  
-  // Use stable dependency to only recreate callback when the deps truly change
-  return useCallback(callback, [depsChanged]);
+  useEffect(() => {
+    if (hasChanged) {
+      depsRef.current = deps;
+      return effect();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasChanged, effect]);
 }
