@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { askAIAssistant } from '@/services/ai/assistant';
 import { AIQuestion } from '@/services/ai/types';
 

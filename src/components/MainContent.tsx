@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Tabs } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import ReflectionTab from '@/components/ReflectionTab';
@@ -22,26 +22,26 @@ const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => 
   const [selectedReflection, setSelectedReflection] = useState<{ id?: string, content?: string } | null>(null);
   const { user } = useAuth();
 
-  const handleCategorySelect = (category: string) => {
+  const handleCategorySelect = useCallback((category: string) => {
     setSelectedCategory(category);
     setActiveTab('category-experience');
-  };
+  }, []);
 
-  const handleOpenAiAssistant = (reflectionId?: string, reflectionContent?: string) => {
+  const handleOpenAiAssistant = useCallback((reflectionId?: string, reflectionContent?: string) => {
     setSelectedReflection({ 
       id: reflectionId || undefined, 
       content: reflectionContent || undefined 
     });
     setAiDialogOpen(true);
-  };
+  }, []);
 
-  const handleCloseAiAssistant = () => {
+  const handleCloseAiAssistant = useCallback(() => {
     setAiDialogOpen(false);
     // Reset selected reflection after dialog closes
     setTimeout(() => {
       setSelectedReflection(null);
     }, 300);
-  };
+  }, []);
 
   // Ensure userProfile has a fallback value
   const safeUserProfile = userProfile || {};

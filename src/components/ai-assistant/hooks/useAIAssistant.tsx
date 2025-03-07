@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantState } from './useAssistantState';
 import { useQuestionSubmit } from './useQuestionSubmit';
@@ -36,11 +36,11 @@ export const useAIAssistant = ({
     }
   }, [open, state]);
 
-  const handleSubmitQuestion = async () => {
-    if (state.question.trim() && user) {
+  const handleSubmitQuestion = useCallback(async () => {
+    if (state.question.trim() && user?.id) {
       await submitQuestion(state.question);
     }
-  };
+  }, [state.question, submitQuestion, user]);
 
   return {
     question: state.question,
