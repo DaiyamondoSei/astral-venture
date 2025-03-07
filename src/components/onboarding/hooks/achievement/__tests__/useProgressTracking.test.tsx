@@ -156,4 +156,50 @@ describe('useProgressTracking Hook', () => {
       wisdom_resources: 1
     });
   });
+
+  // New test cases below
+  it('should handle zero progress changes correctly', () => {
+    const { result } = renderHook(() => 
+      useProgressTracking(mockState, mockSetProgressTracking)
+    );
+    
+    act(() => {
+      result.current.trackProgress('reflections', 0);
+    });
+    
+    expect(mockSetProgressTracking).toHaveBeenCalledWith({
+      ...mockState.progressTracking,
+      reflections: 10 // Should remain unchanged
+    });
+  });
+
+  it('should handle decimal progress values correctly', () => {
+    const { result } = renderHook(() => 
+      useProgressTracking(mockState, mockSetProgressTracking)
+    );
+    
+    act(() => {
+      result.current.trackProgress('meditation_minutes', 1.5);
+    });
+    
+    expect(mockSetProgressTracking).toHaveBeenCalledWith({
+      ...mockState.progressTracking,
+      meditation_minutes: 61.5
+    });
+  });
+
+  it('should reset a specific progress type correctly', () => {
+    const { result } = renderHook(() => 
+      useProgressTracking(mockState, mockSetProgressTracking)
+    );
+    
+    act(() => {
+      result.current.resetProgress('reflections');
+    });
+    
+    expect(mockSetProgressTracking).toHaveBeenCalledWith({
+      ...mockState.progressTracking,
+      reflections: 0
+    });
+  });
 });

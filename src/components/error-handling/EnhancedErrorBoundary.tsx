@@ -1,283 +1,102 @@
 
-import React, { Component, ErrorInfo, ReactNode, useCallback, useState } from 'react';
-import { toast } from '@/components/ui/use-toast';
+import React from 'react';
+import { ErrorHandler } from '@/utils/enhancedErrorHandling';
+import { Button } from '@/components/ui/button';
 
-// Error types for more specific handling
-export type ErrorType = 
-  | 'network' 
-  | 'api' 
-  | 'auth' 
-  | 'validation' 
-  | 'ui' 
-  | 'unknown';
-
-// Props for the main component
-interface EnhancedErrorBoundaryProps {
-  children: ReactNode;
-  fallbackComponent?: React.ComponentType<FallbackProps>;
-  onError?: (error: Error, errorInfo: ErrorInfo, errorType: ErrorType) => void;
-  onReset?: () => void;
-  resetKeys?: any[];
-}
-
-// State for the error boundary
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-  errorInfo: ErrorInfo | null;
-  errorType: ErrorType;
-}
-
-// Props for the fallback component
-export interface FallbackProps {
-  error: Error;
-  errorInfo: ErrorInfo | null;
-  errorType: ErrorType;
-  resetErrorBoundary: () => void;
+interface Props {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+  context?: string;
+  resetOnPropsChange?: boolean;
 }
 
 /**
- * Enhanced Error Boundary Component
+ * Enhanced Error Boundary Component with better error reporting
  * 
- * Provides detailed error handling with typed error categorization
- * and automatic recovery for network errors
+ * Provides more detailed error information, customizable fallback UI,
+ * and integrates with the application's error handling system.
  */
-class EnhancedErrorBoundary extends Component<EnhancedErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: EnhancedErrorBoundaryProps) {
+class EnhancedErrorBoundary extends React.Component<Props, { hasError: boolean; error: Error | null }> {
+  constructor(props: Props) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null,
-      errorType: 'unknown'
+    this.state = { 
+      hasError: false, 
+      error: null 
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    // Update state so next render will show fallback UI
-    return { hasError: true, error };
+  static getDerivedStateFromError(error: Error) {
+    return { 
+      hasError: true, 
+      error 
+    };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Determine error type for specific handling
-    const errorType = this.determineErrorType(error);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log the error to the error handling system
+    const { context = 'ErrorBoundary', onError } = this.props;
     
-    // Update state with error details
-    this.setState({ errorInfo, errorType });
+    // Use our error handler to log the error
+    ErrorHandler.handle(error, context, false);
     
-    // Log error to console and call onError callback
-    console.error('EnhancedErrorBoundary caught an error:', error, errorInfo);
-    if (this.props.onError) {
-      this.props.onError(error, errorInfo, errorType);
-    }
+    // Also log the component stack
+    console.error('Component stack:', errorInfo.componentStack);
     
-    // Attempt automatic recovery for network errors after a delay
-    if (errorType === 'network') {
-      setTimeout(() => {
-        this.resetErrorBoundary();
-        toast({
-          title: "Reconnecting",
-          description: "Attempting to reconnect to the server...",
-          duration: 3000
-        });
-      }, 5000);
+    // Call the custom onError handler if provided
+    if (onError) {
+      onError(error, errorInfo);
     }
   }
 
-  // Reset the error boundary to its initial state
-  resetErrorBoundary = () => {
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null,
-      errorType: 'unknown'
+  componentDidUpdate(prevProps: Props) {
+    // Reset the error state when props change if resetOnPropsChange is true
+    if (this.props.resetOnPropsChange && 
+        this.state.hasError && 
+        prevProps !== this.props) {
+      this.resetError();
+    }
+  }
+
+  resetError = () => {
+    this.setState({ 
+      hasError: false, 
+      error: null 
     });
-    
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
   };
 
-  // Determine the type of error for more specific handling
-  determineErrorType(error: Error): ErrorType {
-    // Check for network errors
-    if (
-      error.message.includes('network') ||
-      error.message.includes('internet') ||
-      error.message.includes('offline') ||
-      error.message.includes('connection') ||
-      error.message.includes('ECONNREFUSED') ||
-      error.message.includes('fetch')
-    ) {
-      return 'network';
-    }
-    
-    // Check for API errors
-    if (
-      error.message.includes('API') ||
-      error.message.includes('status code') ||
-      error.message.includes('response') ||
-      error.message.includes('endpoint')
-    ) {
-      return 'api';
-    }
-    
-    // Check for auth errors
-    if (
-      error.message.includes('authentication') ||
-      error.message.includes('authorization') ||
-      error.message.includes('login') ||
-      error.message.includes('permission') ||
-      error.message.includes('token') ||
-      error.message.includes('session')
-    ) {
-      return 'auth';
-    }
-    
-    // Check for validation errors
-    if (
-      error.message.includes('validation') ||
-      error.message.includes('invalid') ||
-      error.message.includes('required') ||
-      error.message.includes('format')
-    ) {
-      return 'validation';
-    }
-    
-    // Check for UI/rendering errors
-    if (
-      error.message.includes('render') ||
-      error.message.includes('component') ||
-      error.message.includes('element') ||
-      error.message.includes('React')
-    ) {
-      return 'ui';
-    }
-    
-    // Default to unknown
-    return 'unknown';
-  }
-
-  componentDidUpdate(prevProps: EnhancedErrorBoundaryProps) {
-    // Reset the error boundary if any reset keys have changed
-    if (
-      this.state.hasError &&
-      this.props.resetKeys &&
-      prevProps.resetKeys &&
-      this.props.resetKeys.some((key, index) => key !== prevProps.resetKeys?.[index])
-    ) {
-      this.resetErrorBoundary();
-    }
-  }
-
   render() {
-    if (this.state.hasError && this.state.error) {
-      // Use custom fallback component if provided
-      if (this.props.fallbackComponent) {
-        const FallbackComponent = this.props.fallbackComponent;
-        return (
-          <FallbackComponent
-            error={this.state.error}
-            errorInfo={this.state.errorInfo}
-            errorType={this.state.errorType}
-            resetErrorBoundary={this.resetErrorBoundary}
-          />
-        );
+    if (this.state.hasError) {
+      // Render custom fallback UI or the provided fallback
+      if (this.props.fallback) {
+        return this.props.fallback;
       }
       
-      // Use default fallback component
+      // Default error UI
       return (
-        <DefaultErrorFallback
-          error={this.state.error}
-          errorInfo={this.state.errorInfo}
-          errorType={this.state.errorType}
-          resetErrorBoundary={this.resetErrorBoundary}
-        />
+        <div className="p-4 border border-red-500 bg-red-50 dark:bg-red-950 dark:border-red-800 rounded-md shadow-md">
+          <h3 className="text-red-700 dark:text-red-400 font-medium text-lg mb-2">Something went wrong</h3>
+          <p className="text-red-600 dark:text-red-300 text-sm mb-3">
+            {this.state.error?.message || 'An unknown error occurred'}
+          </p>
+          {process.env.NODE_ENV === 'development' && this.state.error && (
+            <pre className="text-xs bg-red-100 dark:bg-red-900 p-2 rounded mb-3 overflow-auto max-h-40">
+              {this.state.error.stack}
+            </pre>
+          )}
+          <Button 
+            variant="destructive"
+            size="sm"
+            onClick={this.resetError}
+          >
+            Try again
+          </Button>
+        </div>
       );
     }
 
-    // When there's no error, render children
     return this.props.children;
   }
 }
-
-/**
- * Default error fallback component with specific error type messages
- */
-const DefaultErrorFallback: React.FC<FallbackProps> = ({
-  error,
-  errorType,
-  resetErrorBoundary
-}) => {
-  const [showDetails, setShowDetails] = useState(false);
-  
-  const getErrorTitle = useCallback(() => {
-    switch (errorType) {
-      case 'network':
-        return 'Connection Error';
-      case 'api':
-        return 'API Error';
-      case 'auth':
-        return 'Authentication Error';
-      case 'validation':
-        return 'Validation Error';
-      case 'ui':
-        return 'UI Rendering Error';
-      default:
-        return 'Unexpected Error';
-    }
-  }, [errorType]);
-  
-  const getErrorMessage = useCallback(() => {
-    switch (errorType) {
-      case 'network':
-        return 'Please check your internet connection and try again.';
-      case 'api':
-        return 'There was a problem communicating with our services.';
-      case 'auth':
-        return 'Your session may have expired. Please try logging in again.';
-      case 'validation':
-        return 'Some information is invalid or missing.';
-      case 'ui':
-        return 'The application encountered a rendering issue.';
-      default:
-        return 'An unexpected error occurred in the application.';
-    }
-  }, [errorType]);
-  
-  return (
-    <div className="flex flex-col items-center justify-center p-6 rounded-lg bg-black/20 backdrop-blur-md">
-      <h2 className="text-xl font-display text-white mb-2">
-        {getErrorTitle()}
-      </h2>
-      <p className="text-white/70 mb-4 text-center">
-        {getErrorMessage()}
-      </p>
-      
-      <div className="flex space-x-4 mb-4">
-        <button 
-          onClick={resetErrorBoundary}
-          className="px-4 py-2 bg-quantum-600 hover:bg-quantum-500 text-white rounded-md transition-colors"
-        >
-          Try Again
-        </button>
-        
-        <button 
-          onClick={() => setShowDetails(!showDetails)}
-          className="px-4 py-2 bg-transparent border border-quantum-600 text-white rounded-md hover:bg-quantum-800/50 transition-colors"
-        >
-          {showDetails ? 'Hide Details' : 'Show Details'}
-        </button>
-      </div>
-      
-      {showDetails && (
-        <div className="w-full max-w-md bg-black/40 p-4 rounded overflow-auto text-xs text-white/60 font-mono">
-          <p className="mb-2">{error.name}: {error.message}</p>
-          <p>{error.stack}</p>
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default EnhancedErrorBoundary;
