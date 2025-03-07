@@ -5,15 +5,22 @@ import { motion } from 'framer-motion';
 interface MetatronsBackgroundProps {
   intensity?: 'low' | 'medium' | 'high';
   animated?: boolean;
+  opacity?: number;
+  consciousnessLevel?: number;
 }
 
 const MetatronsBackground: React.FC<MetatronsBackgroundProps> = ({ 
   intensity = 'medium', 
-  animated = true 
+  animated = true,
+  opacity = 0.15,
+  consciousnessLevel = 1
 }) => {
   // Calculate intensity values
-  const lineOpacity = intensity === 'low' ? 0.1 : intensity === 'medium' ? 0.15 : 0.2;
+  const lineOpacity = opacity * (intensity === 'low' ? 0.7 : intensity === 'medium' ? 1 : 1.3);
   const glowIntensity = intensity === 'low' ? 0.3 : intensity === 'medium' ? 0.5 : 0.7;
+  
+  // Scale effect based on consciousness level (1-10)
+  const levelScale = Math.min(1 + (consciousnessLevel * 0.05), 1.5);
   
   // Animation variants
   const rotateAnimation = animated ? {
@@ -82,6 +89,14 @@ const MetatronsBackground: React.FC<MetatronsBackgroundProps> = ({
         
         {/* Center point */}
         <circle cx="200" cy="200" r="4" fillOpacity="0" strokeWidth="0" className="node-point" data-position="center" />
+
+        {/* Consciousness level visual enhancements */}
+        {consciousnessLevel > 2 && (
+          <>
+            <circle cx="200" cy="200" r={60 + (consciousnessLevel * 3)} fill="none" strokeWidth="0.3" strokeOpacity={0.3 + (consciousnessLevel * 0.05)} />
+            <circle cx="200" cy="200" r={30 + (consciousnessLevel * 2)} fill="none" strokeWidth="0.3" strokeOpacity={0.3 + (consciousnessLevel * 0.05)} />
+          </>
+        )}
       </svg>
       
       {/* Animated overlay - can rotate and pulse without affecting alignment */}
@@ -98,6 +113,16 @@ const MetatronsBackground: React.FC<MetatronsBackgroundProps> = ({
             fill="none" 
             strokeWidth="0.3" 
           />
+          
+          {/* Add consciousness level-based elements */}
+          {consciousnessLevel > 3 && (
+            <polygon 
+              points={`200,${100 - consciousnessLevel * 3} ${250 + consciousnessLevel * 2},${150 - consciousnessLevel} ${250 + consciousnessLevel * 2},${250 + consciousnessLevel} 200,${300 + consciousnessLevel * 3} ${150 - consciousnessLevel * 2},${250 + consciousnessLevel} ${150 - consciousnessLevel * 2},${150 - consciousnessLevel}`}
+              fill="none" 
+              strokeWidth="0.2"
+              strokeOpacity={0.3 + (consciousnessLevel * 0.05)}
+            />
+          )}
         </motion.svg>
       )}
       
@@ -108,13 +133,13 @@ const MetatronsBackground: React.FC<MetatronsBackgroundProps> = ({
           className="absolute w-full h-full"
           animate={pulseAnimation}
         >
-          <circle cx="200" cy="200" r="8" fill="rgba(255,255,255,0.2)" />
-          <circle cx="200" cy="20" r="6" fill="rgba(255,255,255,0.15)" />
-          <circle cx="340" cy="110" r="6" fill="rgba(255,255,255,0.15)" />
-          <circle cx="340" cy="290" r="6" fill="rgba(255,255,255,0.15)" />
-          <circle cx="200" cy="380" r="6" fill="rgba(255,255,255,0.15)" />
-          <circle cx="60" cy="290" r="6" fill="rgba(255,255,255,0.15)" />
-          <circle cx="60" cy="110" r="6" fill="rgba(255,255,255,0.15)" />
+          <circle cx="200" cy="200" r={8 + (consciousnessLevel * 0.5)} fill={`rgba(255,255,255,${0.2 + (consciousnessLevel * 0.02)})`} />
+          <circle cx="200" cy="20" r={6 + (consciousnessLevel * 0.3)} fill={`rgba(255,255,255,${0.15 + (consciousnessLevel * 0.01)})`} />
+          <circle cx="340" cy="110" r={6 + (consciousnessLevel * 0.3)} fill={`rgba(255,255,255,${0.15 + (consciousnessLevel * 0.01)})`} />
+          <circle cx="340" cy="290" r={6 + (consciousnessLevel * 0.3)} fill={`rgba(255,255,255,${0.15 + (consciousnessLevel * 0.01)})`} />
+          <circle cx="200" cy="380" r={6 + (consciousnessLevel * 0.3)} fill={`rgba(255,255,255,${0.15 + (consciousnessLevel * 0.01)})`} />
+          <circle cx="60" cy="290" r={6 + (consciousnessLevel * 0.3)} fill={`rgba(255,255,255,${0.15 + (consciousnessLevel * 0.01)})`} />
+          <circle cx="60" cy="110" r={6 + (consciousnessLevel * 0.3)} fill={`rgba(255,255,255,${0.15 + (consciousnessLevel * 0.01)})`} />
         </motion.svg>
       )}
     </div>

@@ -18,6 +18,8 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
       <MetatronsBackground 
         consciousnessLevel={consciousnessLevel}
         opacity={0.2}
+        intensity="medium"
+        animated={true}
       />
       <QuantumParticles count={20} interactive={true} className="z-0" />
     </div>

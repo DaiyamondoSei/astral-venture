@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { cn } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Info } from 'lucide-react';
@@ -18,6 +18,7 @@ interface MetatronsCubeProps {
   onSelectNode?: (nodeId: string, downloadables?: DownloadableMaterial[]) => void;
   energyPoints: number;
   onBack?: () => void;
+  consciousnessLevel?: number;
 }
 
 const MetatronsCube: React.FC<MetatronsCubeProps> = ({ 
@@ -25,7 +26,8 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
   className, 
   onSelectNode,
   energyPoints = 0,
-  onBack
+  onBack,
+  consciousnessLevel = 1
 }) => {
   const [activeNode, setActiveNode] = useState<string | null>(null);
   const [hoverNode, setHoverNode] = useState<string | null>(null);
@@ -33,7 +35,7 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
   const navigate = useNavigate();
 
   // Get geometry nodes
-  const geometryNodes = createGeometryNodes(onSelectNode);
+  const geometryNodes = useMemo(() => createGeometryNodes(onSelectNode), [onSelectNode]);
   
   // Get node status hook
   const { getNodeStatus } = useNodeStatus(energyPoints, geometryNodes);
@@ -91,14 +93,17 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
       
       {/* Metatron's Cube Background */}
       <div className="absolute inset-0 z-0">
-        <MetatronsBackground />
+        <MetatronsBackground 
+          animated={true} 
+          intensity="medium" 
+          consciousnessLevel={consciousnessLevel}
+        />
       </div>
       
       {/* Geometry Nodes - Precisely positioned at intersection points */}
       {geometryNodes.map((node, index) => {
         const nodeStatus = getNodeStatus(index);
         
-        // Get exact positioning class based on node position
         return (
           <GeometryNodeComponent
             key={node.id}

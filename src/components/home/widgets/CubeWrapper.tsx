@@ -31,8 +31,12 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
   
   useEffect(() => {
     // Calculate consciousness level based on energy points
-    const newLevel = Math.max(1, Math.floor(energyPoints / 200));
-    setConsciousnessLevel(newLevel);
+    // More refined algorithm to provide smoother transition
+    const baseLevel = Math.floor(energyPoints / 200);
+    const remainder = (energyPoints % 200) / 200;
+    const smoothLevel = baseLevel + remainder;
+    
+    setConsciousnessLevel(Math.max(1, smoothLevel));
   }, [energyPoints]);
   
   const handlePortalActivation = () => {
@@ -40,7 +44,7 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
     
     toast({
       title: "Dimensional Portal Activated",
-      description: `Your consciousness has aligned with dimensional frequency level ${consciousnessLevel}.`,
+      description: `Your consciousness has aligned with dimensional frequency level ${consciousnessLevel.toFixed(1)}.`,
     });
     
     // Notify parent component
@@ -102,6 +106,9 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
           <p className="text-xs text-quantum-400">
             Unlock more nodes by increasing your energy points through practice and reflection.
           </p>
+          <p className="text-xs text-quantum-400 mt-2">
+            Current level: {consciousnessLevel.toFixed(1)}
+          </p>
         </div>
       )}
       
@@ -128,13 +135,14 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
             energyPoints={energyPoints}
             onSelectNode={onSelectNode}
             onBack={onBack}
+            consciousnessLevel={consciousnessLevel}
           />
         </div>
       </motion.div>
       
       {isFullscreen && (
         <div className="absolute bottom-4 right-4 text-xs text-white/50">
-          <p>Energy Points: {energyPoints} • Consciousness Level: {consciousnessLevel}</p>
+          <p>Energy Points: {energyPoints} • Consciousness Level: {consciousnessLevel.toFixed(1)}</p>
         </div>
       )}
     </div>

@@ -6,7 +6,7 @@ import SacredGeometryIconNode from '../icons/SacredGeometryIconNode';
 import { GeometryNode as GeometryNodeType, NodeStatus } from '../types/geometry';
 
 // Map node IDs to sacred geometry icon types
-const nodeIconMap: Record<string, any> = {
+const nodeIconMap: Record<string, string> = {
   'meditation': 'flower-of-life',
   'chakras': 'sri-yantra', 
   'dreams': 'torus',
@@ -77,21 +77,38 @@ const GeometryNodeComponent: React.FC<GeometryNodeProps> = ({
     position: positionClass
   };
   
+  // Determine if the node should pulse based on status
+  const shouldPulse = nodeStatus.unlocked && (activeNode !== node.id);
+  
   return (
-    <SacredGeometryIconNode
-      id={node.id}
-      name={node.name}
-      type={iconType}
-      description={node.description}
-      position={positionClass}
-      color={node.color}
-      isActive={activeNode === node.id}
-      isLocked={!nodeStatus.unlocked}
-      hasDownloadables={hasDownloadables}
-      unlocked={nodeStatus.unlocked}
-      onClick={() => onNodeClick(node)}
-      onHover={onNodeHover}
-    />
+    <motion.div
+      className={positionClass}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: index * 0.1, duration: 0.5 }}
+    >
+      <SacredGeometryIconNode
+        id={node.id}
+        name={node.name}
+        type={iconType}
+        description={node.description}
+        position={positionClass}
+        color={node.color}
+        isActive={activeNode === node.id}
+        isLocked={!nodeStatus.unlocked}
+        hasDownloadables={hasDownloadables}
+        unlocked={nodeStatus.unlocked}
+        onClick={() => onNodeClick(node)}
+        onHover={onNodeHover}
+      />
+      
+      {/* Energy threshold indicator for locked nodes */}
+      {!nodeStatus.unlocked && (
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-white/70 bg-black/50 px-2 py-0.5 rounded-full whitespace-nowrap">
+          {nodeStatus.threshold} energy
+        </div>
+      )}
+    </motion.div>
   );
 };
 
