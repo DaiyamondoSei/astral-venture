@@ -1,86 +1,48 @@
 
 import { useCallback, useRef } from 'react';
+import isEqual from 'lodash/isEqual';
 
 /**
- * Creates a memoized selector function that only triggers re-renders
- * when the selected slice of state changes
+ * Creates a memoized selector function that only triggers rerenders when
+ * the selected portion of state changes
  * 
- * @param selector Function that extracts a slice of state
- * @param equalityFn Optional custom equality function
- * @returns A memoized version of the selector function
+ * @param state The complete state object
+ * @param selector Function that extracts a portion of the state
+ * @returns The selected portion of state, memoized by deep comparison
  */
 export function createSelector<State, Selected>(
-  selector: (state: State) => Selected,
-  equalityFn: (a: Selected, b: Selected) => boolean = (a, b) => a === b
-) {
-  return (state: State): Selected => {
-    return selector(state);
-  };
-}
-
-/**
- * Hook that provides selector pattern functionality for any state object
- * 
- * @param state The state object to select from
- * @param selector A function that extracts a piece of state
- * @param equalityFn Optional custom equality function
- * @returns The selected state slice
- */
-export function useSelector<State, Selected>(
   state: State,
-  selector: (state: State) => Selected,
-  equalityFn: (a: Selected, b: Selected) => boolean = (a, b) => a === b
+  selector: (state: State) => Selected
 ): Selected {
-  const prevSelectedRef = useRef<Selected>();
+  const prevStateRef = useRef<State>(state);
+  const prevSelectedRef = useRef<Selected>(selector(state));
   
-  const getSelected = useCallback(() => {
-    const selected = selector(state);
+  // Only recalculate if state reference has changed
+  if (state !== prevStateRef.current) {
+    const newSelected = selector(state);
     
-    // Initialize on first run
-    if (prevSelectedRef.current === undefined) {
-      prevSelectedRef.current = selected;
-      return selected;
+    // Only update if the selected value has actually changed
+    if (!isEqual(newSelected, prevSelectedRef.current)) {
+      prevSelectedRef.current = newSelected;
     }
     
-    // Check if the value changed using the equality function
-    if (!equalityFn(prevSelectedRef.current, selected)) {
-      prevSelectedRef.current = selected;
-    }
-    
-    return prevSelectedRef.current;
-  }, [state, selector, equalityFn]);
+    prevStateRef.current = state;
+  }
   
-  return getSelected();
+  return prevSelectedRef.current;
 }
 
 /**
- * Deep equality function for comparing objects
+ * A hook that creates a memoized selector function
  * 
- * @param a First object to compare
- * @param b Second object to compare
- * @returns Whether the objects are deeply equal
+ * @param selectorFn The selector function to memoize
+ * @returns A memoized selector function that can be used with any state
  */
-export function deepEqual(a: any, b: any): boolean {
-  if (a === b) return true;
-  
-  if (
-    typeof a !== 'object' ||
-    typeof b !== 'object' ||
-    a === null ||
-    b === null
-  ) {
-    return false;
-  }
-  
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-  
-  if (keysA.length !== keysB.length) return false;
-  
-  for (const key of keysA) {
-    if (!keysB.includes(key)) return false;
-    if (!deepEqual(a[key], b[key])) return false;
-  }
-  
-  return true;
+export function useMemoizedSelector<State, Selected>(
+  selectorFn: (state: State) => Selected
+) {
+  return useCallback(
+    (state: State) => createSelector(state, selectorFn),
+    [selectorFn]
+  );
 }

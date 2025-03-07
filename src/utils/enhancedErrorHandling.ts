@@ -1,169 +1,181 @@
+
 import React from 'react';
+import { toast } from '@/components/ui/use-toast';
 
 /**
- * Enhanced error handling utility
- * Provides standardized error handling with better debugging support
+ * Custom error classes for different types of application errors
  */
-
-// Error types for better categorization
-export enum ErrorType {
-  API = 'API_ERROR',
-  AUTHENTICATION = 'AUTH_ERROR',
-  VALIDATION = 'VALIDATION_ERROR',
-  NETWORK = 'NETWORK_ERROR',
-  UNKNOWN = 'UNKNOWN_ERROR',
-  STATE = 'STATE_ERROR',
-  RENDERING = 'RENDERING_ERROR'
-}
-
-// Extended error class with additional properties
 export class AppError extends Error {
-  type: ErrorType;
-  context?: Record<string, unknown>;
-  originalError?: Error;
-  code?: string;
-  
-  constructor(message: string, options: {
-    type?: ErrorType;
-    context?: Record<string, unknown>;
-    originalError?: Error;
-    code?: string;
-  } = {}) {
+  constructor(message: string) {
     super(message);
     this.name = 'AppError';
-    this.type = options.type || ErrorType.UNKNOWN;
-    this.context = options.context;
-    this.originalError = options.originalError;
-    this.code = options.code;
+  }
+}
+
+export class NetworkError extends AppError {
+  constructor(message: string = 'Network request failed') {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+export class AuthError extends AppError {
+  constructor(message: string = 'Authentication error') {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string = 'Validation error') {
+    super(message);
+    this.name = 'ValidationError';
   }
 }
 
 /**
- * Creates a standardized error object
- * 
- * @param message Error message
- * @param options Additional error options
- * @returns Standardized AppError
+ * Error handling utility that centralizes error handling logic
+ * and provides consistent error reporting throughout the application
  */
-export function createError(message: string, options?: {
-  type?: ErrorType;
-  context?: Record<string, unknown>;
-  originalError?: Error;
-  code?: string;
-}): AppError {
-  return new AppError(message, options);
-}
-
-/**
- * Safely executes a function and handles any errors
- * 
- * @param fn Function to execute
- * @param errorHandler Optional custom error handler
- * @returns Result of the function or undefined if an error occurred
- */
-export function safeExecute<T>(
-  fn: () => T,
-  errorHandler?: (error: AppError) => void
-): T | undefined {
-  try {
-    return fn();
-  } catch (error) {
-    const appError = error instanceof AppError
-      ? error
-      : new AppError(
-          error instanceof Error ? error.message : 'An unknown error occurred',
-          { originalError: error instanceof Error ? error : undefined }
-        );
+export const ErrorHandler = {
+  /**
+   * Handle an error with appropriate logging and user feedback
+   * 
+   * @param error The error to handle
+   * @param context Additional context about where the error occurred
+   * @param showToast Whether to show a toast notification to the user
+   */
+  handle: (error: unknown, context: string, showToast: boolean = true): void => {
+    // Convert to Error object if it's not already
+    const errorObj = error instanceof Error ? error : new Error(String(error));
     
-    if (errorHandler) {
-      errorHandler(appError);
-    } else {
-      console.error('Error in safeExecute:', appError);
-    }
+    // Log error with context
+    console.error(`Error in ${context}:`, errorObj);
     
-    return undefined;
-  }
-}
-
-/**
- * Creates an async function that handles errors
- * 
- * @param fn Async function to wrap
- * @param errorHandler Optional custom error handler
- * @returns Wrapped function that handles errors
- */
-export function createSafeAsyncFunction<T, Args extends any[]>(
-  fn: (...args: Args) => Promise<T>,
-  errorHandler?: (error: AppError) => void
-): (...args: Args) => Promise<T | undefined> {
-  return async (...args: Args): Promise<T | undefined> => {
-    try {
-      return await fn(...args);
-    } catch (error) {
-      const appError = error instanceof AppError
-        ? error
-        : new AppError(
-            error instanceof Error ? error.message : 'An unknown error occurred',
-            { originalError: error instanceof Error ? error : undefined }
-          );
-      
-      if (errorHandler) {
-        errorHandler(appError);
-      } else {
-        console.error('Error in safeAsyncFunction:', appError);
-      }
-      
-      return undefined;
+    // Show toast notification if requested
+    if (showToast) {
+      toast({
+        title: "An error occurred",
+        description: errorObj.message || "Something went wrong",
+        variant: "destructive",
+      });
     }
-  };
-}
-
-/**
- * Custom hook for handling errors in async operations
- * 
- * @param defaultErrorHandler Default error handler function
- * @returns Object with error handling utilities
- */
-export function useErrorHandling(defaultErrorHandler?: (error: AppError) => void) {
-  const [error, setError] = React.useState<AppError | null>(null);
+  },
   
-  const handleError = React.useCallback((error: AppError) => {
-    setError(error);
-    if (defaultErrorHandler) {
-      defaultErrorHandler(error);
-    } else {
-      console.error('Error caught by useErrorHandling:', error);
-    }
-  }, [defaultErrorHandler]);
-  
-  const clearError = React.useCallback(() => {
-    setError(null);
-  }, []);
-  
-  const wrapAsync = React.useCallback(<T, Args extends any[]>(
-    fn: (...args: Args) => Promise<T>
+  /**
+   * Create an async error handler that can be used with try/catch blocks
+   * 
+   * @param asyncFn The async function to wrap
+   * @param context Context information for error logging
+   * @param options Additional options
+   * @returns A wrapped function that handles errors
+   */
+  withAsyncErrorHandling: <T, Args extends any[]>(
+    asyncFn: (...args: Args) => Promise<T>,
+    context: string,
+    options: {
+      showToast?: boolean;
+      fallbackValue?: T;
+      onError?: (error: Error) => void;
+    } = {}
   ) => {
     return async (...args: Args): Promise<T | undefined> => {
       try {
-        return await fn(...args);
-      } catch (caughtError) {
-        const appError = caughtError instanceof AppError
-          ? caughtError
-          : new AppError(
-              caughtError instanceof Error ? caughtError.message : 'An unknown error occurred',
-              { originalError: caughtError instanceof Error ? caughtError : undefined }
-            );
-        
-        handleError(appError);
-        return undefined;
+        return await asyncFn(...args);
+      } catch (error) {
+        ErrorHandler.handle(error, context, options.showToast);
+        if (options.onError) {
+          options.onError(error instanceof Error ? error : new Error(String(error)));
+        }
+        return options.fallbackValue;
       }
     };
-  }, [handleError]);
+  },
   
+  /**
+   * Create a component error boundary
+   * 
+   * @param WrappedComponent The component to wrap with error handling
+   * @param fallback Optional fallback component to render on error
+   * @returns Component with error boundary
+   */
+  withErrorBoundary: <P extends object>(
+    WrappedComponent: React.ComponentType<P>,
+    fallback?: React.ReactNode
+  ) => {
+    return class WithErrorBoundary extends React.Component<P, { hasError: boolean; error: Error | null }> {
+      constructor(props: P) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error: Error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.error('Component error:', error, errorInfo);
+      }
+
+      render() {
+        if (this.state.hasError) {
+          if (fallback) {
+            return fallback;
+          }
+          return (
+            <div className="p-4 border border-red-500 bg-red-50 rounded-md">
+              <h3 className="text-red-700 font-medium">Something went wrong</h3>
+              <p className="text-red-600 text-sm">{this.state.error?.message || 'Unknown error'}</p>
+              <button 
+                className="mt-2 px-3 py-1 bg-red-600 text-white text-sm rounded"
+                onClick={() => this.setState({ hasError: false, error: null })}
+              >
+                Try again
+              </button>
+            </div>
+          );
+        }
+
+        return <WrappedComponent {...this.props} />;
+      }
+    };
+  }
+};
+
+/**
+ * Custom hook to use the error handler within functional components
+ * 
+ * @param context The context name for error reporting
+ * @returns Error handling utilities
+ */
+export function useErrorHandler(context: string) {
   return {
-    error,
-    handleError,
-    clearError,
-    wrapAsync
+    /**
+     * Handle an error within a component
+     * 
+     * @param error The error to handle
+     * @param showToast Whether to show a toast notification
+     */
+    handleError: (error: unknown, showToast: boolean = true) => {
+      ErrorHandler.handle(error, context, showToast);
+    },
+    
+    /**
+     * Wrap an async function with error handling
+     * 
+     * @param asyncFn The async function to wrap
+     * @param options Additional options for error handling
+     * @returns A wrapped function that handles errors
+     */
+    withAsyncErrorHandling: <T, Args extends any[]>(
+      asyncFn: (...args: Args) => Promise<T>,
+      options: {
+        showToast?: boolean;
+        fallbackValue?: T;
+        onError?: (error: Error) => void;
+      } = {}
+    ) => {
+      return ErrorHandler.withAsyncErrorHandling(asyncFn, context, options);
+    }
   };
 }

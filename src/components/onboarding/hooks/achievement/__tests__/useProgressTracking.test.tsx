@@ -105,4 +105,55 @@ describe('useProgressTracking Hook', () => {
       meditation_minutes: 70
     });
   });
+
+  it('should handle negative progress values correctly', () => {
+    const { result } = renderHook(() => 
+      useProgressTracking(mockState, mockSetProgressTracking)
+    );
+    
+    act(() => {
+      result.current.trackProgress('reflections', -5);
+    });
+    
+    expect(mockSetProgressTracking).toHaveBeenCalledWith({
+      ...mockState.progressTracking,
+      reflections: 5
+    });
+  });
+
+  it('should prevent progress from going below zero', () => {
+    const { result } = renderHook(() => 
+      useProgressTracking(mockState, mockSetProgressTracking)
+    );
+    
+    act(() => {
+      result.current.trackProgress('reflections', -20); // Would make it negative
+    });
+    
+    expect(mockSetProgressTracking).toHaveBeenCalledWith({
+      ...mockState.progressTracking,
+      reflections: 0
+    });
+  });
+
+  it('should increment multiple tracking types in one call', () => {
+    const { result } = renderHook(() => 
+      useProgressTracking(mockState, mockSetProgressTracking)
+    );
+    
+    act(() => {
+      result.current.trackMultipleProgress({
+        reflections: 2,
+        meditation_minutes: 15,
+        wisdom_resources: 1
+      });
+    });
+    
+    expect(mockSetProgressTracking).toHaveBeenCalledWith({
+      ...mockState.progressTracking,
+      reflections: 12,
+      meditation_minutes: 75,
+      wisdom_resources: 1
+    });
+  });
 });
