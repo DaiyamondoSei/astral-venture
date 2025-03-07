@@ -84,3 +84,6 @@ export default function useVisibilityObserver({
   
   return { setRef, isVisible, wasEverVisible };
 }
+
+// Export for use in other modules
+export { useVisibilityObserver };

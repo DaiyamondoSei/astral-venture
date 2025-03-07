@@ -1,6 +1,7 @@
 
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { DeviceCapability, getPerformanceCategory, monitorPerformance } from '@/utils/performanceUtils';
+import { isFeatureEnabled } from '@/utils/adaptiveRendering';
 
 interface PerformanceContextType {
   deviceCapability: DeviceCapability;
@@ -79,15 +80,32 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ childr
     const isMediumPerformance = deviceCapability === 'medium';
     const isHighPerformance = deviceCapability === 'high';
     
+    // Use the adaptive system if available
+    const enableParticles = typeof isFeatureEnabled === 'function' 
+      ? isFeatureEnabled('particles') 
+      : !isLowPerformance;
+      
+    const enableComplexAnimations = typeof isFeatureEnabled === 'function'
+      ? isFeatureEnabled('complexAnimations')
+      : !isLowPerformance;
+      
+    const enableBlur = typeof isFeatureEnabled === 'function'
+      ? isFeatureEnabled('blurEffects')
+      : !isLowPerformance;
+      
+    const enableShadows = typeof isFeatureEnabled === 'function'
+      ? isFeatureEnabled('shadows')
+      : !isLowPerformance;
+    
     return {
       deviceCapability,
       isLowPerformance,
       isMediumPerformance,
       isHighPerformance,
-      enableParticles: !isLowPerformance,
-      enableComplexAnimations: !isLowPerformance,
-      enableBlur: !isLowPerformance,
-      enableShadows: !isLowPerformance,
+      enableParticles,
+      enableComplexAnimations,
+      enableBlur,
+      enableShadows,
       setManualPerformanceMode,
     };
   }, [deviceCapability, setManualPerformanceMode]);

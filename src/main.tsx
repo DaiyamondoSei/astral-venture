@@ -1,24 +1,25 @@
 
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
 import './index.css';
-import { preloadCriticalAssets } from './utils/preloadAssets';
+import { Toaster } from '@/components/ui/toaster';
+import { AdaptivePerformanceProvider } from '@/contexts/AdaptivePerformanceContext';
+import { initWebVitals } from '@/utils/webVitalsMonitor';
+import { initAdaptiveRendering } from '@/utils/adaptiveRendering';
 
-// Preload critical assets
-preloadCriticalAssets();
+// Initialize performance monitoring and adaptive rendering
+initWebVitals();
+initAdaptiveRendering();
 
-// Use requestIdleCallback to defer non-critical initialization
-const startApp = () => {
-  const root = document.getElementById("root");
-  if (root) {
-    createRoot(root).render(<App />);
-  }
-};
-
-// Use requestIdleCallback for non-critical initialization if available
-if ('requestIdleCallback' in window) {
-  (window as any).requestIdleCallback(startApp);
-} else {
-  // Fallback to setTimeout for browsers that don't support requestIdleCallback
-  setTimeout(startApp, 50);
-}
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <AdaptivePerformanceProvider>
+        <App />
+        <Toaster />
+      </AdaptivePerformanceProvider>
+    </BrowserRouter>
+  </React.StrictMode>
+);
