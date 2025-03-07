@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Info, Wifi, WifiOff } from 'lucide-react';
-import { AIResponse as AIResponseType } from '@/services/ai/aiService';
+import { AIResponse as AIResponseType } from '@/services/ai/types';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -32,7 +32,7 @@ const AIResponse: React.FC<AIResponseProps> = ({
     return name.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
-  const isOfflineMode = modelInfo?.model === 'offline' || !navigator.onLine;
+  const isOfflineMode = modelInfo?.model === 'offline' || response.meta?.model === 'offline' || !navigator.onLine;
 
   return (
     <div className="space-y-4">

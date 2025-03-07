@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, WifiOff } from 'lucide-react';
 import { DialogFooter } from '@/components/ui/dialog';
 
 interface QuestionFormProps {
@@ -29,8 +29,18 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   // Handle streaming responses if available
   const showStreamingResponse = loading && streamingResponse !== null;
   
+  // Check if we're in offline mode
+  const isOffline = !navigator.onLine;
+  
   return (
     <div className="space-y-4">
+      {isOffline && (
+        <div className="bg-amber-800/20 border border-amber-600/30 text-amber-200 px-3 py-2 rounded-md text-sm flex items-center space-x-2">
+          <WifiOff size={16} className="flex-shrink-0" />
+          <span>You're offline. Responses will be limited.</span>
+        </div>
+      )}
+      
       <div className="text-sm text-muted-foreground">
         What would you like to ask about your energy practice or experiences?
       </div>

@@ -31,6 +31,8 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
   }>>([]);
   const [mousePosition, setMousePosition] = useState<{ x: number, y: number } | null>(null);
   const [clickWave, setClickWave] = useState<{ x: number, y: number, active: boolean } | null>(null);
+  const animationFrameIdRef = useRef<number | null>(null);
+  const isMounted = useRef(true);
   
   // Update container dimensions on resize
   useEffect(() => {
@@ -59,7 +61,7 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
   
   // Create particles when dimensions change or energy points update
   useEffect(() => {
-    if (dimensions.width === 0 || dimensions.height === 0) return;
+    if (dimensions.width === 0 || dimensions.height === 0 || !isMounted.current) return;
     
     // Calculate number of particles based on energy and density
     const particleCount = Math.min(Math.floor((energyPoints / 100) * particleDensity * 10), 100);
@@ -84,7 +86,7 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
   // Track mouse movement
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (containerRef.current) {
+      if (containerRef.current && isMounted.current) {
         const rect = containerRef.current.getBoundingClientRect();
         setMousePosition({
           x: e.clientX - rect.left,
@@ -102,7 +104,7 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
     if (!reactToClick) return;
     
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current) {
+      if (containerRef.current && isMounted.current) {
         const rect = containerRef.current.getBoundingClientRect();
         setClickWave({
           x: e.clientX - rect.left,
@@ -112,7 +114,9 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
         
         // Reset click wave after animation
         setTimeout(() => {
-          setClickWave(null);
+          if (isMounted.current) {
+            setClickWave(null);
+          }
         }, 1000);
       }
     };
@@ -121,13 +125,26 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
     return () => window.removeEventListener('click', handleClick);
   }, [reactToClick]);
   
+  // Setup component lifecycle
+  useEffect(() => {
+    isMounted.current = true;
+    
+    return () => {
+      isMounted.current = false;
+      // Clean up animation frame if component unmounts
+      if (animationFrameIdRef.current !== null) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+    };
+  }, []);
+  
   // Update particle positions with a more efficient approach
   useEffect(() => {
     if (particles.length === 0) return;
     
-    let animationFrameId: number;
-    
     const updateParticles = () => {
+      if (!isMounted.current) return;
+      
       setParticles(prevParticles => {
         return prevParticles.map(particle => {
           let { x, y, vx, vy } = particle;
@@ -165,11 +182,18 @@ const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
         });
       });
       
-      animationFrameId = requestAnimationFrame(updateParticles);
+      if (isMounted.current) {
+        animationFrameIdRef.current = requestAnimationFrame(updateParticles);
+      }
     };
     
-    animationFrameId = requestAnimationFrame(updateParticles);
-    return () => cancelAnimationFrame(animationFrameId);
+    animationFrameIdRef.current = requestAnimationFrame(updateParticles);
+    return () => {
+      if (animationFrameIdRef.current !== null) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
+      }
+    };
   }, [particles.length, dimensions, mousePosition]);
   
   // Memoize the background glow to prevent re-renders

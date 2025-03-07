@@ -16,61 +16,80 @@ interface UseQuestionSubmitProps {
   reflectionContext?: string;
   selectedReflectionId?: string;
   userId: string;
+  isMounted: React.MutableRefObject<boolean>;
 }
 
 export const useQuestionSubmit = ({
   state,
   reflectionContext,
   selectedReflectionId,
-  userId
+  userId,
+  isMounted
 }: UseQuestionSubmitProps) => {
   
   const submitQuestion = useCallback(async (question: string) => {
     if (!question.trim() || !userId) return null;
     
     try {
-      state.setLoading(true);
-      state.setError(null);
-      state.setStreamingResponse(null);
+      if (isMounted.current) {
+        state.setLoading(true);
+        state.setError(null);
+        state.setStreamingResponse(null);
+      } else {
+        return null;
+      }
       
       console.log("Submitting question:", {
         question,
         reflectionContext,
         selectedReflectionId,
-        userId
+        userId,
+        isOnline: navigator.onLine
       });
+      
+      // Check online status before proceeding
+      if (!navigator.onLine) {
+        console.log("Device is offline, will use fallback response");
+      }
       
       // Prepare question data
       const questionData: AIQuestion = {
         question,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         context: reflectionContext || '',
-        stream: true // Enable streaming by default
+        stream: navigator.onLine // Only enable streaming if online
       };
       
       // Call the API
       const aiResponse = await askAIAssistant(questionData, userId);
       
-      // Set response in state
-      state.setResponse(aiResponse);
-      
-      // Set model info if available
-      if (aiResponse.meta) {
-        state.setModelInfo({
-          model: aiResponse.meta.model,
-          tokens: aiResponse.meta.tokenUsage
-        });
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        // Set response in state
+        state.setResponse(aiResponse);
+        
+        // Set model info if available
+        if (aiResponse.meta) {
+          state.setModelInfo({
+            model: aiResponse.meta.model,
+            tokens: aiResponse.meta.tokenUsage
+          });
+        }
       }
       
       return aiResponse;
     } catch (error) {
       console.error("Error submitting question:", error);
-      state.setError(error instanceof Error ? error.message : "An unknown error occurred");
+      if (isMounted.current) {
+        state.setError(error instanceof Error ? error.message : "An unknown error occurred");
+      }
       return null;
     } finally {
-      state.setLoading(false);
+      if (isMounted.current) {
+        state.setLoading(false);
+      }
     }
-  }, [state, reflectionContext, selectedReflectionId, userId]);
+  }, [state, reflectionContext, selectedReflectionId, userId, isMounted]);
 
   return { submitQuestion };
 };

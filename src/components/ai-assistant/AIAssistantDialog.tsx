@@ -62,9 +62,6 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
     }
   };
 
-  // Check if we're in offline mode
-  const isOffline = !navigator.onLine;
-
   return (
     <Dialog 
       open={open} 
@@ -78,14 +75,6 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({
         <DialogHeader onClose={handleClose} loading={loading} />
         
         <div className="space-y-4 py-2">
-          {/* Show warning if offline */}
-          {isOffline && (
-            <div className="bg-amber-800/20 border border-amber-600/30 text-amber-200 px-3 py-2 rounded-md text-sm flex items-center space-x-2 mb-4">
-              <span className="flex-shrink-0">⚠️</span>
-              <span>You're offline. Limited functionality is available.</span>
-            </div>
-          )}
-          
           {!response ? (
             <QuestionForm
               question={question}

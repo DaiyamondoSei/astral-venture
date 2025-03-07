@@ -33,7 +33,8 @@ export const useAIAssistant = ({
     state,
     reflectionContext,
     selectedReflectionId,
-    userId: user?.id || ''
+    userId: user?.id || '',
+    isMounted
   });
   
   // Reset the state when the dialog opens/closes
