@@ -23,4 +23,9 @@ export default {
     '!src/main.tsx',
     '!src/__mocks__/**',
   ],
+  // Add specific test match for type validation tests
+  testMatch: [
+    "**/__tests__/**/*.+(ts|tsx|js)",
+    "**/?(*.)+(spec|test).+(ts|tsx|js)"
+  ],
 };
