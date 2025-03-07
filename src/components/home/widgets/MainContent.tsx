@@ -1,13 +1,13 @@
+
 import React, { memo } from 'react';
 import { motion, Variants } from 'framer-motion';
-import { LazyInteractiveEnergyField } from '@/components/lazy';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import GlassmorphicContainer from '@/components/background/GlassmorphicContainer';
 import { usePerformance } from '@/contexts/PerformanceContext';
-import LazyLoadWrapper from '@/components/LazyLoadWrapper';
+import MainContentBackground from './MainContentBackground';
 
 interface MainContentProps {
   userId?: string;
@@ -24,7 +24,6 @@ const MainContent: React.FC<MainContentProps> = ({
 }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const { 
-    deviceCapability, 
     isLowPerformance, 
     enableComplexAnimations, 
     enableBlur,
@@ -38,12 +37,6 @@ const MainContent: React.FC<MainContentProps> = ({
       y: 0,
       transition: { duration: 0.6, ease: "easeOut" }
     }
-  };
-
-  const getParticleDensity = () => {
-    if (isLowPerformance) return 0.1;
-    if (deviceCapability === 'medium') return 0.2;
-    return isMobile ? 0.2 : 0.3;
   };
 
   return (
@@ -71,15 +64,7 @@ const MainContent: React.FC<MainContentProps> = ({
         glowEffect={enableShadows && !isLowPerformance}
         shimmer={enableComplexAnimations && !isLowPerformance}
       >
-        <div className="absolute inset-0 opacity-20">
-          <LazyLoadWrapper fallbackHeight="100%">
-            <LazyInteractiveEnergyField 
-              energyPoints={energyPoints} 
-              particleDensity={getParticleDensity()}
-              className="w-full h-full"
-            />
-          </LazyLoadWrapper>
-        </div>
+        <MainContentBackground energyPoints={energyPoints} />
         
         <div className="relative z-10 w-full h-full flex items-center justify-center">
           <div className="relative w-full h-full rounded-full overflow-hidden">
