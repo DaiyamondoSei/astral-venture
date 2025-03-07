@@ -35,7 +35,7 @@ const bootstrap = () => {
   window.addEventListener('load', () => {
     // Use requestIdleCallback for non-critical operations after load
     if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(() => {
+      window.requestIdleCallback(() => {
         document.documentElement.classList.add('app-loaded');
         console.log('Application fully loaded and idle');
       });
