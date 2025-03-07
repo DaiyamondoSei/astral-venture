@@ -1,8 +1,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
-import { supabase, incrementEnergyPoints } from '@/integrations/supabase/client';
+import { ChakraActivationService } from '@/services/chakra/ChakraActivationService';
 
 interface ChakraActivationProps {
   userId: string;
@@ -46,70 +45,39 @@ export const useChakraActivation = ({
     try {
       console.log('Activating chakra:', chakraIndex, 'for user:', userId);
       
-      // Check if this chakra was already activated today to prevent duplicates
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      const result = await ChakraActivationService.activateChakra(
+        userId, 
+        chakraIndex,
+        activatedChakras
+      );
       
-      const { data: existingActivations, error: checkError } = await supabase
-        .from('user_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('challenge_id', `chakra_${chakraIndex}`)
-        .gte('completed_at', startOfDay)
-        .lte('completed_at', endOfDay);
-      
-      if (checkError) {
-        console.error('Error checking existing activations:', checkError);
-        throw checkError;
-      }
-      
-      if (existingActivations && existingActivations.length > 0) {
-        console.log('Chakra already activated today:', existingActivations);
-        toast({
-          title: `${CHAKRA_NAMES[chakraIndex]} Chakra Already Active`,
-          description: "You've already activated this chakra today.",
-        });
+      if (!result.success) {
+        if (result.alreadyActivated) {
+          toast({
+            title: `${result.chakraName} Chakra Already Active`,
+            description: "You've already activated this chakra today.",
+          });
+        }
         return;
       }
       
-      // Insert new activation
-      const { error } = await supabase
-        .from('user_progress')
-        .insert({
-          user_id: userId,
-          category: 'chakra_activation',
-          challenge_id: `chakra_${chakraIndex}`,
-          completed_at: new Date().toISOString()
-        });
-        
-      if (error) {
-        console.error('Error inserting chakra activation:', error);
-        throw error;
-      }
-      
-      const pointsEarned = 10 + (chakraIndex * 5);
-      const newPoints = await incrementEnergyPoints(userId, pointsEarned);
-      
-      if (newPoints !== undefined) {
+      // Update user profile with new points
+      if (result.newPoints !== undefined) {
         updateUserProfile({
-          energy_points: newPoints
+          energy_points: result.newPoints
         });
       }
       
-      // Update streak and activated chakras
+      // Update streak
       const newStreak = userStreak.current + 1;
       await updateStreak(newStreak);
       
-      const newActivatedChakras = [...activatedChakras];
-      if (!newActivatedChakras.includes(chakraIndex)) {
-        newActivatedChakras.push(chakraIndex);
-      }
-      updateActivatedChakras(newActivatedChakras);
+      // Update activated chakras
+      updateActivatedChakras(result.newActivatedChakras);
       
       toast({
-        title: `${CHAKRA_NAMES[chakraIndex]} Chakra Activated!`,
-        description: `+${pointsEarned} cosmic energy points earned`,
+        title: `${result.chakraName} Chakra Activated!`,
+        description: `+${result.pointsEarned} cosmic energy points earned`,
       });
       
     } catch (error: any) {
@@ -129,73 +97,38 @@ export const useChakraActivation = ({
     if (!userId) return false;
     
     try {
-      const today = new Date();
-      const currentDay = today.getDay();
-      const allDays = Array.from({ length: currentDay + 1 }, (_, i) => i);
-      const missedDays = allDays.filter(day => !activatedChakras.includes(day));
+      const result = await ChakraActivationService.recalibrateChakras(
+        userId,
+        activatedChakras,
+        reflection
+      );
       
-      if (missedDays.length === 0) {
-        toast({
-          title: "No Recalibration Needed",
-          description: "You haven't missed any chakra activations.",
-        });
+      if (!result.success) {
+        if (result.noRecalibrationNeeded) {
+          toast({
+            title: "No Recalibration Needed",
+            description: "You haven't missed any chakra activations.",
+          });
+        }
         return false;
       }
       
-      // Process each missed day
-      for (const missedDay of missedDays) {
-        // Check if this chakra was already recalibrated today
-        const { data: existingRecalibrations, error: checkError } = await supabase
-          .from('user_progress')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('challenge_id', `chakra_${missedDay}`)
-          .eq('category', 'chakra_recalibration');
-        
-        if (checkError) throw checkError;
-        
-        // Skip if already recalibrated
-        if (existingRecalibrations && existingRecalibrations.length > 0) {
-          console.log('Chakra already recalibrated:', missedDay);
-          continue;
-        }
-        
-        await supabase
-          .from('user_progress')
-          .insert({
-            user_id: userId,
-            category: 'chakra_recalibration',
-            challenge_id: `chakra_${missedDay}`,
-            completed_at: new Date().toISOString(),
-            reflection
-          });
-      }
+      // Update activated chakras
+      updateActivatedChakras(result.newActivatedChakras);
       
-      // Update activated chakras with newly recalibrated ones
-      const newActivatedChakras = [...activatedChakras];
-      missedDays.forEach(day => {
-        if (!newActivatedChakras.includes(day)) {
-          newActivatedChakras.push(day);
-        }
-      });
-      updateActivatedChakras(newActivatedChakras);
-      
-      // Award points and update streak
-      const pointsEarned = Math.max(5, missedDays.length * 2);
-      const newPoints = await incrementEnergyPoints(userId, pointsEarned);
-      
-      if (newPoints !== undefined) {
+      // Update user profile with new points
+      if (result.newPoints !== undefined) {
         updateUserProfile({
-          energy_points: newPoints
+          energy_points: result.newPoints
         });
       }
       
-      const newStreak = Math.max(currentDay + 1, activatedChakras.length);
-      await updateStreak(newStreak);
+      // Update streak
+      await updateStreak(result.newStreak);
       
       toast({
         title: "Energy Recalibrated",
-        description: `Your chakra flow has been restored. +${pointsEarned} energy points.`,
+        description: `Your chakra flow has been restored. +${result.pointsEarned} energy points.`,
       });
       
       return true;
