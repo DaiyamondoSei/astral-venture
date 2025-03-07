@@ -4,7 +4,7 @@
  */
 import { supabase, incrementEnergyPoints } from '@/integrations/supabase/client';
 import { CHAKRA_NAMES } from '@/components/entry-animation/cosmic/types';
-import { handleError } from '@/utils/errorHandling';
+import { handleError, ErrorSeverity } from '@/utils/errorHandling';
 
 // Improved typings for better code quality and prevention of bugs
 interface ChakraActivationResult {
@@ -102,7 +102,7 @@ export class ChakraActivationService {
         newActivatedChakras
       };
     } catch (error) {
-      handleError(error, 'ChakraActivationService.activateChakra', false);
+      handleError(error, { context: 'ChakraActivationService.activateChakra', showToast: false });
       throw error;
     }
   }
@@ -196,7 +196,7 @@ export class ChakraActivationService {
         newStreak
       };
     } catch (error) {
-      handleError(error, 'ChakraActivationService.recalibrateChakras', false);
+      handleError(error, { context: 'ChakraActivationService.recalibrateChakras', showToast: false });
       throw error;
     }
   }

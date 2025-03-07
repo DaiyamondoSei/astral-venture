@@ -5,7 +5,6 @@ import { QuantumParticlesProps } from './quantum-particles/types';
 import { usePerformance } from '@/contexts/PerformanceContext';
 import useVisibilityObserver from '@/hooks/useVisibilityObserver';
 import { useOptimizedMemo } from '@/hooks/useOptimizedRender';
-import { submitWorkerTask } from '@/utils/workerManager';
 
 /**
  * QuantumParticles
@@ -13,11 +12,9 @@ import { submitWorkerTask } from '@/utils/workerManager';
  * A wrapper component that ensures correct prop types before passing to the
  * main implementation. Ensures count is always passed as a number.
  * Now with visibility optimization to pause animations when off-screen.
- * Uses web workers for particle calculations when available.
  */
 const QuantumParticles: React.FC<QuantumParticlesProps> = (props) => {
   const { isLowPerformance, isMediumPerformance, enableParticles } = usePerformance();
-  const [useWorker, setUseWorker] = useState(false);
   const workerSupported = useRef(typeof Worker !== 'undefined').current;
   
   // Add visibility observer to optimize rendering
@@ -25,14 +22,6 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = (props) => {
     rootMargin: '100px',
     threshold: 0.1
   });
-  
-  // Check if the browser supports workers
-  useEffect(() => {
-    // Only enable worker for medium/high performance devices
-    if (workerSupported && !isLowPerformance) {
-      setUseWorker(true);
-    }
-  }, [workerSupported, isLowPerformance]);
   
   // Early return with null if particles are disabled
   if (!enableParticles) {
@@ -78,8 +67,6 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = (props) => {
         count={count}
         interactive={interactive}
         isPaused={isPaused}
-        useWorker={useWorker}
-        workerTask={useWorker ? submitWorkerTask : undefined}
       />
     </div>
   );

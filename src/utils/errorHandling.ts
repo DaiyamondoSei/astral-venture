@@ -78,7 +78,7 @@ export function handleError(
       variant: severity === ErrorSeverity.INFO 
         ? "default" 
         : severity === ErrorSeverity.WARNING 
-          ? "warning" 
+          ? "default" // Changed from "warning" to "default" as it's an allowed variant
           : "destructive"
     });
   }
@@ -166,4 +166,9 @@ export function createSafeFunction<T extends any[], R>(
       return null;
     }
   };
+}
+
+// Add captureException function for use in other files
+export function captureException(error: unknown, context: string): void {
+  handleError(error, { context, reportToAnalytics: true });
 }
