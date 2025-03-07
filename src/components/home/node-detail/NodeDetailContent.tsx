@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
+import { DownloadableMaterial as SacredGeometryMaterial } from '@/components/sacred-geometry/types/geometry';
+import { DownloadableMaterial } from './types';
 import PracticesList from './PracticesList';
 import PracticeActionButton from './PracticeActionButton';
 import { nodeDetailsData } from './nodeDetailsData';
@@ -11,7 +12,7 @@ interface NodeDetailContentProps {
   nodeId: string;
   title?: string;
   description?: string;
-  downloadableMaterials?: DownloadableMaterial[];
+  downloadableMaterials?: SacredGeometryMaterial[] | DownloadableMaterial[];
   consciousnessLevel?: number;
 }
 
@@ -27,6 +28,25 @@ const NodeDetailContent: React.FC<NodeDetailContentProps> = ({
     description: description || 'Information about this node is not available.',
     practices: []
   };
+
+  // Convert materials to the format expected by DownloadableMaterialsPanel if needed
+  const formattedMaterials = downloadableMaterials?.map(material => {
+    // Check if it's already in the expected format
+    if ('id' in material && 'name' in material && 'type' in material) {
+      return material as SacredGeometryMaterial;
+    }
+    
+    // Convert to the expected format
+    return {
+      id: Math.random().toString(36).substring(2, 9), // Generate a random ID
+      name: material.title || 'Resource',
+      description: material.description || '',
+      type: (material.format === 'pdf' ? 'pdf' : 
+            material.format === 'audio' ? 'audio' :
+            material.format === 'video' ? 'video' : 'practice') as any,
+      icon: null // We'll let the component handle default icons
+    } as SacredGeometryMaterial;
+  });
 
   return (
     <motion.div
@@ -53,9 +73,9 @@ const NodeDetailContent: React.FC<NodeDetailContentProps> = ({
       )}
       
       {/* Add downloadable materials panel if available */}
-      {downloadableMaterials && downloadableMaterials.length > 0 && (
+      {formattedMaterials && formattedMaterials.length > 0 && (
         <DownloadableMaterialsPanel 
-          materials={downloadableMaterials}
+          materials={formattedMaterials as SacredGeometryMaterial[]}
           nodeName={details.title}
         />
       )}

@@ -14,7 +14,7 @@ interface NodeDetailSectionProps {
   activeNodeId: string | null;
   activeNodeName?: string;
   activeNodeDescription?: string;
-  downloadables?: DownloadableMaterial[];
+  downloadables?: DownloadableMaterial[] | any[]; // Allow for both types
   className?: string;
   onClose?: () => void;
 }
@@ -65,6 +65,7 @@ const NodeDetailSection: React.FC<NodeDetailSectionProps> = ({
             title={activeNodeName || activeNodeId.charAt(0).toUpperCase() + activeNodeId.slice(1)}
             description={activeNodeDescription || "Explore the sacred geometry of this node and its cosmic implications."}
             consciousnessLevel={3}
+            downloadableMaterials={downloadables}
           />
           
           {/* Practice section */}
@@ -97,7 +98,7 @@ const NodeDetailSection: React.FC<NodeDetailSectionProps> = ({
                       rel="noopener noreferrer"
                       className="text-quantum-300 hover:text-quantum-200 transition-colors focus-outline"
                     >
-                      {item.title || `Resource ${index + 1}`}
+                      {item.title || item.name || `Resource ${index + 1}`}
                     </a>
                   </li>
                 ))}

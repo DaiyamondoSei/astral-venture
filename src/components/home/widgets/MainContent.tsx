@@ -11,7 +11,7 @@ import GlassmorphicContainer from '@/components/background/GlassmorphicContainer
 interface MainContentProps {
   userId?: string;
   energyPoints: number;
-  onNodeSelect: (nodeId: string, downloadables?: DownloadableMaterial[]) => void;
+  onNodeSelect: (nodeId: string, downloadables?: DownloadableMaterial[] | any[]) => void;
   className?: string;
 }
 
