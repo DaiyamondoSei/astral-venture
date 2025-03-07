@@ -9,10 +9,10 @@ interface ParticleProps {
   dy: number;
 }
 
+// Using React.memo to prevent unnecessary re-renders
 const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
   return (
     <motion.div
-      key={particle.id}
       className="absolute rounded-full"
       style={{
         left: `${particle.x}%`,
@@ -39,4 +39,5 @@ const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
   );
 };
 
+// Export with React.memo to prevent unnecessary re-renders when props don't change
 export default React.memo(Particle);

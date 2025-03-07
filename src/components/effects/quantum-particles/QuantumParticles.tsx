@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import Particle from './Particle';
 import { useParticleSystem } from './useParticleSystem';
 import { QuantumParticlesProps } from './types';
@@ -17,6 +17,7 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
     <div 
       ref={containerRef}
       className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
+      aria-hidden="true"
     >
       {particles.map(particle => {
         // Calculate movement based on mouse position if interactive
@@ -36,4 +37,5 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   );
 };
 
-export default QuantumParticles;
+// Use memo to prevent unnecessary re-renders
+export default memo(QuantumParticles);

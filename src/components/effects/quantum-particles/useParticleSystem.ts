@@ -13,9 +13,8 @@ export const useParticleSystem = (
   
   // Generate random particles only once on mount
   useEffect(() => {
-    // Prevent multiple initializations causing infinite loop
+    // Prevent regenerating particles on every render
     if (initialized.current) return;
-    initialized.current = true;
     
     const newParticles: QuantumParticle[] = [];
     
@@ -33,7 +32,8 @@ export const useParticleSystem = (
     }
     
     setParticles(newParticles);
-  }, [count, colors]);
+    initialized.current = true;
+  }, [count, colors]); // Only depend on count and colors
   
   // Track mouse position for interactive mode
   useEffect(() => {
@@ -48,7 +48,7 @@ export const useParticleSystem = (
     
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [interactive]);
+  }, [interactive]); // Only depend on interactive flag
   
   return { particles, mousePosition };
 };
