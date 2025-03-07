@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { QuantumParticlesProps } from './types';
 import { useParticleSystem } from './useParticleSystem';
 import Particle from './Particle';
-import { getAnimationQualityLevel } from '@/utils/performanceUtils';
+import { getPerformanceCategory } from '@/utils/performanceUtils';
 
 /**
  * QuantumParticles Component
@@ -30,7 +30,7 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   const [mousePosition, setMousePosition] = useState<{ x: number, y: number } | null>(null);
   
   // Get quality level for performance optimization
-  const qualityLevel = getAnimationQualityLevel();
+  const qualityLevel = getPerformanceCategory();
   
   // Calculate actual count based on quality level
   const actualCount = useRef<number>(

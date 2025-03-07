@@ -3,9 +3,9 @@ import { useRef, useEffect } from 'react';
 
 /**
  * Hook to safely check if a component is mounted
- * Returns a ref object with a current property set to true if mounted, false otherwise
+ * Returns a boolean value indicating if the component is mounted
  */
-export const useIsMounted = () => {
+export const useIsMounted = (): { current: boolean } => {
   const isMounted = useRef(true);
   
   useEffect(() => {

@@ -1,13 +1,15 @@
-
 export interface Particle {
-  id: number;
+  id: string;
   x: number;
   y: number;
   size: number;
   color: string;
-  vx: number;
-  vy: number;
   opacity: number;
+  speed: number;
+  direction: number;
+  pulse: number;
+  vx?: number;
+  vy?: number;
 }
 
 export interface EnergyFieldProps {
@@ -23,17 +25,16 @@ export interface ParticleProps {
 }
 
 export interface BackgroundGlowProps {
+  energyPoints: number;
   colors: string[];
   dimensions: {
     width: number;
     height: number;
-  };
+  } | null;
 }
 
 export interface ClickWaveProps {
-  clickWave: {
-    x: number;
-    y: number;
-    active: boolean;
-  } | null;
+  x: number;
+  y: number;
+  color: string;
 }

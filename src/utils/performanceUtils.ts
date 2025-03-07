@@ -11,22 +11,26 @@ export const detectDeviceCapabilities = (): number => {
   let score = 5;
   
   // Check navigator properties if available
-  if (navigator.deviceMemory) {
-    // Device memory in GB
-    score += Math.min(navigator.deviceMemory, 8) / 2;
+  if (typeof navigator !== 'undefined') {
+    // Safely check for deviceMemory using optional chaining
+    if ('deviceMemory' in navigator) {
+      // @ts-ignore - deviceMemory is not in all TypeScript Navigator types
+      const memory = navigator.deviceMemory as number || 4;
+      score += Math.min(memory, 8) / 2;
+    }
+    
+    // Check for hardware concurrency (CPU cores)
+    if (navigator.hardwareConcurrency) {
+      score += Math.min(navigator.hardwareConcurrency, 8) / 2;
+    }
+    
+    // Check if it's a mobile device (generally lower performance)
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      score -= 2;
+    }
   }
   
-  // Check for hardware concurrency (CPU cores)
-  if (navigator.hardwareConcurrency) {
-    score += Math.min(navigator.hardwareConcurrency, 8) / 2;
-  }
-  
-  // Check if it's a mobile device (generally lower performance)
-  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-    score -= 2;
-  }
-  
-  // Clamp the score between.0 and 10
+  // Clamp the score between 0 and 10
   return Math.max(0, Math.min(10, score));
 };
 
@@ -36,14 +40,52 @@ export const detectDeviceCapabilities = (): number => {
 export type PerformanceCategory = 'low' | 'medium' | 'high';
 
 /**
+ * Device capabilities information
+ */
+export interface DeviceCapabilities {
+  score: number;
+  category: PerformanceCategory;
+  pixelRatio: number;
+  isMobile: boolean;
+  cpuCores: number;
+}
+
+/**
+ * Get detailed device capabilities
+ */
+export const getDeviceCapabilities = (): DeviceCapabilities => {
+  const score = detectDeviceCapabilities();
+  const pixelRatio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  const isMobile = typeof navigator !== 'undefined' 
+    ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    : false;
+  const cpuCores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2;
+  
+  return {
+    score,
+    category: getPerformanceCategory(score),
+    pixelRatio,
+    isMobile,
+    cpuCores
+  };
+};
+
+/**
  * Maps device capabilities to performance categories
  */
-export const getPerformanceCategory = (): PerformanceCategory => {
-  const score = detectDeviceCapabilities();
+export const getPerformanceCategory = (score?: number): PerformanceCategory => {
+  const performanceScore = score !== undefined ? score : detectDeviceCapabilities();
   
-  if (score < 3) return 'low';
-  if (score < 7) return 'medium';
+  if (performanceScore < 3) return 'low';
+  if (performanceScore < 7) return 'medium';
   return 'high';
+};
+
+/**
+ * Get animation quality level based on device capabilities
+ */
+export const getAnimationQualityLevel = (): PerformanceCategory => {
+  return getPerformanceCategory();
 };
 
 /**

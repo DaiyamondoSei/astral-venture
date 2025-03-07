@@ -1,7 +1,7 @@
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
-import { getAnimationQualityLevel } from '@/utils/performanceUtils'; 
+import { getPerformanceCategory } from '@/utils/performanceUtils'; 
 
 // Lazy load the background component to improve initial load time
 const GeometryNetworkBackground = lazy(() => 
@@ -34,7 +34,7 @@ const Layout = ({
 
   // Detect device performance capabilities
   useEffect(() => {
-    const quality = getAnimationQualityLevel();
+    const quality = getPerformanceCategory();
     setAnimationQuality(quality);
     
     // For medium and high-performance devices, load background after 100ms delay

@@ -40,7 +40,9 @@ export const useParticles = ({
         color: colors[Math.floor(Math.random() * colors.length)],
         opacity: Math.random() * 0.5 + 0.3,
         direction: Math.random() * Math.PI * 2,
-        pulse: Math.random() * 2 + 1
+        pulse: Math.random() * 2 + 1,
+        vx: 0,
+        vy: 0
       };
     });
     
@@ -62,7 +64,13 @@ export const useParticles = ({
     let lastTime = performance.now();
     
     const animate = (time: number) => {
-      if (!isMounted) return;
+      if (!isMounted) {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        return;
+      }
       
       const delta = time - lastTime;
       lastTime = time;
@@ -105,7 +113,11 @@ export const useParticles = ({
           if (y < 0) y = dimensions.height;
           if (y > dimensions.height) y = 0;
           
-          return { ...particle, x, y, direction, pulse };
+          // Update vx and vy for type compatibility
+          const vx = Math.cos(direction) * speed;
+          const vy = Math.sin(direction) * speed;
+          
+          return { ...particle, x, y, direction, pulse, vx, vy };
         });
       });
       
@@ -121,6 +133,16 @@ export const useParticles = ({
       }
     };
   }, [dimensions, mousePosition, isMounted]);
+  
+  // Ensure animation frames are cleaned up on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, []);
   
   return particles;
 };

@@ -1,6 +1,6 @@
 
 import { useMemo } from 'react';
-import { getAnimationQualityLevel, getDeviceCapabilities } from '@/utils/performanceUtils';
+import { getPerformanceCategory, getDeviceCapabilities } from '@/utils/performanceUtils';
 
 interface ThrottledAnimationProps {
   animateX: number[];
@@ -39,7 +39,7 @@ export function useThrottledAnimation({
   duration,
   delay
 }: ThrottledAnimationProps): ThrottledAnimationResult {
-  const qualityLevel = getAnimationQualityLevel();
+  const qualityLevel = getPerformanceCategory();
   const deviceCapabilities = getDeviceCapabilities();
   
   return useMemo(() => {
