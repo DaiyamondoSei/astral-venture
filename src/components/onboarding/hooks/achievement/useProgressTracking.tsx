@@ -1,6 +1,6 @@
 
 import { useCallback } from 'react';
-import { AchievementState, ProgressTrackingResult } from './types';
+import { AchievementState, ProgressTrackingResult, AchievementEventType } from './types';
 
 /**
  * Hook for tracking user progress in various achievement categories
@@ -27,6 +27,9 @@ export function useProgressTracking(
     const currentValue = getProgressValue(type);
     const newValue = Math.max(0, currentValue + amount);
     
+    // Only update if the value has changed
+    if (newValue === currentValue) return;
+    
     // Create a new object with the updated value
     const updatedProgress = {
       ...state.progressTracking,
@@ -35,17 +38,28 @@ export function useProgressTracking(
     
     // Call the setter with the new object
     setProgressTracking(updatedProgress);
+    
+    // Log meaningful progress updates
+    if (amount > 0) {
+      console.log(`Progress tracked: ${type} increased by ${amount} to ${newValue}`);
+    } else {
+      console.log(`Progress decreased: ${type} changed by ${amount} to ${newValue}`);
+    }
   }, [state.progressTracking, setProgressTracking, getProgressValue]);
 
   // Reset a specific progress type to zero
   const resetProgress = useCallback((type: string): void => {
+    // Only reset if the current value is not already 0
+    if (getProgressValue(type) === 0) return;
+    
     const updatedProgress = {
       ...state.progressTracking,
       [type]: 0
     };
     
     setProgressTracking(updatedProgress);
-  }, [state.progressTracking, setProgressTracking]);
+    console.log(`Progress reset: ${type} set to 0`);
+  }, [state.progressTracking, setProgressTracking, getProgressValue]);
 
   // Log activity with optional details
   const logActivity = useCallback((activityType: string, details?: Record<string, any>): void => {
@@ -60,24 +74,67 @@ export function useProgressTracking(
       }
     }
 
-    // Track the activity with the extracted or default value
-    trackProgress(activityType, value);
+    // Map activity types to progress tracking types
+    let progressType = activityType;
+    
+    // Handle standard achievement event types
+    switch (activityType) {
+      case AchievementEventType.REFLECTION_COMPLETED:
+        progressType = 'reflections';
+        break;
+      case AchievementEventType.MEDITATION_COMPLETED:
+        progressType = 'meditation_minutes';
+        value = details?.duration || value;
+        break;
+      case AchievementEventType.CHAKRA_ACTIVATED:
+        progressType = 'chakras_activated';
+        break;
+      case AchievementEventType.WISDOM_EXPLORED:
+        progressType = 'wisdom_resources_explored';
+        break;
+      default:
+        // Use the original activity type
+        break;
+    }
 
-    // Additional logging or processing could be added here
-    console.log(`Activity logged: ${activityType}`, details);
+    // Track the activity with the extracted or default value
+    trackProgress(progressType, value);
+
+    // Additional logging or processing
+    console.log(`Activity logged: ${activityType}`, {
+      progressType,
+      value,
+      details,
+      timestamp: new Date().toISOString()
+    });
   }, [trackProgress]);
 
   // Track multiple progress types at once
   const trackMultipleProgress = useCallback((progressUpdates: Record<string, number>): void => {
+    // Skip if empty updates object
+    if (Object.keys(progressUpdates).length === 0) return;
+    
+    // Find changes that need to be applied
+    const changedValues = Object.entries(progressUpdates).filter(([type, amount]) => {
+      const currentValue = state.progressTracking[type] || 0;
+      return Math.max(0, currentValue + amount) !== currentValue;
+    });
+    
+    // Skip if no actual changes
+    if (changedValues.length === 0) return;
+    
     const updatedProgress = { ...state.progressTracking };
     
     // Process each update
-    Object.entries(progressUpdates).forEach(([type, amount]) => {
+    changedValues.forEach(([type, amount]) => {
       const currentValue = updatedProgress[type] || 0;
       updatedProgress[type] = Math.max(0, currentValue + amount);
     });
     
     setProgressTracking(updatedProgress);
+    
+    // Log the batch update
+    console.log('Multiple progress updates:', changedValues);
   }, [state.progressTracking, setProgressTracking]);
 
   return {

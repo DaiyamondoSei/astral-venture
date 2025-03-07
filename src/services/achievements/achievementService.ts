@@ -1,174 +1,158 @@
 
-import { AchievementData } from '@/components/onboarding/data/types';
-import { AchievementEvent, AchievementEventType } from '@/components/onboarding/hooks/achievement/types';
+import { AchievementEventType } from '@/components/onboarding/hooks/achievement/types';
 
-// Event listeners for the achievement system
-const eventListeners: Record<string, Function[]> = {};
-
-// Create a single source of truth for achievement-related operations
-export const achievementService = {
-  /**
-   * Calculate achievement progress percentage
-   * @param achievement The achievement to calculate progress for
-   * @param currentValue The current progress value
-   * @returns Progress percentage (0-100)
-   */
-  calculateProgress: (achievement: AchievementData, currentValue: number): number => {
-    if (!achievement.progressThreshold || achievement.progressThreshold <= 0) {
-      return 100; // If no threshold is defined, achievement is complete
-    }
-    
-    const progress = Math.min(100, Math.floor((currentValue / achievement.progressThreshold) * 100));
-    return progress;
-  },
+/**
+ * Service to track and manage achievement events
+ */
+export class AchievementService {
+  private userId: string | undefined;
+  private eventListeners: Map<string, Array<(data: any) => void>> = new Map();
+  
+  constructor(userId?: string) {
+    this.userId = userId;
+  }
   
   /**
-   * Determine if an achievement should be awarded
-   * @param achievement The achievement to check
-   * @param currentValue The current value to check against
-   * @param previouslyAwarded Whether this achievement was previously awarded
-   * @returns Boolean indicating if achievement should be awarded
+   * Set the user ID for this service instance
    */
-  shouldAwardAchievement: (
-    achievement: AchievementData, 
-    currentValue: number,
-    previouslyAwarded: boolean = false
-  ): boolean => {
-    // Don't award if already awarded (unless it's a progressive achievement)
-    if (previouslyAwarded && achievement.type !== 'progressive') {
-      return false;
-    }
-    
-    // Handle different achievement types
-    switch (achievement.type) {
-      case 'streak':
-        return currentValue >= (achievement.streakDays || 1);
-        
-      case 'progressive':
-        // For tiered achievements, check if we've reached a new tier
-        if (achievement.tieredLevels && achievement.tieredLevels.length > 0) {
-          const nextTierIndex = achievement.tier ? achievement.tier : 0;
-          const nextTierThreshold = achievement.tieredLevels[nextTierIndex];
-          return nextTierThreshold && currentValue >= nextTierThreshold;
-        }
-        return currentValue >= (achievement.progressThreshold || 1);
-        
-      case 'milestone':
-        return currentValue >= (achievement.progressThreshold || 1);
-        
-      default:
-        return true; // For discovery, completion, and interaction types
-    }
-  },
+  setUserId(userId: string) {
+    this.userId = userId;
+  }
   
   /**
-   * Calculate points earned for an achievement
-   * @param achievement The achievement to calculate points for
-   * @param currentTier For tiered achievements, the current tier
-   * @returns Number of points earned
+   * Track an achievement event
+   * @param eventType The type of achievement event
+   * @param data Optional data related to the event
    */
-  calculatePoints: (achievement: AchievementData, currentTier?: number): number => {
-    // For progressive achievements with tier-based points
-    if (achievement.type === 'progressive' && 
-        achievement.pointsPerTier && 
-        achievement.pointsPerTier.length > 0 &&
-        typeof currentTier === 'number') {
-      
-      // Get points for the current tier, or use the last defined tier
-      const tierIndex = Math.min(currentTier, achievement.pointsPerTier.length - 1);
-      return achievement.pointsPerTier[tierIndex] || achievement.points;
+  trackEvent(eventType: AchievementEventType, data: any = {}) {
+    if (!this.userId) {
+      console.warn('Achievement event tracked without userId');
     }
     
-    // Default to the achievement's base points
-    return achievement.points;
-  },
+    const eventData = {
+      eventType,
+      userId: this.userId,
+      timestamp: new Date().toISOString(),
+      ...data
+    };
+    
+    // Log the event
+    console.log(`Achievement event tracked: ${eventType}`, eventData);
+    
+    // Store event in local storage for persistence
+    this.storeEvent(eventData);
+    
+    // Notify listeners
+    this.notifyListeners(eventType, eventData);
+    
+    return eventData;
+  }
   
   /**
-   * Get the next achievement to focus on
-   * @param allAchievements List of all available achievements
-   * @param completedAchievementIds IDs of completed achievements
-   * @param progressData Current progress tracking data
-   * @returns The next achievement to focus on, or null if all complete
+   * Store event in local storage
    */
-  getNextAchievement: (
-    allAchievements: AchievementData[],
-    completedAchievementIds: string[],
-    progressData: Record<string, number>
-  ): AchievementData | null => {
-    // Filter to incomplete achievements
-    const incompleteAchievements = allAchievements.filter(
-      a => !completedAchievementIds.includes(a.id)
-    );
+  private storeEvent(eventData: any) {
+    if (!this.userId) return;
     
-    if (incompleteAchievements.length === 0) return null;
-    
-    // Find achievement closest to completion
-    let highestProgress = -1;
-    let nextAchievement: AchievementData | null = null;
-    
-    incompleteAchievements.forEach(achievement => {
-      let progress = 0;
+    try {
+      const eventsKey = `achievement-events-${this.userId}`;
+      const storedEvents = JSON.parse(localStorage.getItem(eventsKey) || '[]');
+      storedEvents.push(eventData);
       
-      // Calculate progress based on achievement type
-      if (achievement.type === 'streak' && achievement.streakDays) {
-        const streakDays = progressData.streakDays || 0;
-        progress = (streakDays / achievement.streakDays) * 100;
-      } 
-      else if (achievement.type === 'milestone' && achievement.progressThreshold && achievement.trackedValue) {
-        const currentValue = progressData[achievement.trackedValue] || 0;
-        progress = (currentValue / achievement.progressThreshold) * 100;
-      }
-      else if (achievement.type === 'progressive' && achievement.tieredLevels && achievement.trackedValue) {
-        const currentValue = progressData[achievement.trackedValue] || 0;
-        const nextTierIndex = 0; // Assuming we start at the first tier
-        if (nextTierIndex < achievement.tieredLevels.length) {
-          const nextThreshold = achievement.tieredLevels[nextTierIndex];
-          progress = (currentValue / nextThreshold) * 100;
-        }
-      }
-      
-      // Save achievement with highest progress
-      if (progress > highestProgress) {
-        highestProgress = progress;
-        nextAchievement = achievement;
+      // Limit stored events to prevent excessive storage use
+      const limitedEvents = storedEvents.slice(-100);
+      localStorage.setItem(eventsKey, JSON.stringify(limitedEvents));
+    } catch (error) {
+      console.error('Error storing achievement event:', error);
+    }
+  }
+  
+  /**
+   * Add an event listener
+   * @param eventType The event type to listen for, or '*' for all events
+   * @param callback Function to call when the event occurs
+   */
+  addEventListener(eventType: string, callback: (data: any) => void) {
+    if (!this.eventListeners.has(eventType)) {
+      this.eventListeners.set(eventType, []);
+    }
+    
+    this.eventListeners.get(eventType)?.push(callback);
+    
+    return () => this.removeEventListener(eventType, callback);
+  }
+  
+  /**
+   * Remove an event listener
+   */
+  removeEventListener(eventType: string, callback: (data: any) => void) {
+    const listeners = this.eventListeners.get(eventType);
+    if (!listeners) return;
+    
+    const index = listeners.indexOf(callback);
+    if (index !== -1) {
+      listeners.splice(index, 1);
+    }
+  }
+  
+  /**
+   * Notify all listeners of an event
+   */
+  private notifyListeners(eventType: string, data: any) {
+    // Notify specific event listeners
+    const listeners = this.eventListeners.get(eventType) || [];
+    listeners.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('Error in achievement event listener:', error);
       }
     });
     
-    return nextAchievement;
-  },
-  
-  /**
-   * Add event listener for achievement events
-   */
-  addEventListener: (
-    eventType: AchievementEventType,
-    callback: (event: AchievementEvent) => void
-  ) => {
-    if (!eventListeners[eventType]) {
-      eventListeners[eventType] = [];
-    }
-    eventListeners[eventType].push(callback);
-  },
-  
-  /**
-   * Remove event listener
-   */
-  removeEventListener: (
-    eventType: AchievementEventType,
-    callback: (event: AchievementEvent) => void
-  ) => {
-    if (!eventListeners[eventType]) return;
-    eventListeners[eventType] = eventListeners[eventType].filter(cb => cb !== callback);
-  },
-  
-  /**
-   * Dispatch achievement event
-   */
-  dispatchEvent: (event: AchievementEvent) => {
-    if (!eventListeners[event.type]) return;
-    eventListeners[event.type].forEach(callback => callback(event));
+    // Notify wildcard listeners
+    const wildcardListeners = this.eventListeners.get('*') || [];
+    wildcardListeners.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('Error in wildcard achievement event listener:', error);
+      }
+    });
   }
-};
+  
+  /**
+   * Get achievement history from local storage
+   */
+  getAchievementHistory(): Record<string, any> {
+    if (!this.userId) return {};
+    
+    try {
+      const historyKey = `achievements-${this.userId}`;
+      return JSON.parse(localStorage.getItem(historyKey) || '{}');
+    } catch (error) {
+      console.error('Error retrieving achievement history:', error);
+      return {};
+    }
+  }
+  
+  /**
+   * Clear all achievement data for testing purposes
+   * @param confirm Confirmation string to prevent accidental clearing
+   */
+  clearAllData(confirm: string) {
+    if (confirm !== 'CLEAR_ACHIEVEMENTS_DATA' || !this.userId) return;
+    
+    try {
+      localStorage.removeItem(`achievements-${this.userId}`);
+      localStorage.removeItem(`achievement-events-${this.userId}`);
+      console.log('Achievement data cleared');
+    } catch (error) {
+      console.error('Error clearing achievement data:', error);
+    }
+  }
+}
 
-// Export event types
-export { AchievementEventType };
+// Create a singleton instance for global use
+export const achievementService = new AchievementService();
+
+export default achievementService;
