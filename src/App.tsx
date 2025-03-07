@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -9,7 +8,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import QuantumParticles from '@/components/effects/QuantumParticles';
 
 // Lazy load the pages for better performance
-const Index = lazy(() => import('@/pages/Index'));
+const Index = lazy(() => import('@/pages/index'));
 const Login = lazy(() => import('@/pages/Login'));
 const EntryAnimationPage = lazy(() => import('@/pages/EntryAnimation'));
 const DreamCapture = lazy(() => import('@/pages/DreamCapture'));

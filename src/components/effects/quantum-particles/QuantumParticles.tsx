@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Particle from './Particle';
 import { useParticleSystem } from './useParticleSystem';
 import { QuantumParticlesProps } from './types';
@@ -11,9 +11,13 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   interactive = true
 }) => {
   const { particles, mousePosition } = useParticleSystem(count, colors, interactive);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   return (
-    <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
+    <div 
+      ref={containerRef}
+      className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
+    >
       {particles.map(particle => {
         // Calculate movement based on mouse position if interactive
         const dx = interactive ? (mousePosition.x - particle.x) / 50 : 0;
