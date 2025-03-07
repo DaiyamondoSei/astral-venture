@@ -1,127 +1,78 @@
 
-import React, { ComponentType, memo } from 'react';
+import React from 'react';
 
-// Simple component documentation structure
-interface ComponentDocumentation {
+/**
+ * Interface for documenting component props
+ */
+export interface IComponentPropsDocumentation {
   name: string;
   description: string;
-  props: PropDocumentation[];
-  examples?: ComponentExample[];
-}
-
-interface PropDocumentation {
-  name: string;
-  type: string;
   required: boolean;
-  description: string;
+  type: string;
   defaultValue?: string;
+  example?: string;
 }
 
-interface ComponentExample {
+/**
+ * Interface for documenting components
+ */
+export interface IComponentDocumentation {
+  name: string;
+  description: string;
+  props: IComponentPropsDocumentation[];
+  examples: IComponentExample[];
+  notes?: string[];
+}
+
+export interface IComponentExample {
   title: string;
   code: string;
   description?: string;
 }
 
-// Component registry to store documentation
-const componentRegistry: Record<string, ComponentDocumentation> = {};
-
 /**
- * Registers documentation for a component
+ * Documentation decorator for React components
+ * This attaches documentation metadata to a component
  */
-export function registerComponentDocs(docs: ComponentDocumentation): void {
-  componentRegistry[docs.name] = docs;
+export function documentComponent<T>(
+  component: React.ComponentType<T>, 
+  documentation: IComponentDocumentation
+): React.ComponentType<T> {
+  const ComponentWithDocumentation = component as any;
+  ComponentWithDocumentation.__documentation = documentation;
+  return ComponentWithDocumentation;
 }
 
 /**
- * Retrieves documentation for a component by name
+ * Get documentation for a component
  */
-export function getComponentDocs(componentName: string): ComponentDocumentation | undefined {
-  return componentRegistry[componentName];
+export function getComponentDocumentation(
+  component: React.ComponentType<any>
+): IComponentDocumentation | null {
+  return (component as any).__documentation || null;
 }
 
 /**
- * Retrieves all component documentation
+ * Generate prop validation errors based on component documentation
  */
-export function getAllComponentDocs(): Record<string, ComponentDocumentation> {
-  return { ...componentRegistry };
-}
-
-/**
- * HOC that documents a component and adds it to the registry
- */
-export function documentComponent<P>(
-  Component: ComponentType<P>,
-  docs: Omit<ComponentDocumentation, 'name'>
-) {
-  const componentName = Component.displayName || Component.name || 'UnnamedComponent';
+export function validateComponentProps<T>(
+  component: React.ComponentType<T>,
+  props: T
+): string[] {
+  const errors: string[] = [];
+  const documentation = getComponentDocumentation(component);
   
-  // Register the documentation
-  registerComponentDocs({
-    name: componentName,
-    ...docs
-  });
+  if (!documentation) return errors;
   
-  // Set displayName for better debugging
-  const DocumentedComponent = memo(Component);
-  DocumentedComponent.displayName = `Documented(${componentName})`;
-  
-  return DocumentedComponent;
-}
-
-/**
- * Component to display documentation for a specific component
- */
-export const ComponentDocsDisplay: React.FC<{ componentName: string }> = ({ componentName }) => {
-  const docs = getComponentDocs(componentName);
-  
-  if (!docs) {
-    return <div>No documentation found for component: {componentName}</div>;
+  for (const propDoc of documentation.props) {
+    // Check required props
+    if (propDoc.required && 
+        (props as any)[propDoc.name] === undefined) {
+      errors.push(`Required prop "${propDoc.name}" is missing`);
+    }
+    
+    // Additional validation could be added here based on type, etc.
   }
   
-  return (
-    <div className="component-docs">
-      <h2>{docs.name}</h2>
-      <p>{docs.description}</p>
-      
-      <h3>Props</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Required</th>
-            <th>Default</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          {docs.props.map(prop => (
-            <tr key={prop.name}>
-              <td>{prop.name}</td>
-              <td><code>{prop.type}</code></td>
-              <td>{prop.required ? 'Yes' : 'No'}</td>
-              <td>{prop.defaultValue ? <code>{prop.defaultValue}</code> : '-'}</td>
-              <td>{prop.description}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      
-      {docs.examples && docs.examples.length > 0 && (
-        <>
-          <h3>Examples</h3>
-          {docs.examples.map((example, index) => (
-            <div key={index} className="component-example">
-              <h4>{example.title}</h4>
-              {example.description && <p>{example.description}</p>}
-              <pre>
-                <code>{example.code}</code>
-              </pre>
-            </div>
-          ))}
-        </>
-      )}
-    </div>
-  );
-};
+  return errors;
+}

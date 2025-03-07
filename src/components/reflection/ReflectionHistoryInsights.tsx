@@ -3,9 +3,10 @@ import React from 'react';
 import { useChakraBalanceInsights, ChakraInsight, PracticeRecommendation } from '@/components/reflection/insights/useChakraInsights';
 import ChakraInsights from '@/components/reflection/insights/ChakraInsights';
 import RecommendedPractices from '@/components/reflection/insights/RecommendedPractices';
+import { HistoricalReflection } from './types';
 
 interface ReflectionHistoryInsightsProps {
-  reflectionHistory: any[];
+  reflectionHistory: HistoricalReflection[];
   activatedChakras: number[];
 }
 
@@ -48,15 +49,9 @@ const ReflectionHistoryInsights: React.FC<ReflectionHistoryInsightsProps> = ({
 
   return (
     <div className="space-y-6">
-      <ChakraInsights 
-        insights={insights} 
-        activatedChakras={activatedChakras} 
-      />
+      <ChakraInsights insights={insights} />
       
-      <RecommendedPractices 
-        recommendations={recommendations} 
-        activatedChakras={activatedChakras}
-      />
+      <RecommendedPractices recommendations={recommendations} />
     </div>
   );
 };

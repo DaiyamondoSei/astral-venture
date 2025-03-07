@@ -6,7 +6,7 @@
 
 import { validateTypeConsistency } from '../utils/typeValidation';
 
-async function main() {
+async function main(): Promise<void> {
   console.log('Running pre-commit type validation...');
   
   const result = await validateTypeConsistency({

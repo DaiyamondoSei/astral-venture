@@ -1,39 +1,43 @@
 
 import React from 'react';
-import { TrendingUp } from 'lucide-react';
+import { PracticeRecommendation } from './useChakraInsights';
 
 interface RecommendedPracticesProps {
-  practices: string[];
-  loading?: boolean;
+  recommendations: PracticeRecommendation[];
 }
 
-const RecommendedPractices: React.FC<RecommendedPracticesProps> = ({ 
-  practices = [], 
-  loading = false 
-}) => {
-  if (practices.length === 0 && !loading) return null;
-  
-  return (
-    <div className="pt-2">
-      <h4 className="text-sm font-medium text-white/80 mb-2 flex items-center">
-        <TrendingUp size={14} className="mr-1 text-quantum-400" />
-        Recommended Practices
-      </h4>
-      <div className="space-y-1">
-        {loading ? (
-          <div className="animate-pulse space-y-2">
-            <div className="h-3 bg-white/10 rounded w-full"></div>
-            <div className="h-3 bg-white/10 rounded w-5/6"></div>
-          </div>
-        ) : (
-          practices.map((practice, i) => (
-            <div key={i} className="text-sm text-white/70 flex items-center">
-              <span className="text-quantum-400 mr-1">•</span>
-              {practice}
-            </div>
-          ))
-        )}
+const RecommendedPractices: React.FC<RecommendedPracticesProps> = ({ recommendations }) => {
+  if (!recommendations || recommendations.length === 0) {
+    return (
+      <div className="text-muted-foreground text-sm italic">
+        No practice recommendations available yet.
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium">Recommended Practices</h3>
+      <ul className="space-y-3">
+        {recommendations.map((recommendation, index) => (
+          <li key={index} className="p-3 rounded-md bg-quantum-900/5 border border-quantum-500/10">
+            <p className="font-medium text-sm">{recommendation.title}</p>
+            <p className="text-sm mt-1 text-muted-foreground">{recommendation.description}</p>
+            {recommendation.chakraIds && recommendation.chakraIds.length > 0 && (
+              <div className="mt-2 flex gap-1.5">
+                {recommendation.chakraIds.map(chakraId => (
+                  <span 
+                    key={chakraId} 
+                    className="inline-block px-2 py-0.5 text-xs rounded-full bg-quantum-500/10 text-quantum-500"
+                  >
+                    Chakra {chakraId}
+                  </span>
+                ))}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

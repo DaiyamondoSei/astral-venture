@@ -16,31 +16,13 @@ describe('useAssistantState', () => {
   it('should initialize with default values', () => {
     const { result } = renderHook(() => useAssistantState());
     
-    expect(result.current.isOpen).toBe(false);
     expect(result.current.loading).toBe(false);
-    expect(result.current.assistantResponse).toBeNull();
-    expect(result.current.errorMessage).toBeNull();
-    expect(typeof result.current.setIsOpen).toBe('function');
+    expect(result.current.response).toBeNull();
+    expect(result.current.error).toBeNull();
     expect(typeof result.current.setLoading).toBe('function');
-    expect(typeof result.current.setAssistantResponse).toBe('function');
-    expect(typeof result.current.setErrorMessage).toBe('function');
+    expect(typeof result.current.setResponse).toBe('function');
+    expect(typeof result.current.setError).toBe('function');
     expect(typeof result.current.reset).toBe('function');
-  });
-  
-  it('should update isOpen state', () => {
-    const { result } = renderHook(() => useAssistantState());
-    
-    act(() => {
-      result.current.setIsOpen(true);
-    });
-    
-    expect(result.current.isOpen).toBe(true);
-    
-    act(() => {
-      result.current.setIsOpen(false);
-    });
-    
-    expect(result.current.isOpen).toBe(false);
   });
   
   it('should update loading state', () => {
@@ -59,7 +41,7 @@ describe('useAssistantState', () => {
     expect(result.current.loading).toBe(false);
   });
   
-  it('should update assistantResponse state', () => {
+  it('should update response state', () => {
     const { result } = renderHook(() => useAssistantState());
     
     const mockResponse: AIResponse = {
@@ -72,20 +54,20 @@ describe('useAssistantState', () => {
     };
     
     act(() => {
-      result.current.setAssistantResponse(mockResponse);
+      result.current.setResponse(mockResponse);
     });
     
-    expect(result.current.assistantResponse).toEqual(mockResponse);
+    expect(result.current.response).toEqual(mockResponse);
   });
   
-  it('should update errorMessage state', () => {
+  it('should update error state', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setErrorMessage('Test error message');
+      result.current.setError('Test error message');
     });
     
-    expect(result.current.errorMessage).toBe('Test error message');
+    expect(result.current.error).toBe('Test error message');
   });
   
   it('should reset all state values', () => {
@@ -93,9 +75,8 @@ describe('useAssistantState', () => {
     
     // Set some initial values
     act(() => {
-      result.current.setIsOpen(true);
       result.current.setLoading(true);
-      result.current.setAssistantResponse({
+      result.current.setResponse({
         answer: 'Test response',
         source: 'test-source',
         meta: {
@@ -103,7 +84,7 @@ describe('useAssistantState', () => {
           tokenUsage: 100
         }
       });
-      result.current.setErrorMessage('Test error');
+      result.current.setError('Test error');
     });
     
     // Reset all values
@@ -112,9 +93,8 @@ describe('useAssistantState', () => {
     });
     
     // Check that values are reset to defaults
-    expect(result.current.isOpen).toBe(false);
     expect(result.current.loading).toBe(false);
-    expect(result.current.assistantResponse).toBeNull();
-    expect(result.current.errorMessage).toBeNull();
+    expect(result.current.response).toBeNull();
+    expect(result.current.error).toBeNull();
   });
 });

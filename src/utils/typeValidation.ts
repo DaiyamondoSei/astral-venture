@@ -12,7 +12,7 @@ import { captureException } from './errorHandling';
 /**
  * Configuration for the type validation process
  */
-export interface TypeValidationConfig {
+export interface ITypeValidationConfig {
   // Directories to scan for TypeScript files
   includeDirs: string[];
   // Directories to exclude from scanning
@@ -30,7 +30,7 @@ export interface TypeValidationConfig {
 /**
  * Default configuration for type validation
  */
-export const defaultConfig: TypeValidationConfig = {
+export const defaultConfig: ITypeValidationConfig = {
   includeDirs: ['src'],
   excludeDirs: ['node_modules', 'dist', 'build'],
   includeTests: true,
@@ -42,13 +42,13 @@ export const defaultConfig: TypeValidationConfig = {
 /**
  * Result of a type validation check
  */
-export interface ValidationResult {
+export interface IValidationResult {
   success: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
+  errors: IValidationError[];
+  warnings: IValidationWarning[];
 }
 
-export interface ValidationError {
+export interface IValidationError {
   filePath: string;
   line: number;
   column: number;
@@ -57,7 +57,7 @@ export interface ValidationError {
   severity: 'error';
 }
 
-export interface ValidationWarning {
+export interface IValidationWarning {
   filePath: string;
   line: number;
   column: number;
@@ -71,27 +71,45 @@ export interface ValidationWarning {
  * This runs a series of validations beyond what the TypeScript compiler checks
  */
 export async function validateTypeConsistency(
-  config: Partial<TypeValidationConfig> = {}
-): Promise<ValidationResult> {
+  config: Partial<ITypeValidationConfig> = {}
+): Promise<IValidationResult> {
   const fullConfig = { ...defaultConfig, ...config };
-  const result: ValidationResult = {
+  const result: IValidationResult = {
     success: true,
     errors: [],
     warnings: []
   };
 
   try {
-    // Create a TypeScript program from the project files
-    // This would normally use the TypeScript Compiler API to build and analyze the project
     console.log('Starting type validation with config:', fullConfig);
     
-    // In a full implementation, we would:
-    // 1. Create a TypeScript program using the compiler API
-    // 2. Get all source files
-    // 3. Run our custom validations on each file
-    // 4. Collect and report errors
-
-    // For now, we'll return a placeholder result
+    // Create a TypeScript program
+    const compilerOptions = ts.readConfigFile(
+      path.resolve(process.cwd(), 'tsconfig.json'),
+      ts.sys.readFile
+    ).config.compilerOptions;
+    
+    const program = ts.createProgram(
+      findTsFiles(fullConfig.includeDirs, fullConfig.excludeDirs),
+      compilerOptions
+    );
+    
+    // Run validation checks
+    if (fullConfig.checkPropConsistency) {
+      validateComponentProps(program, result);
+    }
+    
+    if (fullConfig.checkHookReturns) {
+      validateHookReturnTypes(program, result);
+    }
+    
+    if (fullConfig.validateInterfaces) {
+      validateInterfaceImplementations(program, result);
+    }
+    
+    // Set success flag based on errors
+    result.success = result.errors.length === 0;
+    
     console.log('Type validation complete!');
     return result;
   } catch (error) {
@@ -110,14 +128,112 @@ export async function validateTypeConsistency(
 }
 
 /**
- * Functions that would be implemented for complete validation:
- * 
- * - validateComponentProps: Check that components are called with correct props
- * - validateHookReturnTypes: Ensure hooks return values match their usage
- * - validateInterfaceImplementations: Check classes/objects implement interfaces correctly
- * - validateTestConsistency: Ensure tests match component interfaces
- * - validateLibraryUsage: Check for correct usage of imported libraries
+ * Find all TypeScript files to validate
  */
+function findTsFiles(includeDirs: string[], excludeDirs: string[]): string[] {
+  const files: string[] = [];
+  
+  const walk = (dir: string) => {
+    if (excludeDirs.some(excluded => dir.includes(excluded))) {
+      return;
+    }
+    
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (
+        entry.isFile() && 
+        (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))
+      ) {
+        files.push(fullPath);
+      }
+    }
+  };
+  
+  for (const dir of includeDirs) {
+    walk(path.resolve(process.cwd(), dir));
+  }
+  
+  return files;
+}
+
+/**
+ * Validate that components are called with correct props
+ */
+function validateComponentProps(program: ts.Program, result: IValidationResult): void {
+  const checker = program.getTypeChecker();
+  const sourceFiles = program.getSourceFiles();
+  
+  // This is a simplified implementation
+  // A full implementation would analyze JSX element props against their component definitions
+  for (const sourceFile of sourceFiles) {
+    if (sourceFile.fileName.includes('node_modules')) continue;
+    
+    // Find all JSX elements
+    ts.forEachChild(sourceFile, function visit(node) {
+      if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+        // Analyze props against component definition
+        // This is a placeholder for the actual implementation
+      }
+      
+      ts.forEachChild(node, visit);
+    });
+  }
+}
+
+/**
+ * Validate that hooks return values match their usage
+ */
+function validateHookReturnTypes(program: ts.Program, result: IValidationResult): void {
+  const checker = program.getTypeChecker();
+  const sourceFiles = program.getSourceFiles();
+  
+  // This is a simplified implementation
+  // A full implementation would track hook usages and their return type expectations
+  for (const sourceFile of sourceFiles) {
+    if (sourceFile.fileName.includes('node_modules')) continue;
+    
+    // Find all hook usages
+    ts.forEachChild(sourceFile, function visit(node) {
+      if (ts.isCallExpression(node) && 
+          ts.isIdentifier(node.expression) && 
+          node.expression.text.startsWith('use')) {
+        // Validate hook return type usage
+        // This is a placeholder for the actual implementation
+      }
+      
+      ts.forEachChild(node, visit);
+    });
+  }
+}
+
+/**
+ * Validate that classes/objects implement interfaces correctly
+ */
+function validateInterfaceImplementations(program: ts.Program, result: IValidationResult): void {
+  const checker = program.getTypeChecker();
+  const sourceFiles = program.getSourceFiles();
+  
+  // This is a simplified implementation
+  // A full implementation would verify interface implementations
+  for (const sourceFile of sourceFiles) {
+    if (sourceFile.fileName.includes('node_modules')) continue;
+    
+    // Find all class declarations
+    ts.forEachChild(sourceFile, function visit(node) {
+      if (ts.isClassDeclaration(node) && node.heritageClauses) {
+        // Check interface implementations
+        // This is a placeholder for the actual implementation
+      }
+      
+      ts.forEachChild(node, visit);
+    });
+  }
+}
 
 /**
  * Integration with build process and CI

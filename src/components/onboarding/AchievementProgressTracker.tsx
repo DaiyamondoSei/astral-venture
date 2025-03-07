@@ -40,8 +40,8 @@ const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
   const pointsToNextMilestone = nextMilestone - totalPoints;
 
   // Calculate achievement progress if available
-  const achievementProgress = nextAchievement ? 
-    ((nextAchievement.progress?.current ?? 0) / (nextAchievement.progress?.required ?? 100)) * 100 : 0;
+  const achievementProgress = nextAchievement && nextAchievement.progress ? 
+    (nextAchievement.progress.current / nextAchievement.progress.required) * 100 : 0;
 
   return (
     <motion.div 

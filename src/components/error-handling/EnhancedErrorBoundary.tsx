@@ -1,20 +1,12 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { toast } from '@/components/ui/use-toast';
-import { captureException } from '@/utils/errorHandling';
-
-// Define proper error context type
-interface ErrorContext {
-  componentName: string;
-  location: string;
-  additionalInfo?: Record<string, any>;
-}
+import { Button } from "@/components/ui/button";
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
-  context: ErrorContext;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  resetOnPropsChange?: boolean;
 }
 
 interface State {
@@ -23,51 +15,57 @@ interface State {
 }
 
 class EnhancedErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null
-  };
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null
+    };
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const { context, onError } = this.props;
-    
-    // Log error with context
-    console.error(`Error in ${context.componentName}:`, error, errorInfo);
-    
-    // Show toast notification
-    toast({
-      title: `Error in ${context.componentName}`,
-      description: error.message || 'An unknown error occurred',
-      variant: "destructive"
-    });
-    
-    // Report error to error tracking service
-    captureException(error, context.componentName);
-    
-    // Call custom error handler if provided
-    if (onError) {
-      onError(error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
+    }
+    console.error("Error caught by EnhancedErrorBoundary:", error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: Props): void {
+    // If props changed and resetOnPropsChange is enabled, reset the error state
+    if (
+      this.state.hasError && 
+      this.props.resetOnPropsChange && 
+      prevProps.children !== this.props.children
+    ) {
+      this.resetErrorBoundary();
     }
   }
 
-  render() {
+  resetErrorBoundary = (): void => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render(): ReactNode {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      
+
       return (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-          <h3 className="text-red-800 font-medium mb-2">
-            Something went wrong in {this.props.context.componentName}
-          </h3>
-          <p className="text-red-600 text-sm">
-            {this.state.error?.message || 'An unknown error occurred'}
-          </p>
+        <div className="p-6 rounded-lg border border-red-200 bg-red-50 text-red-800">
+          <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+          <p className="mb-4">{this.state.error?.message || "An unknown error occurred"}</p>
+          <Button 
+            variant="outline" 
+            className="border-red-300 hover:bg-red-100"
+            onClick={this.resetErrorBoundary}
+          >
+            Try again
+          </Button>
         </div>
       );
     }
