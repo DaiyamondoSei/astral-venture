@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -54,16 +53,8 @@ function App() {
         <AuthProvider>
           <OnboardingProvider>
             <div className="relative min-h-screen overflow-hidden bg-white text-gray-800">
-              {/* Quantum particles background effect wrapped in its own ErrorBoundary */}
-              <ErrorBoundary fallback={
-                <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50 to-white" />
-              }>
-                <div className="absolute inset-0 z-0 opacity-30">
-                  <Suspense fallback={null}>
-                    <QuantumParticles count={40} speed={0.8} />
-                  </Suspense>
-                </div>
-              </ErrorBoundary>
+              {/* Simplified background effect for better performance */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50 to-white" />
               
               <BrowserRouter>
                 <AnimatePresence mode="wait">

@@ -1,6 +1,6 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Button } from "@/components/ui/button";
+import ErrorFallback from './ErrorFallback';
 
 interface Props {
   children: ReactNode;
@@ -12,64 +12,79 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
+/**
+ * EnhancedErrorBoundary Component
+ * 
+ * An improved version of the ErrorBoundary with additional features
+ * like callbacks, detailed error information, and automatic reset on props change
+ */
 class EnhancedErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null
-    };
-  }
+  public state: State = {
+    hasError: false,
+    error: null,
+    errorInfo: null
+  };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Set the error info for more detailed debugging
+    this.setState({ errorInfo });
+    
+    // Optional callback for parent components to handle errors
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-    console.error("Error caught by EnhancedErrorBoundary:", error, errorInfo);
+    
+    // Log the error to an error reporting service
+    console.error('EnhancedErrorBoundary caught an error:', error, errorInfo);
   }
 
-  componentDidUpdate(prevProps: Props): void {
-    // If props changed and resetOnPropsChange is enabled, reset the error state
+  // Reset error state when props change (if enabled)
+  componentDidUpdate(prevProps: Props) {
     if (
       this.state.hasError && 
       this.props.resetOnPropsChange && 
-      prevProps.children !== this.props.children
+      this.props.children !== prevProps.children
     ) {
-      this.resetErrorBoundary();
+      this.resetError();
     }
   }
 
-  resetErrorBoundary = (): void => {
-    this.setState({ hasError: false, error: null });
+  resetError = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
-  render(): ReactNode {
+  render() {
     if (this.state.hasError) {
+      // Render custom fallback UI or the provided fallback
       if (this.props.fallback) {
         return this.props.fallback;
       }
-
-      return (
-        <div className="p-6 rounded-lg border border-red-200 bg-red-50 text-red-800">
-          <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
-          <p className="mb-4">{this.state.error?.message || "An unknown error occurred"}</p>
-          <Button 
-            variant="outline" 
-            className="border-red-300 hover:bg-red-100"
-            onClick={this.resetErrorBoundary}
+      
+      // Use the default error fallback
+      return this.state.error ? (
+        <ErrorFallback error={this.state.error} resetErrorBoundary={this.resetError} />
+      ) : (
+        <div className="p-6 bg-white/90 rounded-lg shadow-lg text-gray-800">
+          <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
+          <button 
+            onClick={this.resetError}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Try again
-          </Button>
+          </button>
         </div>
       );
     }
 
+    // When there's no error, render children normally
     return this.props.children;
   }
 }
