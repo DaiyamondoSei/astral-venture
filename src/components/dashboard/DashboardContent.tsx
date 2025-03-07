@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@/components/ui/skeleton";
 import { useUserStreak } from '@/hooks/useUserStreak';
 import { useDashboardContext } from './DashboardContext';
 import { calculateAstralLevel } from '@/utils/calculations';
 import { calculateNextLevelXP } from '@/utils/calculations';
 import { calculateLevelProgress } from '@/utils/calculations';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from '@/lib/supabaseClient';
 
 const DashboardContent = ({ userId }: { userId: string }) => {
@@ -19,7 +19,11 @@ const DashboardContent = ({ userId }: { userId: string }) => {
   const [levelInfo, setLevelInfo] = useState({ level: 1, nextLevelXP: 100, progress: 0 });
 
   useEffect(() => {
+    let isMounted = true; // For handling async effects safely
+    
     const fetchUserProfile = async () => {
+      if (!userId) return; // Skip if no userId
+
       setIsLoading(true);
       try {
         const { data, error } = await supabase
@@ -30,13 +34,15 @@ const DashboardContent = ({ userId }: { userId: string }) => {
 
         if (error) {
           console.error('Error fetching user profile:', error);
-          setError(error);
-          toast({
-            title: "Error fetching profile",
-            description: "Could not load your profile data.",
-            variant: "destructive"
-          });
-        } else {
+          if (isMounted) {
+            setError(error);
+            toast({
+              title: "Error fetching profile",
+              description: "Could not load your profile data.",
+              variant: "destructive"
+            });
+          }
+        } else if (isMounted) {
           setProfile(data);
           const level = calculateAstralLevel(data.energy_points || 0);
           const nextLevelXP = calculateNextLevelXP(level);
@@ -45,20 +51,27 @@ const DashboardContent = ({ userId }: { userId: string }) => {
         }
       } catch (err) {
         console.error('Error in fetchUserProfile:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error occurred'));
-        toast({
-          title: "Unexpected error",
-          description: "An unexpected error occurred while loading your profile.",
-          variant: "destructive"
-        });
+        if (isMounted) {
+          setError(err instanceof Error ? err : new Error('Unknown error occurred'));
+          toast({
+            title: "Unexpected error",
+            description: "An unexpected error occurred while loading your profile.",
+            variant: "destructive"
+          });
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    if (userId) {
-      fetchUserProfile();
-    }
+    fetchUserProfile();
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
   }, [userId]);
   
   const handleOpenAIAssistant = () => {

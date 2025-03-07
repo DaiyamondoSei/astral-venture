@@ -34,7 +34,7 @@ export const useAIAssistant = ({
       }, 300);
       return () => clearTimeout(timeout);
     }
-  }, [open]);
+  }, [open, state]);
 
   const handleSubmitQuestion = async () => {
     if (state.question.trim() && user) {
