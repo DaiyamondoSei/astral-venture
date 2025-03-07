@@ -1,149 +1,108 @@
-import { useEffect, useRef, useState } from 'react';
+
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Vector2 } from 'three';
 import { Particle } from './types';
 
-interface ParticleSystemOptions {
-  count: number;
-  speed?: number;
-  size?: number;
-  color?: string;
-  interactive?: boolean;
-  containerRef?: React.RefObject<HTMLDivElement>;
-}
-
-const useParticleSystem = ({
-  count,
-  speed = 0.5,
-  size = 3,
-  color = '#ffffff',
-  interactive = false,
-  containerRef
-}: ParticleSystemOptions) => {
+export const useParticleSystem = (
+  count: number,
+  colors: string[],
+  interactive: boolean
+) => {
   const [particles, setParticles] = useState<Particle[]>([]);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [mousePosition, setMousePosition] = useState<Vector2 | null>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
+  const initialized = useRef(false);
 
-  // Initialize particles
+  // Generate a unique ID for each particle
+  const generateId = useCallback(() => {
+    return Math.random().toString(36).substring(2, 9);
+  }, []);
+
+  // Initialize particles only once
   useEffect(() => {
-    if (!containerRef?.current) return;
+    if (initialized.current) return;
     
-    const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
-    setDimensions({ width: rect.width, height: rect.height });
-    
-    // Create initial particles
-    const initialParticles: Particle[] = Array.from({ length: count }).map(() => ({
+    const initialParticles = Array.from({ length: count }).map((_, index) => ({
+      id: generateId(),
       position: new Vector2(
-        Math.random() * rect.width,
-        Math.random() * rect.height
+        Math.random() * 100,
+        Math.random() * 100
       ),
       velocity: new Vector2(
-        (Math.random() - 0.5) * speed,
-        (Math.random() - 0.5) * speed
+        (Math.random() - 0.5) * 0.1,
+        (Math.random() - 0.5) * 0.1
       ),
-      size: Math.random() * size + 1,
-      color: color,
-      alpha: Math.random() * 0.5 + 0.5,
+      size: Math.random() * 3 + 1,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      alpha: Math.random() * 0.5 + 0.3,
       connections: []
     }));
-    
+
     setParticles(initialParticles);
-    
-    // Handle window resize
-    const handleResize = () => {
-      const newRect = container.getBoundingClientRect();
-      setDimensions({ width: newRect.width, height: newRect.height });
-    };
-    
-    window.addEventListener('resize', handleResize);
+    initialized.current = true;
     
     return () => {
-      window.removeEventListener('resize', handleResize);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [containerRef, count, speed, size, color]);
-  
-  // Handle mouse interaction
+  }, [count, colors, generateId]);
+
+  // Handle mouse movements
   useEffect(() => {
-    if (!interactive || !containerRef?.current) return;
-    
-    const container = containerRef.current;
-    
+    if (!interactive || !containerRef.current) return;
+
     const handleMouseMove = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setMousePosition(new Vector2(x, y));
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      setMousePosition({
+        x: ((e.clientX - rect.left) / rect.width) * 100,
+        y: ((e.clientY - rect.top) / rect.height) * 100
+      });
     };
-    
-    const handleMouseLeave = () => {
-      setMousePosition(null);
-    };
-    
-    container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('mouseleave', handleMouseLeave);
+
+    window.addEventListener('mousemove', handleMouseMove);
     
     return () => {
-      container.removeEventListener('mousemove', handleMouseMove);
-      container.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [interactive, containerRef]);
-  
+  }, [interactive]);
+
+  // Animation loop - using useCallback to prevent function recreation
+  const updateParticles = useCallback(() => {
+    setParticles(prevParticles => 
+      prevParticles.map(particle => {
+        // Update position
+        const newPosition = particle.position.clone().add(particle.velocity);
+        
+        // Boundary check
+        if (newPosition.x <= 0 || newPosition.x >= 100) {
+          particle.velocity.setX(-particle.velocity.x);
+        }
+        
+        if (newPosition.y <= 0 || newPosition.y >= 100) {
+          particle.velocity.setY(-particle.velocity.y);
+        }
+        
+        particle.position.add(particle.velocity);
+        
+        return particle;
+      })
+    );
+  }, []);
+
   // Animation loop
   useEffect(() => {
-    if (!containerRef?.current || particles.length === 0) return;
+    if (particles.length === 0) return;
     
     const animate = (timestamp: number) => {
-      // Limit updates to 60fps for performance
-      if (timestamp - lastUpdateTimeRef.current < 16) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-        return;
+      if (timestamp - lastUpdateTimeRef.current > 16) { // Limit to ~60fps
+        lastUpdateTimeRef.current = timestamp;
+        updateParticles();
       }
-      
-      lastUpdateTimeRef.current = timestamp;
-      
-      setParticles(prevParticles => {
-        return prevParticles.map(particle => {
-          // Update position
-          particle.position.add(particle.velocity);
-          
-          // Boundary check
-          if (particle.position.x < 0 || particle.position.x > dimensions.width) {
-            particle.velocity.x = -particle.velocity.x;
-          }
-          
-          if (particle.position.y < 0 || particle.position.y > dimensions.height) {
-            particle.velocity.y = -particle.velocity.y;
-          }
-          
-          // Mouse interaction
-          if (mousePosition) {
-            const distance = particle.position.distanceTo(mousePosition);
-            const maxDistance = 100;
-            
-            if (distance < maxDistance) {
-              const force = (1 - distance / maxDistance) * 0.02;
-              const direction = new Vector2()
-                .subVectors(particle.position, mousePosition)
-                .normalize();
-              
-              particle.velocity.add(direction.multiplyScalar(force));
-              
-              // Limit velocity
-              const maxVelocity = 2;
-              if (particle.velocity.length() > maxVelocity) {
-                particle.velocity.normalize().multiplyScalar(maxVelocity);
-              }
-            }
-          }
-          
-          return { ...particle };
-        });
-      });
       
       animationFrameRef.current = requestAnimationFrame(animate);
     };
@@ -155,44 +114,9 @@ const useParticleSystem = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [particles, dimensions, mousePosition, containerRef]);
-  
-  // Calculate connections between particles
-  useEffect(() => {
-    if (particles.length === 0) return;
-    
-    const calculateConnections = () => {
-      const maxDistance = 100;
-      
-      setParticles(prevParticles => {
-        return prevParticles.map(particle => {
-          particle.connections = [];
-          
-          prevParticles.forEach(otherParticle => {
-            if (particle === otherParticle) return;
-            
-            const distance = particle.position.distanceTo(otherParticle.position);
-            
-            if (distance < maxDistance) {
-              particle.connections.push({
-                particle: otherParticle,
-                distance,
-                opacity: 1 - distance / maxDistance
-              });
-            }
-          });
-          
-          return { ...particle };
-        });
-      });
-    };
-    
-    const interval = setInterval(calculateConnections, 500);
-    
-    return () => clearInterval(interval);
-  }, [particles]);
-  
-  return { particles, dimensions };
+  }, [particles, updateParticles]);
+
+  return { particles, mousePosition, containerRef };
 };
 
 export default useParticleSystem;

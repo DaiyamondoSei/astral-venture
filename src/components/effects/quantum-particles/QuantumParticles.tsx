@@ -1,7 +1,7 @@
 
-import React, { useRef, memo, useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import Particle from './Particle';
-import { useParticleSystem } from './useParticleSystem';
+import useParticleSystem from './useParticleSystem';
 import { QuantumParticlesProps } from './types';
 
 const QuantumParticles: React.FC<QuantumParticlesProps> = ({
@@ -10,20 +10,32 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   className = '',
   interactive = true
 }) => {
-  const { particles, mousePosition } = useParticleSystem(count, colors, interactive);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { particles, mousePosition, containerRef } = useParticleSystem(count, colors, interactive);
   
   // Use useMemo to avoid recalculating particles on every render
   const renderedParticles = useMemo(() => {
     return particles.map(particle => {
+      // Convert the particle's position to the format Particle component expects
+      const x = particle.position.x;
+      const y = particle.position.y;
+      
       // Calculate movement based on mouse position if interactive
-      const dx = interactive ? (mousePosition.x - particle.x) / 50 : 0;
-      const dy = interactive ? (mousePosition.y - particle.y) / 50 : 0;
+      const dx = interactive ? (mousePosition.x - x) / 50 : 0;
+      const dy = interactive ? (mousePosition.y - y) / 50 : 0;
       
       return (
         <Particle 
           key={particle.id} 
-          particle={particle} 
+          particle={{
+            id: parseInt(particle.id.replace(/[^0-9]/g, '')) || 0,
+            x,
+            y,
+            size: particle.size,
+            opacity: particle.alpha,
+            color: particle.color,
+            duration: 2 + Math.random() * 2,
+            delay: Math.random() * 2
+          }} 
           dx={dx} 
           dy={dy}
         />
