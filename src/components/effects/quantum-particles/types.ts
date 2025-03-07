@@ -49,6 +49,11 @@ export interface QuantumParticlesProps {
   interactive?: boolean;
   
   /**
+   * Whether the animation should be paused (defaults to false)
+   */
+  isPaused?: boolean;
+  
+  /**
    * Custom CSS class name
    */
   className?: string;

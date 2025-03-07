@@ -54,7 +54,7 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = (props) => {
         {...props} 
         count={count}
         interactive={interactive}
-        isPaused={!isVisible && !isLowPerformance} // Pause when not visible, except on low perf devices where we already reduced count
+        isPaused={props.isPaused !== undefined ? props.isPaused : (!isVisible && !isLowPerformance)} // Use provided isPaused value if available
       />
     </div>
   );

@@ -23,9 +23,9 @@ const ParticleComponent: React.FC<ParticleProps> = ({ particle }) => {
       backgroundColor: particle.color,
       boxShadow: shadowSize ? `0 0 ${shadowSize}px ${particle.color}` : 'none',
       // Add will-change for better performance
-      willChange: 'transform, opacity' as const,
+      willChange: 'transform, opacity',
       // Add visibility when needed to improve performance
-      visibility: (particle.opacity <= 0.1 ? 'hidden' : 'visible') as const,
+      visibility: (particle.opacity <= 0.1 ? 'hidden' : 'visible')
     } as MotionStyle;
   }, [particle.size, particle.color, particle.opacity, isLowPerformance, isMediumPerformance]);
 
