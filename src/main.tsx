@@ -18,7 +18,7 @@ const bootstrap = () => {
   // Initialize memory management after initial render
   setTimeout(initMemoryManagement, 1000);
 
-  // Render the app
+  // Render the app with only one router
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <AdaptivePerformanceProvider>

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -71,6 +71,9 @@ export function useAuthStateManager(): AuthStateManagerResult {
     // Wait until both auth and profile loading are complete
     if (isLoading || profileLoading) return;
     
+    // Set completed loading flag to prevent multiple updates
+    setHasCompletedLoading(true);
+    
     // If we have a user but no profile, and we haven't retried too many times
     if (user && !userProfile && loadAttempts < 3) {
       setLoadAttempts(prev => prev + 1);
@@ -81,16 +84,13 @@ export function useAuthStateManager(): AuthStateManagerResult {
         duration: 1500
       });
       
-      // Use setTimeout to delay the reload
+      // Use setTimeout to delay the reload but don't set state again in this effect
       const timer = setTimeout(() => {
         window.location.reload();
       }, 2000);
       
       return () => clearTimeout(timer);
     }
-    
-    // Mark as completed to prevent further calls
-    setHasCompletedLoading(true);
   }, [
     isLoading, 
     profileLoading, 

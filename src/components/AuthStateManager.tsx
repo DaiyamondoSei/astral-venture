@@ -28,7 +28,7 @@ const AuthStateManager: React.FC<AuthStateManagerProps> = ({ onLoadingComplete }
   // Use the extracted hook to manage auth state
   const authState = useAuthStateManager();
   
-  // Call the completion handler when loading is complete
+  // Call the completion handler when loading is complete - only once
   useEffect(() => {
     if (authState.hasCompletedLoading) {
       onLoadingComplete({
@@ -45,7 +45,7 @@ const AuthStateManager: React.FC<AuthStateManagerProps> = ({ onLoadingComplete }
         updateUserProfile: authState.updateUserProfile
       });
     }
-  }, [authState, onLoadingComplete]);
+  }, [authState.hasCompletedLoading, onLoadingComplete]);
 
   // Show loading state while data is being fetched
   if (authState.isLoading || authState.profileLoading) {

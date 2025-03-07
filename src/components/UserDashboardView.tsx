@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import UserDashboardCards from '@/components/UserDashboardCards';
 import MainContent from '@/components/MainContent';
@@ -39,7 +38,6 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
   const [activeView, setActiveView] = useState<'sacred-home' | 'traditional'>('sacred-home');
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   
-  // Add debugging effect to log key state values
   useEffect(() => {
     console.log("UserDashboardView mounted with:", {
       userExists: !!user,
@@ -50,7 +48,6 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
       activeView
     });
     
-    // Show toast if user exists but profile is missing
     if (user && !userProfile) {
       toast({
         title: "Profile data unavailable",
@@ -66,13 +63,11 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
     console.log("Node selected:", nodeId);
     setSelectedNode(nodeId);
     
-    // If chakras node is selected, show chakra activation
     if (nodeId === 'chakras') {
       setActiveView('traditional');
     }
   };
 
-  // Ensure all required props have fallback values
   const safeUserStreak = userStreak || { current: 0, longest: 0 };
   const safeActivatedChakras = activatedChakras || [];
   const safeUserProfile = userProfile || (user ? {
@@ -81,7 +76,6 @@ const UserDashboardView: React.FC<UserDashboardViewProps> = ({
     energy_points: 0
   } : null);
 
-  // Failsafe rendering to ensure something always shows
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
