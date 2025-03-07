@@ -1,0 +1,190 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --radius: 0.5rem;
+  }
+  
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  html, body {
+    min-height: 100%;
+    overflow-x: hidden;
+    background-color: black;
+  }
+  
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Improve focus styles for accessibility */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+  
+  /* Improved scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+@layer components {
+  /* Glass panel styles */
+  .glass-panel {
+    @apply bg-white/5 border border-white/10 rounded-xl backdrop-blur-md shadow-lg;
+  }
+  
+  /* Shimmer animation */
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 2.5s infinite;
+    animation-delay: 4s;
+  }
+  
+  /* Improved button hover effects */
+  .btn-hover-effect {
+    @apply relative overflow-hidden transition-all;
+  }
+  
+  .btn-hover-effect:after {
+    @apply absolute inset-0 bg-white/10 opacity-0 transition-opacity;
+    content: '';
+  }
+  
+  .btn-hover-effect:hover:after {
+    @apply opacity-100;
+  }
+  
+  /* Enhanced focus outline for accessibility */
+  .focus-outline {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quantum-400/50;
+  }
+  
+  /* Improved mobile touch targets */
+  @media (max-width: 768px) {
+    .touch-target {
+      @apply min-h-[44px] min-w-[44px];
+    }
+  }
+  
+  /* Loading states */
+  .loading-pulse {
+    @apply animate-pulse bg-white/10 rounded;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Utility for adjusting touch targets on mobile */
+  .touch-safe {
+    @apply p-2 md:p-0;
+  }
+  
+  /* Gradient overlays */
+  .gradient-overlay-top {
+    @apply bg-gradient-to-b from-black/80 to-transparent absolute top-0 left-0 right-0 h-20 pointer-events-none;
+  }
+  
+  .gradient-overlay-bottom {
+    @apply bg-gradient-to-t from-black/80 to-transparent absolute bottom-0 left-0 right-0 h-20 pointer-events-none;
+  }
+}
+
+/* Animation utilities */
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* Ensure buttons and interactive elements have appropriate size on mobile */
+@media (max-width: 768px) {
+  button, 
+  [role="button"],
+  a.btn,
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.5rem;
+  }
+}

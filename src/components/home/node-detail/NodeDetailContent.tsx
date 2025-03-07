@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DownloadableMaterial } from './types';
+import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import PracticesList from './PracticesList';
 import PracticeActionButton from './PracticeActionButton';
 import { nodeDetailsData } from './nodeDetailsData';
@@ -9,18 +9,22 @@ import DownloadableMaterialsPanel from '@/components/home/DownloadableMaterialsP
 
 interface NodeDetailContentProps {
   nodeId: string;
+  title?: string;
+  description?: string;
   downloadableMaterials?: DownloadableMaterial[];
   consciousnessLevel?: number;
 }
 
 const NodeDetailContent: React.FC<NodeDetailContentProps> = ({ 
   nodeId, 
+  title,
+  description,
   downloadableMaterials,
   consciousnessLevel
 }) => {
   const details = nodeDetailsData[nodeId] || {
-    title: 'Unknown Node',
-    description: 'Information about this node is not available.',
+    title: title || 'Unknown Node',
+    description: description || 'Information about this node is not available.',
     practices: []
   };
 
@@ -30,8 +34,8 @@ const NodeDetailContent: React.FC<NodeDetailContentProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <h2 className="text-2xl font-display mb-2">{details.title}</h2>
-      <p className="text-white/80 mb-6">{details.description}</p>
+      <h2 className="text-2xl font-display mb-2">{title || details.title}</h2>
+      <p className="text-white/80 mb-6">{description || details.description}</p>
       
       {consciousnessLevel && consciousnessLevel > 1 && (
         <div className="my-4 p-3 bg-quantum-900/30 border border-quantum-400/20 rounded-lg">
@@ -41,10 +45,13 @@ const NodeDetailContent: React.FC<NodeDetailContentProps> = ({
         </div>
       )}
       
-      <PracticesList practices={details.practices} />
+      {details.practices && details.practices.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-2">Suggested Practices</h3>
+          <PracticesList practices={details.practices} />
+        </div>
+      )}
       
-      <PracticeActionButton />
-
       {/* Add downloadable materials panel if available */}
       {downloadableMaterials && downloadableMaterials.length > 0 && (
         <DownloadableMaterialsPanel 

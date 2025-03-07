@@ -345,10 +345,10 @@ const SacredHomePage: React.FC<SacredHomePageProps> = ({
         <AnimatePresence>
           {selectedNode && (
             <NodeDetailSection 
-              selectedNode={selectedNode}
-              energyPoints={energyPoints}
-              selectedNodeMaterials={selectedNodeMaterials}
-              consciousnessLevel={consciousnessLevel}
+              activeNodeId={selectedNode}
+              activeNodeName={selectedNode === 'portal-center' ? 'Dimensional Portal' : selectedNode.charAt(0).toUpperCase() + selectedNode.slice(1)}
+              activeNodeDescription={`Explore the sacred geometry of the ${selectedNode} node and its cosmic implications.`}
+              downloadables={selectedNodeMaterials || []}
               onClose={() => setSelectedNode(null)}
             />
           )}

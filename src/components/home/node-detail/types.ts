@@ -1,20 +1,26 @@
 
-import { ReactNode } from 'react';
+/**
+ * Type definitions for node detail components
+ */
 
 export interface DownloadableMaterial {
-  id: string;
-  name: string;
-  description: string;
-  type: 'pdf' | 'audio' | 'video' | 'practice' | 'guide';
-  icon: ReactNode;
+  title?: string;
+  description?: string;
+  url?: string;
+  format?: 'pdf' | 'image' | 'audio' | 'video' | 'document';
+  iconType?: string;
+  size?: string;
 }
 
-export interface NodeDetails {
+export interface NodeDetailData {
   title: string;
   description: string;
   practices: string[];
+  downloads?: DownloadableMaterial[];
+  energyRequirement?: number;
+  nodeType?: 'core' | 'elemental' | 'advanced' | 'user';
 }
 
 export interface NodeDetailsMap {
-  [key: string]: NodeDetails;
+  [key: string]: NodeDetailData;
 }

@@ -54,57 +54,6 @@ export const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
     }
   };
   
-  // Get initial and animate states based on position
-  const getAnimationProps = () => {
-    switch (position) {
-      case 'top':
-        return {
-          initial: { y: '-100%' },
-          animate: { y: 0 },
-          exit: { y: '-100%' },
-          drag: 'y',
-          dragConstraints: { top: 0, bottom: 0 },
-          dragElastic: 0.2
-        };
-      case 'bottom':
-        return {
-          initial: { y: '100%' },
-          animate: { y: 0 },
-          exit: { y: '100%' },
-          drag: 'y',
-          dragConstraints: { top: 0, bottom: 0 },
-          dragElastic: 0.2
-        };
-      case 'left':
-        return {
-          initial: { x: '-100%' },
-          animate: { x: 0 },
-          exit: { x: '-100%' },
-          drag: 'x',
-          dragConstraints: { left: 0, right: 0 },
-          dragElastic: 0.2
-        };
-      case 'right':
-        return {
-          initial: { x: '100%' },
-          animate: { x: 0 },
-          exit: { x: '100%' },
-          drag: 'x',
-          dragConstraints: { left: 0, right: 0 },
-          dragElastic: 0.2
-        };
-      default:
-        return {
-          initial: { y: '100%' },
-          animate: { y: 0 },
-          exit: { y: '100%' },
-          drag: 'y',
-          dragConstraints: { top: 0, bottom: 0 },
-          dragElastic: 0.2
-        };
-    }
-  };
-  
   // Get position styles
   const getPositionStyle = () => {
     switch (position) {
@@ -117,7 +66,7 @@ export const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
   };
   
   // Handle drag end
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     setIsDragging(false);
     
     // Check if drag distance exceeds threshold
@@ -167,6 +116,19 @@ export const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
   
   if (!isOpen) return null;
   
+  // Define motion variants
+  const variants = {
+    initial: position === 'top' ? { y: '-100%' } :
+             position === 'bottom' ? { y: '100%' } :
+             position === 'left' ? { x: '-100%' } :
+             { x: '100%' },
+    animate: { x: 0, y: 0 },
+    exit: position === 'top' ? { y: '-100%' } :
+          position === 'bottom' ? { y: '100%' } :
+          position === 'left' ? { x: '-100%' } :
+          { x: '100%' }
+  };
+  
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -182,8 +144,18 @@ export const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
           "shadow-2xl",
           className
         )}
-        {...getAnimationProps()}
+        initial="initial"
         animate={controls}
+        exit="exit"
+        variants={variants}
+        drag={isVertical ? "y" : "x"}
+        dragConstraints={{ 
+          top: position === 'bottom' ? -1000 : 0, 
+          bottom: position === 'top' ? 1000 : 0,
+          left: position === 'right' ? -1000 : 0,
+          right: position === 'left' ? 1000 : 0
+        }}
+        dragElastic={0.2}
         onDragStart={() => setIsDragging(true)}
         onDragEnd={handleDragEnd}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}

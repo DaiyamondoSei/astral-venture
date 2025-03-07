@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getPerformanceCategory } from '@/utils/performanceUtils';
 
-interface GlassmorphicContainerProps extends React.HTMLAttributes<HTMLDivElement> {
+interface GlassmorphicContainerProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onDrag'> {
   children: ReactNode;
   variant?: 'subtle' | 'medium' | 'prominent';
   animate?: boolean;
   blur?: 'none' | 'light' | 'medium' | 'heavy';
   className?: string;
   centerContent?: boolean;
-  motionProps?: MotionProps;
+  motionProps?: Omit<MotionProps, 'onDrag'>;
   glowEffect?: boolean;
   shimmer?: boolean;
 }
@@ -99,7 +99,7 @@ export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        {...motionProps}
+        {...(motionProps as any)}
         {...props}
       >
         {shimmer && !performanceAdjusted && (

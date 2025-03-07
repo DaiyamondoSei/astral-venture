@@ -12,10 +12,13 @@ interface GlassCardProps {
   variant?: 'default' | 'dark' | 'light' | 'purple' | 'quantum';
   interactive?: boolean;
   shimmer?: boolean;
+  glowEffect?: boolean;
+  blurStrength?: 'none' | 'light' | 'medium' | 'heavy';
 }
 
 /**
  * GlassCard component - creates a glassmorphic card effect
+ * Enhanced version with better mobile support and performance optimizations
  * 
  * @param children - Content to display inside the card
  * @param className - Additional CSS classes
@@ -23,6 +26,8 @@ interface GlassCardProps {
  * @param variant - Color variant of the glass effect
  * @param interactive - Whether to add hover/focus effects
  * @param shimmer - Whether to add a subtle shimmer animation
+ * @param glowEffect - Whether to add a subtle glow effect
+ * @param blurStrength - Strength of the backdrop blur effect
  */
 export function GlassCard({
   children,
@@ -30,7 +35,9 @@ export function GlassCard({
   animate = false,
   variant = 'default',
   interactive = false,
-  shimmer = false
+  shimmer = false,
+  glowEffect = false,
+  blurStrength = 'medium'
 }: GlassCardProps) {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isLowPerformance = getPerformanceCategory() === 'low';
@@ -38,7 +45,27 @@ export function GlassCard({
   // Adjust effects for mobile and low-performance devices
   const shouldReduceMotion = isMobile || isLowPerformance;
   
-  const baseStyles = "rounded-xl backdrop-blur-md border shadow-lg overflow-hidden";
+  // Set blur strength based on device capabilities
+  const adjustedBlurStrength = shouldReduceMotion && blurStrength !== 'none'
+    ? blurStrength === 'heavy' 
+      ? 'medium' 
+      : blurStrength === 'medium' 
+        ? 'light' 
+        : blurStrength
+    : blurStrength;
+  
+  // Map blur strengths to actual CSS values
+  const blurMap = {
+    none: '',
+    light: 'backdrop-blur-sm',
+    medium: 'backdrop-blur-md',
+    heavy: 'backdrop-blur-lg'
+  };
+
+  const baseStyles = cn(
+    "rounded-xl border shadow-lg overflow-hidden",
+    blurMap[adjustedBlurStrength]
+  );
   
   const variantStyles = {
     default: "bg-white/5 border-white/10",
@@ -52,6 +79,10 @@ export function GlassCard({
     ? "transition-all duration-300 hover:bg-opacity-[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-quantum-400/50"
     : "";
   
+  const glowStyles = glowEffect && !shouldReduceMotion
+    ? "shadow-[0_0_15px_rgba(130,100,255,0.08)]"
+    : "";
+  
   if (animate) {
     return (
       <motion.div
@@ -59,6 +90,7 @@ export function GlassCard({
           baseStyles,
           variantStyles[variant],
           interactiveStyles,
+          glowStyles,
           className
         )}
         initial={{ opacity: 0, y: 10 }}
@@ -95,6 +127,7 @@ export function GlassCard({
       baseStyles,
       variantStyles[variant],
       interactiveStyles,
+      glowStyles,
       className
     )}>
       {shimmer && !shouldReduceMotion && (

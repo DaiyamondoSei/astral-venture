@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, Variants } from 'framer-motion';
-import InteractiveEnergyField from '@/components/effects/InteractiveEnergyField';
+import InteractiveEnergyField from '@/components/effects/energy-field/InteractiveEnergyField';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import { cn } from '@/lib/utils';
@@ -49,6 +49,8 @@ const MainContent: React.FC<MainContentProps> = ({
           transition: { duration: 0.3 }
         }}
         centerContent={true}
+        glowEffect={true}
+        shimmer={true}
       >
         <div className="absolute inset-0 opacity-40">
           <InteractiveEnergyField 

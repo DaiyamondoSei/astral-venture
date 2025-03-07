@@ -47,6 +47,8 @@ const NodeDetailSection: React.FC<NodeDetailSectionProps> = ({
           variant="purple" 
           className="p-4 md:p-6 relative"
           animate={true}
+          glowEffect={true}
+          shimmer={true}
         >
           {onClose && (
             <button 
@@ -62,17 +64,23 @@ const NodeDetailSection: React.FC<NodeDetailSectionProps> = ({
             nodeId={activeNodeId}
             title={activeNodeName || activeNodeId.charAt(0).toUpperCase() + activeNodeId.slice(1)}
             description={activeNodeDescription || "Explore the sacred geometry of this node and its cosmic implications."}
+            consciousnessLevel={3}
           />
           
           {/* Practice section */}
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-3">Practices</h3>
-            <PracticesList nodeId={activeNodeId} />
+            <PracticesList practices={[
+              "Meditation with geometric visualization",
+              "Energy alignment practice",
+              "Chakra balancing exercise",
+              "Sacred geometry journaling"
+            ]} />
           </div>
           
           {/* Call to action */}
           <div className="mt-6 flex justify-center">
-            <PracticeActionButton nodeId={activeNodeId} />
+            <PracticeActionButton />
           </div>
           
           {/* Downloadable resources section */}
@@ -84,7 +92,7 @@ const NodeDetailSection: React.FC<NodeDetailSectionProps> = ({
                   <li key={`download-${index}`} className="flex items-center text-sm">
                     <span className="w-2 h-2 bg-quantum-400 rounded-full mr-2 flex-shrink-0"></span>
                     <a 
-                      href={item.url} 
+                      href={item.url || '#'} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-quantum-300 hover:text-quantum-200 transition-colors focus-outline"
