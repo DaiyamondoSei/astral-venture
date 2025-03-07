@@ -19,6 +19,7 @@ const SilhouettePath: React.FC<SilhouettePartProps> = ({
   showDetails,
   baseProgressPercentage
 }) => {
+  // Get the appropriate glow colors based on consciousness state
   const getFillForSilhouette = () => {
     return showFractal ? "url(#fractalPattern)" : "url(#silhouetteGradient)";
   };
