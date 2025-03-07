@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { getAnimationQualityLevel } from '@/utils/performanceUtils';
 
-interface AnimationProps {
+interface ThrottledAnimationProps {
   animateX: number[];
   animateY: number[];
   animateScale: number[];
@@ -11,71 +11,88 @@ interface AnimationProps {
   delay: number;
 }
 
+interface ThrottledAnimationResult {
+  animate: {
+    x?: number[];
+    y?: number[];
+    scale?: number[];
+    opacity?: number[];
+  };
+  transition: {
+    duration: number;
+    repeat: number;
+    repeatType: 'reverse' | 'loop';
+    delay: number;
+    ease: string;
+  };
+}
+
 /**
- * Custom hook to optimize animations based on device performance
+ * A hook that optimizes animations based on device capabilities
+ * Returns throttled animation values for better performance
  */
-export const useThrottledAnimation = ({
+export function useThrottledAnimation({
   animateX,
   animateY,
   animateScale,
   animateOpacity,
   duration,
   delay
-}: AnimationProps) => {
-  // Get animation quality based on device capabilities
-  const qualityLevel = useMemo(() => getAnimationQualityLevel(), []);
+}: ThrottledAnimationProps): ThrottledAnimationResult {
+  const qualityLevel = getAnimationQualityLevel();
   
   return useMemo(() => {
-    // Simplify animations for low-performance devices
-    if (qualityLevel === 'low') {
-      return {
-        animate: {
-          scale: [1, 1.1, 1],
-          opacity: animateOpacity
-        },
-        transition: {
-          repeat: Infinity,
-          repeatType: "reverse" as const,
-          duration: duration * 1.5, // Slower animations
-          delay: delay,
-          ease: "linear" as const
-        }
-      };
+    // Scale down animations based on device capability
+    switch (qualityLevel) {
+      case 'low':
+        // For low-end devices, only animate opacity to save resources
+        return {
+          animate: {
+            opacity: animateOpacity
+          },
+          transition: {
+            duration: duration * 1.5, // Slower animations
+            repeat: Infinity,
+            repeatType: 'reverse',
+            delay: delay * 1.5,
+            ease: 'linear'
+          }
+        };
+        
+      case 'medium':
+        // For medium devices, animate opacity and scale but skip position
+        return {
+          animate: {
+            scale: animateScale,
+            opacity: animateOpacity
+          },
+          transition: {
+            duration: duration * 1.2,
+            repeat: Infinity,
+            repeatType: 'reverse',
+            delay: delay * 1.2,
+            ease: 'easeInOut'
+          }
+        };
+        
+      case 'high':
+      default:
+        // For high-end devices, use all animations
+        return {
+          animate: {
+            x: animateX,
+            y: animateY,
+            scale: animateScale,
+            opacity: animateOpacity
+          },
+          transition: {
+            duration,
+            repeat: Infinity,
+            repeatType: 'reverse',
+            delay,
+            ease: 'easeInOut'
+          }
+        };
     }
-    
-    // Medium quality animations
-    if (qualityLevel === 'medium') {
-      return {
-        animate: {
-          x: animateX.map(val => val * 0.7), // Reduced movement
-          y: animateY.map(val => val * 0.7),
-          scale: animateScale
-        },
-        transition: {
-          repeat: Infinity,
-          repeatType: "reverse" as const,
-          duration: duration * 1.2,
-          delay: delay,
-          ease: "easeInOut" as const
-        }
-      };
-    }
-    
-    // Full quality animations
-    return {
-      animate: {
-        x: animateX,
-        y: animateY,
-        scale: animateScale,
-        opacity: animateOpacity,
-      },
-      transition: {
-        repeat: Infinity,
-        repeatType: "reverse" as const,
-        duration: duration,
-        delay: delay,
-        ease: "easeInOut" as const
-      }
-    };
   }, [animateX, animateY, animateScale, animateOpacity, duration, delay, qualityLevel]);
-};
+}

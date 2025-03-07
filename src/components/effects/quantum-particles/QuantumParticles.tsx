@@ -10,7 +10,9 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   colors = ['#6366f1', '#8b5cf6', '#d946ef', '#64748b', '#0ea5e9'],
   speed = 1,
   maxSize = 6,
-  responsive = true
+  responsive = true,
+  interactive = false,
+  className = ''
 }) => {
   // Parse count to number with fallback
   const particleCount = typeof count === 'number' 
@@ -25,15 +27,25 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const isMounted = useRef(true);
   
-  // For performance tracking
+  // Performance metrics
   const lastTimeRef = useRef<number>(0);
   const frameCountRef = useRef<number>(0);
   const fpsRef = useRef<number>(60);
-  const throttleFramesRef = useRef<number>(1); // Only process every nth frame
+  const throttleFramesRef = useRef<number>(1); // Process every nth frame
   const frameSkipCountRef = useRef<number>(0);
   
   // Quality level based on device
   const qualityLevel = useMemo(() => getAnimationQualityLevel(), []);
+  
+  // Adjust particle count based on device performance
+  const adjustedCount = useMemo(() => {
+    if (qualityLevel === 'low') {
+      return Math.min(particleCount, 15); // Fewer particles for low-end devices
+    } else if (qualityLevel === 'medium') {
+      return Math.min(particleCount, 25); // Moderate number for medium devices
+    }
+    return particleCount; // Full count for high-end devices
+  }, [particleCount, qualityLevel]);
   
   // Set throttle rate based on device performance
   useEffect(() => {
@@ -57,11 +69,21 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
       }
     };
     
+    // Initial update
     updateDimensions();
-    window.addEventListener('resize', updateDimensions);
+    
+    // Add throttled resize listener
+    let resizeTimeout: number;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = window.setTimeout(updateDimensions, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
     
     return () => {
-      window.removeEventListener('resize', updateDimensions);
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
     };
   }, [responsive]);
   
@@ -69,37 +91,37 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
   const { particles, updateParticles } = useParticleSystem(
     dimensions.width,
     dimensions.height,
-    { count: particleCount, colors, maxSize, speed }
+    { count: adjustedCount, colors, maxSize, speed, interactive }
   );
 
-  // Animation loop
+  // Animation loop with performance optimizations
   useEffect(() => {
     if (particles.length === 0 || !containerRef.current) return;
     
     const animate = (time: number) => {
       if (!isMounted.current) return;
       
-      // Simple FPS calculation
+      // FPS calculation and monitoring
       frameCountRef.current++;
       if (time - lastTimeRef.current >= 1000) {
         fpsRef.current = frameCountRef.current;
         frameCountRef.current = 0;
         lastTimeRef.current = time;
         
-        // Log FPS for debugging performance issues
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`Quantum Particles FPS: ${fpsRef.current}`);
+        // Adjust throttling dynamically based on FPS
+        if (fpsRef.current < 30 && throttleFramesRef.current < 4) {
+          throttleFramesRef.current++;
+        } else if (fpsRef.current > 55 && throttleFramesRef.current > 1) {
+          throttleFramesRef.current--;
         }
       }
       
-      // Apply throttling based on device performance
+      // Apply throttling
       frameSkipCountRef.current = (frameSkipCountRef.current + 1) % throttleFramesRef.current;
       if (frameSkipCountRef.current === 0) {
-        // Only update particles on throttled frames
         updateParticles();
       }
       
-      // Request next frame using ref to avoid infinite loops
       requestRef.current = requestAnimationFrame(animate);
     };
     
@@ -110,11 +132,12 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
     return () => {
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
+        requestRef.current = undefined;
       }
     };
   }, [particles.length, updateParticles]);
   
-  // Component mount/unmount
+  // Component mount/unmount lifecycle
   useEffect(() => {
     isMounted.current = true;
     
@@ -122,16 +145,18 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = ({
       isMounted.current = false;
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
+        requestRef.current = undefined;
       }
     };
   }, []);
   
-  // Render particles
+  // Render particles with accessibility improvements
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 pointer-events-none overflow-hidden z-0"
+      className={`fixed inset-0 pointer-events-none overflow-hidden z-0 ${className}`}
       aria-hidden="true"
+      role="presentation"
     >
       {particles.map((particle, i) => (
         <Particle 
