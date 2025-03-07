@@ -42,7 +42,7 @@ const MainContent: React.FC<MainContentProps> = ({
       <GlassmorphicContainer 
         variant={isMobile ? "subtle" : "medium"} 
         blur={isMobile ? "light" : "medium"}
-        className="p-1 md:p-3 relative overflow-hidden rounded-full aspect-square"
+        className="p-1 md:p-3 relative overflow-hidden rounded-full aspect-square max-w-3xl mx-auto"
         animate={true}
         motionProps={{
           whileHover: { scale: 1.01 },
@@ -52,20 +52,27 @@ const MainContent: React.FC<MainContentProps> = ({
         glowEffect={true}
         shimmer={true}
       >
-        <div className="absolute inset-0 opacity-40">
+        {/* Reduced opacity for better cube visibility */}
+        <div className="absolute inset-0 opacity-20">
           <InteractiveEnergyField 
             energyPoints={energyPoints} 
-            particleDensity={isMobile ? 0.3 : 0.5}
+            particleDensity={isMobile ? 0.2 : 0.3}
             className="w-full h-full"
           />
         </div>
         
+        {/* Added higher z-index and contrast background for better visibility */}
         <div className="relative z-10 w-full h-full flex items-center justify-center">
-          <CubeWrapper 
-            userId={userId}
-            energyPoints={energyPoints}
-            onSelectNode={onNodeSelect}
-          />
+          <div className="relative w-full h-full rounded-full overflow-hidden">
+            {/* Add subtle contrasting backdrop to make the cube more visible */}
+            <div className="absolute inset-0 bg-gradient-radial from-black/40 via-black/20 to-transparent"></div>
+            
+            <CubeWrapper 
+              userId={userId}
+              energyPoints={energyPoints}
+              onSelectNode={onNodeSelect}
+            />
+          </div>
         </div>
       </GlassmorphicContainer>
     </motion.div>

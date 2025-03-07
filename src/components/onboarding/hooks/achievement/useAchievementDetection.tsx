@@ -17,6 +17,12 @@ export function useAchievementDetection(
 
   // Check for achievements based on completed steps and other criteria
   useEffect(() => {
+    // Skip if no userId is provided
+    if (!userId) return;
+    
+    // We'll use this to track if any new achievements were awarded
+    let newAchievementsAwarded = false;
+    
     // Find achievements that should be awarded
     const newAchievements: AchievementData[] = [];
     
@@ -68,6 +74,7 @@ export function useAchievementDetection(
       
       if (shouldAward) {
         newAchievements.push(achievement);
+        newAchievementsAwarded = true;
       }
     });
     
@@ -98,11 +105,13 @@ export function useAchievementDetection(
           };
           
           newAchievements.push(tierAchievement);
+          newAchievementsAwarded = true;
         }
       }
     });
     
-    if (newAchievements.length > 0) {
+    // Only update state if new achievements were awarded to prevent infinite renders
+    if (newAchievementsAwarded && newAchievements.length > 0) {
       // Update earned achievements state
       setEarnedAchievements(prev => {
         const updatedAchievements = [...prev];

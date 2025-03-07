@@ -27,35 +27,36 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
   
   // Calculate particle count based on device performance and energy points
   const getParticleCount = () => {
-    const baseCount = Math.min(Math.max(15, Math.floor(energyPoints / 100) + 15), 40);
+    // Reduce particle count significantly to improve performance
+    const baseCount = Math.min(Math.max(5, Math.floor(energyPoints / 150) + 5), 25);
     
-    if (performanceCategory === 'low') return Math.max(5, Math.floor(baseCount * 0.4));
-    if (performanceCategory === 'medium') return Math.max(10, Math.floor(baseCount * 0.7));
+    if (performanceCategory === 'low') return Math.max(3, Math.floor(baseCount * 0.3));
+    if (performanceCategory === 'medium') return Math.max(5, Math.floor(baseCount * 0.5));
     return baseCount;
   };
   
   // Calculate animation speed based on consciousness level and device performance
-  const particleSpeed = Math.max(0.5, Math.min(1.5, 
-    consciousnessLevel * (performanceCategory === 'high' ? 0.2 : 0.15)
+  const particleSpeed = Math.max(0.3, Math.min(0.8, 
+    consciousnessLevel * (performanceCategory === 'high' ? 0.15 : 0.10)
   ));
   
-  // Generate background orbs
+  // Generate background orbs - reduced for better performance
   useEffect(() => {
     if (performanceCategory === 'low') {
       setOrbs([]);
       return;
     }
     
-    const orbCount = isMobile ? 3 : Math.min(Math.floor(consciousnessLevel + 2), 6);
+    const orbCount = isMobile ? 2 : Math.min(Math.floor(consciousnessLevel + 1), 4);
     const newOrbs = [];
     
     for (let i = 0; i < orbCount; i++) {
       newOrbs.push({
-        x: `${10 + Math.random() * 80}%`,
-        y: `${10 + Math.random() * 80}%`,
-        size: `${isMobile ? 100 + Math.random() * 100 : 150 + Math.random() * 200}px`,
+        x: `${15 + Math.random() * 70}%`,
+        y: `${15 + Math.random() * 70}%`,
+        size: `${isMobile ? 80 + Math.random() * 80 : 120 + Math.random() * 150}px`,
         color: getOrbColor(i),
-        delay: i * 0.5
+        delay: i * 0.7
       });
     }
     
@@ -65,23 +66,21 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
   // Get orb color based on index
   const getOrbColor = (index: number) => {
     const colors = [
-      'from-quantum-600/20 to-astral-500/10',
-      'from-astral-500/20 to-ethereal-500/10',
-      'from-ethereal-500/15 to-quantum-600/10',
-      'from-purple-500/15 to-blue-500/10',
-      'from-blue-500/15 to-teal-500/10',
-      'from-violet-500/15 to-indigo-500/10'
+      'from-quantum-600/15 to-astral-500/8',
+      'from-astral-500/15 to-ethereal-500/8',
+      'from-ethereal-500/12 to-quantum-600/8',
+      'from-purple-500/12 to-blue-500/8',
     ];
     
     return colors[index % colors.length];
   };
   
   return (
-    <div className="absolute inset-0 overflow-hidden">
-      {/* Base gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-quantum-950/50 to-black/90 z-0"></div>
+    <div className="absolute inset-0 overflow-hidden z-0">
+      {/* Base gradient overlay - simplified for better visibility */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black via-quantum-950/60 to-black/95 z-0"></div>
       
-      {/* Animated background orbs */}
+      {/* Animated background orbs - reduced opacity for better contrast */}
       {orbs.map((orb, index) => (
         <motion.div
           key={`orb-${index}`}
@@ -92,15 +91,15 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
             width: orb.size,
             height: orb.size,
             filter: 'blur(60px)',
-            opacity: 0.4
+            opacity: 0.25
           }}
           initial={{ opacity: 0 }}
           animate={{ 
-            opacity: [0.2, 0.4, 0.2],
-            scale: [1, 1.05, 1]
+            opacity: [0.15, 0.25, 0.15],
+            scale: [1, 1.03, 1]
           }}
           transition={{
-            duration: 8,
+            duration: 10,
             repeat: Infinity,
             repeatType: "reverse",
             ease: "easeInOut",
@@ -109,21 +108,22 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
         />
       ))}
       
-      {/* Sacred geometry background with consciousness level */}
+      {/* Sacred geometry background with consciousness level - improved visibility */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: 0.2 }}
+        animate={{ opacity: 0.25 }}
         transition={{ duration: 1.5 }}
+        className="z-0"
       >
         <MetatronsBackground 
           consciousnessLevel={consciousnessLevel}
-          opacity={0.2}
+          opacity={0.25}
           intensity={performanceCategory === 'low' ? "low" : "medium"}
           animated={performanceCategory !== 'low'}
         />
       </motion.div>
       
-      {/* Quantum particles with dynamic count based on energy */}
+      {/* Quantum particles with dynamic count based on energy - significantly reduced */}
       <QuantumParticles 
         count={getParticleCount()} 
         interactive={performanceCategory !== 'low'}

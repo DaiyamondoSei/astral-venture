@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAchievementTracker } from './hooks/achievement';
 import { useAchievementNotification } from './hooks/useAchievementNotification';
 import AchievementNotification from './AchievementNotification';
@@ -26,6 +26,9 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
   meditationMinutes = 0,
   wisdomResourcesCount = 0
 }) => {
+  const [lastShowTime, setLastShowTime] = useState<number>(0);
+  const [hasInitialized, setHasInitialized] = useState<boolean>(false);
+  
   // Get user streak data from hook
   const { userStreak, activatedChakras } = useUserStreak(userId);
   
@@ -56,27 +59,38 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
     showProgress
   } = useAchievementNotification(earnedAchievements, dismissAchievement);
   
-  // Show progress tracker briefly on component mount or when achievements change
+  // Only show progress tracker on initial mount, not repeatedly
   useEffect(() => {
-    // Wait for earnedAchievements to load before deciding to show progress
-    if (earnedAchievements.length > 0 || Object.keys(completedSteps).length > 0) {
-      const cleanup = showProgress(7000);
-      return cleanup;
+    if (!hasInitialized && userId) {
+      const now = Date.now();
+      // Only show if at least 60 seconds have passed since last show
+      if (now - lastShowTime > 60000) {
+        const cleanup = showProgress(5000);
+        setLastShowTime(now);
+        setHasInitialized(true);
+        return cleanup;
+      }
     }
-  }, [earnedAchievements.length, completedSteps, showProgress]);
+  }, [hasInitialized, userId, lastShowTime, showProgress]);
 
-  // Show the progress tracker after significant changes in tracked values
+  // Show the progress tracker only after significant changes and not too frequently
   useEffect(() => {
-    if (progressTracking && (
-      progressTracking.streakDays > 0 || 
-      progressTracking.reflections > 0 || 
-      progressTracking.meditation_minutes > 0 ||
-      progressTracking.total_energy_points > 0
-    )) {
-      const cleanup = showProgress(5000);
-      return cleanup;
+    if (hasInitialized && progressTracking && userId) {
+      const now = Date.now();
+      const hasSignificantChange = 
+        progressTracking.streakDays > 2 || 
+        progressTracking.reflections > 2 || 
+        progressTracking.meditation_minutes > 10 ||
+        progressTracking.total_energy_points > 50;
+        
+      // Only show if significant change AND at least 60 seconds since last show
+      if (hasSignificantChange && (now - lastShowTime > 60000)) {
+        const cleanup = showProgress(5000);
+        setLastShowTime(now);
+        return cleanup;
+      }
     }
-  }, [progressTracking, showProgress]);
+  }, [progressTracking, hasInitialized, userId, lastShowTime, showProgress]);
 
   return (
     <>
