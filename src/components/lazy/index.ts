@@ -1,75 +1,48 @@
 
-import React from 'react';
-import LazyLoadWrapper from '../LazyLoadWrapper';
+import React, { lazy, Suspense } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Lazy load heavy visualization components
-const LazyQuantumParticles = React.lazy(() => 
-  import('../effects/quantum-particles/QuantumParticles')
+// Default fallback for lazy components
+const DefaultFallback = () => (
+  <div className="animate-pulse flex flex-col space-y-4 p-4">
+    <Skeleton className="h-4 w-3/4 rounded" />
+    <Skeleton className="h-32 w-full rounded-md" />
+    <Skeleton className="h-4 w-1/2 rounded" />
+  </div>
 );
 
-const LazyInteractiveEnergyField = React.lazy(() => 
-  import('../effects/energy-field/InteractiveEnergyField')
-);
-
-const LazyInteractiveMetatronsPortal = React.lazy(() =>
-  import('../sacred-geometry/components/InteractiveMetatronsPortal')
-);
-
-const LazyVisualizationTabs = React.lazy(() =>
-  import('../astral-body-demo/VisualizationTabs')
-);
-
-const LazyCosmicAstralBody = React.lazy(() =>
-  import('../entry-animation/CosmicAstralBody')
-);
-
-const LazyAstralBody = React.lazy(() =>
-  import('../entry-animation/AstralBody')
-);
-
-// Export wrapped versions with optimized loading states
-export const QuantumParticles = (props: any) => (
-  <LazyLoadWrapper>
-    <LazyQuantumParticles {...props} />
-  </LazyLoadWrapper>
-);
-
-export const InteractiveEnergyField = (props: any) => (
-  <LazyLoadWrapper>
-    <LazyInteractiveEnergyField {...props} />
-  </LazyLoadWrapper>
-);
-
-export const InteractiveMetatronsPortal = (props: any) => (
-  <LazyLoadWrapper>
-    <LazyInteractiveMetatronsPortal {...props} />
-  </LazyLoadWrapper>
-);
-
-export const VisualizationTabs = (props: any) => (
-  <LazyLoadWrapper>
-    <LazyVisualizationTabs {...props} />
-  </LazyLoadWrapper>
-);
-
-export const CosmicAstralBody = (props: any) => (
-  <LazyLoadWrapper>
-    <LazyCosmicAstralBody {...props} />
-  </LazyLoadWrapper>
-);
-
-export const AstralBody = (props: any) => (
-  <LazyLoadWrapper>
-    <LazyAstralBody {...props} />
-  </LazyLoadWrapper>
-);
-
-// Also export the raw lazy components for advanced usage scenarios
-export {
-  LazyQuantumParticles,
-  LazyInteractiveEnergyField,
-  LazyInteractiveMetatronsPortal,
-  LazyVisualizationTabs,
-  LazyCosmicAstralBody,
-  LazyAstralBody
+// HOC for creating optimized lazy components
+const createLazyComponent = (importFn: () => Promise<any>, LoadingFallback = DefaultFallback) => {
+  const LazyComponent = lazy(importFn);
+  
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
 };
+
+// Lazy loaded components with custom loading states
+export const LazyInteractiveEnergyField = createLazyComponent(
+  () => import('@/components/effects/InteractiveEnergyField')
+);
+
+export const LazyAstralBody = createLazyComponent(
+  () => import('@/components/astral-body/AstralBody')
+);
+
+export const LazyCosmicAstralBody = createLazyComponent(
+  () => import('@/components/entry-animation/CosmicAstralBody')
+);
+
+export const QuantumParticles = createLazyComponent(
+  () => import('@/components/effects/QuantumParticles')
+);
+
+export const VisualizationTabs = createLazyComponent(
+  () => import('@/components/astral-body-demo/VisualizationTabs')
+);
+
+export const EntryAnimation = createLazyComponent(
+  () => import('@/components/EntryAnimation')
+);
