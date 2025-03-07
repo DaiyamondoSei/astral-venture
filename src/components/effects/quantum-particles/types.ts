@@ -29,8 +29,15 @@ export interface QuantumParticle {
 }
 
 export interface QuantumParticlesProps {
-  count?: number;
+  count?: number | string;
   colors?: string[];
   className?: string;
   interactive?: boolean;
+  speed?: number;
+}
+
+export interface ParticleSystemHookResult {
+  particles: Particle[];
+  mousePosition: { x: number; y: number };
+  containerRef: React.RefObject<HTMLDivElement>;
 }

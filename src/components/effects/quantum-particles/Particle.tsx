@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { QuantumParticle } from './types';
 
@@ -9,38 +9,49 @@ interface ParticleProps {
   dy: number;
 }
 
-// Using React.memo to prevent unnecessary re-renders
+/**
+ * Individual quantum particle component
+ * Optimized for performance with React.memo and useMemo
+ */
 const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
   // Precalculate animation values for better performance
-  const animateX = [0, dx * 10, 0];
-  const animateY = [0, dy * 10, 0];
-  const animateScale = [1, 1.2, 1];
-  const animateOpacity = [particle.opacity, particle.opacity * 1.5, particle.opacity];
+  const animationValues = useMemo(() => {
+    return {
+      animateX: [0, dx * 10, 0],
+      animateY: [0, dy * 10, 0],
+      animateScale: [1, 1.2, 1],
+      animateOpacity: [particle.opacity, particle.opacity * 1.5, particle.opacity],
+      transition: {
+        repeat: Infinity,
+        repeatType: "reverse" as const,
+        duration: particle.duration,
+        delay: particle.delay,
+        ease: "easeInOut" as const
+      }
+    };
+  }, [dx, dy, particle.opacity, particle.duration, particle.delay]);
+  
+  // Base styles for the particle
+  const particleStyle = useMemo(() => ({
+    left: `${particle.x}%`,
+    top: `${particle.y}%`,
+    width: `${particle.size}px`,
+    height: `${particle.size}px`,
+    backgroundColor: particle.color,
+    opacity: particle.opacity,
+  }), [particle]);
   
   return (
     <motion.div
       className="absolute rounded-full"
-      style={{
-        left: `${particle.x}%`,
-        top: `${particle.y}%`,
-        width: `${particle.size}px`,
-        height: `${particle.size}px`,
-        backgroundColor: particle.color,
-        opacity: particle.opacity,
-      }}
+      style={particleStyle}
       animate={{
-        x: animateX,
-        y: animateY,
-        scale: animateScale,
-        opacity: animateOpacity,
+        x: animationValues.animateX,
+        y: animationValues.animateY,
+        scale: animationValues.animateScale,
+        opacity: animationValues.animateOpacity,
       }}
-      transition={{
-        repeat: Infinity,
-        repeatType: "reverse",
-        duration: particle.duration,
-        delay: particle.delay,
-        ease: "easeInOut"
-      }}
+      transition={animationValues.transition}
     />
   );
 };
