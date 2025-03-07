@@ -72,10 +72,10 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
   // Get orb color based on index
   const getOrbColor = (index: number) => {
     const colors = [
-      'from-quantum-600/15 to-astral-500/8',
-      'from-astral-500/15 to-ethereal-500/8',
-      'from-ethereal-500/12 to-quantum-600/8',
-      'from-purple-500/12 to-blue-500/8',
+      'from-quantum-400/15 to-astral-500/8',
+      'from-astral-400/15 to-ethereal-500/8',
+      'from-ethereal-400/12 to-quantum-400/8',
+      'from-purple-400/12 to-blue-400/8',
     ];
     
     return colors[index % colors.length];
@@ -83,8 +83,8 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
   
   return (
     <div className="absolute inset-0 overflow-hidden z-0">
-      {/* Base gradient overlay - simplified for better visibility */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-quantum-950/60 to-black/95 z-0"></div>
+      {/* Base gradient overlay - Light theme for better visibility */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white via-gray-50 to-white/95 z-0"></div>
       
       {/* Animated background orbs - reduced opacity for better contrast */}
       {orbs.map((orb, index) => (

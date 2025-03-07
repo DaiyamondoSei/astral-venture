@@ -13,7 +13,7 @@ const GeometryNetworkBackground = lazy(() =>
 
 // Simple fallback background that doesn't block rendering
 const SimpleFallbackBackground = () => (
-  <div className="fixed inset-0 bg-gradient-to-b from-black/90 to-quantum-900/80" aria-hidden="true" />
+  <div className="fixed inset-0 bg-gradient-to-b from-white/90 to-gray-100/80" aria-hidden="true" />
 );
 
 interface LayoutProps {
@@ -76,7 +76,7 @@ const Layout = ({
   };
   
   return (
-    <div className="min-h-screen relative overflow-hidden" role="main">
+    <div className="min-h-screen relative overflow-hidden bg-white text-gray-800" role="main">
       {/* Background - only load if not explicitly removed */}
       {!removeBackground && (
         <>
@@ -89,7 +89,7 @@ const Layout = ({
               <GeometryNetworkBackground 
                 density={getBackgroundDensity()} 
                 speed={0.6} 
-                className="z-0" 
+                className="z-0 opacity-30" 
               />
             </Suspense>
           )}
@@ -119,7 +119,7 @@ const Layout = ({
         )}
         
         {/* Simplified gradient for better performance */}
-        <div className="absolute inset-0 bg-gradient-radial from-transparent to-black/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-radial from-transparent to-gray-100/40 pointer-events-none" />
       </div>
       
       {/* Main content with improved spacing and z-indexing */}

@@ -22,9 +22,9 @@ const NotFound = lazy(() => import('@/pages/NotFound'));
 
 // Loading component
 const PageLoader = () => (
-  <div className="fixed inset-0 flex items-center justify-center bg-black">
+  <div className="fixed inset-0 flex items-center justify-center bg-white">
     <motion.div
-      className="text-white text-2xl font-light"
+      className="text-gray-800 text-2xl font-light"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
@@ -35,7 +35,7 @@ const PageLoader = () => (
           animate={{ rotate: 360 }}
           transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
         />
-        <p className="mt-4 text-quantum-100">Awakening quantum field...</p>
+        <p className="mt-4 text-quantum-700">Awakening quantum field...</p>
       </div>
     </motion.div>
   </div>
@@ -53,12 +53,12 @@ function App() {
       <ErrorBoundary>
         <AuthProvider>
           <OnboardingProvider>
-            <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-black via-quantum-950 to-black">
+            <div className="relative min-h-screen overflow-hidden bg-white text-gray-800">
               {/* Quantum particles background effect wrapped in its own ErrorBoundary */}
               <ErrorBoundary fallback={
-                <div className="absolute inset-0 bg-gradient-to-br from-black via-quantum-950 to-black" />
+                <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50 to-white" />
               }>
-                <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 z-0 opacity-30">
                   <Suspense fallback={null}>
                     <QuantumParticles count={40} speed={0.8} />
                   </Suspense>
