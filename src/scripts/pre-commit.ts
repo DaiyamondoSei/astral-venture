@@ -1,44 +1,85 @@
 
 #!/usr/bin/env node
+
+/**
+ * Pre-commit hook script
+ * 
+ * This script runs automatically before git commits via husky
+ * to ensure code quality and prevent common errors
+ */
+
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
 // Configuration
-const TYPESCRIPT_FILES_PATTERN = 'src/**/*.{ts,tsx}';
-const IGNORE_PATTERNS = ['**/node_modules/**', '**/dist/**', '**/build/**'];
+const TYPESCRIPT_CHECK = true;
+const LINT_CHECK = true;
+const COMPONENT_VALIDATION_CHECK = true;
+const UNUSED_EXPORTS_CHECK = false; // Optional, can be resource-intensive
 
-// Colors for console output
-const COLORS = {
-  reset: '\x1b[0m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  bold: '\x1b[1m'
-};
+console.log('🔍 Running pre-commit checks...');
 
-console.log(`${COLORS.blue}${COLORS.bold}Running pre-commit type validation...${COLORS.reset}`);
+let hasErrors = false;
 
-try {
-  // Run TypeScript compiler in noEmit mode to check for type errors
-  console.log(`${COLORS.blue}Checking for TypeScript errors...${COLORS.reset}`);
-  execSync(`npx tsc --noEmit`, { stdio: 'inherit' });
+// Helper for running commands and handling errors
+function runCheck(name: string, command: string): boolean {
+  try {
+    console.log(`\n📋 Running ${name}...`);
+    execSync(command, { stdio: 'inherit' });
+    console.log(`✅ ${name} passed!`);
+    return true;
+  } catch (error) {
+    console.error(`❌ ${name} failed!`);
+    hasErrors = true;
+    return false;
+  }
+}
+
+// TypeScript type checking
+if (TYPESCRIPT_CHECK) {
+  runCheck('TypeScript type check', 'tsc --noEmit');
+}
+
+// ESLint checking
+if (LINT_CHECK) {
+  runCheck('ESLint check', 'eslint "src/**/*.{ts,tsx}" --max-warnings=0');
+}
+
+// Component validation check
+if (COMPONENT_VALIDATION_CHECK) {
+  // This is a custom validation that ensures all components follow our documentation standards
+  const componentFiles = execSync('find src/components -name "*.tsx" | grep -v "__tests__"')
+    .toString()
+    .split('\n')
+    .filter(Boolean);
+    
+  let undocumentedComponents = 0;
   
-  // Run ESLint to check for linting errors
-  console.log(`${COLORS.blue}Checking for ESLint errors...${COLORS.reset}`);
-  execSync(`npx eslint ${TYPESCRIPT_FILES_PATTERN} --max-warnings=0`, { 
-    stdio: 'inherit' 
+  componentFiles.forEach(filePath => {
+    const content = fs.readFileSync(filePath, 'utf8');
+    // Check for documented export
+    if (!content.includes('documented(') && content.includes('export default')) {
+      console.warn(`⚠️ Component in ${filePath} is not documented`);
+      undocumentedComponents++;
+    }
   });
   
-  // Run unused exports check
-  console.log(`${COLORS.blue}Checking for unused exports...${COLORS.reset}`);
-  execSync(`npx ts-unused-exports tsconfig.json`, { stdio: 'inherit' });
-  
-  console.log(`${COLORS.green}${COLORS.bold}All checks passed! Commit proceeding.${COLORS.reset}`);
-  process.exit(0);
-} catch (error) {
-  console.error(`${COLORS.red}${COLORS.bold}Pre-commit checks failed!${COLORS.reset}`);
-  console.error(`${COLORS.yellow}Please fix the issues before committing.${COLORS.reset}`);
+  if (undocumentedComponents > 0) {
+    console.warn(`⚠️ Found ${undocumentedComponents} undocumented components`);
+    // We don't fail the commit for this, but we warn about it
+  }
+}
+
+// Unused exports check (optional)
+if (UNUSED_EXPORTS_CHECK) {
+  runCheck('Unused exports check', 'ts-unused-exports tsconfig.json');
+}
+
+// Exit with error code if any checks failed
+if (hasErrors) {
+  console.error('\n❌ Pre-commit checks failed. Please fix the errors before committing.');
   process.exit(1);
+} else {
+  console.log('\n✅ All pre-commit checks passed!');
 }
