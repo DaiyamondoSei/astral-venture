@@ -11,6 +11,12 @@ interface ParticleProps {
 
 // Using React.memo to prevent unnecessary re-renders
 const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
+  // Precalculate animation values for better performance
+  const animateX = [0, dx * 10, 0];
+  const animateY = [0, dy * 10, 0];
+  const animateScale = [1, 1.2, 1];
+  const animateOpacity = [particle.opacity, particle.opacity * 1.5, particle.opacity];
+  
   return (
     <motion.div
       className="absolute rounded-full"
@@ -23,10 +29,10 @@ const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
         opacity: particle.opacity,
       }}
       animate={{
-        x: [0, dx * 10, 0],
-        y: [0, dy * 10, 0],
-        scale: [1, 1.2, 1],
-        opacity: [particle.opacity, particle.opacity * 1.5, particle.opacity],
+        x: animateX,
+        y: animateY,
+        scale: animateScale,
+        opacity: animateOpacity,
       }}
       transition={{
         repeat: Infinity,
@@ -39,5 +45,5 @@ const Particle: React.FC<ParticleProps> = ({ particle, dx, dy }) => {
   );
 };
 
-// Export with React.memo to prevent unnecessary re-renders when props don't change
+// Export with React.memo to prevent unnecessary re-renders
 export default React.memo(Particle);

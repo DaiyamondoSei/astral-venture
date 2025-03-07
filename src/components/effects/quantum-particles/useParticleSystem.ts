@@ -13,7 +13,7 @@ export const useParticleSystem = (
   
   // Generate random particles only once on mount
   useEffect(() => {
-    // Prevent regenerating particles on every render
+    // Only generate particles if not already initialized
     if (initialized.current) return;
     
     const newParticles: QuantumParticle[] = [];
@@ -33,22 +33,25 @@ export const useParticleSystem = (
     
     setParticles(newParticles);
     initialized.current = true;
-  }, [count, colors]); // Only depend on count and colors
+  }, [count, colors]); // These dependencies don't change often
   
   // Track mouse position for interactive mode
   useEffect(() => {
     if (!interactive) return;
     
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({
-        x: (e.clientX / window.innerWidth) * 100,
-        y: (e.clientY / window.innerHeight) * 100
+      // Use requestAnimationFrame to throttle updates
+      requestAnimationFrame(() => {
+        setMousePosition({
+          x: (e.clientX / window.innerWidth) * 100,
+          y: (e.clientY / window.innerHeight) * 100
+        });
       });
     };
     
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [interactive]); // Only depend on interactive flag
+  }, [interactive]); // Only re-run if interactive flag changes
   
   return { particles, mousePosition };
 };

@@ -1,8 +1,9 @@
 
 import React from 'react';
 import QuantumParticlesComponent from './quantum-particles/QuantumParticles';
+import { QuantumParticlesProps } from './quantum-particles/types';
 
-const QuantumParticles = (props) => {
+const QuantumParticles: React.FC<QuantumParticlesProps> = (props) => {
   return <QuantumParticlesComponent {...props} />;
 };
 
