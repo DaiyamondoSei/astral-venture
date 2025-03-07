@@ -123,7 +123,7 @@ export function useQuestionSubmit({
       }
       
       clearTimeout(timeoutId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting question:', error);
       
       // Enhanced error handling with more specific error types
