@@ -1,6 +1,7 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Particle } from './types';
+import { getPerformanceCategory } from '@/utils/performanceUtils';
 
 interface UseParticlesProps {
   energyPoints: number;
@@ -21,16 +22,41 @@ export const useParticles = ({
 }: UseParticlesProps) => {
   const [particles, setParticles] = useState<Particle[]>([]);
   const animationFrameRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
+  const frameSkipRef = useRef<number>(0);
+  const deviceCategory = useMemo(() => getPerformanceCategory(), []);
+  
+  // Calculate frame skip based on device performance
+  const frameSkip = useMemo(() => {
+    if (deviceCategory === 'low') return 3; // Update every 4th frame
+    if (deviceCategory === 'medium') return 1; // Update every 2nd frame
+    return 0; // Update every frame for high-performance devices
+  }, [deviceCategory]);
   
   // Initialize particles
   useEffect(() => {
     if (!dimensions || !isMounted) return;
     
-    // Calculate number of particles based on energy points and density
-    const baseCount = Math.min(75, Math.ceil(energyPoints / 30)) * particleDensity;
-    const count = Math.max(10, Math.min(baseCount, 150)); // Cap between 10-150 particles
+    // Calculate number of particles based on energy points, density, and device capability
+    const getOptimalCount = () => {
+      // Base count from energy points
+      const baseCount = Math.min(75, Math.ceil(energyPoints / 30)) * particleDensity;
+      
+      // Adjust based on device capability
+      if (deviceCategory === 'low') {
+        return Math.max(5, Math.min(baseCount * 0.3, 30));
+      }
+      if (deviceCategory === 'medium') {
+        return Math.max(10, Math.min(baseCount * 0.6, 75));
+      }
+      // High performance
+      return Math.max(10, Math.min(baseCount, 150));
+    };
+    
+    const count = getOptimalCount();
     
     const newParticles: Particle[] = Array.from({ length: count }).map((_, index) => {
+      // Create particles with reduced computation
       return {
         id: `p-${index}`,
         x: Math.random() * dimensions.width,
@@ -55,13 +81,11 @@ export const useParticles = ({
         animationFrameRef.current = null;
       }
     };
-  }, [energyPoints, particleDensity, dimensions, colors, isMounted]);
+  }, [energyPoints, particleDensity, dimensions, colors, isMounted, deviceCategory]);
   
-  // Animate particles
+  // Animate particles with performance optimizations
   useEffect(() => {
     if (!dimensions || !isMounted) return;
-    
-    let lastTime = performance.now();
     
     const animate = (time: number) => {
       if (!isMounted) {
@@ -72,10 +96,19 @@ export const useParticles = ({
         return;
       }
       
-      const delta = time - lastTime;
-      lastTime = time;
+      // Calculate delta time for smooth animation regardless of framerate
+      const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
+      lastTimeRef.current = time;
+      
+      // Skip frames for performance
+      frameSkipRef.current = (frameSkipRef.current + 1) % (frameSkip + 1);
+      if (frameSkipRef.current !== 0) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
       
       setParticles(prevParticles => {
+        // Batch all particle updates to reduce state updates
         return prevParticles.map(particle => {
           let { x, y, direction, pulse } = particle;
           const { speed } = particle;
@@ -90,24 +123,26 @@ export const useParticles = ({
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             if (distance < 150) {
+              // Only perform complex calculations if mouse is close enough
               const factor = 0.02;
               direction = Math.atan2(dy, dx);
               pulse = Math.min(pulse + 0.1, 3);
             } else {
-              // Random wandering
+              // Simplified wandering for distant particles
               direction += (Math.random() - 0.5) * 0.2;
               pulse = Math.max(pulse - 0.05, 1);
             }
           } else {
-            // Random wandering
+            // Simple random wandering when no mouse
             direction += (Math.random() - 0.5) * 0.2;
           }
           
-          // Update position
-          x += Math.cos(direction) * speed * (delta / 16);
-          y += Math.sin(direction) * speed * (delta / 16);
+          // Update position with delta time for consistent movement regardless of framerate
+          const normalizedDelta = delta / 16.67; // Normalize to 60fps
+          x += Math.cos(direction) * speed * normalizedDelta;
+          y += Math.sin(direction) * speed * normalizedDelta;
           
-          // Boundary checking
+          // Boundary checking with wrapping
           if (x < 0) x = dimensions.width;
           if (x > dimensions.width) x = 0;
           if (y < 0) y = dimensions.height;
@@ -124,17 +159,19 @@ export const useParticles = ({
       animationFrameRef.current = requestAnimationFrame(animate);
     };
     
+    // Start animation loop
     animationFrameRef.current = requestAnimationFrame(animate);
     
+    // Clear animation frame when component unmounts or dependencies change
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
     };
-  }, [dimensions, mousePosition, isMounted]);
+  }, [dimensions, mousePosition, isMounted, frameSkip]);
   
-  // Ensure animation frames are cleaned up on unmount
+  // Final cleanup
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) {

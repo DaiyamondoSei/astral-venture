@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { getPerformanceCategory } from '@/utils/performanceUtils';
 
 interface CentralGlowProps {
   showInfinity: boolean;
@@ -15,8 +16,11 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
   showIllumination,
   baseProgressPercentage
 }) => {
-  // Get the appropriate glow colors based on consciousness state
-  const getGlowGradient = () => {
+  // Get device performance category
+  const performanceCategory = getPerformanceCategory();
+  
+  // Memoize gradient class to prevent recalculation
+  const glowGradient = useMemo(() => {
     if (showInfinity) {
       return 'bg-gradient-to-t from-blue-500/45 via-indigo-400/40 to-violet-400/45';
     }
@@ -27,56 +31,68 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
       return 'bg-gradient-to-t from-blue-500/35 via-cyan-400/30 to-indigo-400/30';
     }
     return 'bg-gradient-to-t from-blue-500/25 via-cyan-400/20 to-indigo-400/20';
-  };
+  }, [showInfinity, showTranscendence, showIllumination]);
+
+  // Skip complex animations for low-performance devices
+  const isLowPerformance = performanceCategory === 'low';
+  
+  // Memoize ray count based on performance
+  const rayCount = useMemo(() => {
+    if (isLowPerformance) return 0;
+    if (performanceCategory === 'medium') return 8;
+    return 12;
+  }, [performanceCategory, isLowPerformance]);
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      {/* Primary central glow with enhanced animation */}
+      {/* Primary central glow with optimized animation */}
       <motion.div 
-        className={`w-1/2 h-1/2 rounded-full blur-xl ${getGlowGradient()}`}
+        className={`w-1/2 h-1/2 rounded-full blur-xl ${glowGradient}`}
         initial={{ opacity: 0.3 }}
         animate={{ 
           opacity: [0.3, 0.3 + (baseProgressPercentage * 0.6), 0.3],
           scale: [0.9, 1 + (baseProgressPercentage * 0.25), 0.9],
         }}
         transition={{
-          duration: 6,
+          duration: isLowPerformance ? 8 : 6,
           repeat: Infinity,
           repeatType: "reverse",
           ease: "easeInOut"
         }}
       />
       
-      {/* Additional subtle glow layers for depth */}
-      <motion.div 
-        className={`absolute w-1/3 h-1/3 rounded-full blur-2xl bg-white/10`}
-        animate={{ 
-          opacity: [0.1, 0.3, 0.1],
-          scale: [0.8, 1.2, 0.8],
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          repeatType: "reverse",
-          ease: "easeInOut"
-        }}
-      />
+      {/* Additional subtle glow layer - only render on medium/high performance devices */}
+      {!isLowPerformance && (
+        <motion.div 
+          className={`absolute w-1/3 h-1/3 rounded-full blur-2xl bg-white/10`}
+          animate={{ 
+            opacity: [0.1, 0.3, 0.1],
+            scale: [0.8, 1.2, 0.8],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut"
+          }}
+        />
+      )}
       
-      {/* Cosmic rays for higher states */}
-      {(showTranscendence || showInfinity) && (
+      {/* Cosmic rays for higher states - only on medium/high performance devices */}
+      {!isLowPerformance && (showTranscendence || showInfinity) && (
         <motion.div
           className="absolute w-full h-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: baseProgressPercentage * 0.8 }}
           transition={{ duration: 2 }}
         >
-          {Array.from({ length: 12 }).map((_, i) => (
+          {Array.from({ length: rayCount }).map((_, i) => (
             <motion.div
               key={`ray-${i}`}
               className="absolute top-1/2 left-1/2 h-1/2 w-[1px] bg-gradient-to-t from-indigo-500/0 via-indigo-400/30 to-white/70"
               style={{
                 transformOrigin: 'bottom center',
-                transform: `rotate(${i * 30}deg)`,
+                transform: `rotate(${i * (360 / rayCount)}deg)`,
               }}
               animate={{
                 height: ['30%', '40%', '30%'],
@@ -93,8 +109,8 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
         </motion.div>
       )}
       
-      {/* Special infinity state effect */}
-      {showInfinity && (
+      {/* Special infinity state effect - only on high performance devices */}
+      {performanceCategory === 'high' && showInfinity && (
         <motion.div
           className="absolute w-2/3 h-2/3 rounded-full"
           style={{
@@ -128,4 +144,4 @@ const CentralGlow: React.FC<CentralGlowProps> = ({
   );
 };
 
-export default CentralGlow;
+export default React.memo(CentralGlow);

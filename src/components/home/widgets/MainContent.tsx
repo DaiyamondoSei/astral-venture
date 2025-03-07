@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { motion, Variants } from 'framer-motion';
 import InteractiveEnergyField from '@/components/effects/energy-field/InteractiveEnergyField';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
@@ -7,6 +7,7 @@ import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometr
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import GlassmorphicContainer from '@/components/background/GlassmorphicContainer';
+import { getPerformanceCategory } from '@/utils/performanceUtils';
 
 interface MainContentProps {
   userId?: string;
@@ -22,6 +23,7 @@ const MainContent: React.FC<MainContentProps> = ({
   className
 }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const performanceCategory = getPerformanceCategory();
   
   const fadeInUpVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
@@ -32,12 +34,21 @@ const MainContent: React.FC<MainContentProps> = ({
     }
   };
 
+  // Adjust particle density based on performance category
+  const getParticleDensity = () => {
+    if (performanceCategory === 'low') return 0.1;
+    if (performanceCategory === 'medium') return 0.2;
+    return isMobile ? 0.2 : 0.3;
+  };
+
   return (
     <motion.div 
       className={cn("relative", className)}
       variants={fadeInUpVariants}
       initial="hidden"
       animate="visible"
+      // Add layout=true to optimize Framer Motion's calculations
+      layout={false}
     >
       <GlassmorphicContainer 
         variant={isMobile ? "subtle" : "medium"} 
@@ -45,18 +56,18 @@ const MainContent: React.FC<MainContentProps> = ({
         className="p-1 md:p-3 relative overflow-hidden rounded-full aspect-square max-w-3xl mx-auto"
         animate={true}
         motionProps={{
-          whileHover: { scale: 1.01 },
+          whileHover: performanceCategory !== 'low' ? { scale: 1.01 } : undefined,
           transition: { duration: 0.3 }
         }}
         centerContent={true}
-        glowEffect={true}
-        shimmer={true}
+        glowEffect={performanceCategory !== 'low'}
+        shimmer={performanceCategory !== 'low'}
       >
         {/* Reduced opacity for better cube visibility */}
         <div className="absolute inset-0 opacity-20">
           <InteractiveEnergyField 
             energyPoints={energyPoints} 
-            particleDensity={isMobile ? 0.2 : 0.3}
+            particleDensity={getParticleDensity()}
             className="w-full h-full"
           />
         </div>
@@ -79,4 +90,5 @@ const MainContent: React.FC<MainContentProps> = ({
   );
 };
 
-export default MainContent;
+// Memoize the component to prevent unnecessary re-renders
+export default memo(MainContent);
