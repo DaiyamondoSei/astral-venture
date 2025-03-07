@@ -5,17 +5,20 @@ import { GlassCard } from '@/components/ui/glass-card';
 import InteractiveEnergyField from '@/components/effects/InteractiveEnergyField';
 import CubeWrapper from '@/components/home/widgets/CubeWrapper';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
+import { cn } from '@/lib/utils';
 
 interface MainContentProps {
   userId?: string;
   energyPoints: number;
   onNodeSelect: (nodeId: string, downloadables?: DownloadableMaterial[]) => void;
+  className?: string;
 }
 
 const MainContent: React.FC<MainContentProps> = ({
   userId,
   energyPoints,
-  onNodeSelect
+  onNodeSelect,
+  className
 }) => {
   const fadeInUpVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
@@ -28,10 +31,10 @@ const MainContent: React.FC<MainContentProps> = ({
 
   return (
     <motion.div 
-      className="lg:col-span-2"
+      className={cn("relative", className)}
       variants={fadeInUpVariants}
     >
-      <GlassCard animate variant="default" className="p-4 relative overflow-hidden">
+      <GlassCard animate variant="default" className="p-0 md:p-2 relative overflow-hidden rounded-full aspect-square">
         <div className="absolute inset-0 opacity-50">
           <InteractiveEnergyField 
             energyPoints={energyPoints} 
@@ -40,7 +43,7 @@ const MainContent: React.FC<MainContentProps> = ({
           />
         </div>
         
-        <div className="relative z-10">
+        <div className="relative z-10 w-full h-full">
           <CubeWrapper 
             userId={userId}
             energyPoints={energyPoints}

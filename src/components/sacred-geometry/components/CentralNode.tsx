@@ -1,140 +1,154 @@
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import GlowEffect from '@/components/GlowEffect';
-import { SacredGeometryIcon } from '../icons/SacredGeometryIcons';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
+import { SacredGeometryIcon } from '@/components/sacred-geometry/icons/SacredGeometryIcons';
 
 interface CentralNodeProps {
   energyPoints: number;
-  onSelectNode?: (nodeId: string) => void;
+  onSelectNode?: (nodeId: string, downloadables?: DownloadableMaterial[]) => void;
 }
 
 const CentralNode: React.FC<CentralNodeProps> = ({ energyPoints, onSelectNode }) => {
+  const [pulse, setPulse] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  
+  // Determine size based on energy points
+  const getNodeSize = () => {
+    const baseSize = 24; // base size for 0 energy points
+    const maxSizeIncrease = 16; // maximum additional size
+    const energyFactor = Math.min(energyPoints / 1000, 1); // cap at 1000 points
+    
+    return baseSize + (maxSizeIncrease * energyFactor);
+  };
+  
+  // Continuous slow rotation
+  useEffect(() => {
+    const rotationInterval = setInterval(() => {
+      setRotation(prev => (prev - 0.2) % 360);
+    }, 50);
+    
+    return () => clearInterval(rotationInterval);
+  }, []);
+  
+  // Set up pulse effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPulse(true);
+      
+      // Reset pulse after animation
+      setTimeout(() => setPulse(false), 1500);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  const handleClick = () => {
+    setPulse(true);
+    
+    if (onSelectNode) {
+      onSelectNode('portal-center', [
+        {
+          id: 'central-meditation',
+          name: 'Cosmic Consciousness Meditation',
+          description: 'Connect with the quantum field through guided meditation',
+          type: 'audio',
+          icon: null
+        },
+        {
+          id: 'sacred-geometry-guide',
+          name: 'Sacred Geometry Field Guide',
+          description: 'Learn about the patterns and meanings of sacred geometry',
+          type: 'pdf',
+          icon: null
+        }
+      ]);
+    }
+    
+    // Reset pulse after animation
+    setTimeout(() => setPulse(false), 1500);
+  };
+  
+  const nodeSize = getNodeSize();
+  
   return (
-    <motion.div 
-      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ 
-        duration: 0.5, 
-        delay: 0.5,
-        type: "spring",
-        stiffness: 200,
-        damping: 25 
-      }}
-    >
-      <GlowEffect 
-        className="w-28 h-28 rounded-full flex items-center justify-center bg-black/30 backdrop-blur-md"
-        color="rgba(138, 92, 246, 0.7)"
-        intensity="high"
-        animation="breathe"
-        interactive
-        onClick={() => onSelectNode?.('cosmic-center')}
-        ariaLabel={`Central energy node with ${energyPoints} energy points. Click to select.`}
-        role="button"
+    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
+      <AnimatePresence>
+        {pulse && (
+          <motion.div
+            initial={{ scale: 1, opacity: 0.7 }}
+            animate={{ scale: 2, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/20 z-0"
+            style={{ width: nodeSize, height: nodeSize }}
+          />
+        )}
+      </AnimatePresence>
+      
+      {/* Rotating outer ring */}
+      <motion.div
+        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-2 border-white/30 rounded-full z-10"
+        style={{ 
+          width: nodeSize * 1.5, 
+          height: nodeSize * 1.5,
+          rotate: `${rotation}deg`
+        }}
       >
-        <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-quantum-400 to-quantum-700 flex items-center justify-center overflow-hidden">
-          {/* Energy points display with enhanced typography */}
-          <span className="text-2xl font-display font-bold z-10 text-white drop-shadow-md">
-            {energyPoints}
-          </span>
-          
-          {/* Background sacred geometry icon with improved animation */}
-          <motion.div 
-            className="absolute inset-0 flex items-center justify-center opacity-30"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-          >
-            <SacredGeometryIcon 
-              type="metatron" 
-              size={48} 
-              color="rgba(255,255,255,0.7)" 
-              animated={true} 
-            />
-          </motion.div>
-          
-          {/* Enhanced animated energy glow with better contrast */}
-          <motion.div 
-            className="absolute inset-0 bg-gradient-to-br from-quantum-500/60 via-quantum-600/50 to-quantum-700/60"
-            animate={{
-              opacity: [0.5, 0.7, 0.5],
-              backgroundPosition: ['0% 0%', '100% 100%', '0% 0%']
-            }}
-            transition={{ 
-              duration: 10, 
-              repeat: Infinity,
-              repeatType: "mirror"
-            }}
+        <motion.div
+          className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-quantum-400 rounded-full"
+          animate={{ scale: [1, 1.5, 1] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        />
+        
+        <motion.div
+          className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-astral-400 rounded-full"
+          animate={{ scale: [1, 1.5, 1] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+        />
+        
+        <motion.div
+          className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-ethereal-400 rounded-full"
+          animate={{ scale: [1, 1.5, 1] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        />
+        
+        <motion.div
+          className="absolute top-1/2 right-0 transform translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-chakra-heart rounded-full"
+          animate={{ scale: [1, 1.5, 1] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+        />
+      </motion.div>
+      
+      {/* Main central node */}
+      <motion.div
+        className="bg-gradient-to-br from-quantum-500 to-quantum-700 rounded-full flex items-center justify-center cursor-pointer shadow-lg shadow-quantum-700/30 z-20"
+        style={{ width: nodeSize, height: nodeSize }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={handleClick}
+      >
+        <div className="relative">
+          <SacredGeometryIcon 
+            type="metatron" 
+            size={nodeSize * 0.7}
+            color="rgba(255,255,255,0.9)"
+            secondaryColor="rgba(255,255,255,0.6)"
+            animated={true}
           />
           
-          {/* Add subtle light rays emanating from center with better visibility */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <motion.div
-                key={`ray-${i}`}
-                className="absolute w-1 origin-center bg-gradient-to-t from-transparent to-quantum-300/60"
-                style={{ 
-                  height: '120%',
-                  transform: `rotate(${i * 30}deg)`,
-                }}
-                animate={{
-                  opacity: [0.4, 0.8, 0.4],
-                  height: ['80%', '120%', '80%']
-                }}
-                transition={{
-                  duration: 4,
-                  delay: i * 0.2,
-                  repeat: Infinity,
-                  repeatType: "mirror" 
-                }}
-              />
-            ))}
-          </div>
+          {/* Energy points indicator */}
+          <motion.div 
+            className="absolute -bottom-1 -right-1 bg-black/60 text-white text-[10px] px-1.5 rounded-full border border-white/20"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            {energyPoints}
+          </motion.div>
         </div>
-      </GlowEffect>
-      
-      {/* Enhanced decorative rings around the central node with better contrast */}
-      <div className="absolute inset-[-10%] -z-10">
-        <motion.div 
-          className="absolute inset-0 rounded-full border-2 border-quantum-500/40"
-          animate={{ 
-            scale: [1, 1.1, 1],
-            opacity: [0.4, 0.6, 0.4]
-          }}
-          transition={{ 
-            duration: 4, 
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-        />
-        <motion.div 
-          className="absolute inset-0 rounded-full border-2 border-quantum-400/30"
-          animate={{ 
-            scale: [1.1, 1.2, 1.1],
-            opacity: [0.3, 0.5, 0.3]
-          }}
-          transition={{ 
-            duration: 4,
-            delay: 0.5,
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-        />
-        <motion.div 
-          className="absolute inset-0 rounded-full border-2 border-quantum-300/20"
-          animate={{ 
-            scale: [1.2, 1.3, 1.2],
-            opacity: [0.2, 0.4, 0.2]
-          }}
-          transition={{ 
-            duration: 4,
-            delay: 1,
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-        />
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 };
 

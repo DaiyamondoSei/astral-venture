@@ -1,58 +1,57 @@
 
 import React from 'react';
-import { motion } from 'framer-motion';
 import { cn } from "@/lib/utils";
-import SacredGeometryIconNode from '../icons/SacredGeometryIconNode';
-import { GeometryNode as GeometryNodeType, NodeStatus } from '../types/geometry';
-
-// Map node IDs to sacred geometry icon types
-const nodeIconMap: Record<string, string> = {
-  'meditation': 'flower-of-life',
-  'chakras': 'sri-yantra', 
-  'dreams': 'torus',
-  'energy': 'merkaba',
-  'reflection': 'vesica-piscis',
-  'healing': 'golden-spiral',
-  'wisdom': 'tree-of-life',
-  'astral': 'octagram',
-  'sacred': 'metatron',
-  'elements': 'pentagram',
-  'consciousness': 'infinity',
-  'nature': 'seed-of-life',
-  'guidance': 'hexagram',
-  'sound': 'torus',
-  'user': 'flower-of-life',
-  'cosmic-center': 'platonic-solid'
-};
-
-// Precise positioning classes for each node on the Metatron's Cube
-const nodePositionMap: Record<string, string> = {
-  'meditation': 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2', // center
-  'chakras': 'absolute top-[10%] left-1/2 -translate-x-1/2', // top
-  'dreams': 'absolute top-[18%] right-[27%]', // top-right inner
-  'energy': 'absolute bottom-[18%] right-[27%]', // bottom-right inner
-  'reflection': 'absolute bottom-[10%] left-1/2 -translate-x-1/2', // bottom
-  'healing': 'absolute bottom-[18%] left-[27%]', // bottom-left inner
-  'wisdom': 'absolute top-[18%] left-[27%]', // top-left inner
-  'astral': 'absolute top-[27%] left-[18%]', // top-left outer
-  'sacred': 'absolute top-[27%] right-[18%]', // top-right outer
-  'elements': 'absolute bottom-[27%] right-[18%]', // bottom-right outer
-  'consciousness': 'absolute bottom-[27%] left-[18%]', // bottom-left outer
-  'nature': 'absolute right-[10%] top-1/2 -translate-y-1/2', // right
-  'guidance': 'absolute left-[10%] top-1/2 -translate-y-1/2', // left
-  'sound': 'absolute top-[40%] right-[12%]', // right upper
-  'user': 'absolute bottom-[40%] left-[12%]', // left lower
-};
+import { motion, AnimatePresence } from 'framer-motion';
+import SacredGeometryIconNode from '@/components/sacred-geometry/icons/SacredGeometryIconNode';
 
 interface GeometryNodeProps {
-  node: GeometryNodeType;
+  node: any;
   index: number;
-  nodeStatus: NodeStatus;
+  nodeStatus: {
+    unlocked: boolean;
+    threshold: number;
+    level: number;
+  };
   activeNode: string | null;
   hoverNode: string | null;
-  onNodeClick: (node: GeometryNodeType) => void;
+  onNodeClick: (node: any) => void;
   onNodeHover: (nodeId: string | null) => void;
 }
+
+// Map node IDs to sacred geometry types
+const nodeTypeMap: Record<string, any> = {
+  'meditation': 'flower-of-life',
+  'chakras': 'sri-yantra',
+  'energy': 'torus',
+  'wisdom': 'tree-of-life',
+  'astral': 'merkaba',
+  'healing': 'vesica-piscis',
+  'dreams': 'golden-spiral',
+  'portal-center': 'metatron',
+  'elements': 'pentagram',
+  'consciousness': 'infinity',
+  'reflection': 'seed-of-life',
+  'guidance': 'octagram',
+  'manifestation': 'hexagram',
+  'default': 'platonic-solid'
+};
+
+// Map node IDs to colors
+const nodeColorMap: Record<string, string> = {
+  'meditation': 'from-quantum-300 to-quantum-600',
+  'chakras': 'from-amber-400 to-amber-600',
+  'energy': 'from-cyan-400 to-cyan-600',
+  'wisdom': 'from-indigo-400 to-indigo-600',
+  'astral': 'from-purple-400 to-purple-600',
+  'healing': 'from-emerald-400 to-emerald-600',
+  'dreams': 'from-blue-400 to-blue-600',
+  'elements': 'from-orange-400 to-orange-600',
+  'consciousness': 'from-violet-400 to-violet-600',
+  'reflection': 'from-teal-400 to-teal-600',
+  'guidance': 'from-sky-400 to-sky-600',
+  'manifestation': 'from-pink-400 to-pink-600',
+  'default': 'from-quantum-400 to-quantum-600'
+};
 
 const GeometryNodeComponent: React.FC<GeometryNodeProps> = ({
   node,
@@ -63,50 +62,74 @@ const GeometryNodeComponent: React.FC<GeometryNodeProps> = ({
   onNodeClick,
   onNodeHover
 }) => {
-  const hasDownloadables = node.downloadables && node.downloadables.length > 0;
+  const isActive = activeNode === node.id;
+  const isHovered = hoverNode === node.id;
   
-  // Get the sacred geometry icon type for this node
-  const iconType = nodeIconMap[node.id] || 'metatron';
+  // Get the color based on node ID or use default
+  const nodeColor = nodeColorMap[node.id] || nodeColorMap.default;
   
-  // Get the precise position for this node
-  const positionClass = nodePositionMap[node.id] || node.position;
-  
-  // Create a node with the position
-  const nodeWithPosition = {
-    ...node,
-    position: positionClass
-  };
-  
-  // Determine if the node should pulse based on status
-  const shouldPulse = nodeStatus.unlocked && (activeNode !== node.id);
+  // Get the sacred geometry type based on node ID or use default
+  const geometryType = nodeTypeMap[node.id] || nodeTypeMap.default;
   
   return (
     <motion.div
-      className={positionClass}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: index * 0.1, duration: 0.5 }}
+      className={cn(
+        "absolute z-20 transform -translate-x-1/2 -translate-y-1/2",
+        node.position,
+        isActive ? "z-30" : "z-20"
+      )}
+      initial={{ opacity: 0, scale: 0 }}
+      animate={{ 
+        opacity: 1, 
+        scale: isActive ? 1.1 : 1,
+      }}
+      transition={{ 
+        type: "spring",
+        stiffness: 300,
+        damping: 20,
+        delay: index * 0.05
+      }}
     >
       <SacredGeometryIconNode
         id={node.id}
-        name={node.name}
-        type={iconType as "flower-of-life" | "sri-yantra" | "torus" | "merkaba" | "vesica-piscis" | "golden-spiral" | "tree-of-life" | "octagram" | "metatron" | "pentagram" | "infinity" | "seed-of-life" | "hexagram" | "platonic-solid"}
-        description={node.description}
-        position={positionClass}
-        color={node.color}
-        isActive={activeNode === node.id}
+        name={node.name || node.id.charAt(0).toUpperCase() + node.id.slice(1)}
+        type={geometryType}
+        description={node.description || "Sacred geometry pattern representing cosmic consciousness"}
+        position=""
+        color={nodeColor}
+        isActive={isActive}
         isLocked={!nodeStatus.unlocked}
-        hasDownloadables={hasDownloadables}
+        hasDownloadables={!!node.downloadables && node.downloadables.length > 0}
         unlocked={nodeStatus.unlocked}
         onClick={() => onNodeClick(node)}
         onHover={onNodeHover}
       />
       
-      {/* Energy threshold indicator for locked nodes */}
-      {!nodeStatus.unlocked && (
-        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-white/70 bg-black/50 px-2 py-0.5 rounded-full whitespace-nowrap">
-          {nodeStatus.threshold} energy
-        </div>
+      {/* Pulse effect for active node */}
+      {isActive && (
+        <motion.div
+          className="absolute inset-0 rounded-full bg-white/30 z-0"
+          initial={{ scale: 1, opacity: 0.7 }}
+          animate={{ 
+            scale: [1, 1.5, 1],
+            opacity: [0.7, 0, 0.7]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+      )}
+      
+      {/* Hover effect */}
+      {isHovered && nodeStatus.unlocked && (
+        <motion.div
+          className="absolute inset-0 rounded-full border-2 border-white/30 z-0"
+          initial={{ scale: 1, opacity: 0 }}
+          animate={{ scale: 1.2, opacity: 0.6 }}
+          transition={{ duration: 0.3 }}
+        />
       )}
     </motion.div>
   );
