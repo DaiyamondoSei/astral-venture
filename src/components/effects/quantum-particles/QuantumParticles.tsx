@@ -1,97 +1,203 @@
 
-import React, { useMemo, memo, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Particle from './Particle';
-import useParticleSystem from './useParticleSystem';
-import { QuantumParticlesProps } from './types';
-import { isLowPerformanceDevice } from '@/utils/performanceUtils';
+import { QuantumParticle } from './types';
+import { getAnimationQualityLevel } from '@/utils/performanceUtils';
 
-/**
- * QuantumParticles Component
- * 
- * Renders an interactive field of animated particles with optimized performance
- */
-const QuantumParticles: React.FC<QuantumParticlesProps> = ({
+const QuantumParticles: React.FC<{
+  count?: number;
+  colors?: string[];
+  speed?: number;
+  maxSize?: number;
+  responsive?: boolean;
+}> = ({
   count = 30,
-  colors = ['#8B5CF6', '#6366F1', '#4F46E5', '#A78BFA', '#C4B5FD'],
-  className = '',
-  interactive = true,
-  speed = 1
+  colors = ['#6366f1', '#8b5cf6', '#d946ef', '#64748b', '#0ea5e9'],
+  speed = 1,
+  maxSize = 6,
+  responsive = true
 }) => {
-  // Detect if we're on a low-performance device to reduce particle count
-  const isLowPerformance = useMemo(() => isLowPerformanceDevice(), []);
+  // Parse count to number with fallback
+  const particleCount = typeof count === 'number' 
+    ? count 
+    : parseInt(String(count), 10) || 30;
   
-  // Adjust count for low-performance devices
-  const adjustedCount = useMemo(() => 
-    isLowPerformance ? Math.min(15, Number(count)) : Number(count),
-  [count, isLowPerformance]);
+  // State for particles and container dimensions
+  const [particles, setParticles] = useState<QuantumParticle[]>([]);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   
-  // Use memoized colors array to prevent re-creation on each render
-  const particleColors = useMemo(() => colors, [colors]);
+  // Animation frame reference
+  const requestRef = useRef<number>();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isMounted = useRef(true);
   
-  // Get particles and mouse position from custom hook
-  const { particles, mousePosition, containerRef } = useParticleSystem(
-    adjustedCount, 
-    particleColors, 
-    interactive,
-    speed
-  );
+  // For performance tracking
+  const lastTimeRef = useRef<number>(0);
+  const frameCountRef = useRef<number>(0);
+  const fpsRef = useRef<number>(60);
   
-  // Memoized function to calculate particle movement based on mouse position
-  const calculateMovement = useCallback((x: number, y: number) => {
-    if (!interactive) return { dx: 0, dy: 0 };
+  // Quality level based on device
+  const qualityLevel = useMemo(() => getAnimationQualityLevel(), []);
+  
+  // Initialize particles
+  useEffect(() => {
+    if (!containerRef.current) return;
     
-    return {
-      dx: (mousePosition.x - x) / 50,
-      dy: (mousePosition.y - y) / 50
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    setDimensions({ width: rect.width, height: rect.height });
+    
+    // Create initial particles
+    const newParticles = Array.from({ length: particleCount }).map((_, i) => createParticle(
+      rect.width, 
+      rect.height, 
+      colors, 
+      maxSize, 
+      speed, 
+      qualityLevel
+    ));
+    
+    setParticles(newParticles);
+    
+    // Handle resize
+    const handleResize = () => {
+      if (responsive && containerRef.current) {
+        const newRect = containerRef.current.getBoundingClientRect();
+        setDimensions({ width: newRect.width, height: newRect.height });
+      }
     };
-  }, [mousePosition, interactive]);
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [particleCount, colors, maxSize, speed, responsive, qualityLevel]);
   
-  // Use useMemo to avoid recalculating particles on every render
-  const renderedParticles = useMemo(() => {
-    return particles.map(particle => {
-      // Convert the particle's position to the format Particle component expects
-      const x = particle.position.x;
-      const y = particle.position.y;
+  // Animation loop
+  useEffect(() => {
+    // Skip if no particles or container
+    if (particles.length === 0 || !containerRef.current) return;
+    
+    let animationFrameId: number;
+    
+    const animate = (time: number) => {
+      if (!isMounted.current) return;
       
-      // Calculate movement based on mouse position
-      const { dx, dy } = calculateMovement(x, y);
+      // Simple FPS calculation
+      frameCountRef.current++;
+      if (time - lastTimeRef.current >= 1000) {
+        fpsRef.current = frameCountRef.current;
+        frameCountRef.current = 0;
+        lastTimeRef.current = time;
+        
+        // Log FPS for debugging performance issues
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Quantum Particles FPS: ${fpsRef.current}`);
+        }
+      }
       
-      // Create a unique ID based on particle ID
-      const particleId = parseInt(particle.id.replace(/[^0-9]/g, '0')) || 0;
-      
-      return (
-        <Particle 
-          key={particle.id} 
-          particle={{
-            id: particleId,
-            x,
-            y,
-            size: particle.size,
-            opacity: particle.alpha,
-            color: particle.color,
-            duration: 2 + Math.random() * 2,
-            delay: Math.random() * 2
-          }} 
-          dx={dx} 
-          dy={dy}
-        />
+      // Update particle positions
+      setParticles(prevParticles => 
+        prevParticles.map(particle => {
+          // Update position
+          let newX = particle.x + particle.vx;
+          let newY = particle.y + particle.vy;
+          
+          // Boundary check
+          if (newX < 0 || newX > 100) {
+            particle.vx *= -1;
+            newX = particle.x + particle.vx;
+          }
+          
+          if (newY < 0 || newY > 100) {
+            particle.vy *= -1;
+            newY = particle.y + particle.vy;
+          }
+          
+          return {
+            ...particle,
+            x: newX,
+            y: newY
+          };
+        })
       );
-    });
-  }, [particles, calculateMovement]);
+      
+      // Request next frame using ref to avoid infinite loops
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    
+    // Start animation
+    animationFrameId = requestAnimationFrame(animate);
+    
+    // Cleanup
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [dimensions, particles.length]); // Only re-run when dimensions or particle count changes
   
-  // Add proper aria attributes for accessibility
+  // Component mount/unmount
+  useEffect(() => {
+    isMounted.current = true;
+    
+    return () => {
+      isMounted.current = false;
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+      }
+    };
+  }, []);
+  
+  // Render particles
   return (
     <div 
       ref={containerRef}
-      className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0"
       aria-hidden="true"
-      role="presentation"
-      data-testid="quantum-particles"
     >
-      {renderedParticles}
+      {particles.map((particle, i) => (
+        <Particle 
+          key={`quantum-particle-${i}`}
+          particle={particle}
+          dx={Math.sin(i) * 5}
+          dy={Math.cos(i) * 5}
+        />
+      ))}
     </div>
   );
 };
 
-// Use memo to prevent unnecessary re-renders
-export default memo(QuantumParticles);
+// Helper function to create a particle
+function createParticle(
+  width: number, 
+  height: number, 
+  colors: string[], 
+  maxSize: number,
+  speed: number,
+  qualityLevel: 'low' | 'medium' | 'high'
+): QuantumParticle {
+  // Adjust particle complexity based on quality level
+  const sizeFactor = qualityLevel === 'low' ? 0.6 : 
+                    qualityLevel === 'medium' ? 0.8 : 1;
+  
+  // Adjust animation speed based on quality level
+  const speedFactor = qualityLevel === 'low' ? 0.5 : 
+                     qualityLevel === 'medium' ? 0.8 : 1;
+  
+  const size = (Math.random() * maxSize + 1) * sizeFactor;
+  
+  return {
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    vx: (Math.random() - 0.5) * 0.1 * speed * speedFactor,
+    vy: (Math.random() - 0.5) * 0.1 * speed * speedFactor,
+    size,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    opacity: Math.random() * 0.5 + 0.1,
+    duration: Math.random() * 3 + 2,
+    delay: Math.random() * 2
+  };
+}
+
+export default React.memo(QuantumParticles);

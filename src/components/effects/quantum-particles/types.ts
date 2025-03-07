@@ -1,43 +1,45 @@
 
-import { Vector2 } from 'three';
-
-export interface Particle {
-  id: string;
-  position: Vector2;
-  velocity: Vector2;
-  size: number;
-  color: string;
-  alpha: number;
-  connections: Connection[];
-}
-
-export interface Connection {
-  particle: Particle;
-  distance: number;
-  opacity: number;
-}
-
+/**
+ * Properties for a single quantum particle
+ */
 export interface QuantumParticle {
-  id: number;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   size: number;
-  opacity: number;
   color: string;
+  opacity: number;
   duration: number;
   delay: number;
 }
 
+/**
+ * Props for the QuantumParticles component
+ */
 export interface QuantumParticlesProps {
+  /**
+   * Number of particles to render (defaults to 30)
+   */
   count?: number | string;
+  
+  /**
+   * Array of colors to use for particles
+   */
   colors?: string[];
-  className?: string;
-  interactive?: boolean;
+  
+  /**
+   * Animation speed multiplier (defaults to 1)
+   */
   speed?: number;
-}
-
-export interface ParticleSystemHookResult {
-  particles: Particle[];
-  mousePosition: { x: number; y: number };
-  containerRef: React.RefObject<HTMLDivElement>;
+  
+  /**
+   * Maximum particle size in pixels (defaults to 6)
+   */
+  maxSize?: number;
+  
+  /**
+   * Whether particles should respond to container resize (defaults to true)
+   */
+  responsive?: boolean;
 }
