@@ -8,6 +8,7 @@ import AIAssistantDialog from '@/components/ai-assistant/AIAssistantDialog';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import PhilosophicalTab from '@/components/dashboard/PhilosophicalTab';
 import { useAuth } from '@/contexts/AuthContext';
+import { DashboardProvider } from '@/components/dashboard/DashboardContext';
 
 interface MainContentProps {
   userProfile: any;
@@ -46,9 +47,9 @@ const MainContent = ({ userProfile, onChallengeComplete }: MainContentProps) => 
   return (
     <div className="space-y-6">
       {activeTab === 'dashboard' && (
-        <DashboardContent 
-          userId={userId}
-        />
+        <DashboardProvider onOpenAIAssistant={handleOpenAiAssistant}>
+          <DashboardContent userId={userId} />
+        </DashboardProvider>
       )}
 
       {activeTab === 'reflection' && (

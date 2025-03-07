@@ -1,6 +1,5 @@
+
 import React, { useState, useEffect } from 'react';
-import { useUser, useSupabaseClient } from '@supabase/auth-helpers-react';
-import { useRouter } from 'next/router';
 import { toast } from '@/components/ui/use-toast';
 import { Skeleton } from "@/components/ui/skeleton"
 import { useUserStreak } from '@/hooks/useUserStreak';
@@ -9,14 +8,12 @@ import { calculateAstralLevel } from '@/utils/calculations';
 import { calculateNextLevelXP } from '@/utils/calculations';
 import { calculateLevelProgress } from '@/utils/calculations';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { api } from '@/utils/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 
 const DashboardContent = ({ userId }: { userId: string }) => {
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const supabaseClient = useSupabaseClient();
-  const router = useRouter();
   const { onOpenAIAssistant } = useDashboardContext();
   const { userStreak, activatedChakras, isLoading: isStreakLoading, error: streakError } = useUserStreak(userId);
   const [levelInfo, setLevelInfo] = useState({ level: 1, nextLevelXP: 100, progress: 0 });
@@ -25,7 +22,7 @@ const DashboardContent = ({ userId }: { userId: string }) => {
     const fetchUserProfile = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('id', userId)
@@ -62,10 +59,10 @@ const DashboardContent = ({ userId }: { userId: string }) => {
     if (userId) {
       fetchUserProfile();
     }
-  }, [userId, supabaseClient]);
+  }, [userId]);
   
   const handleOpenAIAssistant = () => {
-    onOpenAIAssistant(); // Removed the incorrect argument
+    onOpenAIAssistant();
   };
 
   return (
