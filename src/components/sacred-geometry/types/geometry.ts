@@ -20,6 +20,7 @@ export interface GeometryNode {
   route?: string;
   action?: () => void;
   downloadables?: DownloadableMaterial[];
+  functionalities?: string[];
 }
 
 export interface NodeStatus {

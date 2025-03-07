@@ -16,9 +16,6 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
     <div className="absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-black via-quantum-950/50 to-black/90 z-0"></div>
       <MetatronsBackground 
-        energyPoints={energyPoints} 
-        enableAnimation={true}
-        interactivity="advanced"
         consciousnessLevel={consciousnessLevel}
         opacity={0.2}
       />

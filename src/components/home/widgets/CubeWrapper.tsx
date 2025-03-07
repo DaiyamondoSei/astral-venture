@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import MetatronsCube from '@/components/sacred-geometry/MetatronsCube';
@@ -7,7 +7,7 @@ import InteractiveMetatronsPortal from '@/components/sacred-geometry/components/
 import { toast } from '@/components/ui/use-toast';
 import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometry';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Maximize2, Minimize2, Info } from 'lucide-react';
 
 interface CubeWrapperProps {
   userId?: string;
@@ -26,18 +26,21 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
 }) => {
   const [portalActivated, setPortalActivated] = useState(false);
   const [consciousnessLevel, setConsciousnessLevel] = useState(1);
+  const [showHelp, setShowHelp] = useState(false);
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    // Calculate consciousness level based on energy points
+    const newLevel = Math.max(1, Math.floor(energyPoints / 200));
+    setConsciousnessLevel(newLevel);
+  }, [energyPoints]);
   
   const handlePortalActivation = () => {
     setPortalActivated(true);
     
-    // Calculate consciousness level based on energy points
-    const newLevel = Math.max(1, Math.floor(energyPoints / 200));
-    setConsciousnessLevel(newLevel);
-    
     toast({
       title: "Dimensional Portal Activated",
-      description: `Your consciousness has aligned with dimensional frequency level ${newLevel}.`,
+      description: `Your consciousness has aligned with dimensional frequency level ${consciousnessLevel}.`,
     });
     
     // Notify parent component
@@ -60,18 +63,46 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
     }
   };
 
+  const toggleHelp = () => {
+    setShowHelp(!showHelp);
+  };
+
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-black/90' : 'lg:col-span-2'} flex flex-col items-center justify-center`}>
-      {isFullscreen && (
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-black/90' : 'lg:col-span-2'} flex flex-col items-center justify-center relative`}>
+      <div className="absolute top-4 left-4 flex space-x-2 z-50">
         <Button 
           variant="ghost" 
           size="sm" 
-          className="absolute top-4 left-4 text-white/80 hover:text-white"
+          className="text-white/80 hover:text-white"
           onClick={handleBackNavigation}
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Dashboard
+          Back
         </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-white/80 hover:text-white"
+          onClick={toggleHelp}
+        >
+          <Info className="w-4 h-4" />
+        </Button>
+      </div>
+      
+      {showHelp && (
+        <div className="absolute top-20 left-4 bg-black/70 backdrop-blur-md p-4 rounded-lg max-w-xs z-50 border border-quantum-800/50">
+          <h3 className="text-quantum-300 text-sm font-semibold mb-2">Metatron's Cube Navigation</h3>
+          <p className="text-xs text-white/80 mb-2">
+            Each node in Metatron's Cube represents a different aspect of consciousness and spiritual growth.
+          </p>
+          <p className="text-xs text-white/80 mb-2">
+            Click on the nodes to explore different practices and teachings. Nodes with a glowing border contain downloadable materials.
+          </p>
+          <p className="text-xs text-quantum-400">
+            Unlock more nodes by increasing your energy points through practice and reflection.
+          </p>
+        </div>
       )}
       
       <motion.div
@@ -100,6 +131,12 @@ const CubeWrapper: React.FC<CubeWrapperProps> = ({
           />
         </div>
       </motion.div>
+      
+      {isFullscreen && (
+        <div className="absolute bottom-4 right-4 text-xs text-white/50">
+          <p>Energy Points: {energyPoints} • Consciousness Level: {consciousnessLevel}</p>
+        </div>
+      )}
     </div>
   );
 };
