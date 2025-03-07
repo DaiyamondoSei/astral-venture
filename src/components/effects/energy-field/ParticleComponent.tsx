@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, MotionStyle } from 'framer-motion';
 import { ParticleProps } from './types';
 import { usePerformance } from '@/contexts/PerformanceContext';
 
@@ -23,10 +23,10 @@ const ParticleComponent: React.FC<ParticleProps> = ({ particle }) => {
       backgroundColor: particle.color,
       boxShadow: shadowSize ? `0 0 ${shadowSize}px ${particle.color}` : 'none',
       // Add will-change for better performance
-      willChange: 'transform, opacity',
+      willChange: 'transform, opacity' as const,
       // Add visibility when needed to improve performance
-      visibility: particle.opacity <= 0.1 ? 'hidden' : 'visible',
-    };
+      visibility: (particle.opacity <= 0.1 ? 'hidden' : 'visible') as const,
+    } as MotionStyle;
   }, [particle.size, particle.color, particle.opacity, isLowPerformance, isMediumPerformance]);
 
   // Skip rendering nearly invisible particles to reduce DOM nodes

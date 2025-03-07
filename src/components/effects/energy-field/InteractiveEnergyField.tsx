@@ -1,84 +1,75 @@
 
-import React, { useRef, useCallback } from 'react';
-import { useDimensions } from './useDimensions';
-import { useIsMounted } from './useIsMounted';
-import { useMouseTracking } from './useMouseTracking';
+import React, { useRef } from 'react';
 import { useParticles } from './useParticles';
+import { useDimensions } from './useDimensions';
+import { useMouseTracking } from './useMouseTracking';
+import { useIsMounted } from './useIsMounted';
 import ParticleComponent from './ParticleComponent';
-import ClickWave from './ClickWave';
+import { EnergyFieldProps } from './types';
 import BackgroundGlow from './BackgroundGlow';
-import { getOptimalElementCount } from '@/utils/performanceUtils';
-import { usePerformance } from '@/contexts/PerformanceContext';
+import ClickWave from './ClickWave';
+import useVisibilityObserver from '@/hooks/useVisibilityObserver';
 
-interface InteractiveEnergyFieldProps {
-  energyPoints: number;
-  colors?: string[];
-  particleDensity?: number;
-  reactToMouse?: boolean;
-  className?: string;
-}
-
-const InteractiveEnergyField: React.FC<InteractiveEnergyFieldProps> = ({
-  energyPoints,
-  colors = ['#8b5cf6', '#6366f1', '#ec4899', '#0ea5e9', '#22d3ee'],
-  particleDensity = 1.5,
-  reactToMouse = true,
-  className = ''
+const InteractiveEnergyField: React.FC<EnergyFieldProps> = ({
+  energyPoints = 100,
+  colors = ['#8A5CF6', '#6366F1', '#ED64A6', '#EC4899', '#8B5CF6'],
+  className = '',
+  particleDensity = 1,
+  reactToClick = true
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const isMountedRef = useIsMounted();
-  const { enableParticles, deviceCapability } = usePerformance();
-  
-  // Get container dimensions
+  const isMounted = useIsMounted();
   const dimensions = useDimensions(containerRef);
   
-  // Track mouse movements and clicks only if we're reacting to mouse
-  const { mousePosition, clickWave } = useMouseTracking({
-    containerRef,
-    isMounted: isMountedRef.current,
-    reactToClick: reactToMouse && enableParticles
+  // Add visibility observer to pause animations when not visible
+  const { setRef, isVisible } = useVisibilityObserver({
+    rootMargin: '100px', // Start animation slightly before becoming visible
+    threshold: 0.1
   });
   
-  // Calculate optimal particle density based on device capabilities
-  const adjustedDensity = getOptimalElementCount(
-    Math.ceil(particleDensity), 
-    deviceCapability
-  ) / 10;
+  // Set both refs - our container ref and the visibility observer ref
+  const setContainerRef = (el: HTMLDivElement | null) => {
+    containerRef.current = el;
+    if (el) setRef(el);
+  };
   
-  // Create and update particles
+  const { mousePosition, clickWave } = useMouseTracking({
+    containerRef,
+    isMounted: isMounted.current,
+    reactToClick
+  });
+  
   const particles = useParticles({
     energyPoints,
     colors,
-    particleDensity: enableParticles ? adjustedDensity : 0.1, // Minimal particles if disabled
+    particleDensity,
     dimensions,
-    mousePosition: reactToMouse ? mousePosition : null,
-    isMounted: isMountedRef.current
+    mousePosition,
+    isMounted: isMounted.current,
+    isVisible
   });
   
   return (
-    <div 
-      ref={containerRef}
-      className={`relative overflow-hidden rounded-lg w-full h-full ${className}`}
-      aria-hidden="true"
+    <div
+      ref={setContainerRef}
+      className={`relative w-full h-full overflow-hidden ${className}`}
+      aria-label="Interactive Energy Field"
+      role="img"
     >
-      {/* Background glow */}
-      <BackgroundGlow 
-        energyPoints={energyPoints} 
-        colors={colors} 
-        dimensions={dimensions} 
-      />
-      
-      {/* Render particles only if enabled */}
-      {enableParticles && particles.map(particle => (
-        <ParticleComponent 
-          key={`energy-particle-${particle.id}`}
-          particle={particle}
+      {dimensions && (
+        <BackgroundGlow
+          energyPoints={energyPoints}
+          colors={colors}
+          dimensions={dimensions}
         />
+      )}
+      
+      {particles.map(particle => (
+        <ParticleComponent key={particle.id} particle={particle} />
       ))}
       
-      {/* Render click wave if active and particles enabled */}
-      {enableParticles && clickWave && clickWave.active && (
-        <ClickWave 
+      {clickWave && (
+        <ClickWave
           x={clickWave.x}
           y={clickWave.y}
           color={colors[Math.floor(Math.random() * colors.length)]}

@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Particle } from './types';
-import { getPerformanceCategory, animationFrameManager } from '@/utils/performanceUtils';
 import { usePerformance } from '@/contexts/PerformanceContext';
+import { animationScheduler } from '@/utils/animation/AnimationScheduler';
 
 interface UseParticlesProps {
   energyPoints: number;
@@ -11,6 +11,7 @@ interface UseParticlesProps {
   dimensions: { width: number; height: number } | null;
   mousePosition: { x: number; y: number } | null;
   isMounted: boolean;
+  isVisible?: boolean;
 }
 
 export const useParticles = ({
@@ -19,19 +20,37 @@ export const useParticles = ({
   particleDensity,
   dimensions,
   mousePosition,
-  isMounted
+  isMounted,
+  isVisible = true
 }: UseParticlesProps) => {
   const [particles, setParticles] = useState<Particle[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const instanceIdRef = useRef<string>(`particles-${Math.random().toString(36).substring(2, 9)}`);
   const { isLowPerformance, isMediumPerformance } = usePerformance();
   
-  // Calculate frame skip based on device performance
-  const frameSkip = useMemo(() => {
-    if (isLowPerformance) return 3; // Update every 4th frame
-    if (isMediumPerformance) return 1; // Update every 2nd frame
-    return 0; // Update every frame for high-performance devices
-  }, [isLowPerformance, isMediumPerformance]);
+  // Calculate frame skip and update interval based on device performance and visibility
+  const updateConfig = useMemo(() => {
+    // Base update interval in ms (0 means every frame)
+    let interval = 0;
+    
+    if (!isVisible) {
+      // When not visible, update very infrequently
+      interval = 500;
+    } else if (isLowPerformance) {
+      interval = 100; // ~10fps
+    } else if (isMediumPerformance) {
+      interval = 32; // ~30fps
+    }
+    
+    // Animation priority based on visibility and performance
+    const priority = !isVisible 
+      ? 'low'
+      : isLowPerformance 
+        ? 'medium' 
+        : 'high';
+        
+    return { interval, priority };
+  }, [isLowPerformance, isMediumPerformance, isVisible]);
   
   // Initialize particles
   useEffect(() => {
@@ -77,26 +96,19 @@ export const useParticles = ({
     
   }, [energyPoints, particleDensity, dimensions, colors, isMounted, isLowPerformance, isMediumPerformance]);
   
-  // Animate particles with performance optimizations using shared animation manager
+  // Animate particles with performance optimizations using our animation scheduler
   useEffect(() => {
     if (!dimensions || !isMounted) return;
     
     const instanceId = instanceIdRef.current;
     let lastTimeRef = 0;
-    let frameSkipRef = 0;
     
     const updateParticles = (time: number) => {
-      if (!isMounted) return;
+      if (!isMounted || !isVisible) return;
       
       // Calculate delta time for smooth animation regardless of framerate
       const delta = lastTimeRef ? time - lastTimeRef : 16.67;
       lastTimeRef = time;
-      
-      // Skip frames for performance
-      frameSkipRef = (frameSkipRef + 1) % (frameSkip + 1);
-      if (frameSkipRef !== 0) {
-        return;
-      }
       
       const updatedParticles = particlesRef.current.map(particle => {
         let { x, y, direction, pulse } = particle;
@@ -147,20 +159,23 @@ export const useParticles = ({
       // Update local ref immediately
       particlesRef.current = updatedParticles;
       
-      // Batch state updates to reduce renders - only update state every other frame
-      // for better performance, since the visual difference is minimal
+      // Batch state updates to reduce renders
       setParticles(updatedParticles);
     };
     
-    // Register with animation frame manager with appropriate priority
-    const priority = isLowPerformance ? 'low' : isMediumPerformance ? 'medium' : 'high';
-    animationFrameManager.registerAnimation(instanceId, updateParticles, priority);
+    // Register with animation scheduler
+    animationScheduler.register(
+      instanceId, 
+      updateParticles, 
+      updateConfig.priority as 'high' | 'medium' | 'low',
+      updateConfig.interval
+    );
     
     // Cleanup on unmount
     return () => {
-      animationFrameManager.unregisterAnimation(instanceId);
+      animationScheduler.unregister(instanceId);
     };
-  }, [dimensions, mousePosition, isMounted, frameSkip, isLowPerformance, isMediumPerformance]);
+  }, [dimensions, mousePosition, isMounted, isVisible, updateConfig.interval, updateConfig.priority]);
   
   return particles;
 };
