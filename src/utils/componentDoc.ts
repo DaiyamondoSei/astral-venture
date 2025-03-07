@@ -7,6 +7,7 @@
 
 import { ComponentType } from 'react';
 import { z } from 'zod';
+import { devLogger } from '@/utils/debugUtils';
 
 // Custom error class for prop validation errors
 export class PropValidationError extends Error {
@@ -24,6 +25,7 @@ type PropMetadata = {
   example?: any;
   validator?: (value: any) => boolean | string;
   schema?: z.ZodType<any>;
+  autoFixStrategy?: (invalidValue: any) => any; // New: Strategy for auto-fixing invalid values
 };
 
 type ComponentMetadata = {
@@ -37,9 +39,11 @@ type ComponentMetadata = {
   }>;
   notes?: string[];
   schema?: z.ZodType<any>;
+  autoFixStrategies?: Record<string, (props: any) => any>; // New: Component-level auto-fix strategies
 };
 
 const componentRegistry = new Map<string, ComponentMetadata>();
+const activeValidators = new Map<string, Set<() => void>>(); // Store active validation functions
 
 /**
  * Registers documentation for a component
@@ -48,7 +52,7 @@ export function registerComponent(metadata: ComponentMetadata): void {
   componentRegistry.set(metadata.name, metadata);
   
   if (process.env.NODE_ENV === 'development') {
-    console.log(`📚 Registered documentation for ${metadata.name}`);
+    devLogger.info('ComponentDoc', `Registered documentation for ${metadata.name}`);
   }
 }
 
@@ -100,6 +104,120 @@ export function documented<T>(
 }
 
 /**
+ * Set up continuous validation for a component
+ * This allows for real-time monitoring of component props
+ */
+export function monitorComponent(
+  componentName: string,
+  getProps: () => Record<string, any>,
+  options: {
+    intervalMs?: number;
+    onValidationError?: (error: PropValidationError) => void;
+    autoFix?: boolean;
+  } = {}
+): () => void {
+  if (process.env.NODE_ENV !== 'development') {
+    return () => {}; // No-op in production
+  }
+  
+  const { 
+    intervalMs = 1000, 
+    onValidationError, 
+    autoFix = false 
+  } = options;
+  
+  // Create validator function
+  const validator = () => {
+    try {
+      const props = getProps();
+      validateProps(componentName, props, false); // Don't throw, just validate
+    } catch (error) {
+      if (error instanceof PropValidationError) {
+        if (onValidationError) {
+          onValidationError(error);
+        }
+        
+        if (autoFix) {
+          attemptAutoFix(componentName, getProps());
+        }
+      }
+    }
+  };
+  
+  // Store validator in registry
+  if (!activeValidators.has(componentName)) {
+    activeValidators.set(componentName, new Set());
+  }
+  
+  const validatorsForComponent = activeValidators.get(componentName)!;
+  validatorsForComponent.add(validator);
+  
+  // Set up interval for continuous validation
+  const intervalId = setInterval(validator, intervalMs);
+  
+  // Return cleanup function
+  return () => {
+    clearInterval(intervalId);
+    validatorsForComponent.delete(validator);
+    if (validatorsForComponent.size === 0) {
+      activeValidators.delete(componentName);
+    }
+  };
+}
+
+/**
+ * Attempt to auto-fix invalid props based on registered strategies
+ */
+function attemptAutoFix(
+  componentName: string, 
+  props: Record<string, any>
+): Record<string, any> | null {
+  const metadata = componentRegistry.get(componentName);
+  if (!metadata) return null;
+  
+  const fixedProps = { ...props };
+  let wasFixed = false;
+  
+  // Try component-level fix strategy first
+  if (metadata.autoFixStrategies) {
+    Object.entries(metadata.autoFixStrategies).forEach(([key, fixStrategy]) => {
+      if (props[key] !== undefined) {
+        try {
+          const fixed = fixStrategy(props[key]);
+          fixedProps[key] = fixed;
+          wasFixed = true;
+          devLogger.info(
+            'AutoFix', 
+            `Auto-fixed ${componentName}.${key} from ${JSON.stringify(props[key])} to ${JSON.stringify(fixed)}`
+          );
+        } catch (error) {
+          devLogger.warn('AutoFix', `Failed to auto-fix ${componentName}.${key}: ${error}`);
+        }
+      }
+    });
+  }
+  
+  // Try prop-level fix strategies
+  Object.entries(metadata.props).forEach(([propName, propMeta]) => {
+    if (props[propName] !== undefined && propMeta.autoFixStrategy) {
+      try {
+        const fixed = propMeta.autoFixStrategy(props[propName]);
+        fixedProps[propName] = fixed;
+        wasFixed = true;
+        devLogger.info(
+          'AutoFix', 
+          `Auto-fixed ${componentName}.${propName} from ${JSON.stringify(props[propName])} to ${JSON.stringify(fixed)}`
+        );
+      } catch (error) {
+        devLogger.warn('AutoFix', `Failed to auto-fix ${componentName}.${propName}: ${error}`);
+      }
+    }
+  });
+  
+  return wasFixed ? fixedProps : null;
+}
+
+/**
  * Validates props against component documentation at runtime
  * Only runs in development mode
  * @throws {PropValidationError} If validation fails and throwOnError is true
@@ -114,7 +232,7 @@ export function validateProps(
   const metadata = componentRegistry.get(componentName);
   if (!metadata) {
     const message = `No documentation found for component: ${componentName}`;
-    console.warn(message);
+    devLogger.warn('ComponentDoc', message);
     if (throwOnError) {
       throw new PropValidationError(message);
     }
@@ -269,4 +387,87 @@ export function createSchemaFromComponentDocs(componentName: string): z.ZodType<
   });
   
   return z.object(schemaShape);
+}
+
+/**
+ * Run validation for all currently monitored components
+ * This can be called manually or automatically by the monitoring system
+ */
+export function validateAllMonitoredComponents(): { 
+  valid: string[]; 
+  invalid: { component: string; errors: string[] }[] 
+} {
+  const results = {
+    valid: [] as string[],
+    invalid: [] as { component: string; errors: string[] }[]
+  };
+  
+  if (process.env.NODE_ENV !== 'development') {
+    return results;
+  }
+  
+  activeValidators.forEach((validators, componentName) => {
+    validators.forEach(validator => {
+      try {
+        validator();
+        results.valid.push(componentName);
+      } catch (error) {
+        if (error instanceof PropValidationError) {
+          results.invalid.push({
+            component: componentName,
+            errors: [error.message]
+          });
+        } else {
+          results.invalid.push({
+            component: componentName,
+            errors: [(error as Error).message || 'Unknown error']
+          });
+        }
+      }
+    });
+  });
+  
+  return results;
+}
+
+/**
+ * Create a continuous monitoring system that checks all registered components
+ * periodically and reports any validation issues
+ */
+export function startGlobalComponentMonitoring(options: {
+  intervalMs?: number;
+  onIssueDetected?: (issues: { component: string; errors: string[] }[]) => void;
+  autoFix?: boolean;
+} = {}): () => void {
+  if (process.env.NODE_ENV !== 'development') {
+    return () => {}; // No-op in production
+  }
+  
+  const { 
+    intervalMs = 5000, 
+    onIssueDetected, 
+    autoFix = false 
+  } = options;
+  
+  const intervalId = setInterval(() => {
+    const result = validateAllMonitoredComponents();
+    
+    if (result.invalid.length > 0 && onIssueDetected) {
+      onIssueDetected(result.invalid);
+      
+      if (autoFix) {
+        // Here we would attempt to auto-fix all invalid components
+        // This is more complex and would require a registry of component instances
+        // and their current props, which is beyond this simple implementation
+        devLogger.info('GlobalMonitoring', 'Auto-fix would attempt to correct validation issues');
+      }
+    }
+  }, intervalMs);
+  
+  devLogger.info('GlobalMonitoring', `Started global component monitoring every ${intervalMs}ms`);
+  
+  return () => {
+    clearInterval(intervalId);
+    devLogger.info('GlobalMonitoring', 'Stopped global component monitoring');
+  };
 }
