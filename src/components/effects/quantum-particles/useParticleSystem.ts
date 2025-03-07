@@ -1,7 +1,7 @@
-
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Vector2 } from 'three';
 import { Particle, ParticleSystemHookResult } from './types';
+import { createOptimizedAnimationFrame } from '@/utils/performanceUtils';
 
 /**
  * Custom hook that manages quantum particle system
@@ -16,7 +16,7 @@ export const useParticleSystem = (
   // Memoize the initial particles array to avoid recreating on every render
   const initialParticles = useMemo(() => {
     return Array.from({ length: count }).map((_, index) => ({
-      id: Math.random().toString(36).substring(2, 9),
+      id: `p-${Math.random().toString(36).substring(2, 9)}-${index}`,
       position: new Vector2(
         Math.random() * 100,
         Math.random() * 100
@@ -37,14 +37,23 @@ export const useParticleSystem = (
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
+  const isComponentMounted = useRef(true);
+  
+  // Get optimized animation frame request function
+  const requestOptimizedAnimationFrame = useMemo(
+    () => createOptimizedAnimationFrame(),
+    []
+  );
   
   // Update particles using useCallback to prevent function recreation
   const updateParticles = useCallback(() => {
+    if (!isComponentMounted.current) return;
+    
     setParticles(prevParticles => 
       prevParticles.map(particle => {
         // Create a clone of current position and velocity to avoid mutation
-        const newPosition = new Vector2(particle.position.x, particle.position.y);
-        const velocity = new Vector2(particle.velocity.x, particle.velocity.y);
+        const newPosition = new Vector2().copy(particle.position);
+        const velocity = new Vector2().copy(particle.velocity);
         
         // Add velocity to position
         newPosition.add(velocity);
@@ -57,6 +66,10 @@ export const useParticleSystem = (
         if (newPosition.y <= 0 || newPosition.y >= 100) {
           velocity.setY(-velocity.y);
         }
+        
+        // Keep position within bounds
+        newPosition.x = Math.max(0, Math.min(100, newPosition.x));
+        newPosition.y = Math.max(0, Math.min(100, newPosition.y));
         
         // Return updated particle with new position and velocity
         return {
@@ -91,29 +104,35 @@ export const useParticleSystem = (
 
   // Animation loop with proper performance optimizations
   useEffect(() => {
-    let animationActive = true;
+    isComponentMounted.current = true;
     
     const animate = (timestamp: number) => {
-      if (!animationActive) return;
+      if (!isComponentMounted.current) return;
       
-      if (timestamp - lastUpdateTimeRef.current > 16) { // Limit to ~60fps
+      // Limit to ~60fps for performance
+      if (timestamp - lastUpdateTimeRef.current > 16) { 
         lastUpdateTimeRef.current = timestamp;
         updateParticles();
       }
       
-      animationFrameRef.current = requestAnimationFrame(animate);
+      animationFrameRef.current = requestOptimizedAnimationFrame(animate);
     };
     
-    animationFrameRef.current = requestAnimationFrame(animate);
+    animationFrameRef.current = requestOptimizedAnimationFrame(animate);
     
     // Proper cleanup function to prevent memory leaks
     return () => {
-      animationActive = false;
+      isComponentMounted.current = false;
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [updateParticles]);
+  }, [updateParticles, requestOptimizedAnimationFrame]);
+  
+  // Reset particles when count or colors change
+  useEffect(() => {
+    setParticles(initialParticles);
+  }, [initialParticles]);
 
   return { particles, mousePosition, containerRef };
 };

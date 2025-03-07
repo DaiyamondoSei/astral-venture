@@ -14,7 +14,7 @@ const QuantumParticles: React.FC<QuantumParticlesProps> = (props) => {
   const count = typeof props.count === 'number' 
     ? props.count 
     : props.count !== undefined && props.count !== null 
-      ? parseInt(String(props.count), 10) 
+      ? parseInt(String(props.count), 10) || 30 // Added fallback if parseInt returns NaN
       : 30;
   
   return <QuantumParticlesComponent {...props} count={count} />;
