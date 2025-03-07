@@ -28,25 +28,37 @@ export const LazyAstralBody = React.lazy(() =>
 
 // Export wrapped versions for direct use
 export const QuantumParticles = (props: any) => (
-  <LazyQuantumParticles {...props} />
+  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+    <LazyQuantumParticles {...props} />
+  </React.Suspense>
 );
 
 export const InteractiveEnergyField = (props: any) => (
-  <LazyInteractiveEnergyField {...props} />
+  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+    <LazyInteractiveEnergyField {...props} />
+  </React.Suspense>
 );
 
 export const InteractiveMetatronsPortal = (props: any) => (
-  <LazyInteractiveMetatronsPortal {...props} />
+  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+    <LazyInteractiveMetatronsPortal {...props} />
+  </React.Suspense>
 );
 
 export const VisualizationTabs = (props: any) => (
-  <LazyVisualizationTabs {...props} />
+  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+    <LazyVisualizationTabs {...props} />
+  </React.Suspense>
 );
 
 export const CosmicAstralBody = (props: any) => (
-  <LazyCosmicAstralBody {...props} />
+  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+    <LazyCosmicAstralBody {...props} />
+  </React.Suspense>
 );
 
 export const AstralBody = (props: any) => (
-  <LazyAstralBody {...props} />
+  <React.Suspense fallback={<div className="loading-fallback">Loading...</div>}>
+    <LazyAstralBody {...props} />
+  </React.Suspense>
 );

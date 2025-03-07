@@ -1,76 +1,107 @@
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
-interface UseVisibilityObserverOptions {
+interface VisibilityObserverOptions {
   rootMargin?: string;
   threshold?: number | number[];
-  disabled?: boolean;
+  skipWhenLowPerformance?: boolean;
 }
 
 /**
- * Hook to track whether an element is visible in the viewport
- * Used to optimize animations by pausing them when not visible
+ * Hook to observe element visibility with optimized intersection observer
+ * Provides ref function, visibility state, and intersection details
  */
-export const useVisibilityObserver = (
-  options: UseVisibilityObserverOptions = {}
-) => {
-  const { rootMargin = '0px', threshold = 0, disabled = false } = options;
-  
+export default function useVisibilityObserver({
+  rootMargin = '0px',
+  threshold = 0,
+  skipWhenLowPerformance = false
+}: VisibilityObserverOptions = {}) {
   const [isVisible, setIsVisible] = useState(false);
-  const [wasEverVisible, setWasEverVisible] = useState(false);
-  const elementRef = useRef<HTMLElement | null>(null);
+  const [intersectionRatio, setIntersectionRatio] = useState(0);
+  const elementRef = useRef<Element | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
-
-  // Cleanup function to disconnect observer
-  const cleanup = useCallback(() => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
-  }, []);
-
-  // Setup observer
+  const { isLowPerformance } = usePerformance();
+  
+  // Skip observer when on low performance if flag is set
+  const shouldSkipObserver = skipWhenLowPerformance && isLowPerformance;
+  
+  // Clean up observer on unmount
   useEffect(() => {
-    // Skip if disabled or running in non-browser environment
-    if (disabled || typeof window === 'undefined') {
-      setIsVisible(true); // Assume visible when disabled
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Set up the intersection observer
+  useEffect(() => {
+    // If we're skipping observation on low performance devices, 
+    // just set elements as always visible
+    if (shouldSkipObserver) {
+      setIsVisible(true);
+      setIntersectionRatio(1);
       return;
     }
-
-    cleanup();
-
-    const observer = new IntersectionObserver(
+    
+    // Skip if IntersectionObserver is not supported
+    if (!('IntersectionObserver' in window)) {
+      setIsVisible(true); // Assume visible if not supported
+      return;
+    }
+    
+    // Disconnect previous observer if it exists
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+    
+    // Create observer
+    observerRef.current = new IntersectionObserver(
       (entries) => {
-        const [entry] = entries;
-        const newIsVisible = entry.isIntersecting;
-        
-        setIsVisible(newIsVisible);
-        
-        if (newIsVisible && !wasEverVisible) {
-          setWasEverVisible(true);
-        }
+        const entry = entries[0];
+        setIsVisible(entry.isIntersecting);
+        setIntersectionRatio(entry.intersectionRatio);
       },
       { rootMargin, threshold }
     );
     
-    observerRef.current = observer;
-
-    return cleanup;
-  }, [rootMargin, threshold, disabled, cleanup, wasEverVisible]);
-
-  // Observe element when ref changes
-  const setRef = useCallback((element: HTMLElement | null) => {
+    // Start observing if we have an element
     if (elementRef.current) {
-      cleanup();
+      observerRef.current.observe(elementRef.current);
     }
-
-    if (element && observerRef.current) {
-      elementRef.current = element;
+    
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [rootMargin, threshold, shouldSkipObserver]);
+  
+  // Ref setter function that saves the element and sets up observation
+  const setRef = useCallback((element: Element | null) => {
+    // Skip if nothing changed
+    if (element === elementRef.current) return;
+    
+    // Clean up old observer
+    if (observerRef.current && elementRef.current) {
+      observerRef.current.unobserve(elementRef.current);
+    }
+    
+    // Save new element
+    elementRef.current = element;
+    
+    // Start observing new element
+    if (observerRef.current && element && !shouldSkipObserver) {
       observerRef.current.observe(element);
     }
-  }, [cleanup]);
-
-  return { setRef, isVisible, wasEverVisible };
-};
-
-export default useVisibilityObserver;
+  }, [shouldSkipObserver]);
+  
+  return {
+    setRef,
+    isVisible: shouldSkipObserver ? true : isVisible,
+    intersectionRatio: shouldSkipObserver ? 1 : intersectionRatio,
+    element: elementRef.current
+  };
+}

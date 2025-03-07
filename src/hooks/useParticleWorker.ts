@@ -2,124 +2,132 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePerformance } from '@/contexts/PerformanceContext';
 
-interface ParticleWorkerOptions {
-  enabled?: boolean;
-  particleCount?: number;
+interface Particle {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  speed: number;
+  color: string;
+  opacity: number;
+  direction: number;
+  pulse: number;
+}
+
+interface UseParticleWorkerProps {
+  count: number;
   dimensions: { width: number; height: number } | null;
-  colors?: string[];
-  initialParticles?: any[];
+  colors: string[];
+  mousePosition: { x: number; y: number } | null;
+  isVisible: boolean;
 }
 
 /**
- * Hook to use a Web Worker for particle physics calculations
- * Prevents UI thread blocking during heavy particle simulations
+ * Hook that offloads particle calculations to a Web Worker
  */
 export function useParticleWorker({
-  enabled = true,
-  particleCount = 30,
+  count,
   dimensions,
-  colors = ['#8b5cf6', '#6366f1', '#a78bfa'],
-  initialParticles
-}: ParticleWorkerOptions) {
-  // Store worker and particles state
-  const [particles, setParticles] = useState<any[]>(initialParticles || []);
+  colors,
+  mousePosition,
+  isVisible
+}: UseParticleWorkerProps) {
+  const [particles, setParticles] = useState<Particle[]>([]);
   const workerRef = useRef<Worker | null>(null);
-  const { deviceCapability } = usePerformance();
-  
-  // Only use worker for medium and high capability devices
-  const shouldUseWorker = enabled && deviceCapability !== 'low' && typeof window !== 'undefined';
+  const lastUpdateTimeRef = useRef<number>(0);
+  const { isLowPerformance } = usePerformance();
   
   // Initialize worker
   useEffect(() => {
-    if (!shouldUseWorker || !dimensions) return;
-    
-    // Create worker
-    const worker = new Worker(
-      new URL('../workers/particleWorker.ts', import.meta.url),
-      { type: 'module' }
-    );
-    
-    // Handle messages from worker
-    worker.onmessage = (event) => {
-      const { type, data } = event.data;
-      
-      if (type === 'particlesUpdated') {
-        setParticles(data.particles);
+    // Only create worker if browser supports it
+    if (typeof Worker !== 'undefined' && !isLowPerformance) {
+      try {
+        workerRef.current = new Worker(new URL('../workers/particleWorker.ts', import.meta.url), {
+          type: 'module'
+        });
+        
+        // Set up message handler
+        workerRef.current.onmessage = (event) => {
+          const { type, particles: updatedParticles } = event.data;
+          
+          if (type === 'particlesUpdated') {
+            setParticles(updatedParticles);
+          } else if (type === 'particlesGenerated') {
+            setParticles(updatedParticles);
+          }
+        };
+      } catch (error) {
+        console.error('Failed to initialize worker:', error);
       }
-    };
-    
-    // Store worker reference
-    workerRef.current = worker;
-    
-    // Initialize worker with particles if not provided
-    if (!initialParticles) {
-      // Create random particles
-      const newParticles = Array.from({ length: particleCount }).map((_, index) => ({
-        id: `particle-${index}`,
-        x: Math.random() * dimensions.width,
-        y: Math.random() * dimensions.height,
-        direction: Math.random() * Math.PI * 2,
-        speed: Math.random() * 1.5 + 0.5,
-        pulse: Math.random() * 2 + 1,
-        color: colors[Math.floor(Math.random() * colors.length)]
-      }));
-      
-      // Initialize worker
-      worker.postMessage({
-        type: 'initialize',
-        data: {
-          particles: newParticles,
-          dimensions
-        }
-      });
-      
-      // Update local state
-      setParticles(newParticles);
-    } else {
-      // Use provided particles
-      worker.postMessage({
-        type: 'initialize',
-        data: {
-          particles: initialParticles,
-          dimensions
-        }
-      });
     }
     
-    // Cleanup
     return () => {
+      // Clean up worker
       if (workerRef.current) {
-        workerRef.current.postMessage({ type: 'terminate' });
         workerRef.current.terminate();
         workerRef.current = null;
       }
     };
-  }, [shouldUseWorker, dimensions, particleCount, colors, initialParticles]);
+  }, [isLowPerformance]);
   
-  // Update dimensions when they change
+  // Generate initial particles
   useEffect(() => {
-    if (!workerRef.current || !dimensions) return;
-    
-    workerRef.current.postMessage({
-      type: 'updateParticles',
-      data: { dimensions }
-    });
-  }, [dimensions]);
+    if (dimensions && workerRef.current) {
+      workerRef.current.postMessage({
+        type: 'generateParticles',
+        data: {
+          count,
+          width: dimensions.width,
+          height: dimensions.height,
+          colors
+        }
+      });
+    }
+  }, [count, dimensions, colors]);
   
-  // Function to update mouse position for interactive effects
-  const updateMousePosition = (position: { x: number; y: number } | null) => {
-    if (!workerRef.current) return;
+  // Update particles with animation frame
+  useEffect(() => {
+    if (!dimensions || !workerRef.current || !isVisible) return;
     
-    workerRef.current.postMessage({
-      type: 'updateParticles',
-      data: { mousePosition: position }
-    });
-  };
+    const updateParticles = (time: number) => {
+      // Calculate delta time
+      const delta = lastUpdateTimeRef.current ? time - lastUpdateTimeRef.current : 16.67;
+      lastUpdateTimeRef.current = time;
+      
+      // Skip updates if not visible
+      if (!isVisible) return;
+      
+      // Send message to worker to update particles
+      workerRef.current?.postMessage({
+        type: 'updateParticles',
+        data: {
+          particles,
+          dimensions,
+          mousePosition,
+          delta
+        }
+      });
+    };
+    
+    // Run update on each animation frame
+    let rafId: number;
+    const startAnimation = () => {
+      rafId = requestAnimationFrame((time) => {
+        updateParticles(time);
+        startAnimation();
+      });
+    };
+    
+    startAnimation();
+    
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [dimensions, mousePosition, particles, isVisible]);
   
-  return {
-    particles,
-    updateMousePosition
-  };
+  return particles;
 }
 
 export default useParticleWorker;

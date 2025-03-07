@@ -7,6 +7,7 @@ import AuthStateManager from '@/components/AuthStateManager';
 import OnboardingManager from '@/components/onboarding/OnboardingManager';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { usePerformance } from '@/contexts/PerformanceContext';
+import { initializeApp } from '@/utils/appInitializer';
 
 // Lazy load components that aren't needed for initial render
 const UserDashboardView = lazy(() => import('@/components/UserDashboardView'));
@@ -27,6 +28,11 @@ const Index = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isLowPerformance } = usePerformance();
+
+  // Initialize app with performance optimizations
+  useEffect(() => {
+    initializeApp({ route: 'index', prioritizeLCP: true });
+  }, []);
 
   // Debug logging
   useEffect(() => {
