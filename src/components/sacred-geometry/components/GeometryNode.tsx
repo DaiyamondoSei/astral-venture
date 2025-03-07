@@ -90,7 +90,7 @@ const GeometryNodeComponent: React.FC<GeometryNodeProps> = ({
       <SacredGeometryIconNode
         id={node.id}
         name={node.name}
-        type={iconType}
+        type={iconType as "flower-of-life" | "sri-yantra" | "torus" | "merkaba" | "vesica-piscis" | "golden-spiral" | "tree-of-life" | "octagram" | "metatron" | "pentagram" | "infinity" | "seed-of-life" | "hexagram" | "platonic-solid"}
         description={node.description}
         position={positionClass}
         color={node.color}
