@@ -17,9 +17,10 @@ export async function askAIAssistant(
   userId: string
 ): Promise<AIResponse> {
   try {
-    // If streaming is requested, handle differently
-    if (questionData.stream) {
-      return handleStreamingRequest(questionData, userId);
+    // Check for offline mode
+    if (!navigator.onLine) {
+      console.log("Device is offline, using fallback response");
+      return createFallbackResponse(questionData.question, true);
     }
     
     // For non-streaming requests, check for cached response first
@@ -43,7 +44,7 @@ export async function askAIAssistant(
       message: questionData.question,
       context: questionData.context,
       reflectionIds: questionData.reflectionIds,
-      stream: false,
+      stream: questionData.stream || false,
       userId 
     };
     
@@ -71,9 +72,10 @@ export async function askAIAssistant(
     
     // Extract metadata if available
     const meta = {
-      model: data.meta?.model || "unknown",
+      model: data.meta?.model || model || "unknown",
       tokenUsage: data.meta?.tokenUsage || 0,
-      processingTime: data.meta?.processingTime || 0
+      processingTime: data.meta?.processingTime || 0,
+      streaming: Boolean(questionData.stream)
     };
     
     // Structure the response
@@ -85,66 +87,15 @@ export async function askAIAssistant(
     };
     
     // Cache the response for future use (only for non-streaming)
-    cacheResponse(questionData.question, response);
+    if (!questionData.stream) {
+      cacheResponse(questionData.question, response);
+    }
     
     return response;
   } catch (error) {
     console.error('Error asking AI assistant:', error);
     
     // Use fallback response in case of error
-    return createFallbackResponse(questionData.question);
-  }
-}
-
-/**
- * Handle streaming response from AI assistant
- */
-async function handleStreamingRequest(
-  questionData: AIQuestion,
-  userId: string
-): Promise<AIResponse> {
-  try {
-    // Prepare request data for streaming
-    const requestData: any = { 
-      message: questionData.question,
-      context: questionData.context,
-      reflectionIds: questionData.reflectionIds,
-      stream: true,
-      userId 
-    };
-    
-    // Always use the more reliable model for streaming
-    requestData.model = 'gpt-4o';
-    
-    console.log("Sending streaming request to AI assistant:", requestData);
-    
-    // Call the Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('ask-assistant', {
-      body: requestData
-    });
-    
-    if (error) {
-      console.error("Error from streaming ask-assistant function:", error);
-      throw error;
-    }
-    
-    // For streaming, we just return a minimal response to acknowledge the request was accepted
-    // The actual content will be delivered via the streaming callback
-    return {
-      answer: data?.initialResponse || "Processing your question...",
-      relatedInsights: [],
-      suggestedPractices: [],
-      meta: {
-        model: requestData.model,
-        tokenUsage: 0,
-        processingTime: 0,
-        streaming: true
-      }
-    };
-  } catch (error) {
-    console.error('Error in streaming request:', error);
-    
-    // Use fallback response in case of error, even for streaming requests
     return createFallbackResponse(questionData.question);
   }
 }

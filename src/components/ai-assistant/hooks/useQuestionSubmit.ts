@@ -31,6 +31,7 @@ export const useQuestionSubmit = ({
     try {
       state.setLoading(true);
       state.setError(null);
+      state.setStreamingResponse(null);
       
       console.log("Submitting question:", {
         question,
@@ -44,7 +45,7 @@ export const useQuestionSubmit = ({
         question,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         context: reflectionContext || '',
-        stream: false
+        stream: true // Enable streaming by default
       };
       
       // Call the API
