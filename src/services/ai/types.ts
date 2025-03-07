@@ -19,3 +19,19 @@ export interface AIResponse {
     streaming?: boolean;
   };
 }
+
+// AI Insight type for reflection analysis
+export interface AIInsight {
+  id?: string;
+  content: string;
+  category: string;
+  confidence?: number;
+  relevance?: number;
+  created_at?: string;
+  reflection_id?: string;
+}
+
+// Supported AI models
+export type AIModel = 
+  | "gpt-4o"         // High quality, higher cost, slower
+  | "gpt-4o-mini";   // Good quality, lower cost, faster
