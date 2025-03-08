@@ -11,8 +11,8 @@ export function useAchievementTracker(props: AchievementTrackerProps): Achieveme
   const [earnedAchievements, setEarnedAchievements] = useState<AchievementData[]>([]);
   
   // Initialize state with proper defaults
-  const state = useAchievementState({
-    ...props,
+  const achievementState = useAchievementState({
+    achievements: props.achievements || [],
     currentStreak: props.currentStreak || 0,
     reflectionCount: props.reflectionCount || 0,
     meditationMinutes: props.meditationMinutes || 0,
@@ -21,15 +21,22 @@ export function useAchievementTracker(props: AchievementTrackerProps): Achieveme
     wisdomResourcesExplored: props.wisdomResourcesExplored || 0
   });
 
-  // Extract state and setters for sub-hooks
-  const { achievementHistory, currentAchievement, progressTracking } = state;
-  const [achievementHistoryState, setAchievementHistory] = useState(achievementHistory);
-  const [progressTrackingState, setProgressTracking] = useState(progressTracking);
+  // Extract state for sub-hooks
+  const [state, actions] = achievementState;
+  const [achievementHistoryState, setAchievementHistory] = useState(state.achievementHistory || []);
+  const [progressTrackingState, setProgressTracking] = useState(state.progressTracking || {});
+  const [currentAchievement, setCurrentAchievement] = useState(state.currentAchievement);
 
   // Track achievement progress
   useAchievementDetection(
     props,
-    { ...state, achievementHistory: achievementHistoryState, progressTracking: progressTrackingState },
+    { 
+      ...state, 
+      achievementHistory: achievementHistoryState, 
+      progressTracking: progressTrackingState,
+      earnedAchievements,
+      currentAchievement
+    },
     setEarnedAchievements,
     setAchievementHistory
   );
@@ -41,12 +48,24 @@ export function useAchievementTracker(props: AchievementTrackerProps): Achieveme
     getProgressPercentage 
   } = useAchievementProgress(
     props,
-    { ...state, achievementHistory: achievementHistoryState, progressTracking: progressTrackingState }
+    { 
+      ...state, 
+      achievementHistory: achievementHistoryState, 
+      progressTracking: progressTrackingState,
+      earnedAchievements,
+      currentAchievement
+    }
   );
 
   // Get progress tracking utilities
   const { trackProgress, logActivity } = useProgressTracking(
-    { ...state, progressTracking: progressTrackingState },
+    { 
+      ...state, 
+      progressTracking: progressTrackingState,
+      achievementHistory: achievementHistoryState,
+      earnedAchievements,
+      currentAchievement
+    },
     setProgressTracking
   );
 

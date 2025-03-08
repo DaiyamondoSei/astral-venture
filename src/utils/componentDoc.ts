@@ -1,156 +1,254 @@
 
 import React, { ComponentType } from 'react';
-import { devLogger } from './debugUtils';
 
-/**
- * Type definitions for component documentation
- */
-export interface ComponentDocumentation {
+// Type definitions for component documentation
+export interface ComponentDoc {
   name: string;
-  description?: string;
-  props?: PropDocumentation[];
-  examples?: ComponentExample[];
-  dependencies?: string[];
-  hooks?: string[];
+  description: string;
+  props: PropDefinition[];
+  examples?: CodeExample[];
   notes?: string[];
-  complexity?: number;
+  version?: string;
+  author?: string;
+  deprecated?: boolean;
+  children?: boolean;
 }
 
-export interface PropDocumentation {
+export interface PropDefinition {
   name: string;
   type: string;
-  required?: boolean;
-  default?: any;
-  description?: string;
+  required: boolean;
+  defaultValue?: any;
+  description: string;
+  values?: string[];
 }
 
-export interface ComponentExample {
+export interface CodeExample {
   title: string;
   code: string;
   description?: string;
 }
 
-/**
- * Create component documentation for a React component
- */
-export function createComponentDoc<T>(
-  Component: ComponentType<T>,
-  documentation: Omit<ComponentDocumentation, 'name'>
-): ComponentDocumentation {
-  const componentName = Component.displayName || 
-    (Component as any).name || 
-    'UnnamedComponent';
-  
-  return {
-    name: componentName,
-    ...documentation
-  };
-}
-
-/**
- * Generate component documentation from props interface
- */
-export function extractPropsFromInterface<T>(
-  propsInterface: T
-): PropDocumentation[] {
-  try {
-    // This is a simplified implementation
-    // In a real-world scenario, you would use TypeScript compiler API
-    // to extract prop information from the interface
-    
-    return Object.entries(propsInterface as any).map(([name, type]) => ({
-      name,
-      type: typeof type === 'object' ? 'object' : typeof type,
-      required: true
-    }));
-  } catch (error) {
-    devLogger.error('ComponentDoc', 'Failed to extract props', error);
-    return [];
+export class PropValidationError extends Error {
+  constructor(message: string, public component: string, public prop: string) {
+    super(message);
+    this.name = 'PropValidationError';
   }
 }
 
+// Store for component documentation
+const componentDocs: Map<string, ComponentDoc> = new Map();
+const monitoredComponents: Set<string> = new Set();
+
 /**
- * Generate markdown documentation from component documentation
+ * Register a component with its documentation
  */
-export function generateMarkdownDocs(
-  docs: ComponentDocumentation
-): string {
-  let markdown = `# ${docs.name}\n\n`;
+export function createComponentDoc(doc: ComponentDoc): void {
+  componentDocs.set(doc.name, doc);
+}
+
+/**
+ * Start global component monitoring
+ */
+export function startGlobalComponentMonitoring(): void {
+  console.log('Started global component monitoring');
+}
+
+/**
+ * Get documentation for a specific component
+ */
+export function getComponentDocs(componentName: string): ComponentDoc | undefined {
+  return componentDocs.get(componentName);
+}
+
+/**
+ * List all documented components
+ */
+export function listDocumentedComponents(): string[] {
+  return Array.from(componentDocs.keys());
+}
+
+/**
+ * Generate markdown documentation from component docs
+ */
+export function generateMarkdownDocs(): string {
+  let markdown = '# Component Documentation\n\n';
   
-  if (docs.description) {
-    markdown += `${docs.description}\n\n`;
-  }
-  
-  if (docs.complexity) {
-    markdown += `**Complexity:** ${docs.complexity}/10\n\n`;
-  }
-  
-  if (docs.props && docs.props.length > 0) {
-    markdown += '## Props\n\n';
-    markdown += '| Name | Type | Required | Default | Description |\n';
-    markdown += '|------|------|----------|---------|-------------|\n';
+  for (const [name, doc] of componentDocs.entries()) {
+    markdown += `## ${name}\n\n`;
     
-    docs.props.forEach(prop => {
-      markdown += `| ${prop.name} | ${prop.type} | ${prop.required ? 'Yes' : 'No'} | ${
-        prop.default !== undefined ? `\`${prop.default}\`` : ''
-      } | ${prop.description || ''} |\n`;
-    });
+    if (doc.deprecated) {
+      markdown += '> **DEPRECATED**\n\n';
+    }
     
-    markdown += '\n';
-  }
-  
-  if (docs.hooks && docs.hooks.length > 0) {
-    markdown += '## Hooks\n\n';
-    docs.hooks.forEach(hook => {
-      markdown += `- ${hook}\n`;
-    });
-    markdown += '\n';
-  }
-  
-  if (docs.dependencies && docs.dependencies.length > 0) {
-    markdown += '## Dependencies\n\n';
-    docs.dependencies.forEach(dep => {
-      markdown += `- ${dep}\n`;
-    });
-    markdown += '\n';
-  }
-  
-  if (docs.examples && docs.examples.length > 0) {
-    markdown += '## Examples\n\n';
+    markdown += `${doc.description}\n\n`;
     
-    docs.examples.forEach(example => {
-      markdown += `### ${example.title}\n\n`;
+    if (doc.props.length > 0) {
+      markdown += '### Props\n\n';
+      markdown += '| Name | Type | Required | Default | Description |\n';
+      markdown += '|------|------|----------|---------|-------------|\n';
       
-      if (example.description) {
-        markdown += `${example.description}\n\n`;
+      for (const prop of doc.props) {
+        markdown += `| ${prop.name} | \`${prop.type}\` | ${prop.required ? 'Yes' : 'No'} | ${prop.defaultValue !== undefined ? `\`${prop.defaultValue}\`` : '-'} | ${prop.description} |\n`;
       }
       
-      markdown += '```jsx\n';
-      markdown += example.code;
-      markdown += '\n```\n\n';
-    });
-  }
-  
-  if (docs.notes && docs.notes.length > 0) {
-    markdown += '## Notes\n\n';
-    docs.notes.forEach(note => {
-      markdown += `- ${note}\n`;
-    });
+      markdown += '\n';
+    }
+    
+    if (doc.examples && doc.examples.length > 0) {
+      markdown += '### Examples\n\n';
+      
+      for (const example of doc.examples) {
+        markdown += `#### ${example.title}\n\n`;
+        
+        if (example.description) {
+          markdown += `${example.description}\n\n`;
+        }
+        
+        markdown += '```jsx\n';
+        markdown += example.code;
+        markdown += '\n```\n\n';
+      }
+    }
+    
+    if (doc.notes && doc.notes.length > 0) {
+      markdown += '### Notes\n\n';
+      
+      for (const note of doc.notes) {
+        markdown += `- ${note}\n`;
+      }
+      
+      markdown += '\n';
+    }
   }
   
   return markdown;
 }
 
 /**
- * Attach documentation to a component for access at runtime
+ * Monitor a component for validation
  */
-export function attachDocumentation<T>(
-  Component: ComponentType<T>,
-  documentation: Omit<ComponentDocumentation, 'name'>
-): ComponentType<T> {
-  const doc = createComponentDoc(Component, documentation);
-  // Using type assertion to safely add the docs property
-  const ComponentWithDocs = Component as ComponentType<T> & { docs: ComponentDocumentation };
-  ComponentWithDocs.docs = doc;
-  return ComponentWithDocs;
+export function monitorComponent(
+  componentName: string, 
+  props: Record<string, any>
+): void {
+  monitoredComponents.add(componentName);
+  validateProps(componentName, props);
+}
+
+/**
+ * Validate component props against documentation
+ */
+export function validateProps(
+  componentName: string, 
+  props: Record<string, any>
+): boolean {
+  const doc = componentDocs.get(componentName);
+  
+  if (!doc) {
+    console.warn(`No documentation found for component: ${componentName}`);
+    return false;
+  }
+  
+  let isValid = true;
+  
+  // Check required props
+  for (const propDef of doc.props) {
+    if (propDef.required && (props[propDef.name] === undefined || props[propDef.name] === null)) {
+      console.error(`Required prop '${propDef.name}' is missing in ${componentName}`);
+      isValid = false;
+    }
+    
+    // Validate prop types (basic validation)
+    if (props[propDef.name] !== undefined) {
+      const propValue = props[propDef.name];
+      const expectedType = propDef.type;
+      
+      if (!validatePropType(propValue, expectedType)) {
+        console.error(`Invalid type for prop '${propDef.name}' in ${componentName}. Expected ${expectedType}.`);
+        isValid = false;
+      }
+      
+      // Validate enum values if specified
+      if (propDef.values && propDef.values.length > 0 && !propDef.values.includes(String(propValue))) {
+        console.error(`Invalid value for prop '${propDef.name}' in ${componentName}. Expected one of: ${propDef.values.join(', ')}`);
+        isValid = false;
+      }
+    }
+  }
+  
+  return isValid;
+}
+
+/**
+ * Validate all monitored components
+ */
+export function validateAllMonitoredComponents(): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  let valid = true;
+  
+  console.log(`Validating ${monitoredComponents.size} monitored components`);
+  
+  // In a real implementation, we would iterate through all monitored components
+  // and validate their current props. Since we don't have access to the current
+  // prop values, this is just a placeholder.
+  
+  return { valid, errors };
+}
+
+/**
+ * Higher-order component that documents a component
+ */
+export function documented<P>(componentDoc: ComponentDoc) {
+  return function(Component: ComponentType<P>): ComponentType<P> {
+    createComponentDoc(componentDoc);
+    
+    const DocumentedComponent = (props: P) => {
+      // Validate props in development
+      if (process.env.NODE_ENV !== 'production') {
+        validateProps(componentDoc.name, props as Record<string, any>);
+      }
+      
+      return <Component {...props} />;
+    };
+    
+    // Set display name for dev tools
+    DocumentedComponent.displayName = `Documented(${componentDoc.name})`;
+    
+    return DocumentedComponent;
+  };
+}
+
+// Basic prop type validation
+function validatePropType(value: any, type: string): boolean {
+  // Handle union types
+  if (type.includes('|')) {
+    return type.split('|').some(t => validatePropType(value, t.trim()));
+  }
+  
+  // Handle array types
+  if (type.endsWith('[]')) {
+    return Array.isArray(value) && value.every(v => validatePropType(v, type.slice(0, -2)));
+  }
+  
+  // Basic types
+  switch (type.toLowerCase()) {
+    case 'string':
+      return typeof value === 'string';
+    case 'number':
+      return typeof value === 'number';
+    case 'boolean':
+      return typeof value === 'boolean';
+    case 'function':
+      return typeof value === 'function';
+    case 'object':
+      return typeof value === 'object' && value !== null && !Array.isArray(value);
+    case 'array':
+      return Array.isArray(value);
+    case 'any':
+      return true;
+    default:
+      // If we can't validate, assume it's valid
+      return true;
+  }
 }

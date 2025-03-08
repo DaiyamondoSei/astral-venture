@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -7,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster } from '@/components/ui/toaster';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { PerformanceProvider } from './contexts/PerformanceContext';
+import { ErrorPreventionProvider } from './contexts/ErrorPreventionContext';
 import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
 import PerformanceInsights from './components/dev-mode/PerformanceInsights';
 import RenderInsights from './components/dev-mode/RenderInsights';
@@ -58,124 +58,111 @@ const PageLoader = () => (
  */
 function App() {
   // Use the combined code enhancement hook
-  useCodeEnhancement('App', {
-    complexity: 40,
-    dependencies: [
-      'BrowserRouter', 'Routes', 'Route', 'AuthProvider', 
-      'OnboardingProvider', 'AnimatePresence', 'Toaster', 
-      'ErrorBoundary', 'PerformanceProvider'
-    ],
-    hooks: ['usePerformanceTracking', 'useRenderTracking', 'useCodeEnhancement'],
-    childComponents: [
-      'BrowserRouter', 'ErrorBoundary', 'AuthProvider', 
-      'OnboardingProvider', 'PerformanceMonitor', 'PerformanceInsights',
-      'RenderInsights', 'ComponentRelationships', 'CodeQualityDashboard',
-      'AIAssistantDashboard'
-    ],
-    trackRenders: true
-  });
+  useCodeEnhancement('App');
   
   return (
     <PerformanceProvider>
-      <ErrorBoundary>
-        <AuthProvider>
-          <OnboardingProvider>
-            <div className="relative min-h-screen overflow-hidden bg-white text-gray-800">
-              {/* Simplified background effect for better performance */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50 to-white" />
-              
-              <BrowserRouter>
-                <AnimatePresence mode="wait">
-                  <Suspense fallback={<PageLoader />}>
-                    <Routes>
-                      <Route path="/" element={
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <Index />
-                        </motion.div>
-                      } />
-                      <Route path="/login" element={
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -20 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <Login />
-                        </motion.div>
-                      } />
-                      <Route path="/entry-animation" element={
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.8 }}
-                        >
-                          <EntryAnimationPage />
-                        </motion.div>
-                      } />
-                      <Route path="/dream-capture" element={
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.98 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.98 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <DreamCapture />
-                        </motion.div>
-                      } />
-                      <Route path="/astral-body-demo" element={
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <AstralBodyDemo />
-                        </motion.div>
-                      } />
-                      <Route path="/dashboard" element={
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <Dashboard />
-                        </motion.div>
-                      } />
-                      <Route path="/preferences" element={
-                        <motion.div
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -20 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <PersonalizationPage />
-                        </motion.div>
-                      } />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
-                </AnimatePresence>
-              </BrowserRouter>
-              <Toaster />
-            </div>
-          </OnboardingProvider>
-        </AuthProvider>
-      </ErrorBoundary>
-      <PerformanceMonitor />
-      
-      {/* Development mode analysis tools */}
-      <PerformanceInsights />
-      <RenderInsights />
-      <ComponentRelationships />
-      <CodeQualityDashboard />
-      <AIAssistantDashboard />
+      <ErrorPreventionProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <OnboardingProvider>
+              <div className="relative min-h-screen overflow-hidden bg-white text-gray-800">
+                {/* Simplified background effect for better performance */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50 to-white" />
+                
+                <BrowserRouter>
+                  <AnimatePresence mode="wait">
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route path="/" element={
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <Index />
+                          </motion.div>
+                        } />
+                        <Route path="/login" element={
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <Login />
+                          </motion.div>
+                        } />
+                        <Route path="/entry-animation" element={
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.8 }}
+                          >
+                            <EntryAnimationPage />
+                          </motion.div>
+                        } />
+                        <Route path="/dream-capture" element={
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <DreamCapture />
+                          </motion.div>
+                        } />
+                        <Route path="/astral-body-demo" element={
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <AstralBodyDemo />
+                          </motion.div>
+                        } />
+                        <Route path="/dashboard" element={
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <Dashboard />
+                          </motion.div>
+                        } />
+                        <Route path="/preferences" element={
+                          <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <PersonalizationPage />
+                          </motion.div>
+                        } />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </AnimatePresence>
+                </BrowserRouter>
+                <Toaster />
+              </div>
+            </OnboardingProvider>
+          </AuthProvider>
+        </ErrorBoundary>
+        <PerformanceMonitor />
+        
+        {/* Development mode analysis tools */}
+        <PerformanceInsights />
+        <RenderInsights />
+        <ComponentRelationships />
+        <CodeQualityDashboard />
+        <AIAssistantDashboard />
+      </ErrorPreventionProvider>
     </PerformanceProvider>
   );
 }
