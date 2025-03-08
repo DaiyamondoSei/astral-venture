@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -11,6 +12,7 @@ import PerformanceInsights from './components/dev-mode/PerformanceInsights';
 import RenderInsights from './components/dev-mode/RenderInsights';
 import ComponentRelationships from './components/dev-mode/ComponentRelationships';
 import CodeQualityDashboard from './components/dev-mode/CodeQualityDashboard';
+import AIAssistantDashboard from './components/dev-mode/AIAssistantDashboard';
 import { QuantumParticles } from '@/components/lazy';
 import { usePerformanceTracking } from './hooks/usePerformanceTracking';
 import { useRenderTracking } from './hooks/useRenderTracking';
@@ -67,7 +69,8 @@ function App() {
     childComponents: [
       'BrowserRouter', 'ErrorBoundary', 'AuthProvider', 
       'OnboardingProvider', 'PerformanceMonitor', 'PerformanceInsights',
-      'RenderInsights', 'ComponentRelationships', 'CodeQualityDashboard'
+      'RenderInsights', 'ComponentRelationships', 'CodeQualityDashboard',
+      'AIAssistantDashboard'
     ],
     trackRenders: true
   });
@@ -172,6 +175,7 @@ function App() {
       <RenderInsights />
       <ComponentRelationships />
       <CodeQualityDashboard />
+      <AIAssistantDashboard />
     </PerformanceProvider>
   );
 }
