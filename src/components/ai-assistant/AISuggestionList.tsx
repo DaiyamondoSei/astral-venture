@@ -1,197 +1,222 @@
 
-import React from 'react';
-import { useAICodeAssistant } from '@/hooks/useAICodeAssistant';
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  Lightbulb, 
-  Code, 
-  ArrowRight
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader,
-  CardTitle 
-} from '@/components/ui/card';
+import { Zap, Code, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { useAICodeAssistant } from '@/hooks/useAICodeAssistant';
+import { AssistantSuggestion } from '@/utils/ai/AICodeAssistant';
+import { aiLearningSystem } from '@/utils/ai/AIAssistantLearningSystem';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AISuggestionListProps {
   componentName?: string;
   maxItems?: number;
-  compact?: boolean;
+  category?: 'performance' | 'quality' | 'architecture' | 'refactoring';
 }
 
-export const AISuggestionList: React.FC<AISuggestionListProps> = ({
+const AISuggestionList: React.FC<AISuggestionListProps> = ({
   componentName,
   maxItems = 5,
-  compact = false
+  category
 }) => {
   const { 
     suggestions, 
-    loading,
-    lastUpdated,
+    loading, 
+    refreshSuggestions,
     applyAutoFix,
-    refreshSuggestions
-  } = useAICodeAssistant(componentName, {
-    autoRefresh: true,
-    refreshInterval: 30000 // 30 seconds
-  });
+    lastUpdated
+  } = useAICodeAssistant(componentName);
   
-  const getIconForType = (type: string) => {
-    switch (type) {
-      case 'performance':
-        return <AlertTriangle className="text-amber-500" />;
-      case 'quality':
-        return <Lightbulb className="text-blue-500" />;
-      case 'architecture':
-        return <Code className="text-purple-500" />;
-      case 'refactoring':
-        return <ArrowRight className="text-green-500" />;
-      default:
-        return <Lightbulb className="text-blue-500" />;
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  
+  // Filter suggestions based on category if provided
+  const filteredSuggestions = category 
+    ? suggestions.filter(s => s.type === category)
+    : suggestions;
+  
+  // Get top N suggestions
+  const topSuggestions = filteredSuggestions.slice(0, maxItems);
+  
+  const handleApplyFix = (suggestionId: string) => {
+    const success = applyAutoFix(suggestionId);
+    
+    if (success) {
+      // Record the learning event
+      aiLearningSystem.recordEvent('suggestion_accepted', {
+        suggestionId,
+        patternId: suggestionId.split('-')[0],
+        componentName
+      });
     }
   };
   
-  const displayedSuggestions = suggestions.slice(0, maxItems);
+  const handleRejectSuggestion = (suggestionId: string) => {
+    // Record the learning event
+    aiLearningSystem.recordEvent('suggestion_rejected', {
+      suggestionId,
+      patternId: suggestionId.split('-')[0],
+      componentName
+    });
+    
+    // Hide the suggestion by setting state
+    setExpanded(prev => ({
+      ...prev,
+      [suggestionId]: false
+    }));
+  };
   
-  if (compact) {
+  const toggleExpand = (suggestionId: string) => {
+    setExpanded(prev => ({
+      ...prev,
+      [suggestionId]: !prev[suggestionId]
+    }));
+  };
+  
+  if (loading) {
     return (
-      <div className="space-y-2">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium">AI Suggestions</h3>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={refreshSuggestions}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-        </div>
-        
-        {loading ? (
-          <div className="animate-pulse space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-8 bg-gray-200 dark:bg-gray-800 rounded"></div>
-            ))}
-          </div>
-        ) : displayedSuggestions.length === 0 ? (
-          <div className="text-sm text-muted-foreground p-2">
-            No suggestions for this component
-          </div>
-        ) : (
-          <ul className="space-y-1">
-            {displayedSuggestions.map(suggestion => (
-              <li key={suggestion.id} className="flex items-center gap-2 p-2 text-sm hover:bg-secondary rounded-md">
-                {getIconForType(suggestion.type)}
-                <span className="flex-1 truncate">{suggestion.title}</span>
-                {suggestion.autoFixAvailable && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => applyAutoFix(suggestion.id)}
-                  >
-                    Apply
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-5/6" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+  
+  if (topSuggestions.length === 0) {
+    return (
+      <div className="text-center py-12 space-y-4">
+        <p className="text-muted-foreground">No suggestions available</p>
+        {componentName && (
+          <p className="text-sm text-muted-foreground">
+            There are no suggestions for component: {componentName}
+          </p>
         )}
+        <Button variant="outline" size="sm" onClick={refreshSuggestions}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh Suggestions
+        </Button>
       </div>
     );
   }
   
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>AI Code Suggestions</span>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={refreshSuggestions}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-        </CardTitle>
-        <CardDescription>
-          {componentName 
-            ? `Suggestions for ${componentName}` 
-            : "Suggestions for your codebase"}
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-medium">
+            AI Code Suggestions
+            {componentName && <span className="text-sm text-muted-foreground ml-2">for {componentName}</span>}
+          </h3>
           {lastUpdated && (
-            <span className="text-xs ml-2 text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Last updated: {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={refreshSuggestions}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+      
+      {topSuggestions.map((suggestion) => (
+        <SuggestionCard 
+          key={suggestion.id}
+          suggestion={suggestion}
+          expanded={expanded[suggestion.id] || false}
+          onToggleExpand={() => toggleExpand(suggestion.id)}
+          onApplyFix={() => handleApplyFix(suggestion.id)}
+          onReject={() => handleRejectSuggestion(suggestion.id)}
+        />
+      ))}
+      
+      {filteredSuggestions.length > maxItems && (
+        <div className="text-center pt-2">
+          <Button variant="ghost" size="sm">
+            Show {filteredSuggestions.length - maxItems} more suggestions
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface SuggestionCardProps {
+  suggestion: AssistantSuggestion;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onApplyFix: () => void;
+  onReject: () => void;
+}
+
+const SuggestionCard: React.FC<SuggestionCardProps> = ({
+  suggestion,
+  expanded,
+  onToggleExpand,
+  onApplyFix,
+  onReject
+}) => {
+  // Determine card color based on priority
+  const getBorderColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'border-red-500';
+      case 'high': return 'border-orange-500';
+      case 'medium': return 'border-yellow-500';
+      case 'low': return 'border-green-500';
+      default: return '';
+    }
+  };
+  
+  return (
+    <Card className={`overflow-hidden ${getBorderColor(suggestion.priority)} border-l-4`}>
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-base">{suggestion.title}</CardTitle>
+          <div className="flex space-x-1">
+            <Button variant="ghost" size="sm" onClick={onReject}>
+              <ThumbsDown className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onToggleExpand}>
+              {expanded ? 'Collapse' : 'Expand'}
+            </Button>
+          </div>
+        </div>
+        <CardDescription>
+          {suggestion.context.component && (
+            <span className="text-xs bg-muted px-2 py-1 rounded">
+              {suggestion.context.component}
             </span>
           )}
         </CardDescription>
       </CardHeader>
-      
       <CardContent>
-        {loading ? (
-          <div className="animate-pulse space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-full"></div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-5/6"></div>
-              </div>
-            ))}
+        <p className="text-sm">{suggestion.description}</p>
+        
+        {expanded && suggestion.codeExample && (
+          <div className="mt-4 bg-muted p-3 rounded text-xs font-mono overflow-x-auto">
+            <pre>{suggestion.codeExample}</pre>
           </div>
-        ) : displayedSuggestions.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground">
-            <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500 opacity-50" />
-            <p>No suggestions available for {componentName || "your codebase"}</p>
-            <p className="text-sm">Everything looks good!</p>
-          </div>
-        ) : (
-          <ul className="space-y-4">
-            {displayedSuggestions.map(suggestion => (
-              <li key={suggestion.id} className="border rounded-lg p-3">
-                <div className="flex items-start gap-3">
-                  <div className="mt-1">
-                    {getIconForType(suggestion.type)}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium">{suggestion.title}</h4>
-                    <p className="text-sm text-muted-foreground">{suggestion.description}</p>
-                    
-                    {suggestion.codeExample && (
-                      <pre className="mt-2 p-2 text-xs bg-muted rounded overflow-x-auto">
-                        <code>{suggestion.codeExample}</code>
-                      </pre>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      disabled={!suggestion.autoFixAvailable}
-                      onClick={() => suggestion.autoFixAvailable && applyAutoFix(suggestion.id)}
-                    >
-                      Apply Fix
-                    </Button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
         )}
       </CardContent>
-      
-      {displayedSuggestions.length > 0 && (
-        <CardFooter className="flex justify-between">
-          <div className="text-sm text-muted-foreground">
-            Showing {displayedSuggestions.length} of {suggestions.length} suggestions
+      {expanded && (
+        <CardFooter className="flex justify-between pt-0">
+          <div className="text-xs text-muted-foreground">
+            {suggestion.type.charAt(0).toUpperCase() + suggestion.type.slice(1)} / 
+            {suggestion.priority.charAt(0).toUpperCase() + suggestion.priority.slice(1)} priority
           </div>
-          {suggestions.length > maxItems && (
-            <Button variant="link" size="sm">
-              View All
+          {suggestion.autoFixAvailable && (
+            <Button size="sm" onClick={onApplyFix}>
+              <Zap className="h-4 w-4 mr-2" />
+              Apply Fix
             </Button>
           )}
         </CardFooter>
