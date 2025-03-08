@@ -1,164 +1,124 @@
 
 /**
- * Development debugging utilities
- * These utilities are automatically disabled in production builds
- */
-
-/**
- * Enhanced console logging that only works in development mode
- * Automatically adds context information and pretty formatting
+ * Debug logger with different log levels
+ * Only logs in development environment
  */
 export const devLogger = {
-  log: (context: string, ...args: any[]): void => {
+  log: (context: string, message: string, ...args: any[]) => {
     if (process.env.NODE_ENV !== 'development') return;
-    console.log(`[${context}]`, ...args);
+    console.log(`[${context}]`, message, ...args);
   },
   
-  info: (context: string, ...args: any[]): void => {
+  info: (context: string, message: string, ...args: any[]) => {
     if (process.env.NODE_ENV !== 'development') return;
-    console.info(`%c[${context}]`, 'color: #2563eb; font-weight: bold;', ...args);
+    console.info(`[${context}]`, message, ...args);
   },
   
-  warn: (context: string, ...args: any[]): void => {
+  warn: (context: string, message: string, ...args: any[]) => {
     if (process.env.NODE_ENV !== 'development') return;
-    console.warn(`%c[${context}]`, 'color: #d97706; font-weight: bold;', ...args);
+    console.warn(`[${context}]`, message, ...args);
   },
   
-  error: (context: string, ...args: any[]): void => {
+  error: (context: string, message: string, ...args: any[]) => {
     if (process.env.NODE_ENV !== 'development') return;
-    console.error(`%c[${context}]`, 'color: #dc2626; font-weight: bold;', ...args);
+    console.error(`[${context}]`, message, ...args);
   },
   
-  group: (context: string, ...args: any[]): void => {
+  group: (context: string, title: string) => {
     if (process.env.NODE_ENV !== 'development') return;
-    console.group(`[${context}]`, ...args);
+    console.group(`[${context}] ${title}`);
   },
   
-  groupEnd: (): void => {
+  groupEnd: () => {
     if (process.env.NODE_ENV !== 'development') return;
     console.groupEnd();
   },
   
-  table: (context: string, tabularData: any): void => {
+  // Log component lifecycle events
+  renderStart: (componentName: string) => {
     if (process.env.NODE_ENV !== 'development') return;
-    console.log(`[${context}]`);
-    console.table(tabularData);
+    console.debug(`[${componentName}] Render started`);
   },
   
-  trace: (context: string, ...args: any[]): void => {
+  renderComplete: (componentName: string, duration: number) => {
     if (process.env.NODE_ENV !== 'development') return;
-    console.log(`[${context} Trace]`, ...args);
-    console.trace();
+    console.debug(`[${componentName}] Render completed in ${duration.toFixed(2)}ms`);
   }
 };
 
 /**
- * Component rendering tracker to detect excessive re-renders
- * @param componentName Name of the component to track
- * @param props Component props (optional)
- * @param limit Maximum number of renders before warning
+ * Format a value for display in logs or errors
  */
-export function trackRenders(
-  componentName: string, 
-  props?: Record<string, any>,
-  limit: number = 5
-): (() => void) {
-  if (process.env.NODE_ENV !== 'development') {
-    return () => {}; // No-op in production
+export function formatValue(value: any): string {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  
+  if (typeof value === 'function') {
+    return 'function() {...}';
   }
   
-  const renderCount = { current: 1 };
-  const startTime = performance.now();
-  
-  devLogger.log(`Render Tracker`, `${componentName} rendered (count: ${renderCount.current})`);
-  
-  if (props) {
-    devLogger.log(`Render Tracker`, `${componentName} props:`, props);
-  }
-  
-  return () => {
-    if (process.env.NODE_ENV !== 'development') return;
-    
-    renderCount.current++;
-    
-    if (renderCount.current > limit) {
-      devLogger.warn(
-        `Render Tracker`,
-        `${componentName} has rendered ${renderCount.current} times in ${Math.round(performance.now() - startTime)}ms! This may indicate a performance issue.`
-      );
+  if (typeof value === 'object') {
+    try {
+      const str = JSON.stringify(value);
+      if (str.length > 50) {
+        return str.substring(0, 47) + '...';
+      }
+      return str;
+    } catch (e) {
+      return Object.prototype.toString.call(value);
     }
-  };
+  }
+  
+  return String(value);
 }
 
 /**
- * Performance measurement utility
+ * Check if running in development environment
  */
-export const measure = {
-  /**
-   * Start measuring a performance metric
-   */
-  start: (label: string): void => {
-    if (process.env.NODE_ENV !== 'development') return;
-    performance.mark(`${label}-start`);
-  },
-  
-  /**
-   * End measuring a performance metric and log the result
-   */
-  end: (label: string, logThreshold: number = 0): void => {
-    if (process.env.NODE_ENV !== 'development') return;
-    
-    performance.mark(`${label}-end`);
-    performance.measure(label, `${label}-start`, `${label}-end`);
-    
-    const measurement = performance.getEntriesByName(label, 'measure')[0];
-    const duration = measurement.duration;
-    
-    // Only log if duration exceeds threshold
-    if (duration > logThreshold) {
-      devLogger.info(
-        'Performance',
-        `${label}: ${duration.toFixed(2)}ms ${duration > 100 ? '⚠️' : ''}`
-      );
-    }
-    
-    // Clean up
-    performance.clearMarks(`${label}-start`);
-    performance.clearMarks(`${label}-end`);
-    performance.clearMeasures(label);
-  }
-};
-
-/**
- * Creates a development-only lifecycle hook marker
- * Helps track component lifecycle events during development
- */
-export function devLifecycle(componentName: string): {
-  mount: () => void;
-  update: (props?: Record<string, any>) => void;
-  unmount: () => void;
-} {
-  return {
-    mount: () => {
-      if (process.env.NODE_ENV !== 'development') return;
-      devLogger.info('Lifecycle', `${componentName} mounted`);
-    },
-    update: (props?: Record<string, any>) => {
-      if (process.env.NODE_ENV !== 'development') return;
-      devLogger.info('Lifecycle', `${componentName} updated`, props ? { props } : '');
-    },
-    unmount: () => {
-      if (process.env.NODE_ENV !== 'development') return;
-      devLogger.info('Lifecycle', `${componentName} unmounted`);
-    }
-  };
+export function isDevelopment(): boolean {
+  return process.env.NODE_ENV === 'development';
 }
 
 /**
- * Logs when a component doesn't have proper type information
+ * Create a debuggable version of a function that logs inputs/outputs
  */
-export function logTypeIssue(componentName: string, message: string): void {
-  if (process.env.NODE_ENV !== 'development') return;
+export function createDebugFunction<T extends (...args: any[]) => any>(
+  fn: T,
+  functionName: string,
+  context: string
+): T {
+  if (!isDevelopment()) return fn;
   
-  devLogger.warn('Type Safety', `${componentName}: ${message}`);
+  return ((...args: any[]) => {
+    devLogger.group(context, `${functionName} called`);
+    console.debug('Arguments:', args);
+    
+    try {
+      const result = fn(...args);
+      
+      if (result instanceof Promise) {
+        result
+          .then(resolvedValue => {
+            console.debug('Async Result:', resolvedValue);
+            devLogger.groupEnd();
+            return resolvedValue;
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            devLogger.groupEnd();
+            throw error;
+          });
+        
+        return result;
+      } else {
+        console.debug('Result:', result);
+        devLogger.groupEnd();
+        return result;
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      devLogger.groupEnd();
+      throw error;
+    }
+  }) as T;
 }

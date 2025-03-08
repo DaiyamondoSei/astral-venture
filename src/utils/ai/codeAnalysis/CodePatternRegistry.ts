@@ -4,17 +4,27 @@ import { devLogger } from '@/utils/debugUtils';
 
 /**
  * Registry for code patterns that can be detected in the codebase
- * Separates pattern definitions from the analyzer implementation
  */
 export class CodePatternRegistry {
   private patterns: Map<string, CodePattern> = new Map();
   
   /**
-   * Register a new code pattern
+   * Register a new pattern
    */
-  public register(pattern: CodePattern): void {
+  public registerPattern(pattern: CodePattern): void {
+    if (this.patterns.has(pattern.id)) {
+      devLogger.warn('CodePatternRegistry', `Pattern with ID ${pattern.id} already exists. Overwriting.`);
+    }
+    
     this.patterns.set(pattern.id, pattern);
     devLogger.info('CodePatternRegistry', `Registered pattern: ${pattern.name}`);
+  }
+  
+  /**
+   * Register multiple patterns at once
+   */
+  public registerPatterns(patterns: CodePattern[]): void {
+    patterns.forEach(pattern => this.registerPattern(pattern));
   }
   
   /**
@@ -46,172 +56,45 @@ export class CodePatternRegistry {
   }
   
   /**
-   * Register multiple patterns at once
+   * Clear all registered patterns
    */
-  public registerMany(patterns: CodePattern[]): void {
-    patterns.forEach(pattern => this.register(pattern));
+  public clear(): void {
+    this.patterns.clear();
+    devLogger.info('CodePatternRegistry', 'All patterns cleared');
   }
 }
 
-// Create and export the default pattern registry instance
+// Export singleton instance
 export const codePatternRegistry = new CodePatternRegistry();
 
 // Register default patterns
-export function registerDefaultPatterns(): void {
-  // Architecture patterns
-  codePatternRegistry.registerMany([
-    {
-      id: 'large-component',
-      name: 'Large Component',
-      description: 'Component is too large and should be broken down into smaller components',
-      category: 'architecture',
-      severity: 'high',
-      detectFn: (code: string) => {
-        // Count non-empty, non-comment lines
-        const lines = code.split('\n')
-          .filter(line => line.trim() !== '')
-          .filter(line => !line.trim().startsWith('//'))
-          .filter(line => !line.trim().startsWith('/*'))
-          .filter(line => !line.trim().startsWith('*'));
-        
-        return lines.length > 150;
-      },
-      goodExample: 'A component with focused responsibility that is less than 100 lines',
-      badExample: 'A 400-line component handling multiple concerns',
+// This would be expanded with more patterns in a full implementation
+codePatternRegistry.registerPatterns([
+  {
+    id: 'unused-state',
+    name: 'Unused State Variable',
+    description: 'State variable is declared but never used',
+    detectFn: (code: string) => {
+      // A simple detection for demonstration
+      return /const \[[a-zA-Z0-9]+, set[A-Z][a-zA-Z0-9]+\] = useState/.test(code) &&
+             !/(set[A-Z][a-zA-Z0-9]+\()/.test(code);
     },
-    {
-      id: 'excessive-nesting',
-      name: 'Excessive Component Nesting',
-      description: 'Too many levels of nested components can harm readability and performance',
-      category: 'architecture',
-      severity: 'medium',
-      detectFn: (code: string) => {
-        // Count JSX closing tags with indentation greater than 4 levels
-        const jsxClosingWithIndent = code.match(/^\s{8,}<\/[A-Z][A-Za-z0-9]*>/gm);
-        return jsxClosingWithIndent !== null && jsxClosingWithIndent.length > 5;
-      },
-      goodExample: 'Flat component hierarchy with composition',
-      badExample: 'Deeply nested component structure with > 5 levels',
-    }
-  ]);
-  
-  // Performance patterns
-  codePatternRegistry.registerMany([
-    {
-      id: 'missing-memo',
-      name: 'Missing Memo',
-      description: 'Component could benefit from React.memo to prevent unnecessary re-renders',
-      category: 'performance',
-      severity: 'medium',
-      detectFn: (code: string) => {
-        // Component takes props but isn't memoized
-        return (
-          code.includes('interface') && 
-          code.includes('Props') && 
-          !code.includes('memo(') && 
-          !code.includes('React.memo(')
-        );
-      },
-      goodExample: 'export default memo(Component);',
-      badExample: 'export default Component;',
-      suggestedFix: (code: string) => {
-        if (!code.includes('import { memo }') && !code.includes('import React, {')) {
-          code = code.replace(
-            'import React from',
-            'import React, { memo } from'
-          );
-        }
-        
-        return code.replace(
-          /export default (\w+);/g,
-          'export default memo($1);'
-        );
-      }
+    category: 'quality',
+    severity: 'medium',
+    goodExample: 'const [count, setCount] = useState(0); /* Then use setCount somewhere */',
+    badExample: 'const [count, setCount] = useState(0); /* But setCount is never used */',
+  },
+  {
+    id: 'missing-dependency',
+    name: 'Missing useEffect Dependency',
+    description: 'useEffect hook might be missing dependencies',
+    detectFn: (code: string) => {
+      // Simplified detection for demonstration
+      return /useEffect\(\(\) => {[\s\S]+?}, \[\]\);/.test(code);
     },
-    {
-      id: 'excessive-usestate',
-      name: 'Excessive useState',
-      description: 'Component uses too many useState hooks and should consider useReducer',
-      category: 'performance',
-      severity: 'medium',
-      detectFn: (code: string) => {
-        const useStateMatches = code.match(/useState\(/g);
-        return useStateMatches !== null && useStateMatches.length >= 5;
-      },
-      goodExample: 'Using useReducer for complex state',
-      badExample: 'A component with 8+ useState hooks',
-    }
-  ]);
-  
-  // Style patterns
-  codePatternRegistry.registerMany([
-    {
-      id: 'inconsistent-naming',
-      name: 'Inconsistent Naming',
-      description: 'Component or variable names don\'t follow project conventions',
-      category: 'style',
-      severity: 'low',
-      detectFn: (code: string, context?: any) => {
-        // If it's a component file but component name doesn't match PascalCase
-        if (context?.type === 'component') {
-          const match = code.match(/function\s+([a-z][A-Za-z0-9]*)\s*\(/);
-          return match !== null;
-        }
-        return false;
-      },
-      goodExample: 'function UserProfile() { ... }',
-      badExample: 'function userProfile() { ... }',
-    },
-    {
-      id: 'inline-styles',
-      name: 'Inline Styles',
-      description: 'Using inline styles instead of Tailwind or CSS classes',
-      category: 'style',
-      severity: 'low',
-      detectFn: (code: string) => {
-        const inlineStyleMatches = code.match(/style=\{(\{|style|styles)/g);
-        return inlineStyleMatches !== null && inlineStyleMatches.length > 2;
-      },
-      goodExample: 'className="p-4 bg-blue-500 text-white"',
-      badExample: 'style={{ padding: "16px", backgroundColor: "blue", color: "white" }}',
-    }
-  ]);
-  
-  // Quality patterns
-  codePatternRegistry.registerMany([
-    {
-      id: 'missing-error-handling',
-      name: 'Missing Error Handling',
-      description: 'Async operations without proper error handling',
-      category: 'quality',
-      severity: 'high',
-      detectFn: (code: string) => {
-        // Has async/await but no try/catch
-        return (
-          code.includes('async') && 
-          code.includes('await') && 
-          !code.includes('try {') && 
-          !code.includes('.catch(')
-        );
-      },
-      goodExample: 'try { await fetchData() } catch (error) { handleError(error) }',
-      badExample: 'const data = await fetchData();',
-    },
-    {
-      id: 'any-type',
-      name: 'Any Type Usage',
-      description: 'Using the "any" type extensively defeats TypeScript\'s purpose',
-      category: 'quality',
-      severity: 'medium',
-      detectFn: (code: string) => {
-        const anyMatches = code.match(/: any(\[|\]|\)|\s|,|;|=)/g);
-        return anyMatches !== null && anyMatches.length > 2;
-      },
-      goodExample: 'function process(data: UserData): Result { ... }',
-      badExample: 'function process(data: any): any { ... }',
-    }
-  ]);
-}
-
-// Initialize the registry with default patterns
-registerDefaultPatterns();
+    category: 'performance',
+    severity: 'high',
+    goodExample: 'useEffect(() => { doSomething(value); }, [value]);',
+    badExample: 'useEffect(() => { doSomething(value); }, []); // Missing value dependency',
+  }
+]);

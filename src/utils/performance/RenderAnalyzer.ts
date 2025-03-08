@@ -1,40 +1,25 @@
 
-/**
- * Render Analyzer
- * 
- * Analyzes component renders to identify unnecessary re-renders
- * and suggest performance optimizations.
- */
-
 import { devLogger } from '@/utils/debugUtils';
+import { performanceMonitor } from './performanceMonitor';
 
-export type RenderInfo = {
-  componentName: string;
-  renderTime: number;
-  renderCount: number;
-  props?: Record<string, any>;
-  reasons?: string[];
-  timestamp: number;
-};
+export interface RenderSuggestion {
+  type: string;
+  description: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+}
 
-export type RenderAnalysis = {
+export interface ComponentRenderInsights {
   component: string;
+  renderCount: number;
   averageRenderTime: number;
-  totalRenderCount: number;
-  unnecessaryRenderCount: number;
-  suggestions: {
-    type: 'memo' | 'callback' | 'state' | 'prop-drilling';
-    description: string;
-    priority: 'high' | 'medium' | 'low';
-  }[];
-};
+  lastRenderTime: number;
+  renderFrequency: number;
+  suggestions: RenderSuggestion[];
+}
 
-export class RenderAnalyzer {
+class RenderAnalyzer {
   private static instance: RenderAnalyzer;
-  private renderHistory: Map<string, RenderInfo[]> = new Map();
-  private analysisCache: Map<string, RenderAnalysis> = new Map();
-  private isEnabled = process.env.NODE_ENV === 'development';
-  private maxHistoryLength = 20;
+  private componentSuggestions: Record<string, RenderSuggestion[]> = {};
   
   private constructor() {
     // Private constructor for singleton
@@ -48,227 +33,128 @@ export class RenderAnalyzer {
   }
   
   /**
-   * Record a component render
+   * Analyze component render performance
    */
-  public recordRender(
-    componentName: string, 
-    renderTime: number, 
-    props?: Record<string, any>,
-    reasons?: string[]
-  ): void {
-    if (!this.isEnabled) return;
+  public analyzeComponent(componentName: string): RenderSuggestion[] {
+    const metrics = performanceMonitor.getComponentMetrics(componentName);
+    if (!metrics) return [];
     
-    const renderInfo: RenderInfo = {
-      componentName,
-      renderTime,
-      renderCount: 1,
-      props,
-      reasons,
-      timestamp: Date.now()
-    };
+    const suggestions: RenderSuggestion[] = [];
     
-    // Get existing history or create new array
-    const history = this.renderHistory.get(componentName) || [];
+    // Calculate render frequency (renders per second)
+    const appRuntime = (Date.now() - performanceMonitor.getMetrics().startTime) / 1000;
+    const renderFrequency = metrics.renders / Math.max(appRuntime, 1);
     
-    // Add new render to history
-    history.unshift(renderInfo);
-    
-    // Limit history length
-    if (history.length > this.maxHistoryLength) {
-      history.pop();
-    }
-    
-    // Update history
-    this.renderHistory.set(componentName, history);
-    
-    // Invalidate analysis cache
-    this.analysisCache.delete(componentName);
-    
-    devLogger.log('RenderAnalyzer', `Recorded render for ${componentName}: ${renderTime.toFixed(2)}ms`);
-  }
-  
-  /**
-   * Analyze renders for a specific component
-   */
-  public analyzeRenders(componentName: string): RenderAnalysis | null {
-    if (!this.isEnabled) return null;
-    
-    // Return cached analysis if available
-    if (this.analysisCache.has(componentName)) {
-      return this.analysisCache.get(componentName)!;
-    }
-    
-    const history = this.renderHistory.get(componentName);
-    if (!history || history.length < 2) {
-      return null;
-    }
-    
-    // Calculate metrics
-    const totalRenderCount = history.length;
-    const totalRenderTime = history.reduce((sum, info) => sum + info.renderTime, 0);
-    const averageRenderTime = totalRenderTime / totalRenderCount;
-    
-    // Count potentially unnecessary renders
-    let unnecessaryRenderCount = 0;
-    
-    // Compare consecutive renders to detect unnecessary ones
-    for (let i = 0; i < history.length - 1; i++) {
-      const currentRender = history[i];
-      const previousRender = history[i + 1];
-      
-      // If renders happened close together and props look the same
-      if (
-        currentRender.timestamp - previousRender.timestamp < 100 && // Within 100ms
-        this.arePropsEquivalent(currentRender.props, previousRender.props)
-      ) {
-        unnecessaryRenderCount++;
-      }
-    }
-    
-    // Generate suggestions based on analysis
-    const suggestions: RenderAnalysis['suggestions'] = [];
-    
-    // Suggest memoization for frequently rendering components
-    if (totalRenderCount > 10 && averageRenderTime > 5) {
+    // Check for frequent renders
+    if (renderFrequency > 5) {
       suggestions.push({
         type: 'memo',
-        description: 'Component renders frequently with significant render time',
-        priority: 'high'
+        description: `Component renders very frequently (${renderFrequency.toFixed(1)} renders/sec). Consider using React.memo() or checking for unnecessary parent re-renders.`,
+        priority: renderFrequency > 10 ? 'critical' : 'high'
       });
     }
     
-    // Suggest useCallback for components passing functions to children
-    if (this.hasFunctionProps(history[0]?.props)) {
+    // Check for slow renders
+    if (metrics.averageRenderTime > 16) {
       suggestions.push({
-        type: 'callback',
-        description: 'Component passes functions to children which may cause unnecessary re-renders',
-        priority: 'medium'
+        type: 'complexity',
+        description: `Component has slow average render time (${metrics.averageRenderTime.toFixed(1)}ms). Consider optimizing the render function or splitting into smaller components.`,
+        priority: metrics.averageRenderTime > 50 ? 'critical' : 'high'
       });
     }
     
-    // Suggest state optimization if many renders with similar props
-    if (unnecessaryRenderCount > totalRenderCount * 0.3) {
+    // Many renders with slow average could indicate a bad pattern
+    if (metrics.renders > 10 && metrics.averageRenderTime > 10) {
       suggestions.push({
         type: 'state',
-        description: `${unnecessaryRenderCount} of ${totalRenderCount} renders may be unnecessary`,
+        description: 'Component combines frequent rendering with slow render times. Consider reviewing state management and component structure.',
         priority: 'high'
       });
     }
     
-    const analysis: RenderAnalysis = {
-      component: componentName,
-      averageRenderTime,
-      totalRenderCount,
-      unnecessaryRenderCount,
-      suggestions
-    };
+    // Store suggestions for this component
+    this.componentSuggestions[componentName] = suggestions;
     
-    // Cache the analysis
-    this.analysisCache.set(componentName, analysis);
-    
-    return analysis;
+    return suggestions;
   }
   
   /**
-   * Get components with performance issues
+   * Get insights for a specific component
    */
-  public findComponentsWithPerformanceIssues(): RenderAnalysis[] {
-    if (!this.isEnabled) return [];
+  public getComponentInsights(componentName: string): ComponentRenderInsights | null {
+    const metrics = performanceMonitor.getComponentMetrics(componentName);
+    if (!metrics) return null;
     
-    const results: RenderAnalysis[] = [];
+    // Calculate render frequency (renders per second)
+    const appRuntime = (Date.now() - performanceMonitor.getMetrics().startTime) / 1000;
+    const renderFrequency = metrics.renders / Math.max(appRuntime, 1);
     
-    this.renderHistory.forEach((_, componentName) => {
-      const analysis = this.analyzeRenders(componentName);
-      if (analysis && analysis.suggestions.length > 0) {
-        results.push(analysis);
-      }
-    });
-    
-    // Sort by priority (high to low)
-    return results.sort((a, b) => {
-      const aHighPriority = a.suggestions.some(s => s.priority === 'high');
-      const bHighPriority = b.suggestions.some(s => s.priority === 'high');
-      
-      if (aHighPriority && !bHighPriority) return -1;
-      if (!aHighPriority && bHighPriority) return 1;
-      
-      // If same priority, sort by unnecessary render count
-      return b.unnecessaryRenderCount - a.unnecessaryRenderCount;
-    });
-  }
-  
-  /**
-   * Helper to check if two prop objects are roughly equivalent
-   */
-  private arePropsEquivalent(
-    props1?: Record<string, any>, 
-    props2?: Record<string, any>
-  ): boolean {
-    if (!props1 || !props2) return false;
-    
-    // Basic check: same properties
-    const keys1 = Object.keys(props1);
-    const keys2 = Object.keys(props2);
-    
-    if (keys1.length !== keys2.length) return false;
-    
-    // Check primitive values for equality
-    for (const key of keys1) {
-      if (!keys2.includes(key)) return false;
-      
-      const val1 = props1[key];
-      const val2 = props2[key];
-      
-      // Skip functions - we can't easily compare them
-      if (typeof val1 === 'function' || typeof val2 === 'function') {
-        continue;
-      }
-      
-      // Shallow comparison for objects
-      if (typeof val1 === 'object' && typeof val2 === 'object') {
-        // Both null
-        if (val1 === null && val2 === null) continue;
-        
-        // One null, other not
-        if (val1 === null || val2 === null) return false;
-        
-        // Both arrays - check length only
-        if (Array.isArray(val1) && Array.isArray(val2)) {
-          if (val1.length !== val2.length) return false;
-          continue;
-        }
-        
-        // Different types
-        if (Array.isArray(val1) !== Array.isArray(val2)) return false;
-        
-        // Skip deep object comparison, just check keys
-        continue;
-      }
-      
-      // Compare primitive values
-      if (val1 !== val2) return false;
+    // Get or generate suggestions
+    let suggestions = this.componentSuggestions[componentName];
+    if (!suggestions) {
+      suggestions = this.analyzeComponent(componentName);
     }
     
-    return true;
+    return {
+      component: componentName,
+      renderCount: metrics.renders,
+      averageRenderTime: metrics.averageRenderTime,
+      lastRenderTime: metrics.lastRenderTime,
+      renderFrequency,
+      suggestions
+    };
   }
   
   /**
-   * Check if props contain functions
+   * Find components with performance issues
    */
-  private hasFunctionProps(props?: Record<string, any>): boolean {
-    if (!props) return false;
+  public findComponentsWithPerformanceIssues(): ComponentRenderInsights[] {
+    const allMetrics = performanceMonitor.getMetrics();
+    const componentNames = Object.keys(allMetrics.componentMetrics);
     
-    return Object.values(props).some(val => typeof val === 'function');
+    const insights: ComponentRenderInsights[] = [];
+    
+    for (const name of componentNames) {
+      const componentInsights = this.getComponentInsights(name);
+      if (componentInsights && componentInsights.suggestions.length > 0) {
+        insights.push(componentInsights);
+      }
+    }
+    
+    // Sort by priority
+    return insights.sort((a, b) => {
+      const aMaxPriority = Math.max(
+        ...a.suggestions.map(s => this.getPriorityValue(s.priority))
+      );
+      const bMaxPriority = Math.max(
+        ...b.suggestions.map(s => this.getPriorityValue(s.priority))
+      );
+      
+      return bMaxPriority - aMaxPriority;
+    });
   }
   
   /**
-   * Clear render history
+   * Convert priority string to numeric value for sorting
    */
-  public clearHistory(): void {
-    this.renderHistory.clear();
-    this.analysisCache.clear();
+  private getPriorityValue(priority: string): number {
+    switch (priority) {
+      case 'critical': return 4;
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 0;
+    }
+  }
+  
+  /**
+   * Reset all stored insights
+   */
+  public reset(): void {
+    this.componentSuggestions = {};
+    devLogger.log('RenderAnalyzer', 'Render analysis data reset');
   }
 }
 
-// Export the singleton instance
+// Export singleton instance
 export const renderAnalyzer = RenderAnalyzer.getInstance();
