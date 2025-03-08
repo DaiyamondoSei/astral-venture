@@ -87,6 +87,13 @@ export class PatternAnalyzer {
   }
   
   /**
+   * Get a pattern by ID
+   */
+  public getPattern(patternId: string): CodePattern | undefined {
+    return codePatternRegistry.getPattern(patternId);
+  }
+  
+  /**
    * Get a summary of pattern matches by category
    */
   public getMatchesByCategory(): Record<CodePattern['category'], PatternMatch[]> {
