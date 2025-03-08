@@ -1,6 +1,8 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { aiCodeAssistant, AssistantSuggestion, AssistantIntent } from '@/utils/ai/AICodeAssistant';
+import { aiAssistantContext } from '@/utils/ai/AIAssistantContext';
+import { toast } from '@/components/ui/use-toast';
 
 /**
  * Hook for interacting with the AI Code Assistant
@@ -14,12 +16,14 @@ export function useAICodeAssistant(
     autoRefresh?: boolean;
     refreshInterval?: number;
     trackIntent?: string;
+    showToasts?: boolean;
   } = {}
 ) {
   const {
     autoRefresh = true,
     refreshInterval = 5000,
-    trackIntent
+    trackIntent,
+    showToasts = true
   } = options;
   
   const [suggestions, setSuggestions] = useState<AssistantSuggestion[]>([]);
@@ -38,15 +42,19 @@ export function useAICodeAssistant(
       registerIntent: () => '',
       applyAutoFix: () => false,
       markIntentImplemented: () => false,
-      markIntentAbandoned: () => false
+      markIntentAbandoned: () => false,
+      getCurrentContext: () => ({})
     };
   }
   
   // Load suggestions and intents
-  const refreshSuggestions = () => {
+  const refreshSuggestions = useCallback(() => {
     setLoading(true);
     
     if (componentName) {
+      // Update context with current component
+      aiAssistantContext.setCurrentComponent(componentName);
+      
       // Get suggestions for specific component
       const componentSuggestions = aiCodeAssistant.getSuggestionsForComponent(componentName);
       setSuggestions(componentSuggestions);
@@ -62,38 +70,99 @@ export function useAICodeAssistant(
     
     setLastUpdated(new Date());
     setLoading(false);
-  };
+  }, [componentName]);
   
   // Helper functions
-  const registerIntent = (description: string, relatedComponents: string[] = []): string => {
+  const registerIntent = useCallback((description: string, relatedComponents: string[] = []): string => {
     const intentId = aiCodeAssistant.registerIntent(description, relatedComponents);
+    
+    // Also register in the context
+    aiAssistantContext.registerIntent({
+      description,
+      priority: 'medium',
+      category: 'feature',
+      status: 'pending',
+      components: relatedComponents
+    });
+    
     refreshSuggestions();
+    
+    if (showToasts) {
+      toast({
+        title: "Development intent tracked",
+        description: description.length > 50 ? `${description.substring(0, 47)}...` : description,
+      });
+    }
+    
     return intentId;
-  };
+  }, [refreshSuggestions, showToasts]);
   
-  const applyAutoFix = (suggestionId: string): boolean => {
+  const applyAutoFix = useCallback((suggestionId: string): boolean => {
     const result = aiCodeAssistant.applyAutoFix(suggestionId);
+    
     if (result) {
       refreshSuggestions();
+      
+      if (showToasts) {
+        toast({
+          title: "Auto-fix applied",
+          description: "The suggested code improvement has been applied.",
+        });
+      }
+    } else if (showToasts) {
+      toast({
+        title: "Auto-fix failed",
+        description: "Unable to apply the suggested fix automatically.",
+        variant: "destructive"
+      });
     }
+    
     return result;
-  };
+  }, [refreshSuggestions, showToasts]);
   
-  const markIntentImplemented = (intentId: string): boolean => {
+  const markIntentImplemented = useCallback((intentId: string): boolean => {
     const result = aiCodeAssistant.updateIntentStatus(intentId, 'implemented');
+    
+    // Also update in context
+    aiAssistantContext.updateIntent(intentId, { status: 'implemented' });
+    
     if (result) {
       refreshSuggestions();
+      
+      if (showToasts) {
+        toast({
+          title: "Intent marked as implemented",
+          description: "Development intent has been completed.",
+        });
+      }
     }
+    
     return result;
-  };
+  }, [refreshSuggestions, showToasts]);
   
-  const markIntentAbandoned = (intentId: string): boolean => {
+  const markIntentAbandoned = useCallback((intentId: string): boolean => {
     const result = aiCodeAssistant.updateIntentStatus(intentId, 'abandoned');
+    
+    // Also update in context
+    aiAssistantContext.updateIntent(intentId, { status: 'abandoned' });
+    
     if (result) {
       refreshSuggestions();
+      
+      if (showToasts) {
+        toast({
+          title: "Intent marked as abandoned",
+          description: "Development intent has been abandoned.",
+        });
+      }
     }
+    
     return result;
-  };
+  }, [refreshSuggestions, showToasts]);
+  
+  const getCurrentContext = useCallback(() => {
+    return aiAssistantContext.getContext();
+  }, []);
   
   // Initial load and auto refresh
   useEffect(() => {
@@ -107,7 +176,7 @@ export function useAICodeAssistant(
       
       return () => clearInterval(intervalId);
     }
-  }, [componentName, autoRefresh, refreshInterval]);
+  }, [componentName, autoRefresh, refreshInterval, refreshSuggestions]);
   
   // Track specific intent if provided
   useEffect(() => {
@@ -116,6 +185,12 @@ export function useAICodeAssistant(
       aiCodeAssistant.updateContext({
         currentIntent: trackIntent,
         componentName
+      });
+      
+      // Also update the assistant context
+      aiAssistantContext.updateContext({
+        currentComponent: componentName,
+        currentIntent: trackIntent
       });
     }
   }, [trackIntent, componentName]);
@@ -129,7 +204,8 @@ export function useAICodeAssistant(
     registerIntent,
     applyAutoFix,
     markIntentImplemented,
-    markIntentAbandoned
+    markIntentAbandoned,
+    getCurrentContext
   };
 }
 
