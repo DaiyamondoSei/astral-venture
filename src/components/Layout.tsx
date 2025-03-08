@@ -1,8 +1,7 @@
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
-import { usePerformance } from '@/contexts/PerformanceContext';
-import { useCodeEnhancement } from '@/hooks/useCodeEnhancement';
+import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 
 // Simple fallback background that doesn't block rendering
 const SimpleFallbackBackground = () => (
@@ -22,17 +21,8 @@ const Layout = ({
   contentWidth = 'standard',
   removeBackground = false
 }: LayoutProps) => {
-  const { 
-    deviceCapability, 
-    isLowPerformance
-  } = usePerformance();
-  
-  // Use the code enhancement hook with valid options
-  useCodeEnhancement('Layout', {
-    complexity: 20,
-    dependencies: ['usePerformance', 'cn'],
-    hooks: ['usePerformance', 'useCodeEnhancement']
-  });
+  // Use performance tracking directly as useCodeEnhancement might not be available yet
+  usePerformanceTracking('Layout');
   
   // Map content width options to appropriate max-width classes
   const getContentWidthClass = () => {
