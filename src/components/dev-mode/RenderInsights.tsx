@@ -6,12 +6,19 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle, BarChart, X, RefreshCw } from 'lucide-react';
 import { renderAnalyzer, RenderAnalysis } from '@/utils/performance/RenderAnalyzer';
 import { Progress } from '@/components/ui/progress';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
 
 const RenderInsights: React.FC = () => {
   const [insights, setInsights] = useState<RenderAnalysis[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const config = usePerfConfig();
+
+  // Skip in production or when feature is disabled
+  if (process.env.NODE_ENV === 'production' || !config.enableRenderTracking) {
+    return null;
+  }
 
   useEffect(() => {
     // Get components with performance issues
@@ -79,10 +86,10 @@ const RenderInsights: React.FC = () => {
                 <div 
                   key={index} 
                   className="border rounded p-3 text-sm space-y-2 hover:bg-muted/50 cursor-pointer"
-                  onClick={() => setSelectedComponent(selectedComponent === insight.componentName ? null : insight.componentName)}
+                  onClick={() => setSelectedComponent(selectedComponent === insight.component ? null : insight.component)}
                 >
                   <div className="font-medium flex items-center justify-between">
-                    <span>{insight.componentName}</span>
+                    <span>{insight.component}</span>
                     <span className={`px-1.5 py-0.5 text-xs rounded-full ${getFrequencyColorClass(insight.renderFrequency)}`}>
                       {insight.renderFrequency}
                     </span>
@@ -107,7 +114,7 @@ const RenderInsights: React.FC = () => {
                     <Progress value={getRenderScore(insight)} className="h-1.5" />
                   </div>
                   
-                  {selectedComponent === insight.componentName && (
+                  {selectedComponent === insight.component && (
                     <div className="mt-3 pt-3 border-t text-xs space-y-2">
                       <span className="font-medium block">Optimization suggestions:</span>
                       <ul className="space-y-1 list-disc pl-4">

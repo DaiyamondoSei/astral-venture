@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { usePerformanceTracking } from './usePerformanceTracking';
 import { useRenderTracking } from './useRenderTracking';
 import { useErrorPrevention } from './useErrorPrevention';
+import { usePerfConfig } from './usePerfConfig';
 
 interface CodeEnhancementOptions {
   complexity?: number;
@@ -27,6 +28,9 @@ export function useCodeEnhancement(
   // Skip in production for performance
   if (process.env.NODE_ENV !== 'development') return;
   
+  // Get global performance configuration
+  const config = usePerfConfig();
+  
   const {
     complexity = 0,
     dependencies = [],
@@ -37,33 +41,39 @@ export function useCodeEnhancement(
     trackPropChanges = true
   } = options;
   
-  // Use performance tracking
-  usePerformanceTracking(componentName);
+  // Only use performance tracking if globally enabled
+  usePerformanceTracking(componentName, {
+    enabled: config.enablePerformanceTracking
+  });
   
-  // Use render tracking
+  // Only use render tracking if globally enabled
   useRenderTracking(componentName, {
     complexity,
     dependencies,
     hooks,
-    childComponents
+    childComponents,
+    enabled: config.enableRenderTracking
   });
   
-  // Use error prevention
+  // Only use error prevention if globally enabled
   const props = { complexity, dependencies, hooks, childComponents };
   useErrorPrevention(componentName, props, {
-    trackRenders,
-    validateProps,
-    trackPropChanges
+    trackRenders: trackRenders && config.enableRenderTracking,
+    validateProps: validateProps && config.enableValidation,
+    trackPropChanges: trackPropChanges && config.enablePropTracking
   });
   
-  // Log component lifecycle
+  // Log component lifecycle with less verbosity
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'development') return;
+    if (process.env.NODE_ENV !== 'development' || !config.enableDebugLogging) return;
     
-    console.debug(`[${componentName}] Component mounted`);
-    
-    return () => {
-      console.debug(`[${componentName}] Component unmounted`);
-    };
-  }, [componentName]);
+    // Only log component mounting for top-level components to reduce noise
+    if (complexity > 2 || childComponents.length > 0) {
+      console.debug(`[${componentName}] Component mounted`);
+      
+      return () => {
+        console.debug(`[${componentName}] Component unmounted`);
+      };
+    }
+  }, [componentName, complexity, childComponents, config.enableDebugLogging]);
 }

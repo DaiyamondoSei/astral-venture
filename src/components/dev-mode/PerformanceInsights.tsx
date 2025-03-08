@@ -6,6 +6,7 @@ import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Trash, RefreshCw, AlertTriangle, Clock, Zap } from 'lucide-react';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
 
 // Component for displaying performance insights and metrics
 const PerformanceInsights: React.FC = () => {
@@ -13,6 +14,12 @@ const PerformanceInsights: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [refreshKey, setRefreshKey] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const config = usePerfConfig();
+
+  // Skip in production or when feature is disabled
+  if (process.env.NODE_ENV === 'production' || !config.enablePerformanceTracking) {
+    return null;
+  }
 
   // Subscribe to performance metrics updates
   useEffect(() => {

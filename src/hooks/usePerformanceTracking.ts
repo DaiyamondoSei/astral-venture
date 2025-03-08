@@ -6,6 +6,7 @@ interface PerformanceTrackingOptions {
   logSlowRenders?: boolean;
   logSlowRenderThreshold?: number;
   reportToAnalytics?: boolean;
+  enabled?: boolean;
 }
 
 /**
@@ -24,17 +25,27 @@ export function usePerformanceTracking(
   const {
     logSlowRenders = true,
     logSlowRenderThreshold = 16, // 1 frame at 60fps
-    reportToAnalytics = false
+    reportToAnalytics = false,
+    enabled = true
   } = options;
+  
+  // Skip if not enabled
+  if (!enabled) return;
   
   const renderStartTimeRef = useRef<number>(0);
   const lastRenderTimeRef = useRef<number>(0);
+  const recordedThisRenderRef = useRef(false);
   
   // Start render timing when component renders
   renderStartTimeRef.current = performance.now();
+  recordedThisRenderRef.current = false;
   
-  // Track render completion and log metrics
+  // Track render completion and log metrics with throttling
   useEffect(() => {
+    // Skip if already recorded this render cycle (prevents double recording)
+    if (recordedThisRenderRef.current) return;
+    
+    recordedThisRenderRef.current = true;
     const renderEndTime = performance.now();
     const renderDuration = renderEndTime - renderStartTimeRef.current;
     

@@ -1,5 +1,5 @@
 
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { cn } from "@/lib/utils";
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 
@@ -21,8 +21,11 @@ const Layout = ({
   contentWidth = 'standard',
   removeBackground = false
 }: LayoutProps) => {
-  // Use performance tracking directly as useCodeEnhancement might not be available yet
-  usePerformanceTracking('Layout');
+  // Use performance tracking with minimal options
+  usePerformanceTracking('Layout', { 
+    logSlowRenders: true,
+    reportToAnalytics: false
+  });
   
   // Map content width options to appropriate max-width classes
   const getContentWidthClass = () => {
