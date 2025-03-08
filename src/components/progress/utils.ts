@@ -1,124 +1,171 @@
 
-import { ProgressColorScheme, ProgressSize, LabelPosition, GlowIntensity, AnimationStyle } from '@/components/onboarding/data/types';
+import { ProgressColorScheme, LabelPosition, AnimationStyle } from './types';
 
-// Get color scheme based on the colorScheme prop
-export const getColorScheme = (colorScheme: ProgressColorScheme): string => {
-  if (colorScheme === 'primary') {
+export function getColorClass(color: ProgressColorScheme): string {
+  // Handle standard color schemes
+  if (color === 'primary') {
     return 'bg-primary';
   }
   
-  if (colorScheme === 'secondary') {
+  if (color === 'secondary') {
     return 'bg-secondary';
   }
   
-  if (colorScheme === 'accent') {
+  if (color === 'accent') {
     return 'bg-accent';
   }
   
-  if (colorScheme === 'quantum') {
-    return 'bg-gradient-to-r from-quantum-400 to-quantum-600';
+  if (color === 'success') {
+    return 'bg-green-500';
   }
   
-  if (colorScheme.startsWith('from-quantum-')) {
-    return `bg-gradient-to-r ${colorScheme}`;
+  if (color === 'warning') {
+    return 'bg-amber-500';
   }
   
-  return 'bg-primary';
-};
+  if (color === 'danger') {
+    return 'bg-red-500';
+  }
+  
+  if (color === 'info') {
+    return 'bg-blue-500';
+  }
+  
+  // Custom color (assumes Tailwind class)
+  return color.startsWith('bg-') ? color : `bg-${color}`;
+}
 
-// Get CSS height class based on size
-export const getProgressHeight = (size: ProgressSize): string => {
-  switch (size) {
-    case 'sm':
-      return 'h-1.5';
-    case 'lg':
-      return 'h-3';
-    case 'md':
-    default:
-      return 'h-2';
-  }
-};
+export function getBackgroundColorClass(color: string): string {
+  // Handle standard color schemes
+  return color.startsWith('bg-') ? color : `bg-${color}`;
+}
 
-// Get CSS classes for the layout based on label position
-export const getLayoutClass = (labelPosition: LabelPosition): string => {
-  switch (labelPosition) {
-    case 'left':
-    case 'right':
-      return 'flex items-center space-x-2';
-    case 'inside':
-      return 'relative';
-    case 'bottom':
-    case 'top':
-    default:
-      return 'space-y-1';
-  }
-};
-
-// Get CSS classes for the label based on position
-export const getLabelClass = (labelPosition: LabelPosition): string => {
-  switch (labelPosition) {
-    case 'right':
-      return 'order-2';
-    case 'inside':
-      return 'absolute inset-0 flex items-center justify-center text-white z-10';
-    case 'bottom':
-      return 'order-2 pt-1';
-    case 'left':
-    case 'top':
-    default:
-      return '';
-  }
-};
-
-// Get CSS classes for the glow effect
-export const getGlowClasses = (intensity: GlowIntensity): string => {
-  switch (intensity) {
-    case 'low':
-      return 'opacity-20 blur-[1px]';
-    case 'high':
-      return 'opacity-70 blur-[3px]';
-    case 'medium':
-    default:
-      return 'opacity-40 blur-[2px]';
-  }
-};
-
-// Get CSS classes for progress color
-export const getProgressColorClasses = (colorScheme: ProgressColorScheme): string => {
-  if (colorScheme === 'primary') {
-    return 'bg-primary';
+export function getLabelPositionClass(position: LabelPosition, shape: 'linear' | 'circular' | 'radial'): string {
+  if (shape === 'linear') {
+    if (position === 'left') {
+      return 'flex-row-reverse items-center';
+    }
+    if (position === 'right') {
+      return 'flex-row items-center';
+    }
+    
+    if (position === 'bottom') {
+      return 'flex-col-reverse';
+    }
+    if (position === 'top') {
+      return 'flex-col';
+    }
+    
+    // Default to right for linear
+    return 'flex-row items-center';
   }
   
-  if (colorScheme === 'secondary') {
-    return 'bg-secondary';
+  if (shape === 'circular' || shape === 'radial') {
+    if (position === 'right') {
+      return 'flex-row items-center gap-4';
+    }
+    
+    if (position === 'bottom') {
+      return 'flex-col-reverse gap-4';
+    }
+    
+    if (position === 'left') {
+      return 'flex-row-reverse items-center gap-4';
+    }
+    if (position === 'top') {
+      return 'flex-col gap-4';
+    }
+    
+    // Default to center (label inside) for circular/radial
+    return 'relative';
   }
   
-  if (colorScheme === 'accent') {
-    return 'bg-accent';
-  }
-  
-  if (colorScheme === 'quantum') {
-    return 'bg-gradient-to-r from-quantum-400 to-quantum-600';
-  }
-  
-  if (colorScheme.startsWith('from-quantum-')) {
-    return `bg-gradient-to-r ${colorScheme}`;
-  }
-  
-  return 'bg-primary';
-};
+  return '';
+}
 
-// Get animation style
-export const getGlowAnimation = (animation: AnimationStyle): string => {
-  switch (animation) {
-    case 'pulse':
-      return 'animate-pulse';
-    case 'slide':
-      return 'animate-slide';
-    case 'ripple':
-      return 'animate-ripple';
-    case 'none':
-    default:
-      return '';
+export function getValueText(value: number, max: number, valueText?: string): string {
+  if (valueText) {
+    return valueText;
   }
-};
+  
+  const percentage = Math.round((value / max) * 100);
+  return `${percentage}%`;
+}
+
+export function getBaseColorClass(color: ProgressColorScheme): string {
+  // Handle standard color schemes
+  if (color === 'primary') {
+    return 'text-primary';
+  }
+  
+  if (color === 'secondary') {
+    return 'text-secondary';
+  }
+  
+  if (color === 'accent') {
+    return 'text-accent';
+  }
+  
+  if (color === 'success') {
+    return 'text-green-500';
+  }
+  
+  if (color === 'warning') {
+    return 'text-amber-500';
+  }
+  
+  if (color === 'danger') {
+    return 'text-red-500';
+  }
+  
+  if (color === 'info') {
+    return 'text-blue-500';
+  }
+  
+  // Custom color (assumes Tailwind class)
+  return color.startsWith('text-') ? color : `text-${color}`;
+}
+
+export function getAnimationClass(animation: AnimationStyle): string {
+  if (animation === 'slide') {
+    return 'transition-all duration-500 ease-in-out';
+  }
+  
+  if (animation === 'ripple') {
+    return 'progress-ripple';
+  }
+  
+  if (animation === 'glow') {
+    return 'progress-glow';
+  }
+  
+  if (animation === 'pulse') {
+    return 'animate-pulse';
+  }
+  
+  return '';
+}
+
+export function getProgressSizeClass(size: 'sm' | 'md' | 'lg' | 'xl', shape: 'linear' | 'circular' | 'radial'): string {
+  if (shape === 'linear') {
+    switch (size) {
+      case 'sm': return 'h-1';
+      case 'md': return 'h-2';
+      case 'lg': return 'h-3';
+      case 'xl': return 'h-4';
+      default: return 'h-2';
+    }
+  }
+  
+  if (shape === 'circular' || shape === 'radial') {
+    switch (size) {
+      case 'sm': return 'w-16 h-16';
+      case 'md': return 'w-24 h-24';
+      case 'lg': return 'w-32 h-32';
+      case 'xl': return 'w-40 h-40';
+      default: return 'w-24 h-24';
+    }
+  }
+  
+  return '';
+}

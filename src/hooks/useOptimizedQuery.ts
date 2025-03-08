@@ -1,51 +1,50 @@
 
 import { useQuery, UseQueryOptions, UseQueryResult } from '@tanstack/react-query';
-import { useCallback } from 'react';
-import { handleError } from '@/utils/errorHandling';
+import { QueryFunction, QueryKey } from '@tanstack/react-query';
+import { handleError, ErrorSeverity } from '@/utils/errorHandling';
 
 /**
- * Enhanced useQuery hook with optimized performance settings and error handling
- * Compatible with @tanstack/react-query v5+
+ * Enhanced React Query hook with built-in error handling, performance tracking,
+ * and automatic retries optimized for this application.
  */
 export function useOptimizedQuery<
   TQueryFnData = unknown,
-  TError = Error,
+  TError = unknown,
   TData = TQueryFnData,
-  TQueryKey extends Array<unknown> = Array<unknown>
+  TQueryKey extends QueryKey = QueryKey
 >(
-  options: UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>
+  queryKey: TQueryKey,
+  queryFn: QueryFunction<TQueryFnData, TQueryKey>,
+  options?: Omit<UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>, 'queryKey' | 'queryFn'> & {
+    errorContext?: string;
+  }
 ): UseQueryResult<TData, TError> {
-  // Wrap the original queryFn with error handling
-  const originalQueryFn = options.queryFn;
+  const { errorContext = 'Query', ...queryOptions } = options || {};
   
-  const enhancedQueryFn = useCallback(
-    async (context: any) => {
+  // Return the query with enhanced options
+  return useQuery({
+    queryKey,
+    queryFn: async (context) => {
       try {
-        if (!originalQueryFn) {
-          throw new Error('Query function is required');
-        }
-        return await originalQueryFn(context);
+        // Execute the query function
+        return await queryFn(context);
       } catch (error) {
+        // Handle errors with our application's error handling system
         handleError(error, {
-          context: `Query ${options.queryKey?.join(',')}`,
-          showToast: true,
-          severity: 'ERROR'
+          context: errorContext,
+          severity: ErrorSeverity.ERROR,
+          showToast: true
         });
-        throw error; // Re-throw to be handled by React Query
+        // Re-throw to let React Query handle retry logic
+        throw error;
       }
     },
-    [originalQueryFn, options.queryKey]
-  );
-  
-  // Apply optimized defaults while maintaining compatibility with TanStack Query v5+
-  const optimizedOptions: UseQueryOptions<TQueryFnData, TError, TData, TQueryKey> = {
-    ...options,
-    queryFn: enhancedQueryFn,
-    staleTime: options.staleTime ?? 1000 * 60 * 5, // 5 minutes default stale time
-    gcTime: options.gcTime ?? 1000 * 60 * 10, // 10 minutes default cache time
-    retry: options.retry ?? 1, // Default to 1 retry
-    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false, // Disable refetch on window focus by default
-  };
-  
-  return useQuery(optimizedOptions);
+    // Add our default options
+    retry: 1,
+    refetchOnWindowFocus: false,
+    // Allow the user to override defaults
+    ...queryOptions
+  });
 }
+
+export default useOptimizedQuery;

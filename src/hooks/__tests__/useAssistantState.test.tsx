@@ -1,30 +1,35 @@
 
 import { renderHook, act } from '@testing-library/react';
-import { useAssistantState } from '@/components/ai-assistant/hooks/useAssistantState';
+import { useAssistantState } from '../useCodeAssistant';
 
-// Mock for the AIResponse type
-interface AIResponse {
-  answer: string;
-  source: string;
-  meta: {
-    model: string;
-    tokenUsage: number;
-  };
-}
+// Mock state for testing
+const initialState = {
+  isLoading: false,
+  conversation: [],
+  error: null
+};
+
+// Mock the API response
+jest.mock('../../utils/ai/AICodeAssistant', () => ({
+  aiCodeAssistant: {
+    registerIntent: jest.fn((description, relatedComponents) => 'mock-intent-id'),
+    updateIntentStatus: jest.fn(() => true),
+    getIntents: jest.fn(() => []),
+    generateSuggestions: jest.fn(() => [])
+  }
+}));
 
 describe('useAssistantState', () => {
-  it('should initialize with default values', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should initialize with default state', () => {
     const { result } = renderHook(() => useAssistantState());
     
-    expect(result.current.loading).toBe(false);
-    expect(result.current.response).toBeNull();
-    expect(result.current.error).toBeNull();
-    expect(typeof result.current.setLoading).toBe('function');
-    expect(typeof result.current.setResponse).toBe('function');
-    expect(typeof result.current.setError).toBe('function');
-    expect(typeof result.current.reset).toBe('function');
+    expect(result.current.state).toEqual(initialState);
   });
-  
+
   it('should update loading state', () => {
     const { result } = renderHook(() => useAssistantState());
     
@@ -32,69 +37,56 @@ describe('useAssistantState', () => {
       result.current.setLoading(true);
     });
     
-    expect(result.current.loading).toBe(true);
-    
-    act(() => {
-      result.current.setLoading(false);
-    });
-    
-    expect(result.current.loading).toBe(false);
+    expect(result.current.state.isLoading).toBe(true);
   });
-  
-  it('should update response state', () => {
+
+  it('should add a message to the conversation', () => {
     const { result } = renderHook(() => useAssistantState());
-    
-    const mockResponse: AIResponse = {
-      answer: 'This is a test response',
-      source: 'test-source',
-      meta: {
-        model: 'test-model',
-        tokenUsage: 100
-      }
-    };
+    const message = { role: 'user', content: 'Hello', timestamp: new Date() };
     
     act(() => {
-      result.current.setResponse(mockResponse);
+      result.current.addMessage(message);
     });
     
-    expect(result.current.response).toEqual(mockResponse);
+    expect(result.current.state.conversation).toContain(message);
   });
-  
-  it('should update error state', () => {
+
+  it('should add an AI response to the conversation', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setError('Test error message');
-    });
-    
-    expect(result.current.error).toBe('Test error message');
-  });
-  
-  it('should reset all state values', () => {
-    const { result } = renderHook(() => useAssistantState());
-    
-    // Set some initial values
-    act(() => {
-      result.current.setLoading(true);
-      result.current.setResponse({
-        answer: 'Test response',
-        source: 'test-source',
-        meta: {
-          model: 'test-model',
-          tokenUsage: 100
-        }
+      result.current.setAIResponse({
+        content: 'Hello from AI',
+        metadata: { processingTime: 500 }
       });
-      result.current.setError('Test error');
     });
     
-    // Reset all values
+    expect(result.current.state.conversation[0]).toMatchObject({
+      role: 'assistant',
+      content: 'Hello from AI'
+    });
+  });
+
+  it('should clear the conversation', () => {
+    const { result } = renderHook(() => useAssistantState());
+    const message = { role: 'user', content: 'Hello', timestamp: new Date() };
+    
     act(() => {
-      result.current.reset();
+      result.current.addMessage(message);
+      result.current.clearConversation();
     });
     
-    // Check that values are reset to defaults
-    expect(result.current.loading).toBe(false);
-    expect(result.current.response).toBeNull();
-    expect(result.current.error).toBeNull();
+    expect(result.current.state.conversation).toHaveLength(0);
+  });
+
+  it('should set an error', () => {
+    const { result } = renderHook(() => useAssistantState());
+    const error = new Error('Test error');
+    
+    act(() => {
+      result.current.setError(error);
+    });
+    
+    expect(result.current.state.error).toBe(error);
   });
 });

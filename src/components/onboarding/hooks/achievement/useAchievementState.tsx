@@ -1,108 +1,220 @@
 
-import { useState, useEffect, useRef } from 'react';
-import { AchievementData } from '../../data/types';
-import { AchievementState, AchievementTrackerProps } from './types';
+import { useState, useEffect, useCallback } from 'react';
+import { IAchievementData } from '../../data/validators';
 
-export function useAchievementState(props: AchievementTrackerProps): AchievementState {
-  const { userId } = props;
-  const isInitialized = useRef(false);
-  
-  const [earnedAchievements, setEarnedAchievements] = useState<AchievementData[]>([]);
-  const [achievementHistory, setAchievementHistory] = useState<Record<string, {awarded: boolean, timestamp: string, tier?: number}>>({});
-  const [currentAchievement, setCurrentAchievement] = useState<AchievementData | null>(null);
-  const [progressTracking, setProgressTracking] = useState<Record<string, number>>({});
+export interface IAchievementState {
+  achievements: IAchievementData[];
+  completed: IAchievementData[];
+  inProgress: IAchievementData[];
+  locked: IAchievementData[];
+  visible: IAchievementData[];
+  currentlyDisplayed: IAchievementData | null;
+  isAchievementVisible: boolean;
+}
 
-  // Load previously awarded achievements - only once
-  useEffect(() => {
-    if (!userId || isInitialized.current) return;
-    
-    try {
-      const storedAchievements = JSON.parse(localStorage.getItem(`achievements-${userId}`) || '{}');
-      setAchievementHistory(storedAchievements);
-      
-      // Initialize progress tracking based on props
-      initializeProgressTracking(props);
-      isInitialized.current = true;
-    } catch (error) {
-      console.error("Error loading achievement history:", error);
-      // Reset in case of corrupt data
-      localStorage.removeItem(`achievements-${userId}`);
-    }
-  }, [userId, props]);
+const initialState: IAchievementState = {
+  achievements: [],
+  completed: [],
+  inProgress: [],
+  locked: [],
+  visible: [],
+  currentlyDisplayed: null,
+  isAchievementVisible: false
+};
 
-  // Initialize and update progress tracking when values change
-  const initializeProgressTracking = ({
-    currentStreak = 0,
-    reflectionCount = 0,
-    meditationMinutes = 0,
-    totalPoints = 0,
-    uniqueChakrasActivated = 0,
-    wisdomResourcesExplored = 0
-  }: Partial<AchievementTrackerProps>) => {
-    setProgressTracking({
-      streakDays: currentStreak,
-      reflections: reflectionCount,
-      meditation_minutes: meditationMinutes,
-      total_energy_points: totalPoints,
-      unique_chakras_activated: uniqueChakrasActivated,
-      wisdom_resources_explored: wisdomResourcesExplored
-    });
-  };
+export interface IAchievementActions {
+  completeAchievement: (id: string) => void;
+  showAchievement: (achievement: IAchievementData) => void;
+  hideAchievement: () => void;
+  updateProgress: (id: string, progress: number) => void;
+  unlockAchievement: (id: string) => void;
+  loadAchievements: (achievements: IAchievementData[]) => void;
+  resetState: () => void;
+}
 
-  // Update progress tracking when props change - but throttle updates
-  // to prevent too many re-renders
-  const prevProps = useRef({
-    currentStreak: props.currentStreak || 0,
-    reflectionCount: props.reflectionCount || 0,
-    meditationMinutes: props.meditationMinutes || 0,
-    totalPoints: props.totalPoints || 0,
-    uniqueChakrasActivated: props.uniqueChakrasActivated || 0,
-    wisdomResourcesExplored: props.wisdomResourcesExplored || 0
+export function useAchievementState(
+  defaultAchievements: IAchievementData[] = []
+): [IAchievementState, IAchievementActions] {
+  const [state, setState] = useState<IAchievementState>({
+    ...initialState,
+    achievements: defaultAchievements
   });
-  
+
+  // Initialize achievement data
   useEffect(() => {
-    // Only update if values have changed significantly
-    const current = {
-      currentStreak: props.currentStreak || 0,
-      reflectionCount: props.reflectionCount || 0,
-      meditationMinutes: props.meditationMinutes || 0,
-      totalPoints: props.totalPoints || 0,
-      uniqueChakrasActivated: props.uniqueChakrasActivated || 0,
-      wisdomResourcesExplored: props.wisdomResourcesExplored || 0
-    };
-    
-    const hasSignificantChange = 
-      Math.abs(current.currentStreak - prevProps.current.currentStreak) >= 1 ||
-      Math.abs(current.reflectionCount - prevProps.current.reflectionCount) >= 1 ||
-      Math.abs(current.meditationMinutes - prevProps.current.meditationMinutes) >= 5 ||
-      Math.abs(current.totalPoints - prevProps.current.totalPoints) >= 10 ||
-      Math.abs(current.uniqueChakrasActivated - prevProps.current.uniqueChakrasActivated) >= 1 ||
-      Math.abs(current.wisdomResourcesExplored - prevProps.current.wisdomResourcesExplored) >= 1;
+    if (defaultAchievements.length > 0) {
+      loadAchievements(defaultAchievements);
+    }
+  }, [defaultAchievements]);
+
+  // Action to complete an achievement
+  const completeAchievement = useCallback((id: string) => {
+    setState(prev => {
+      const achievement = prev.achievements.find(a => a.id === id);
+      if (!achievement) return prev;
+
+      const updatedAchievement = {
+        ...achievement,
+        completed: true,
+        completedAt: new Date(),
+        progress: 100
+      };
+
+      const updatedAchievements = prev.achievements.map(a =>
+        a.id === id ? updatedAchievement : a
+      );
+
+      // Update the completed and inProgress lists
+      const newCompleted = [...prev.completed, updatedAchievement];
+      const newInProgress = prev.inProgress.filter(a => a.id !== id);
+
+      return {
+        ...prev,
+        achievements: updatedAchievements,
+        completed: newCompleted,
+        inProgress: newInProgress,
+        currentlyDisplayed: updatedAchievement,
+        isAchievementVisible: true
+      };
+    });
+  }, []);
+
+  // Action to show an achievement
+  const showAchievement = useCallback((achievement: IAchievementData) => {
+    setState(prev => ({
+      ...prev,
+      currentlyDisplayed: achievement,
+      isAchievementVisible: true
+    }));
+  }, []);
+
+  // Action to hide the currently displayed achievement
+  const hideAchievement = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      isAchievementVisible: false
+    }));
+  }, []);
+
+  // Action to update achievement progress
+  const updateProgress = useCallback((id: string, progress: number) => {
+    setState(prev => {
+      const achievement = prev.achievements.find(a => a.id === id);
+      if (!achievement) return prev;
+
+      const shouldComplete = progress >= 100;
       
-    if (hasSignificantChange) {
-      initializeProgressTracking(current);
-      prevProps.current = current;
-    }
-  }, [
-    props.currentStreak, 
-    props.reflectionCount, 
-    props.meditationMinutes, 
-    props.totalPoints, 
-    props.uniqueChakrasActivated, 
-    props.wisdomResourcesExplored
-  ]);
+      const updatedAchievement = {
+        ...achievement,
+        progress,
+        completed: shouldComplete,
+        completedAt: shouldComplete ? new Date() : undefined
+      };
 
-  // Display current achievement
-  useEffect(() => {
-    if (earnedAchievements.length > 0 && !currentAchievement) {
-      setCurrentAchievement(earnedAchievements[0]);
-    }
-  }, [earnedAchievements, currentAchievement]);
+      const updatedAchievements = prev.achievements.map(a =>
+        a.id === id ? updatedAchievement : a
+      );
 
-  return {
-    earnedAchievements,
-    achievementHistory,
-    currentAchievement,
-    progressTracking
+      // Update the lists
+      let newCompleted = [...prev.completed];
+      let newInProgress = [...prev.inProgress];
+
+      if (shouldComplete) {
+        newCompleted = [...newCompleted, updatedAchievement];
+        newInProgress = newInProgress.filter(a => a.id !== id);
+      } else if (!newInProgress.some(a => a.id === id)) {
+        newInProgress = [...newInProgress, updatedAchievement];
+      } else {
+        newInProgress = newInProgress.map(a => 
+          a.id === id ? updatedAchievement : a
+        );
+      }
+
+      return {
+        ...prev,
+        achievements: updatedAchievements,
+        completed: newCompleted,
+        inProgress: newInProgress,
+        currentlyDisplayed: shouldComplete ? updatedAchievement : prev.currentlyDisplayed,
+        isAchievementVisible: shouldComplete ? true : prev.isAchievementVisible
+      };
+    });
+  }, []);
+
+  // Action to unlock an achievement
+  const unlockAchievement = useCallback((id: string) => {
+    setState(prev => {
+      const achievement = prev.achievements.find(a => a.id === id);
+      if (!achievement) return prev;
+
+      const updatedAchievement = {
+        ...achievement,
+        visible: true
+      };
+
+      const updatedAchievements = prev.achievements.map(a =>
+        a.id === id ? updatedAchievement : a
+      );
+
+      // Update the visible and locked lists
+      const newVisible = [...prev.visible, updatedAchievement];
+      const newLocked = prev.locked.filter(a => a.id !== id);
+
+      return {
+        ...prev,
+        achievements: updatedAchievements,
+        visible: newVisible,
+        locked: newLocked,
+      };
+    });
+  }, []);
+
+  // Action to load achievements
+  const loadAchievements = useCallback((achievements: IAchievementData[]) => {
+    const completed: IAchievementData[] = [];
+    const inProgress: IAchievementData[] = [];
+    const locked: IAchievementData[] = [];
+    const visible: IAchievementData[] = [];
+
+    achievements.forEach(achievement => {
+      if (achievement.completed) {
+        completed.push(achievement);
+      } else if (achievement.progress && achievement.progress > 0) {
+        inProgress.push(achievement);
+      }
+
+      if (achievement.visible || !achievement.hideUntilUnlocked) {
+        visible.push(achievement);
+      } else {
+        locked.push(achievement);
+      }
+    });
+
+    setState({
+      achievements,
+      completed,
+      inProgress,
+      locked,
+      visible,
+      currentlyDisplayed: null,
+      isAchievementVisible: false
+    });
+  }, []);
+
+  // Action to reset the state
+  const resetState = useCallback(() => {
+    setState(initialState);
+  }, []);
+
+  const actions: IAchievementActions = {
+    completeAchievement,
+    showAchievement,
+    hideAchievement,
+    updateProgress,
+    unlockAchievement,
+    loadAchievements,
+    resetState
   };
+
+  return [state, actions];
 }

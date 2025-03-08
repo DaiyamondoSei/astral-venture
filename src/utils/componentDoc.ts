@@ -1,3 +1,4 @@
+
 /**
  * Component Documentation System
  * 
@@ -86,8 +87,7 @@ export function documented<T>(
   
   // In development, wrap with validation
   if (process.env.NODE_ENV === 'development') {
-    // @ts-expect-error - We're wrapping the component to add validation
-    const WrappedComponent = (props: T) => {
+    const WrappedComponent = (props: any) => {
       // Validate props at render time in development
       validateProps(componentName, props as Record<string, any>);
       

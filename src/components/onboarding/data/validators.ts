@@ -1,91 +1,60 @@
 
 import { z } from 'zod';
-import { AchievementData } from './types';
-import { validateData } from '@/utils/typeValidation';
 
-/**
- * Achievement validator schema using Zod
- */
+// Create schemas for validation
 export const achievementSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
-  iconName: z.string().optional(),
-  level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
-  category: z.string().optional(),
-  points: z.number().optional(),
-  unlockRequirement: z.string().optional(),
-  progress: z.object({
-    current: z.number(),
-    required: z.number()
-  }).optional(),
-  isSecret: z.boolean().optional(),
-  unlocked: z.boolean().optional(),
-  dateUnlocked: z.string().optional(),
+  category: z.string(),
+  type: z.enum([
+    'discovery', 
+    'completion', 
+    'interaction', 
+    'streak', 
+    'progressive', 
+    'milestone'
+  ]),
+  level: z.enum(['beginner', 'intermediate', 'advanced']),
   icon: z.string().optional(),
-  type: z.enum(['discovery', 'completion', 'interaction', 'streak', 'progressive', 'milestone']).optional(),
-  requiredStep: z.string().optional(),
-  requiredSteps: z.array(z.string()).optional(),
-  requiredInteraction: z.string().optional(),
-  streakDays: z.number().optional(),
-  progressThreshold: z.number().optional(),
-  trackedValue: z.string().optional(),
-  tieredLevels: z.array(z.number()).optional(),
-  pointsPerTier: z.array(z.number()).optional(),
-  basePoints: z.number().optional(),
-  tier: z.number().optional()
+  points: z.number(),
+  unlockCondition: z.function().optional(),
+  requiresPrior: z.array(z.string()).optional(),
+  unlocksNext: z.array(z.string()).optional(),
+  completed: z.boolean().optional(),
+  progress: z.number().optional(),
+  rewards: z.array(z.string()).optional(),
+  visible: z.boolean().optional(),
+  hideUntilUnlocked: z.boolean().optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+  completedAt: z.date().optional(),
+  thresholds: z.array(z.number()).optional(),
+  tier: z.number().optional(),
 });
 
-/**
- * Validates an achievement using Zod schema
- * Returns the achievement if valid, null if invalid
- */
-export function validateAchievement(achievement: unknown): AchievementData | null {
-  return validateData(achievement, achievementSchema, 'Achievement Validation');
+// Create validator functions
+export function validateAchievement(data: Record<string, any>): boolean {
+  try {
+    achievementSchema.parse(data);
+    return true;
+  } catch (error) {
+    console.error('Achievement validation failed:', error);
+    return false;
+  }
 }
 
-/**
- * Validates an array of achievements
- * Returns only the valid achievements
- */
-export function validateAchievements(achievements: unknown[]): AchievementData[] {
-  return achievements
-    .map(achievement => validateAchievement(achievement))
-    .filter((achievement): achievement is AchievementData => achievement !== null);
+export function createDefaultAchievement(): z.infer<typeof achievementSchema> {
+  return {
+    id: `achievement-${Date.now()}`,
+    title: 'New Achievement',
+    description: 'Description of the achievement',
+    category: 'general',
+    type: 'discovery',
+    level: 'beginner',
+    points: 10
+  };
 }
 
-/**
- * Achievement state schema for validating the state structure
- */
-export const achievementStateSchema = z.object({
-  unlocked: z.array(achievementSchema),
-  inProgress: z.array(achievementSchema),
-  recent: z.array(achievementSchema)
-});
-
-/**
- * Validates achievement progress
- */
-export const achievementProgressSchema = z.object({
-  achievementId: z.string(),
-  progress: z.number(),
-  total: z.number(),
-  completed: z.boolean()
-});
-
-/**
- * Checks if an achievement is valid for display
- * This helps prevent rendering invalid achievements in the UI
- */
-export function isValidForDisplay(achievement: unknown): achievement is AchievementData {
-  if (!achievement || typeof achievement !== 'object') return false;
-  
-  const obj = achievement as Record<string, unknown>;
-  
-  // Minimal checks for display - must have id, title and description
-  return (
-    typeof obj.id === 'string' && 
-    typeof obj.title === 'string' && 
-    typeof obj.description === 'string'
-  );
-}
+// Type for Achievement data from schema
+export type IAchievementData = z.infer<typeof achievementSchema>;
