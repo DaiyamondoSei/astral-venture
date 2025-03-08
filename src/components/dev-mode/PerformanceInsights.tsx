@@ -1,223 +1,260 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { performanceMonitor } from '@/utils/performance/PerformanceMonitor';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { performanceMonitor } from '@/utils/performance/performanceMonitor';
+import { devLogger } from '@/utils/debugUtils';
 
-interface PerformanceInsightsProps {
-  compact?: boolean;
-}
-
-const PerformanceInsights: React.FC<PerformanceInsightsProps> = ({ compact = false }) => {
-  const [metrics, setMetrics] = useState<{
-    fps: number;
-    memory: number;
-    domNodes: number;
-    renderTime: number;
-    componentStats: any[];
-  }>({
-    fps: 60,
-    memory: 0,
-    domNodes: 0,
-    renderTime: 0,
-    componentStats: []
-  });
+/**
+ * Performance Insights Dashboard
+ * Displays real-time performance metrics and insights for the application
+ */
+const PerformanceInsights = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [performanceData, setPerformanceData] = useState(performanceMonitor.getMetrics());
+  const [activeTab, setActiveTab] = useState('metrics');
   
-  const refreshMetrics = () => {
-    // This is mocked for now, as we don't have the actual implementation
-    // In a real implementation, this would call performanceMonitor.getPerformanceSummary()
-    const summary = performanceMonitor.getPerformanceSummary ? 
-      performanceMonitor.getPerformanceSummary() : 
-      { 
-        totalComponents: 12, 
-        slowComponents: 2, 
-        averageRenderTime: 4.3,
-        worstComponents: [
-          { name: 'InteractiveEnergyField', renderTime: 12.5 },
-          { name: 'ChakraActivationHandler', renderTime: 8.7 },
-          { name: 'VisualizationGuide', renderTime: 7.2 }
-        ]
-      };
-      
-    const bottlenecks = performanceMonitor.getPerformanceBottlenecks ?
-      performanceMonitor.getPerformanceBottlenecks() :
-      [];
-    
-    setMetrics({
-      fps: 60 - Math.random() * 15, // Simulate varying FPS
-      memory: 50 + Math.random() * 150, // Simulate memory usage in MB
-      domNodes: 250 + Math.floor(Math.random() * 100),
-      renderTime: summary.averageRenderTime,
-      componentStats: summary.worstComponents || []
-    });
-  };
-  
+  // Subscribe to performance updates
   useEffect(() => {
-    refreshMetrics();
+    const updateData = () => {
+      setPerformanceData(performanceMonitor.getMetrics());
+    };
     
-    const intervalId = setInterval(refreshMetrics, 5000);
-    return () => clearInterval(intervalId);
+    // Set up subscription
+    const unsubscribe = performanceMonitor.subscribe(updateData);
+    
+    // Clean up subscription
+    return () => {
+      unsubscribe();
+    };
   }, []);
   
-  const getPerformanceLevel = (fps: number) => {
-    if (fps >= 55) return { level: 'excellent', color: 'text-green-500' };
-    if (fps >= 40) return { level: 'good', color: 'text-blue-500' };
-    if (fps >= 30) return { level: 'fair', color: 'text-yellow-500' };
-    return { level: 'poor', color: 'text-red-500' };
-  };
-  
-  const perfLevel = getPerformanceLevel(metrics.fps);
-  
-  if (compact) {
+  if (!isVisible) {
     return (
-      <div className="space-y-2">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium">Performance</h3>
-          <Button variant="ghost" size="sm" onClick={refreshMetrics}>
-            Refresh
-          </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="bg-muted p-2 rounded">
-            <span className="block text-muted-foreground">FPS</span>
-            <span className={`font-mono ${perfLevel.color}`}>{metrics.fps.toFixed(1)}</span>
-          </div>
-          <div className="bg-muted p-2 rounded">
-            <span className="block text-muted-foreground">Memory</span>
-            <span className="font-mono">{(metrics.memory).toFixed(1)} MB</span>
-          </div>
-        </div>
-      </div>
+      <Button 
+        className="fixed bottom-4 right-4 z-50 bg-violet-600 hover:bg-violet-700 text-white"
+        onClick={() => setIsVisible(true)}
+        size="sm"
+      >
+        Show Performance
+      </Button>
     );
   }
   
+  // Calculate average render times
+  const avgRenderTime = performanceData.renderTimes.length 
+    ? performanceData.renderTimes.reduce((sum, time) => sum + time, 0) / performanceData.renderTimes.length 
+    : 0;
+  
+  const getPerformanceIndicator = (value: number, thresholds: [number, number]) => {
+    if (value <= thresholds[0]) return 'good';
+    if (value <= thresholds[1]) return 'warning';
+    return 'critical';
+  };
+  
+  const renderIndicator = getPerformanceIndicator(avgRenderTime, [20, 50]);
+  const memoryIndicator = getPerformanceIndicator(performanceData.memoryUsage || 0, [50, 80]);
+  
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>Performance Metrics</span>
-          <Badge variant={perfLevel.level === 'poor' ? 'destructive' : 'outline'}>
-            {perfLevel.level}
-          </Badge>
-        </CardTitle>
-        <CardDescription>
-          Real-time performance monitoring
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="metrics">
-          <TabsList className="mb-4">
-            <TabsTrigger value="metrics">Key Metrics</TabsTrigger>
-            <TabsTrigger value="components">Component Analysis</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="metrics" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">FPS</span>
-                    <span className={`text-2xl font-bold ${perfLevel.color}`}>
-                      {metrics.fps.toFixed(1)}
-                    </span>
-                    <Progress 
-                      value={metrics.fps > 60 ? 100 : (metrics.fps / 60) * 100} 
-                      className="h-1.5 mt-2"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">Memory Usage</span>
-                    <span className="text-2xl font-bold">
-                      {metrics.memory.toFixed(1)} <span className="text-sm">MB</span>
-                    </span>
-                    <Progress 
-                      value={Math.min(100, (metrics.memory / 300) * 100)} 
-                      className="h-1.5 mt-2"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">DOM Nodes</span>
-                    <span className="text-2xl font-bold">{metrics.domNodes}</span>
-                    <Progress 
-                      value={Math.min(100, (metrics.domNodes / 500) * 100)} 
-                      className="h-1.5 mt-2"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">Render Time</span>
-                    <span className="text-2xl font-bold">
-                      {metrics.renderTime.toFixed(1)} <span className="text-sm">ms</span>
-                    </span>
-                    <Progress 
-                      value={Math.min(100, (metrics.renderTime / 16) * 100)} 
-                      className="h-1.5 mt-2"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+    <div className="fixed bottom-0 right-0 z-50 w-[450px] bg-gray-900/95 text-white rounded-tl-lg shadow-lg border border-gray-700 overflow-hidden">
+      <div className="flex justify-between items-center p-2 bg-gray-800">
+        <h3 className="text-sm font-semibold">Performance Insights</h3>
+        <div className="flex gap-2">
+          <Button 
+            variant="ghost" 
+            className="h-6 px-2 text-xs text-gray-300 hover:text-white"
+            onClick={() => performanceMonitor.clearMetrics()}
+          >
+            Reset
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="h-6 px-2 text-xs text-gray-300 hover:text-white"
+            onClick={() => setIsVisible(false)}
+          >
+            ✕
+          </Button>
+        </div>
+      </div>
+      
+      <Tabs defaultValue="metrics" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full bg-gray-800 p-0 h-8">
+          <TabsTrigger value="metrics" className="text-xs h-8 data-[state=active]:bg-gray-700">
+            Metrics
+          </TabsTrigger>
+          <TabsTrigger value="components" className="text-xs h-8 data-[state=active]:bg-gray-700">
+            Components
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="text-xs h-8 data-[state=active]:bg-gray-700">
+            Insights
+          </TabsTrigger>
+          <TabsTrigger value="timeline" className="text-xs h-8 data-[state=active]:bg-gray-700">
+            Timeline
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="metrics" className="p-3 m-0">
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="bg-gray-800 border-gray-700 p-3">
+              <div className="text-xs text-gray-400">Render Performance</div>
+              <div className="flex items-end gap-2">
+                <div className="text-2xl font-semibold">{avgRenderTime.toFixed(1)}ms</div>
+                <Badge className={`
+                  ${renderIndicator === 'good' ? 'bg-green-600' : ''}
+                  ${renderIndicator === 'warning' ? 'bg-yellow-600' : ''}
+                  ${renderIndicator === 'critical' ? 'bg-red-600' : ''}
+                `}>
+                  {renderIndicator}
+                </Badge>
+              </div>
+              <div className="text-xs text-gray-400 mt-2">Last render: {performanceData.lastRenderTime.toFixed(1)}ms</div>
+            </Card>
             
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={refreshMetrics}>
-                Refresh Metrics
-              </Button>
-            </div>
-          </TabsContent>
+            <Card className="bg-gray-800 border-gray-700 p-3">
+              <div className="text-xs text-gray-400">Memory Usage</div>
+              <div className="flex items-end gap-2">
+                <div className="text-2xl font-semibold">{performanceData.memoryUsage?.toFixed(1)}%</div>
+                <Badge className={`
+                  ${memoryIndicator === 'good' ? 'bg-green-600' : ''}
+                  ${memoryIndicator === 'warning' ? 'bg-yellow-600' : ''}
+                  ${memoryIndicator === 'critical' ? 'bg-red-600' : ''}
+                `}>
+                  {memoryIndicator}
+                </Badge>
+              </div>
+              <div className="text-xs text-gray-400 mt-2">
+                {(performanceData.jsHeapSizeLimit / (1024 * 1024)).toFixed(0)}MB limit
+              </div>
+            </Card>
+          </div>
           
-          <TabsContent value="components">
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Slowest Components</h3>
-              
-              {metrics.componentStats.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No component data available</p>
-              ) : (
-                <div className="space-y-2">
-                  {metrics.componentStats.map((component, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <span className="text-sm">{component.name}</span>
-                      <Badge 
-                        variant={component.renderTime > 10 ? "destructive" : "outline"}
-                        className="ml-auto"
-                      >
-                        {component.renderTime.toFixed(1)} ms
-                      </Badge>
+          <div className="mt-3">
+            <div className="text-xs text-gray-400 mb-1">Recent Events</div>
+            <Card className="bg-gray-800 border-gray-700 h-[120px] overflow-hidden">
+              <ScrollArea className="h-[120px] w-full">
+                <div className="p-2">
+                  {performanceData.events.slice(-5).reverse().map((event, i) => (
+                    <div key={i} className="text-xs py-1 border-b border-gray-700 last:border-0">
+                      <span className="text-gray-400">{new Date(event.timestamp).toLocaleTimeString()}</span>
+                      <span className="ml-2">{event.description}</span>
                     </div>
                   ))}
+                  {performanceData.events.length === 0 && (
+                    <div className="text-xs py-1 text-gray-500">No events recorded</div>
+                  )}
                 </div>
+              </ScrollArea>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="components" className="p-0 pt-2 m-0 h-[280px]">
+          <ScrollArea className="h-[280px] w-full">
+            <div className="p-3">
+              <div className="text-xs text-gray-400 mb-2">Component Render Times (Top 10)</div>
+              {performanceData.componentStats
+                .sort((a, b) => b.averageRenderTime - a.averageRenderTime)
+                .slice(0, 10)
+                .map((stat, i) => (
+                  <div key={i} className="mb-2">
+                    <div className="flex justify-between text-xs">
+                      <span>{stat.name}</span>
+                      <span>{stat.averageRenderTime.toFixed(1)}ms</span>
+                    </div>
+                    <div className="w-full bg-gray-700 h-1.5 rounded-full mt-1 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${
+                          stat.averageRenderTime < 20 ? 'bg-green-500' : 
+                          stat.averageRenderTime < 50 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${Math.min(100, (stat.averageRenderTime / 100) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              {performanceData.componentStats.length === 0 && (
+                <div className="text-xs text-gray-500">No component data available</div>
               )}
-              
-              <div className="mt-4">
-                <h3 className="text-sm font-medium">Optimization Tips</h3>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>• Use React.memo for pure functional components</li>
-                  <li>• Memoize expensive calculations with useMemo</li>
-                  <li>• Optimize re-renders by using useCallback for event handlers</li>
-                  <li>• Consider using virtualization for long lists</li>
-                </ul>
-              </div>
             </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+          </ScrollArea>
+        </TabsContent>
+        
+        <TabsContent value="insights" className="p-3 m-0 h-[280px]">
+          <ScrollArea className="h-[280px] w-full">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Performance Insights</div>
+              {performanceData.insights.map((insight, i) => (
+                <Card key={i} className="bg-gray-800 border-gray-700 p-2 mb-2">
+                  <div className="flex items-start gap-2">
+                    <Badge className={`
+                      ${insight.severity === 'info' ? 'bg-blue-600' : ''}
+                      ${insight.severity === 'warning' ? 'bg-yellow-600' : ''}
+                      ${insight.severity === 'critical' ? 'bg-red-600' : ''}
+                    `}>
+                      {insight.severity}
+                    </Badge>
+                    <div>
+                      <div className="text-sm font-medium">{insight.title}</div>
+                      <div className="text-xs text-gray-400 mt-1">{insight.description}</div>
+                      {insight.recommendation && (
+                        <div className="text-xs mt-1 text-violet-400">
+                          Recommendation: {insight.recommendation}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {performanceData.insights.length === 0 && (
+                <div className="text-xs text-gray-500">No insights available</div>
+              )}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+        
+        <TabsContent value="timeline" className="p-3 m-0 h-[280px]">
+          <ScrollArea className="h-[280px] w-full">
+            <div>
+              <div className="text-xs text-gray-400 mb-2">Render Timeline</div>
+              {performanceData.renderTimeline.length === 0 ? (
+                <div className="text-xs text-gray-500">No timeline data available</div>
+              ) : (
+                performanceData.renderTimeline.slice(-10).reverse().map((item, i) => (
+                  <div key={i} className="mb-2 text-xs border-l-2 border-gray-700 pl-2 pb-2">
+                    <div className="flex justify-between">
+                      <span className="font-medium">{item.componentName}</span>
+                      <span className="text-gray-400">
+                        {item.renderTime.toFixed(1)}ms
+                      </span>
+                    </div>
+                    <div className="text-gray-400 mt-0.5">
+                      {new Date(item.timestamp).toLocaleTimeString()}
+                    </div>
+                    {item.props && (
+                      <div className="mt-1 text-violet-400">
+                        {Object.keys(item.props).length} props
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
+      
+      <Separator className="bg-gray-700" />
+      
+      <div className="p-2 text-xs text-gray-400 flex justify-between items-center bg-gray-800">
+        <div>FPS: {performanceData.fps.toFixed(0)}</div>
+        <div>Total renders: {performanceData.totalRenders}</div>
+        <div>Last updated: {new Date(performanceData.lastUpdated).toLocaleTimeString()}</div>
+      </div>
+    </div>
   );
 };
 

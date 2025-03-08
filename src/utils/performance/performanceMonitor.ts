@@ -1,366 +1,415 @@
 /**
- * Performance monitoring utilities for tracking and optimizing application performance
+ * Performance Monitoring System
+ * 
+ * This service tracks real-time performance metrics for the application
+ * including render times, memory usage, FPS, and component-level statistics.
  */
+import { devLogger } from '../debugUtils';
 
-// Performance thresholds for different metrics
-const THRESHOLDS = {
-  FPS: {
-    LOW: 30,
-    MEDIUM: 45,
-    HIGH: 55
-  },
-  MEMORY: {
-    LOW: 50 * 1024 * 1024, // 50MB
-    MEDIUM: 150 * 1024 * 1024, // 150MB
-    HIGH: 300 * 1024 * 1024 // 300MB
-  },
-  LOAD_TIME: {
-    FAST: 1000, // 1s
-    MEDIUM: 2500, // 2.5s
-    SLOW: 5000 // 5s
-  },
-  INTERACTION: {
-    FAST: 100, // 100ms
-    MEDIUM: 300, // 300ms
-    SLOW: 500 // 500ms
-  }
-};
+export interface PerformanceMetrics {
+  fps: number;
+  memoryUsage: number | null;
+  jsHeapSizeLimit: number;
+  totalRenders: number;
+  renderTimes: number[];
+  lastRenderTime: number;
+  lastUpdated: number;
+  events: PerformanceEvent[];
+  componentStats: ComponentStat[];
+  insights: PerformanceInsight[];
+  renderTimeline: RenderTimelineItem[];
+}
 
-// Store for performance metrics
-const performanceStore = {
-  fps: {
-    current: 60,
-    average: 60,
-    samples: [] as number[],
-    lowFpsEvents: 0
-  },
-  memory: {
-    current: 0,
-    peak: 0,
-    snapshots: [] as number[]
-  },
-  loadTime: {
-    navigationStart: 0,
-    firstContentfulPaint: 0,
-    domInteractive: 0,
-    domComplete: 0
-  },
-  interactions: {
-    events: [] as InteractionEvent[],
-    longEvents: 0
-  },
-  errors: {
-    count: 0,
-    messages: [] as string[]
-  }
-};
-
-// Interface for interaction events
-interface InteractionEvent {
-  type: string;
+export interface PerformanceEvent {
+  type: 'render' | 'navigation' | 'error' | 'api' | 'interaction' | 'resource';
+  description: string;
   timestamp: number;
-  duration: number;
-  target?: string;
+  duration?: number;
+  componentName?: string;
+  metadata?: Record<string, any>;
 }
 
-/**
- * Initializes the performance monitoring system
- */
-export function initPerformanceMonitoring(options: {
-  enableFpsMonitoring?: boolean;
-  enableMemoryMonitoring?: boolean;
-  enableInteractionMonitoring?: boolean;
-  enableLoadTimeMonitoring?: boolean;
-  reportingInterval?: number;
-} = {}) {
-  const {
-    enableFpsMonitoring = true,
-    enableMemoryMonitoring = true,
-    enableInteractionMonitoring = true,
-    enableLoadTimeMonitoring = true,
-    reportingInterval = 10000 // 10s
-  } = options;
-  
-  // Track navigation timing metrics
-  if (enableLoadTimeMonitoring && performance && performance.timing) {
-    trackLoadTimeMetrics();
-  }
-  
-  // Start FPS monitoring
-  if (enableFpsMonitoring) {
-    startFpsMonitoring();
-  }
-  
-  // Start memory monitoring if available
-  if (enableMemoryMonitoring && (performance as any).memory) {
-    startMemoryMonitoring();
-  }
-  
-  // Track interaction events
-  if (enableInteractionMonitoring) {
-    startInteractionMonitoring();
-  }
-  
-  // Periodically report performance metrics
-  setInterval(() => {
-    reportPerformanceMetrics();
-  }, reportingInterval);
-  
-  // Log initial setup
-  console.log('Performance monitoring initialized', options);
+export interface ComponentStat {
+  name: string;
+  renderCount: number;
+  totalRenderTime: number;
+  averageRenderTime: number;
+  lastRenderTime: number;
+  recentRenderTimes: number[];
 }
 
-/**
- * Tracks page load time metrics
- */
-function trackLoadTimeMetrics() {
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      if (performance.timing) {
-        const timing = performance.timing;
-        
-        performanceStore.loadTime = {
-          navigationStart: timing.navigationStart,
-          firstContentfulPaint: 0, // Needs PerformanceObserver
-          domInteractive: timing.domInteractive - timing.navigationStart,
-          domComplete: timing.domComplete - timing.navigationStart
-        };
-        
-        // Get First Contentful Paint if available
-        const paintEntries = performance.getEntriesByType('paint');
-        const fcpEntry = paintEntries.find(entry => entry.name === 'first-contentful-paint');
-        
-        if (fcpEntry) {
-          performanceStore.loadTime.firstContentfulPaint = fcpEntry.startTime;
-        }
-        
-        // Log load time metrics
-        console.log('Load time metrics:', performanceStore.loadTime);
-        
-        // Check if load time is concerning
-        if (performanceStore.loadTime.domComplete > THRESHOLDS.LOAD_TIME.SLOW) {
-          console.warn(`Slow page load: ${performanceStore.loadTime.domComplete}ms`);
-        }
-      }
-    }, 0);
-  });
+export interface PerformanceInsight {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'info' | 'warning' | 'critical';
+  timestamp: number;
+  recommendation?: string;
+  componentName?: string;
+  metadata?: Record<string, any>;
 }
 
-/**
- * Starts monitoring frames per second (FPS)
- */
-function startFpsMonitoring() {
-  let lastTime = performance.now();
-  let frames = 0;
-  const sampleSize = 60; // Number of samples to keep for average
+export interface RenderTimelineItem {
+  componentName: string;
+  timestamp: number;
+  renderTime: number;
+  renderCount: number;
+  props?: Record<string, any>;
+}
+
+export type PerformanceSubscriber = () => void;
+
+class PerformanceMonitor {
+  private metrics: PerformanceMetrics;
+  private subscribers: PerformanceSubscriber[] = [];
+  private isActive: boolean = false;
+  private rafId: number | null = null;
+  private lastFrameTime: number = 0;
+  private frameCount: number = 0;
+  private fpsUpdateInterval: number = 1000; // Update FPS every second
+  private lastFpsUpdate: number = 0;
   
-  function measureFps(timestamp: number) {
-    frames++;
+  constructor() {
+    this.metrics = {
+      fps: 0,
+      memoryUsage: null,
+      jsHeapSizeLimit: 0,
+      totalRenders: 0,
+      renderTimes: [],
+      lastRenderTime: 0,
+      lastUpdated: Date.now(),
+      events: [],
+      componentStats: [],
+      insights: [],
+      renderTimeline: []
+    };
     
-    const elapsed = timestamp - lastTime;
+    // Start monitoring on initialization if in browser environment
+    if (typeof window !== 'undefined') {
+      this.start();
+    }
+  }
+  
+  /**
+   * Start performance monitoring
+   */
+  public start(): void {
+    if (this.isActive) return;
     
-    // Calculate FPS approximately every second
-    if (elapsed >= 1000) {
-      const currentFps = Math.round((frames * 1000) / elapsed);
-      
-      // Store current FPS
-      performanceStore.fps.current = currentFps;
-      
-      // Add to samples for calculating average
-      performanceStore.fps.samples.push(currentFps);
-      
-      // Keep only the last N samples
-      if (performanceStore.fps.samples.length > sampleSize) {
-        performanceStore.fps.samples.shift();
-      }
-      
-      // Calculate average FPS
-      const sum = performanceStore.fps.samples.reduce((a, b) => a + b, 0);
-      performanceStore.fps.average = Math.round(sum / performanceStore.fps.samples.length);
-      
-      // Check if FPS is low
-      if (currentFps < THRESHOLDS.FPS.LOW) {
-        performanceStore.fps.lowFpsEvents++;
-        console.warn(`Low FPS detected: ${currentFps.toFixed(1)} FPS`);
-      }
-      
-      // Reset for next measurement
-      frames = 0;
-      lastTime = timestamp;
+    this.isActive = true;
+    this.lastFrameTime = performance.now();
+    this.frameCount = 0;
+    this.lastFpsUpdate = this.lastFrameTime;
+    
+    // Start RAF loop for FPS calculation
+    this.measureFps();
+    
+    // Collect memory usage stats if available
+    this.collectMemoryStats();
+    
+    devLogger.info('PerformanceMonitor', 'Performance monitoring started');
+  }
+  
+  /**
+   * Stop performance monitoring
+   */
+  public stop(): void {
+    if (!this.isActive) return;
+    
+    this.isActive = false;
+    if (this.rafId !== null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
     
-    // Continue measuring
-    requestAnimationFrame(measureFps);
+    devLogger.info('PerformanceMonitor', 'Performance monitoring stopped');
   }
   
-  // Start the measurement loop
-  requestAnimationFrame(measureFps);
-}
-
-/**
- * Starts monitoring memory usage if available
- */
-function startMemoryMonitoring() {
-  if (!(performance as any).memory) {
-    console.warn('Memory monitoring not supported in this browser');
-    return;
-  }
-  
-  const memoryCheckInterval = 5000; // Check every 5 seconds
-  
-  function checkMemory() {
-    try {
-      const memoryInfo = (performance as any).memory;
+  /**
+   * Measure FPS using requestAnimationFrame
+   */
+  private measureFps(): void {
+    if (!this.isActive || typeof window === 'undefined') return;
+    
+    const currentTime = performance.now();
+    this.frameCount++;
+    
+    // Calculate FPS every second
+    if (currentTime - this.lastFpsUpdate >= this.fpsUpdateInterval) {
+      const elapsedTime = currentTime - this.lastFpsUpdate;
+      this.metrics.fps = (this.frameCount * 1000) / elapsedTime;
       
-      if (memoryInfo) {
-        const memoryUsed = memoryInfo.usedJSHeapSize;
-        
-        // Update current and peak memory usage
-        performanceStore.memory.current = memoryUsed;
-        performanceStore.memory.peak = Math.max(performanceStore.memory.peak, memoryUsed);
-        
-        // Add to snapshots
-        performanceStore.memory.snapshots.push(memoryUsed);
-        
-        // Keep only recent snapshots (last 100)
-        if (performanceStore.memory.snapshots.length > 100) {
-          performanceStore.memory.snapshots.shift();
-        }
-        
-        // Log warning if memory usage is high
-        if (memoryUsed > THRESHOLDS.MEMORY.HIGH) {
-          console.warn(`High memory usage: ${(memoryUsed / (1024 * 1024)).toFixed(1)} MB`);
-        }
-      }
-    } catch (e) {
-      console.error('Error monitoring memory usage:', e);
+      this.lastFpsUpdate = currentTime;
+      this.frameCount = 0;
+      this.metrics.lastUpdated = Date.now();
+      
+      // Notify subscribers
+      this.notifySubscribers();
+      
+      // Collect memory stats with each FPS update
+      this.collectMemoryStats();
     }
     
-    setTimeout(checkMemory, memoryCheckInterval);
+    this.lastFrameTime = currentTime;
+    this.rafId = window.requestAnimationFrame(() => this.measureFps());
   }
   
-  // Start checking memory
-  checkMemory();
-}
-
-/**
- * Starts monitoring user interactions
- */
-function startInteractionMonitoring() {
-  const interactionEvents = [
-    'click',
-    'keydown',
-    'scroll',
-    'touchstart',
-    'touchmove',
-    'touchend'
-  ];
-  
-  interactionEvents.forEach(eventType => {
-    document.addEventListener(eventType, (event) => {
-      const startTime = performance.now();
+  /**
+   * Collect memory usage statistics
+   */
+  private collectMemoryStats(): void {
+    if (typeof window === 'undefined') return;
+    
+    // Check if performance memory API is available (Chrome only)
+    const performance = window.performance as any;
+    if (performance && performance.memory) {
+      const { usedJSHeapSize, jsHeapSizeLimit } = performance.memory;
       
-      // Use requestAnimationFrame to measure when the browser responds
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const endTime = performance.now();
-          const duration = endTime - startTime;
-          
-          // Record the interaction
-          const target = event.target as HTMLElement;
-          const targetDescription = target ? 
-            (target.id || target.tagName || 'unknown') : 
-            'unknown';
-          
-          const interactionEvent: InteractionEvent = {
-            type: eventType,
-            timestamp: startTime,
-            duration,
-            target: targetDescription
-          };
-          
-          performanceStore.interactions.events.push(interactionEvent);
-          
-          // Keep only recent events (last 50)
-          if (performanceStore.interactions.events.length > 50) {
-            performanceStore.interactions.events.shift();
-          }
-          
-          // Check if interaction was slow
-          if (duration > THRESHOLDS.INTERACTION.SLOW) {
-            performanceStore.interactions.longEvents++;
-            console.warn(`Slow interaction: ${eventType} took ${duration.toFixed(1)}ms`);
-          }
+      this.metrics.memoryUsage = (usedJSHeapSize / jsHeapSizeLimit) * 100;
+      this.metrics.jsHeapSizeLimit = jsHeapSizeLimit;
+    }
+  }
+  
+  /**
+   * Record a component render
+   */
+  public recordRender(componentName: string, renderTime: number, props?: Record<string, any>): void {
+    if (!this.isActive) return;
+    
+    this.metrics.totalRenders++;
+    this.metrics.renderTimes.push(renderTime);
+    this.metrics.lastRenderTime = renderTime;
+    
+    // Keep only the last 100 render times
+    if (this.metrics.renderTimes.length > 100) {
+      this.metrics.renderTimes.shift();
+    }
+    
+    // Add to timeline
+    this.metrics.renderTimeline.push({
+      componentName,
+      timestamp: Date.now(),
+      renderTime,
+      renderCount: 1, // Will be updated if the component exists
+      props: props ? { ...props } : undefined
+    });
+    
+    // Keep only the last 100 timeline items
+    if (this.metrics.renderTimeline.length > 100) {
+      this.metrics.renderTimeline.shift();
+    }
+    
+    // Update component stats
+    this.updateComponentStats(componentName, renderTime);
+    
+    // Add event
+    this.recordEvent({
+      type: 'render',
+      description: `Rendered ${componentName} (${renderTime.toFixed(1)}ms)`,
+      timestamp: Date.now(),
+      duration: renderTime,
+      componentName
+    });
+    
+    // Generate insights based on render time
+    this.generateRenderInsights(componentName, renderTime);
+    
+    // Notify subscribers
+    this.notifySubscribers();
+  }
+  
+  /**
+   * Update component-level statistics
+   */
+  private updateComponentStats(componentName: string, renderTime: number): void {
+    let componentStat = this.metrics.componentStats.find(
+      stat => stat.name === componentName
+    );
+    
+    if (!componentStat) {
+      componentStat = {
+        name: componentName,
+        renderCount: 0,
+        totalRenderTime: 0,
+        averageRenderTime: 0,
+        lastRenderTime: 0,
+        recentRenderTimes: []
+      };
+      this.metrics.componentStats.push(componentStat);
+    }
+    
+    componentStat.renderCount++;
+    componentStat.totalRenderTime += renderTime;
+    componentStat.lastRenderTime = renderTime;
+    componentStat.averageRenderTime = componentStat.totalRenderTime / componentStat.renderCount;
+    
+    // Track recent render times (last 10)
+    componentStat.recentRenderTimes.push(renderTime);
+    if (componentStat.recentRenderTimes.length > 10) {
+      componentStat.recentRenderTimes.shift();
+    }
+    
+    // Update the render count in the timeline
+    const timelineItem = this.metrics.renderTimeline.find(
+      item => item.componentName === componentName
+    );
+    if (timelineItem) {
+      timelineItem.renderCount = componentStat.renderCount;
+    }
+  }
+  
+  /**
+   * Record a performance event
+   */
+  public recordEvent(event: PerformanceEvent): void {
+    if (!this.isActive) return;
+    
+    this.metrics.events.push(event);
+    
+    // Keep only the last 100 events
+    if (this.metrics.events.length > 100) {
+      this.metrics.events.shift();
+    }
+    
+    this.metrics.lastUpdated = Date.now();
+    this.notifySubscribers();
+  }
+  
+  /**
+   * Generate insights based on render performance
+   */
+  private generateRenderInsights(componentName: string, renderTime: number): void {
+    // Generate insights for slow renders
+    if (renderTime > 50) {
+      const insightId = `slow-render-${componentName}`;
+      
+      // Check if we already have this insight
+      const existingInsight = this.metrics.insights.find(
+        insight => insight.id === insightId
+      );
+      
+      if (!existingInsight) {
+        this.metrics.insights.push({
+          id: insightId,
+          title: `Slow render detected in ${componentName}`,
+          description: `Component took ${renderTime.toFixed(1)}ms to render, which exceeds the recommended threshold of 50ms.`,
+          severity: renderTime > 100 ? 'critical' : 'warning',
+          timestamp: Date.now(),
+          recommendation: 'Consider optimizing with React.memo or useMemo for expensive calculations.',
+          componentName
         });
-      });
-    }, { passive: true });
-  });
-}
-
-/**
- * Reports current performance metrics
- */
-function reportPerformanceMetrics() {
-  // In a real app, you might send these to an analytics service
-  const metrics = {
-    fps: {
-      current: performanceStore.fps.current,
-      average: performanceStore.fps.average,
-      lowFpsEvents: performanceStore.fps.lowFpsEvents
-    },
-    memory: {
-      current: performanceStore.memory.current / (1024 * 1024), // MB
-      peak: performanceStore.memory.peak / (1024 * 1024) // MB
-    },
-    interactions: {
-      longEvents: performanceStore.interactions.longEvents
-    },
-    errors: {
-      count: performanceStore.errors.count
+      }
     }
-  };
-  
-  console.debug('Performance metrics:', metrics);
-  
-  // Here you would typically send the metrics to your monitoring service
-}
-
-/**
- * Tracks the loading time for a specific resource
- */
-export function trackResourceTiming(resourceUrl: string) {
-  try {
-    const entries = performance.getEntriesByType('resource');
-    const resourceEntry = entries.find(entry => entry.name === resourceUrl);
     
-    if (resourceEntry) {
-      console.log(`Resource timing for ${resourceUrl}:`, {
-        duration: resourceEntry.duration,
-        transferSize: (resourceEntry as any).transferSize,
-        decodedBodySize: (resourceEntry as any).decodedBodySize
-      });
+    // Generate insights for components that render too frequently
+    const componentStat = this.metrics.componentStats.find(
+      stat => stat.name === componentName
+    );
+    
+    if (componentStat && componentStat.renderCount > 50) {
+      const insightId = `frequent-renders-${componentName}`;
+      
+      // Check if we already have this insight
+      const existingInsight = this.metrics.insights.find(
+        insight => insight.id === insightId
+      );
+      
+      if (!existingInsight) {
+        this.metrics.insights.push({
+          id: insightId,
+          title: `Frequent re-renders in ${componentName}`,
+          description: `Component has rendered ${componentStat.renderCount} times, which may indicate inefficient rendering.`,
+          severity: 'warning',
+          timestamp: Date.now(),
+          recommendation: 'Review the component\'s dependencies and consider using React.memo or useCallback.',
+          componentName
+        });
+      }
     }
-  } catch (e) {
-    console.error('Error tracking resource timing:', e);
+    
+    // Limit the number of insights
+    if (this.metrics.insights.length > 20) {
+      this.metrics.insights.shift();
+    }
   }
-}
-
-/**
- * Records an error for performance monitoring
- */
-export function recordError(message: string) {
-  performanceStore.errors.count++;
-  performanceStore.errors.messages.push(message);
   
-  // Keep error messages list manageable
-  if (performanceStore.errors.messages.length > 50) {
-    performanceStore.errors.messages.shift();
+  /**
+   * Add a performance insight manually
+   */
+  public addInsight(insight: Omit<PerformanceInsight, 'id' | 'timestamp'>): void {
+    if (!this.isActive) return;
+    
+    const id = `insight-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    this.metrics.insights.push({
+      ...insight,
+      id,
+      timestamp: Date.now()
+    });
+    
+    // Limit the number of insights
+    if (this.metrics.insights.length > 20) {
+      this.metrics.insights.shift();
+    }
+    
+    this.metrics.lastUpdated = Date.now();
+    this.notifySubscribers();
+  }
+  
+  /**
+   * Clear all metrics
+   */
+  public clearMetrics(): void {
+    this.metrics = {
+      fps: this.metrics.fps,
+      memoryUsage: this.metrics.memoryUsage,
+      jsHeapSizeLimit: this.metrics.jsHeapSizeLimit,
+      totalRenders: 0,
+      renderTimes: [],
+      lastRenderTime: 0,
+      lastUpdated: Date.now(),
+      events: [],
+      componentStats: [],
+      insights: [],
+      renderTimeline: []
+    };
+    
+    this.notifySubscribers();
+    devLogger.info('PerformanceMonitor', 'Performance metrics cleared');
+  }
+  
+  /**
+   * Get current performance metrics
+   */
+  public getMetrics(): PerformanceMetrics {
+    return { ...this.metrics };
+  }
+  
+  /**
+   * Subscribe to performance updates
+   */
+  public subscribe(callback: PerformanceSubscriber): () => void {
+    this.subscribers.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
+  }
+  
+  /**
+   * Notify all subscribers of updates
+   */
+  private notifySubscribers(): void {
+    this.subscribers.forEach(callback => {
+      try {
+        callback();
+      } catch (error) {
+        devLogger.error('PerformanceMonitor', 'Error in subscriber callback', error);
+      }
+    });
   }
 }
 
-/**
- * Gets the current performance metrics
- */
-export function getPerformanceMetrics() {
-  return { ...performanceStore };
-}
+// Export singleton instance
+export const performanceMonitor = new PerformanceMonitor();
