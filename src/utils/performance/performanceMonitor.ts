@@ -1,212 +1,219 @@
+/**
+ * Performance Monitor Utility
+ * 
+ * Tracks component render times, memory usage, and other performance metrics
+ */
 
-import { devLogger } from '@/utils/debugUtils';
-
-export interface ComponentMetrics {
-  renders: number;
-  totalRenderTime: number;
-  averageRenderTime: number;
+// Basic performance metrics interface
+export interface PerformanceMetrics {
+  componentName: string;
+  renderTimes: number[];
   lastRenderTime: number;
-  slowRenders: number;
-  firstRenderTime?: number;
-  lastRenderTimestamp?: number;
-}
-
-interface PerformanceMetrics {
-  totalComponents: number;
-  totalRenders: number;
-  totalRenderTime: number;
   averageRenderTime: number;
-  slowRenders: number; // Renders taking > 16ms
-  componentsWithSlowRenders: string[];
-  startTime: number;
-  componentMetrics: Record<string, ComponentMetrics>;
+  memoryUsage: {
+    jsHeapSizeLimit: number;
+    totalJSHeapSize: number;
+    usedJSHeapSize: number;
+  };
+  events: Array<{
+    time: number;
+    type: string;
+    data?: any;
+  }>;
+  componentStats: Record<string, {
+    count: number;
+    total: number;
+    average: number;
+    max: number;
+  }>;
+  insights: string[];
+  renderTimeline: Array<{
+    component: string;
+    startTime: number;
+    endTime: number;
+    duration: number;
+  }>;
+  fps: number;
+  lastUpdated: number;
 }
 
 class PerformanceMonitor {
-  private metrics: PerformanceMetrics;
-  private enabled: boolean;
+  private metrics: Record<string, Partial<PerformanceMetrics>> = {};
+  private listeners: Array<(metrics: Record<string, Partial<PerformanceMetrics>>) => void> = [];
   
   constructor() {
-    this.metrics = this.getInitialMetrics();
-    this.enabled = process.env.NODE_ENV === 'development';
+    // Initialize memory tracking if available
+    this.trackMemoryUsage();
   }
   
   /**
    * Record a component render
    */
-  public recordRender(componentName: string, renderTime: number): void {
-    if (!this.enabled) return;
-    
-    // Initialize component metrics if not exists
-    if (!this.metrics.componentMetrics[componentName]) {
-      this.metrics.componentMetrics[componentName] = {
-        renders: 0,
-        totalRenderTime: 0,
+  public recordRender(componentName: string, duration: number): void {
+    if (!this.metrics[componentName]) {
+      this.metrics[componentName] = {
+        componentName,
+        renderTimes: [],
+        events: [],
         averageRenderTime: 0,
-        lastRenderTime: 0,
-        slowRenders: 0,
-        firstRenderTime: renderTime,
-        lastRenderTimestamp: Date.now()
+        insights: [],
+        componentStats: {},
+        renderTimeline: []
       };
     }
     
-    const compMetrics = this.metrics.componentMetrics[componentName];
+    // Add render time
+    const renderTimes = this.metrics[componentName].renderTimes || [];
+    renderTimes.push(duration);
     
-    // Update component metrics
-    compMetrics.renders++;
-    compMetrics.totalRenderTime += renderTime;
-    compMetrics.averageRenderTime = compMetrics.totalRenderTime / compMetrics.renders;
-    compMetrics.lastRenderTime = renderTime;
-    compMetrics.lastRenderTimestamp = Date.now();
-    
-    // Check if this is a slow render
-    if (renderTime > 16) { // 16ms = 1 frame at 60fps
-      compMetrics.slowRenders++;
-      
-      if (!this.metrics.componentsWithSlowRenders.includes(componentName)) {
-        this.metrics.componentsWithSlowRenders.push(componentName);
-      }
+    // Only keep last 100 render times
+    if (renderTimes.length > 100) {
+      renderTimes.shift();
     }
     
-    // Update global metrics
-    this.metrics.totalRenders++;
-    this.metrics.totalRenderTime += renderTime;
-    this.metrics.averageRenderTime = this.metrics.totalRenderTime / this.metrics.totalRenders;
+    // Update average
+    const averageRenderTime = 
+      renderTimes.reduce((sum, time) => sum + time, 0) / renderTimes.length;
     
-    if (renderTime > 16) {
-      this.metrics.slowRenders++;
+    // Add event
+    const events = this.metrics[componentName].events || [];
+    events.push({
+      time: Date.now(),
+      type: 'render',
+      data: { duration }
+    });
+    
+    // Add to timeline
+    const renderTimeline = this.metrics[componentName].renderTimeline || [];
+    const now = performance.now();
+    renderTimeline.push({
+      component: componentName,
+      startTime: now - duration,
+      endTime: now,
+      duration
+    });
+    
+    // Only keep last 50 timeline entries
+    if (renderTimeline.length > 50) {
+      renderTimeline.shift();
     }
     
-    // Ensure component is counted
-    const uniqueComponents = Object.keys(this.metrics.componentMetrics).length;
-    this.metrics.totalComponents = uniqueComponents;
+    // Update metrics
+    this.metrics[componentName] = {
+      ...this.metrics[componentName],
+      renderTimes,
+      lastRenderTime: duration,
+      averageRenderTime,
+      events,
+      renderTimeline,
+      lastUpdated: Date.now()
+    };
     
-    // Log very slow renders
-    if (renderTime > 50) {
-      devLogger.warn('Performance', `Very slow render detected in ${componentName}: ${renderTime.toFixed(1)}ms`);
-    }
+    // Notify listeners
+    this.notifyListeners();
   }
   
   /**
    * Record a component unmount
    */
   public recordUnmount(componentName: string): void {
-    // Just log for now, could track mount/unmount patterns in the future
-    devLogger.log('Performance', `Component unmounted: ${componentName}`);
-  }
-  
-  /**
-   * Get all performance metrics
-   */
-  public getMetrics(): PerformanceMetrics {
-    return { ...this.metrics };
+    if (!this.metrics[componentName]) return;
+    
+    const events = this.metrics[componentName].events || [];
+    events.push({
+      time: Date.now(),
+      type: 'unmount'
+    });
+    
+    this.metrics[componentName].events = events;
+    this.notifyListeners();
   }
   
   /**
    * Get metrics for a specific component
    */
-  public getComponentMetrics(componentName: string): ComponentMetrics | null {
-    const metrics = this.metrics.componentMetrics[componentName];
-    return metrics ? { ...metrics } : null;
+  public getComponentMetrics(componentName: string): Partial<PerformanceMetrics> {
+    return this.metrics[componentName] || { componentName };
   }
   
   /**
-   * Get components with the slowest average render times
+   * Get all performance metrics
    */
-  public getSlowestComponents(limit: number = 5): { name: string; metrics: ComponentMetrics }[] {
-    return Object.entries(this.metrics.componentMetrics)
-      .map(([name, metrics]) => ({ name, metrics }))
-      .sort((a, b) => b.metrics.averageRenderTime - a.metrics.averageRenderTime)
-      .slice(0, limit);
+  public getAllMetrics(): Record<string, Partial<PerformanceMetrics>> {
+    return { ...this.metrics };
   }
   
   /**
-   * Get components with the most renders
+   * Track memory usage if available in the browser
    */
-  public getMostFrequentlyRenderedComponents(limit: number = 5): { name: string; metrics: ComponentMetrics }[] {
-    return Object.entries(this.metrics.componentMetrics)
-      .map(([name, metrics]) => ({ name, metrics }))
-      .sort((a, b) => b.metrics.renders - a.metrics.renders)
-      .slice(0, limit);
+  private trackMemoryUsage(): void {
+    if (typeof performance === 'undefined' || 
+        !performance.memory) {
+      return;
+    }
+    
+    // Update every 2 seconds
+    setInterval(() => {
+      const memory = performance.memory;
+      
+      if (!memory) return;
+      
+      for (const componentName in this.metrics) {
+        this.metrics[componentName].memoryUsage = {
+          jsHeapSizeLimit: memory.jsHeapSizeLimit,
+          totalJSHeapSize: memory.totalJSHeapSize,
+          usedJSHeapSize: memory.usedJSHeapSize
+        };
+      }
+      
+      this.notifyListeners();
+    }, 2000);
+  }
+  
+  /**
+   * Subscribe to metrics updates
+   */
+  public subscribe(callback: (metrics: Record<string, Partial<PerformanceMetrics>>) => void): () => void {
+    this.listeners.push(callback);
+    return () => {
+      this.listeners = this.listeners.filter(listener => listener !== callback);
+    };
+  }
+  
+  /**
+   * Notify all listeners of metrics updates
+   */
+  private notifyListeners(): void {
+    const metricsSnapshot = this.getAllMetrics();
+    this.listeners.forEach(listener => listener(metricsSnapshot));
   }
   
   /**
    * Clear all metrics
    */
   public clearMetrics(): void {
-    this.metrics = this.getInitialMetrics();
-    devLogger.log('Performance', 'Performance metrics cleared');
+    this.metrics = {};
+    this.notifyListeners();
   }
   
   /**
-   * Enable or disable performance monitoring
+   * Add a performance insight for a component
    */
-  public setEnabled(enabled: boolean): void {
-    this.enabled = enabled;
-    devLogger.log('Performance', `Performance monitoring ${enabled ? 'enabled' : 'disabled'}`);
-  }
-  
-  /**
-   * Get initial metrics structure
-   */
-  private getInitialMetrics(): PerformanceMetrics {
-    return {
-      totalComponents: 0,
-      totalRenders: 0,
-      totalRenderTime: 0,
-      averageRenderTime: 0,
-      slowRenders: 0,
-      componentsWithSlowRenders: [],
-      startTime: Date.now(),
-      componentMetrics: {}
-    };
-  }
-  
-  /**
-   * Generate a performance report summary
-   */
-  public generateReport(): string {
-    const { 
-      totalComponents, 
-      totalRenders, 
-      totalRenderTime, 
-      averageRenderTime, 
-      slowRenders 
-    } = this.metrics;
+  public addInsight(componentName: string, insight: string): void {
+    if (!this.metrics[componentName]) {
+      this.recordRender(componentName, 0); // Create metrics entry if it doesn't exist
+    }
     
-    const runtime = (Date.now() - this.metrics.startTime) / 1000;
-    const rendersPerSecond = totalRenders / runtime;
+    const insights = this.metrics[componentName].insights || [];
+    insights.push(insight);
     
-    let report = `
-Performance Report:
-==================
-Runtime: ${runtime.toFixed(1)}s
-Total Components: ${totalComponents}
-Total Renders: ${totalRenders} (${rendersPerSecond.toFixed(1)}/s)
-Total Render Time: ${totalRenderTime.toFixed(1)}ms
-Average Render Time: ${averageRenderTime.toFixed(2)}ms
-Slow Renders (>16ms): ${slowRenders} (${((slowRenders / totalRenders) * 100).toFixed(1)}%)
-
-Top 5 Slowest Components:
-------------------------
-`;
+    // Only keep last 10 insights
+    if (insights.length > 10) {
+      insights.shift();
+    }
     
-    const slowest = this.getSlowestComponents(5);
-    slowest.forEach(({ name, metrics }, index) => {
-      report += `${index + 1}. ${name}: ${metrics.averageRenderTime.toFixed(2)}ms avg (${metrics.renders} renders)\n`;
-    });
-    
-    report += `
-Top 5 Most Frequently Rendered:
------------------------------
-`;
-    
-    const frequent = this.getMostFrequentlyRenderedComponents(5);
-    frequent.forEach(({ name, metrics }, index) => {
-      report += `${index + 1}. ${name}: ${metrics.renders} renders (${metrics.averageRenderTime.toFixed(2)}ms avg)\n`;
-    });
-    
-    return report;
+    this.metrics[componentName].insights = insights;
+    this.notifyListeners();
   }
 }
 
