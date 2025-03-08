@@ -19,19 +19,70 @@ interface PatternFrequency {
   acceptanceRate: number;
 }
 
+interface UserBehaviorPattern {
+  name: string;
+  frequency: number;
+  lastObserved: Date;
+}
+
 class AIAssistantLearningSystem {
   private static instance: AIAssistantLearningSystem;
   private events: LearningEvent[] = [];
   private patternStats: Map<string, PatternFrequency> = new Map();
+  private userBehaviorPatterns: UserBehaviorPattern[] = [];
+  private sessionEvents: LearningEvent[] = [];
   
   // Only allow singleton instance
-  private constructor() {}
+  private constructor() {
+    // Initialize learning system
+    this.loadStoredLearning();
+  }
   
   public static getInstance(): AIAssistantLearningSystem {
     if (!AIAssistantLearningSystem.instance) {
       AIAssistantLearningSystem.instance = new AIAssistantLearningSystem();
     }
     return AIAssistantLearningSystem.instance;
+  }
+  
+  /**
+   * Load previously stored learning data
+   */
+  private loadStoredLearning(): void {
+    try {
+      const storedData = localStorage.getItem('ai_learning_system');
+      if (storedData) {
+        const data = JSON.parse(storedData);
+        this.events = data.events || [];
+        
+        // Convert stored pattern stats back to Map
+        if (data.patternStats) {
+          this.patternStats = new Map(Object.entries(data.patternStats));
+        }
+        
+        this.userBehaviorPatterns = data.userBehaviorPatterns || [];
+      }
+    } catch (error) {
+      console.error("Error loading AI learning data:", error);
+    }
+  }
+  
+  /**
+   * Save current learning data to persistent storage
+   */
+  private saveCurrentLearning(): void {
+    try {
+      // Convert Map to object for storage
+      const patternStatsObj = Object.fromEntries(this.patternStats.entries());
+      
+      localStorage.setItem('ai_learning_system', JSON.stringify({
+        events: this.events.slice(-100), // Only store the most recent 100 events
+        patternStats: patternStatsObj,
+        userBehaviorPatterns: this.userBehaviorPatterns
+      }));
+    } catch (error) {
+      console.error("Error saving AI learning data:", error);
+    }
   }
   
   /**
@@ -48,11 +99,20 @@ class AIAssistantLearningSystem {
     };
     
     this.events.push(event);
+    this.sessionEvents.push(event);
     
     // Update pattern statistics if applicable
     if (data.patternId) {
       this.updatePatternStats(data.patternId, type);
     }
+    
+    // Analyze session behavior patterns
+    if (this.sessionEvents.length >= 5) {
+      this.analyzeSessionBehavior();
+    }
+    
+    // Persist learning data
+    this.saveCurrentLearning();
     
     console.log(`AI Assistant Learning: Recorded ${type} event`);
     return id;
@@ -83,6 +143,17 @@ class AIAssistantLearningSystem {
     stats.acceptanceRate = totalEvents > 0 ? acceptedEvents / totalEvents : 0;
     
     this.patternStats.set(patternId, stats);
+  }
+  
+  /**
+   * Analyze current session behavior to detect patterns
+   */
+  private analyzeSessionBehavior(): void {
+    // Reset session events
+    this.sessionEvents = [];
+    
+    // In a real implementation, this would use more sophisticated analysis
+    // to detect patterns in user behavior
   }
   
   /**
@@ -125,6 +196,9 @@ class AIAssistantLearningSystem {
   public reset(): void {
     this.events = [];
     this.patternStats.clear();
+    this.userBehaviorPatterns = [];
+    this.sessionEvents = [];
+    localStorage.removeItem('ai_learning_system');
   }
   
   /**
@@ -134,6 +208,7 @@ class AIAssistantLearningSystem {
     totalEvents: number;
     acceptanceRate: number;
     mostEffectivePatterns: PatternFrequency[];
+    userBehaviorInsights: string[];
   } {
     const totalEvents = this.events.length;
     
@@ -147,11 +222,49 @@ class AIAssistantLearningSystem {
       .filter(p => p.occurrences >= 3 && p.acceptanceRate > 0.7)
       .slice(0, 5);
     
+    // Generate insights about user behavior
+    const userBehaviorInsights = this.generateUserBehaviorInsights();
+    
     return {
       totalEvents,
       acceptanceRate,
-      mostEffectivePatterns
+      mostEffectivePatterns,
+      userBehaviorInsights
     };
+  }
+  
+  /**
+   * Generate insights about user behavior
+   */
+  private generateUserBehaviorInsights(): string[] {
+    const insights: string[] = [];
+    
+    // Simple example of generating insights
+    if (this.events.length > 10) {
+      const recentEvents = this.getRecentEvents(10);
+      
+      // Check if user frequently rejects performance suggestions
+      const performanceRejections = recentEvents.filter(e => 
+        e.type === 'suggestion_rejected' && 
+        e.data.category === 'performance'
+      ).length;
+      
+      if (performanceRejections >= 3) {
+        insights.push("User tends to reject performance-related suggestions");
+      }
+      
+      // Check if user accepts architectural suggestions
+      const architectureAcceptances = recentEvents.filter(e => 
+        e.type === 'suggestion_accepted' && 
+        e.data.category === 'architecture'
+      ).length;
+      
+      if (architectureAcceptances >= 3) {
+        insights.push("User frequently implements architectural improvements");
+      }
+    }
+    
+    return insights;
   }
 }
 
