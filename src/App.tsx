@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -7,7 +8,9 @@ import { Toaster } from '@/components/ui/toaster';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { PerformanceProvider } from './contexts/PerformanceContext';
 import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
+import PerformanceInsights from './components/dev-mode/PerformanceInsights';
 import { QuantumParticles } from '@/components/lazy';
+import { usePerformanceTracking } from './hooks/usePerformanceTracking';
 
 // Lazy load the pages for better performance
 const Index = lazy(() => import('@/pages/index'));
@@ -45,8 +48,12 @@ const PageLoader = () => (
  * 
  * Sets up the application's routing and global providers.
  * Wraps the entire app in an ErrorBoundary for graceful error handling.
+ * Now with integrated performance tracking.
  */
 function App() {
+  // Track the App component's performance
+  usePerformanceTracking('App');
+  
   return (
     <PerformanceProvider>
       <ErrorBoundary>
@@ -141,6 +148,9 @@ function App() {
         </AuthProvider>
       </ErrorBoundary>
       <PerformanceMonitor />
+      
+      {/* Add the new Performance Insights component */}
+      <PerformanceInsights />
     </PerformanceProvider>
   );
 }

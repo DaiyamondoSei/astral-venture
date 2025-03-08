@@ -2,6 +2,8 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 import { usePerformance } from '@/contexts/PerformanceContext';
+import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
+import { useComponentAnalysis } from '@/hooks/useComponentAnalysis';
 
 // Simple fallback background that doesn't block rendering
 const SimpleFallbackBackground = () => (
@@ -25,6 +27,16 @@ const Layout = ({
     deviceCapability, 
     isLowPerformance
   } = usePerformance();
+  
+  // Track performance of this component
+  usePerformanceTracking('Layout', { className, contentWidth, removeBackground });
+  
+  // Register with component analyzer
+  useComponentAnalysis('Layout', {
+    complexity: 20,
+    dependencies: ['usePerformance', 'cn'],
+    hooks: ['usePerformance', 'usePerformanceTracking', 'useComponentAnalysis'],
+  });
   
   // Map content width options to appropriate max-width classes
   const getContentWidthClass = () => {
