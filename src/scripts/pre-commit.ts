@@ -1,56 +1,56 @@
 
-#!/usr/bin/env ts-node
-/**
- * Pre-commit hook for code quality analysis
- * 
- * This script analyzes staged files and provides suggestions
- * for improvements before committing.
- */
+#!/usr/bin/env node
 
-import { componentAnalyzer } from '../utils/performance/ComponentAnalyzer';
+import { execSync } from 'child_process';
 import fs from 'fs';
-import path from 'path';
 
-// Log start of pre-commit analysis
-console.log('🔍 Running code quality analysis...');
+// Get staged files
+const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM')
+  .toString()
+  .trim()
+  .split('\n')
+  .filter(file => file.endsWith('.ts') || file.endsWith('.tsx'));
 
-// Get components with issues
-const componentsWithIssues = componentAnalyzer.findComponentsWithIssues();
-
-if (componentsWithIssues.length > 0) {
-  console.log('\n⚠️ Found potential issues in the following components:');
-  
-  componentsWithIssues.forEach(analysis => {
-    console.log(`\n📋 ${analysis.component.name}:`);
-    
-    analysis.issues.forEach(issue => {
-      const severityIcon = issue.severity === 'high' ? '🔴' : 
-                           issue.severity === 'medium' ? '🟠' : '🟡';
-      
-      console.log(`  ${severityIcon} ${issue.type}: ${issue.description}`);
-      console.log(`     Suggestion: ${issue.suggestion}`);
-    });
-  });
-  
-  // Generate refactoring suggestions
-  const refactoringSuggestions = componentAnalyzer.generateRefactoringSuggestions();
-  
-  if (refactoringSuggestions.length > 0) {
-    console.log('\n💡 Refactoring opportunities:');
-    
-    refactoringSuggestions.forEach(suggestion => {
-      const priorityIcon = suggestion.priority === 'high' ? '🔴' : 
-                           suggestion.priority === 'medium' ? '🟠' : '🟡';
-      
-      console.log(`\n  ${priorityIcon} ${suggestion.type}: ${suggestion.description}`);
-      console.log(`     Affected components: ${suggestion.components.join(', ')}`);
-    });
-  }
-  
-  console.log('\n✅ Analysis complete. Address issues or use --no-verify to bypass.');
-} else {
-  console.log('✅ No code quality issues detected!');
+if (stagedFiles.length === 0) {
+  console.log('No TypeScript files to analyze.');
+  process.exit(0);
 }
 
-// Exit with success code - we don't want to block commits yet
-process.exit(0);
+// Run code quality checks
+try {
+  console.log('Running code quality checks on staged files...');
+  
+  // Check for component complexity
+  const complexityIssues = [];
+  
+  for (const file of stagedFiles) {
+    if (!fs.existsSync(file)) continue;
+    
+    const content = fs.readFileSync(file, 'utf-8');
+    
+    // Simple heuristic for complexity: check function/component size
+    const lines = content.split('\n').length;
+    if (lines > 200) {
+      complexityIssues.push(`${file}: Component has ${lines} lines and may be too complex.`);
+    }
+    
+    // Check for too many hooks
+    const hookMatches = content.match(/use[A-Z][a-zA-Z]+/g) || [];
+    if (hookMatches.length > 7) {
+      complexityIssues.push(`${file}: Component uses ${hookMatches.length} hooks and may benefit from refactoring.`);
+    }
+  }
+  
+  if (complexityIssues.length > 0) {
+    console.warn('\nCode Quality Issues Found:');
+    complexityIssues.forEach(issue => console.warn(`- ${issue}`));
+    console.warn('\nConsider addressing these issues before committing.');
+  } else {
+    console.log('No significant code quality issues found.');
+  }
+  
+  process.exit(0);
+} catch (error) {
+  console.error('Error running code quality checks:', error);
+  process.exit(1);
+}
