@@ -27,13 +27,11 @@ const Layout = ({
     isLowPerformance
   } = usePerformance();
   
-  // Use the code enhancement hook for comprehensive analysis
+  // Use the code enhancement hook with valid options
   useCodeEnhancement('Layout', {
     complexity: 20,
     dependencies: ['usePerformance', 'cn'],
-    hooks: ['usePerformance', 'useCodeEnhancement'],
-    renderProps: { className, contentWidth, removeBackground },
-    renderReasons: ['props update']
+    hooks: ['usePerformance', 'useCodeEnhancement']
   });
   
   // Map content width options to appropriate max-width classes

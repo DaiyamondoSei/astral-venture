@@ -1,3 +1,4 @@
+
 /**
  * Performance Monitor Utility
  * 
@@ -35,6 +36,15 @@ export interface PerformanceMetrics {
   }>;
   fps: number;
   lastUpdated: number;
+}
+
+// Extend Performance interface to include memory property
+interface ExtendedPerformance extends Performance {
+  memory?: {
+    jsHeapSizeLimit: number;
+    totalJSHeapSize: number;
+    usedJSHeapSize: number;
+  };
 }
 
 class PerformanceMonitor {
@@ -147,14 +157,16 @@ class PerformanceMonitor {
    * Track memory usage if available in the browser
    */
   private trackMemoryUsage(): void {
-    if (typeof performance === 'undefined' || 
-        !performance.memory) {
+    const extendedPerformance = performance as ExtendedPerformance;
+    
+    if (typeof extendedPerformance === 'undefined' || 
+        !extendedPerformance.memory) {
       return;
     }
     
     // Update every 2 seconds
     setInterval(() => {
-      const memory = performance.memory;
+      const memory = extendedPerformance.memory;
       
       if (!memory) return;
       

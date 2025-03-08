@@ -1,216 +1,168 @@
 
 import React, { useState, useEffect } from 'react';
-import { renderAnalyzer, RenderAnalysis } from '@/utils/performance/RenderAnalyzer';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronDown, ChevronUp, XCircle, AlertCircle, Clock, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertCircle, BarChart, X, RefreshCw } from 'lucide-react';
+import { renderAnalyzer, RenderAnalysis } from '@/utils/performance/RenderAnalyzer';
+import { Progress } from '@/components/ui/progress';
 
-const RenderInsights = () => {
+const RenderInsights: React.FC = () => {
+  const [insights, setInsights] = useState<RenderAnalysis[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [issues, setIssues] = useState<RenderAnalysis[]>([]);
-  const [activeTab, setActiveTab] = useState('issues');
-  
-  // Update issues when component opens or refreshes
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
-    if (!isOpen) return;
+    // Get components with performance issues
+    const componentsWithIssues = renderAnalyzer.findComponentsWithPerformanceIssues();
+    setInsights(componentsWithIssues);
     
-    const updateIssues = () => {
-      const componentIssues = renderAnalyzer.findComponentsWithPerformanceIssues();
-      setIssues(componentIssues);
-    };
-    
-    updateIssues();
-    
-    // Update every 2 seconds while open
-    const interval = setInterval(updateIssues, 2000);
+    // Set up an interval to refresh the data
+    const interval = setInterval(() => {
+      setInsights(renderAnalyzer.findComponentsWithPerformanceIssues());
+    }, 3000);
     
     return () => clearInterval(interval);
-  }, [isOpen]);
-  
-  // Don't render anything in production
-  if (process.env.NODE_ENV !== 'development') {
-    return null;
-  }
-  
-  const handleReset = () => {
-    renderAnalyzer.clearHistory();
-    setIssues([]);
+  }, [refreshKey]);
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+    setInsights(renderAnalyzer.findComponentsWithPerformanceIssues());
   };
-  
-  // Get total issues by priority
-  const highPriorityCount = issues.reduce(
-    (count, issue) => count + issue.suggestions.filter(s => s.priority === 'high').length, 
-    0
-  );
-  
-  const mediumPriorityCount = issues.reduce(
-    (count, issue) => count + issue.suggestions.filter(s => s.priority === 'medium').length, 
-    0
-  );
-  
-  return (
-    <div className="fixed bottom-0 right-0 z-50 max-w-md">
-      {/* Toggle button */}
+
+  if (!isOpen) {
+    return (
       <Button
-        variant="outline"
+        className="fixed bottom-4 left-[6.5rem] z-50 bg-orange-600 hover:bg-orange-700"
+        onClick={() => setIsOpen(true)}
         size="sm"
-        onClick={() => setIsOpen(!isOpen)}
-        className="mb-1 ml-auto flex items-center space-x-1 bg-background/80 backdrop-blur-sm"
+        variant="default"
       >
-        <Clock className="h-4 w-4 mr-1" />
-        <span>Render Insights</span>
-        {highPriorityCount > 0 && (
-          <Badge variant="destructive" className="ml-2">
-            {highPriorityCount}
-          </Badge>
+        <AlertCircle className="w-4 h-4 mr-2" />
+        Render
+        {insights.length > 0 && (
+          <span className="ml-1 w-5 h-5 rounded-full bg-white text-orange-600 text-xs flex items-center justify-center">
+            {insights.length}
+          </span>
         )}
-        {mediumPriorityCount > 0 && (
-          <Badge variant="default" className="ml-1">
-            {mediumPriorityCount}
-          </Badge>
-        )}
-        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
       </Button>
-      
-      {isOpen && (
-        <Card className="w-full shadow-lg border border-border/50 backdrop-blur-sm bg-background/90">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg font-medium">Render Performance</CardTitle>
-              <Button variant="ghost" size="sm" onClick={handleReset}>
-                <RotateCcw className="h-4 w-4 mr-1" />
-                Reset
-              </Button>
-            </div>
-            <CardDescription>
-              Analyze component rendering performance
-            </CardDescription>
-          </CardHeader>
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="px-4">
-              <TabsList className="w-full">
-                <TabsTrigger value="issues" className="flex-1">
-                  Issues {issues.length > 0 && `(${issues.length})`}
-                </TabsTrigger>
-                <TabsTrigger value="suggestions" className="flex-1">
-                  Suggestions
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <CardContent className="pb-4 pt-2">
-              <TabsContent value="issues">
-                <ScrollArea className="h-64">
-                  {issues.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
-                      <AlertCircle className="h-10 w-10 mb-2" />
-                      <p>No render performance issues detected yet.</p>
-                      <p className="text-xs mt-1">Interact with components to start tracking.</p>
+    );
+  }
+
+  return (
+    <Card className="fixed bottom-4 left-[6.5rem] w-96 h-96 z-50 shadow-xl">
+      <CardHeader className="p-3 bg-orange-600 text-white flex flex-row items-center justify-between">
+        <CardTitle className="text-base flex items-center">
+          <BarChart className="h-4 w-4 mr-2" />
+          Render Insights
+          {insights.length > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 rounded-full bg-white text-orange-600 text-xs">
+              {insights.length}
+            </span>
+          )}
+        </CardTitle>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white" onClick={() => setIsOpen(false)}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0 h-[calc(100%-56px)]">
+        <ScrollArea className="h-full p-3">
+          {insights.length > 0 ? (
+            <div className="space-y-4">
+              {insights.map((insight, index) => (
+                <div 
+                  key={index} 
+                  className="border rounded p-3 text-sm space-y-2 hover:bg-muted/50 cursor-pointer"
+                  onClick={() => setSelectedComponent(selectedComponent === insight.componentName ? null : insight.componentName)}
+                >
+                  <div className="font-medium flex items-center justify-between">
+                    <span>{insight.componentName}</span>
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${getFrequencyColorClass(insight.renderFrequency)}`}>
+                      {insight.renderFrequency}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                    <span className="text-muted-foreground">Render count:</span>
+                    <span>{insight.renderCount}</span>
+                    
+                    <span className="text-muted-foreground">Avg render time:</span>
+                    <span>{insight.averageRenderTime.toFixed(2)}ms</span>
+                    
+                    <span className="text-muted-foreground">Max render time:</span>
+                    <span>{insight.maxRenderTime.toFixed(2)}ms</span>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Render performance:</span>
+                      <span>{getRenderScore(insight)}/100</span>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {issues.map((analysis) => (
-                        <Alert key={analysis.component} variant="default" className="py-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <AlertTitle>{analysis.component}</AlertTitle>
-                              <AlertDescription className="mt-1">
-                                <div className="text-xs">
-                                  <span className="font-medium">Render count:</span> {analysis.totalRenderCount}
-                                </div>
-                                <div className="text-xs">
-                                  <span className="font-medium">Avg time:</span> {analysis.averageRenderTime.toFixed(2)}ms
-                                </div>
-                                <div className="text-xs">
-                                  <span className="font-medium">Unnecessary:</span> {analysis.unnecessaryRenderCount}
-                                </div>
-                                
-                                {analysis.suggestions.length > 0 && (
-                                  <div className="mt-2">
-                                    <span className="text-xs font-medium">Suggestions:</span>
-                                    <ul className="mt-1 space-y-1">
-                                      {analysis.suggestions.map((suggestion, i) => (
-                                        <li key={i} className="text-xs flex items-start">
-                                          <Badge 
-                                            variant={
-                                              suggestion.priority === 'high' ? 'destructive' : 
-                                              suggestion.priority === 'medium' ? 'default' : 'outline'
-                                            }
-                                            className="h-4 mr-2 px-1 min-w-8 text-center"
-                                          >
-                                            {suggestion.type}
-                                          </Badge>
-                                          <span>{suggestion.description}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                              </AlertDescription>
-                            </div>
-                          </div>
-                        </Alert>
-                      ))}
+                    <Progress value={getRenderScore(insight)} className="h-1.5" />
+                  </div>
+                  
+                  {selectedComponent === insight.componentName && (
+                    <div className="mt-3 pt-3 border-t text-xs space-y-2">
+                      <span className="font-medium block">Optimization suggestions:</span>
+                      <ul className="space-y-1 list-disc pl-4">
+                        {insight.possibleOptimizations.map((suggestion, i) => (
+                          <li key={i}>{suggestion}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
-                </ScrollArea>
-              </TabsContent>
-              
-              <TabsContent value="suggestions">
-                <ScrollArea className="h-64">
-                  <div className="space-y-3 p-1">
-                    <Alert>
-                      <AlertTitle className="text-sm font-medium">Common Render Optimizations</AlertTitle>
-                      <AlertDescription className="mt-2">
-                        <ul className="space-y-2 text-xs">
-                          <li>
-                            <Badge variant="outline" className="mr-1">memo</Badge>
-                            Use React.memo for components that render often with the same props
-                          </li>
-                          <li>
-                            <Badge variant="outline" className="mr-1">callback</Badge>
-                            Use useCallback for functions passed as props to prevent unnecessary re-renders
-                          </li>
-                          <li>
-                            <Badge variant="outline" className="mr-1">useMemo</Badge>
-                            Memoize expensive calculations that don't need to be recomputed on every render
-                          </li>
-                          <li>
-                            <Badge variant="outline" className="mr-1">state</Badge>
-                            Keep state as local as possible to prevent cascading re-renders
-                          </li>
-                        </ul>
-                      </AlertDescription>
-                    </Alert>
-                    
-                    <Alert>
-                      <AlertTitle className="text-sm font-medium">How to Use This Tool</AlertTitle>
-                      <AlertDescription className="mt-2 text-xs">
-                        <p className="mb-1">1. Add render tracking to your components:</p>
-                        <pre className="bg-muted p-2 rounded text-[10px] overflow-x-auto">
-                          {`import { useRenderTracking } from '@/hooks/useRenderTracking';
-                            
-// Inside your component
-useRenderTracking('YourComponentName', props);`}
-                        </pre>
-                        <p className="mt-2 mb-1">2. Review the Issues tab for performance problems</p>
-                        <p className="mb-1">3. Apply suggested optimizations to problematic components</p>
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                </ScrollArea>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
-        </Card>
-      )}
-    </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              No render performance issues detected
+            </div>
+          )}
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 };
+
+// Helper function to get color class based on render frequency
+function getFrequencyColorClass(frequency: string): string {
+  switch (frequency) {
+    case 'excessive':
+      return 'bg-red-500 text-white';
+    case 'high':
+      return 'bg-orange-500 text-white';
+    case 'medium':
+      return 'bg-yellow-500 text-black';
+    default:
+      return 'bg-green-500 text-white';
+  }
+}
+
+// Calculate a performance score from 0-100
+function getRenderScore(analysis: RenderAnalysis): number {
+  let score = 100;
+  
+  // Penalize based on render frequency
+  if (analysis.renderFrequency === 'excessive') score -= 40;
+  else if (analysis.renderFrequency === 'high') score -= 25;
+  else if (analysis.renderFrequency === 'medium') score -= 10;
+  
+  // Penalize for long render times
+  if (analysis.averageRenderTime > 50) score -= 30;
+  else if (analysis.averageRenderTime > 30) score -= 20;
+  else if (analysis.averageRenderTime > 16) score -= 10;
+  
+  // Penalize for optimization count
+  score -= analysis.possibleOptimizations.length * 5;
+  
+  return Math.max(0, Math.min(100, score));
+}
 
 export default RenderInsights;

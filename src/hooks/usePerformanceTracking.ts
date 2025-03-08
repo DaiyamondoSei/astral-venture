@@ -1,6 +1,6 @@
 
 import { useEffect, useRef } from 'react';
-import { performanceMonitor } from '@/utils/performance/PerformanceMonitor';
+import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
 interface PerformanceTrackingOptions {
   logSlowRenders?: boolean;

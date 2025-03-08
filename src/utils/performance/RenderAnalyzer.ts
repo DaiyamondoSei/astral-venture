@@ -16,6 +16,7 @@ export interface RenderAnalysis {
   recentRenderTimes: number[];
   renderFrequency: 'low' | 'medium' | 'high' | 'excessive';
   possibleOptimizations: string[];
+  suggestions?: string[]; // Add missing suggestions property
   lastUpdated: number;
 }
 
@@ -188,12 +189,13 @@ class RenderAnalyzer {
       recentRenderTimes,
       renderFrequency,
       possibleOptimizations,
+      suggestions: possibleOptimizations, // Add suggestions property with the same value as possibleOptimizations
       lastUpdated: history.timestamps[history.timestamps.length - 1]
     };
   }
   
   /**
-   * Get analysis for all components
+   * Get all components analysis
    */
   public getAllComponentsAnalysis(): Record<string, RenderAnalysis> {
     const result: Record<string, RenderAnalysis> = {};
@@ -206,6 +208,27 @@ class RenderAnalyzer {
     });
     
     return result;
+  }
+  
+  /**
+   * Find components with performance issues
+   */
+  public findComponentsWithPerformanceIssues(): RenderAnalysis[] {
+    const issues: RenderAnalysis[] = [];
+    
+    Object.keys(this.renderHistory).forEach(componentName => {
+      const analysis = this.getComponentAnalysis(componentName);
+      if (analysis && (
+        analysis.renderFrequency === 'high' || 
+        analysis.renderFrequency === 'excessive' ||
+        analysis.averageRenderTime > 16 ||
+        analysis.maxRenderTime > 100
+      )) {
+        issues.push(analysis);
+      }
+    });
+    
+    return issues;
   }
   
   /**
