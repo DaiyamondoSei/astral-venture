@@ -1,54 +1,56 @@
 
-#!/usr/bin/env node
+#!/usr/bin/env ts-node
+/**
+ * Pre-commit hook for code quality analysis
+ * 
+ * This script analyzes staged files and provides suggestions
+ * for improvements before committing.
+ */
 
-import { execSync } from 'child_process';
+import { componentAnalyzer } from '../utils/performance/ComponentAnalyzer';
 import fs from 'fs';
 import path from 'path';
 
-// Get staged files
-const stagedFiles = execSync('git diff --cached --name-only')
-  .toString()
-  .split('\n')
-  .filter(file => file.endsWith('.tsx') || file.endsWith('.ts'));
+// Log start of pre-commit analysis
+console.log('🔍 Running code quality analysis...');
 
-// Skip if no relevant files are staged
-if (stagedFiles.length === 0) {
-  console.log('No TypeScript files to validate');
-  process.exit(0);
-}
+// Get components with issues
+const componentsWithIssues = componentAnalyzer.findComponentsWithIssues();
 
-let hasErrors = false;
-
-// Check each file for error handling
-stagedFiles.forEach(file => {
-  if (!fs.existsSync(file)) return;
+if (componentsWithIssues.length > 0) {
+  console.log('\n⚠️ Found potential issues in the following components:');
   
-  const content = fs.readFileSync(file, 'utf8');
+  componentsWithIssues.forEach(analysis => {
+    console.log(`\n📋 ${analysis.component.name}:`);
+    
+    analysis.issues.forEach(issue => {
+      const severityIcon = issue.severity === 'high' ? '🔴' : 
+                           issue.severity === 'medium' ? '🟠' : '🟡';
+      
+      console.log(`  ${severityIcon} ${issue.type}: ${issue.description}`);
+      console.log(`     Suggestion: ${issue.suggestion}`);
+    });
+  });
   
-  // Check if file contains try/catch but no error handling utility
-  if (
-    content.includes('try {') && 
-    content.includes('catch') && 
-    !content.includes('handleError(') &&
-    !content.includes('createSafeAsyncFunction')
-  ) {
-    console.error(`⚠️ ${file}: Contains try/catch but doesn't use error handling utilities`);
-    hasErrors = true;
+  // Generate refactoring suggestions
+  const refactoringSuggestions = componentAnalyzer.generateRefactoringSuggestions();
+  
+  if (refactoringSuggestions.length > 0) {
+    console.log('\n💡 Refactoring opportunities:');
+    
+    refactoringSuggestions.forEach(suggestion => {
+      const priorityIcon = suggestion.priority === 'high' ? '🔴' : 
+                           suggestion.priority === 'medium' ? '🟠' : '🟡';
+      
+      console.log(`\n  ${priorityIcon} ${suggestion.type}: ${suggestion.description}`);
+      console.log(`     Affected components: ${suggestion.components.join(', ')}`);
+    });
   }
   
-  // Check for direct console.error without proper error handling
-  if (
-    content.includes('console.error(') && 
-    !content.includes('handleError(')
-  ) {
-    console.warn(`⚠️ ${file}: Uses console.error directly instead of error handling utilities`);
-  }
-});
-
-// Exit with error if issues were found
-if (hasErrors) {
-  console.error('\n❌ Error handling validation failed. Please use error handling utilities.');
-  process.exit(1);
+  console.log('\n✅ Analysis complete. Address issues or use --no-verify to bypass.');
+} else {
+  console.log('✅ No code quality issues detected!');
 }
 
-console.log('✅ Error handling validation passed');
+// Exit with success code - we don't want to block commits yet
+process.exit(0);

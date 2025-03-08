@@ -9,8 +9,12 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { PerformanceProvider } from './contexts/PerformanceContext';
 import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
 import PerformanceInsights from './components/dev-mode/PerformanceInsights';
+import RenderInsights from './components/dev-mode/RenderInsights';
+import ComponentRelationships from './components/dev-mode/ComponentRelationships';
 import { QuantumParticles } from '@/components/lazy';
 import { usePerformanceTracking } from './hooks/usePerformanceTracking';
+import { useRenderTracking } from './hooks/useRenderTracking';
+import { useCodeEnhancement } from './hooks/useCodeEnhancement';
 
 // Lazy load the pages for better performance
 const Index = lazy(() => import('@/pages/index'));
@@ -48,11 +52,25 @@ const PageLoader = () => (
  * 
  * Sets up the application's routing and global providers.
  * Wraps the entire app in an ErrorBoundary for graceful error handling.
- * Now with integrated performance tracking.
+ * Now with integrated performance tracking and code quality analysis.
  */
 function App() {
-  // Track the App component's performance
-  usePerformanceTracking('App');
+  // Use the combined code enhancement hook
+  useCodeEnhancement('App', {
+    complexity: 40,
+    dependencies: [
+      'BrowserRouter', 'Routes', 'Route', 'AuthProvider', 
+      'OnboardingProvider', 'AnimatePresence', 'Toaster', 
+      'ErrorBoundary', 'PerformanceProvider'
+    ],
+    hooks: ['usePerformanceTracking', 'useRenderTracking', 'useCodeEnhancement'],
+    childComponents: [
+      'BrowserRouter', 'ErrorBoundary', 'AuthProvider', 
+      'OnboardingProvider', 'PerformanceMonitor', 'PerformanceInsights',
+      'RenderInsights', 'ComponentRelationships'
+    ],
+    trackRenders: true
+  });
   
   return (
     <PerformanceProvider>
@@ -149,8 +167,10 @@ function App() {
       </ErrorBoundary>
       <PerformanceMonitor />
       
-      {/* Add the new Performance Insights component */}
+      {/* Development mode analysis tools */}
       <PerformanceInsights />
+      <RenderInsights />
+      <ComponentRelationships />
     </PerformanceProvider>
   );
 }
