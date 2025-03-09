@@ -4,11 +4,16 @@ import { startGlobalComponentMonitoring, validateAllMonitoredComponents } from '
 import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
 interface ErrorPreventionContextType {
   isEnabled: boolean;
   enableErrorPrevention: () => void;
   disableErrorPrevention: () => void;
-  validateAllComponents: () => { valid: boolean; errors: string[] };
+  validateAllComponents: () => ValidationResult;
   getHighImpactComponents: () => any[];
   getSlowComponents: () => any[];
   resetMetrics: () => void;
@@ -78,10 +83,12 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
     renderCostAnalyzer.setEnabled(false);
   };
   
-  const validateAllComponents = () => {
-    return process.env.NODE_ENV === 'development' 
-      ? validateAllMonitoredComponents() || { valid: true, errors: [] }
-      : { valid: true, errors: [] };
+  const validateAllComponents = (): ValidationResult => {
+    if (process.env.NODE_ENV === 'development') {
+      const result = validateAllMonitoredComponents();
+      return result ? result : { valid: true, errors: [] };
+    }
+    return { valid: true, errors: [] };
   };
   
   const getHighImpactComponents = () => {

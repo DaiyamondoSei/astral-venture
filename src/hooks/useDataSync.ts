@@ -1,118 +1,124 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
-import { usePerfConfig } from './usePerfConfig';
+import { toast } from '@/components/ui/use-toast';
 
-// Interface for the synchronization state
-interface SyncState {
-  isLoading: boolean;
-  lastSyncTime: string | null;
-  syncErrors: Record<string, string>;
-  syncInProgress: boolean;
+interface DataSyncOptions {
+  syncInterval?: number;
+  autoSync?: boolean;
+  showToasts?: boolean;
+  onSyncComplete?: (data: any) => void;
+  onSyncError?: (error: Error) => void;
 }
 
-// Available data sections to sync
-type DataSection = 'user_profile' | 'achievements' | 'energy_reflections' | 'activity' | 'streak' | 'all';
-
 /**
- * Hook for synchronizing data between client and backend
- * 
- * This hook manages bidirectional data synchronization:
- * 1. Pull: Fetches updated data from the server
- * 2. Push: Sends locally modified data to the server
+ * Hook for syncing user data with the server
  */
-export function useDataSync() {
-  const { user } = useAuth();
-  const config = usePerfConfig();
-  const [syncState, setSyncState] = useState<SyncState>({
-    isLoading: false,
-    lastSyncTime: null,
-    syncErrors: {},
-    syncInProgress: false
-  });
+export function useDataSync(options: DataSyncOptions = {}) {
+  const { 
+    syncInterval = 300000, // 5 minutes
+    autoSync = true,
+    showToasts = false,
+    onSyncComplete,
+    onSyncError
+  } = options;
+  
+  const { user, isAuthenticated } = useAuth();
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [syncData, setSyncData] = useState<any>(null);
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Synchronize data from the backend
-  const syncFromBackend = useCallback(async (section: DataSection = 'all') => {
-    if (!user) return null;
-    
+  // Function to sync data with the server
+  const syncData = async () => {
+    if (!isAuthenticated || !user) {
+      setError(new Error('User not authenticated'));
+      return;
+    }
+
     try {
-      setSyncState(prev => ({
-        ...prev,
-        isLoading: true,
-        syncInProgress: true
-      }));
-      
-      // Get the last sync timestamp for this section
-      const lastSyncTimestamp = localStorage.getItem(`last_sync_${section}`) || null;
-      
-      // Call the edge function to get updated data
+      setIsSyncing(true);
+      setError(null);
+
+      // Call the sync-user-data edge function
       const { data, error } = await supabase.functions.invoke('sync-user-data', {
-        body: { 
-          section, 
-          lastSyncTimestamp
+        body: {
+          lastSyncTime: lastSyncTime?.toISOString()
         }
       });
-      
-      if (error) throw error;
-      
-      if (data?.success) {
-        // Store the sync timestamp
-        const newSyncTime = data.data.syncTimestamp;
-        localStorage.setItem(`last_sync_${section}`, newSyncTime);
-        
-        // Update the sync state
-        setSyncState(prev => ({
-          ...prev,
-          isLoading: false,
-          lastSyncTime: newSyncTime,
-          syncInProgress: false,
-          syncErrors: { ...prev.syncErrors, [section]: null }
-        }));
-        
-        return data.data;
+
+      if (error) {
+        throw new Error(error.message);
       }
+
+      // Update the last sync time
+      setLastSyncTime(new Date());
+      setSyncData(data);
+
+      // Call the onSyncComplete callback
+      if (onSyncComplete) {
+        onSyncComplete(data);
+      }
+
+      // Show success toast if enabled
+      if (showToasts) {
+        toast({
+          title: 'Data synced',
+          description: 'Your data has been successfully synchronized',
+          duration: 3000
+        });
+      }
+
+      return data;
+    } catch (err: any) {
+      const errorObj = new Error(err.message || 'Error syncing data');
+      setError(errorObj);
       
-      throw new Error('Sync response was not successful');
-    } catch (error) {
-      console.error(`Error syncing ${section} from backend:`, error);
-      
-      setSyncState(prev => ({
-        ...prev,
-        isLoading: false,
-        syncInProgress: false,
-        syncErrors: { 
-          ...prev.syncErrors, 
-          [section]: error.message || 'Unknown error during sync'
-        }
-      }));
-      
+      // Call the onSyncError callback
+      if (onSyncError) {
+        onSyncError(errorObj);
+      }
+
+      // Show error toast if enabled
+      if (showToasts) {
+        toast({
+          title: 'Sync error',
+          description: errorObj.message,
+          variant: 'destructive',
+          duration: 5000
+        });
+      }
+
       return null;
+    } finally {
+      setIsSyncing(false);
     }
-  }, [user]);
-  
-  // Periodically synchronize based on config settings
+  };
+
+  // Set up automatic sync interval
   useEffect(() => {
-    if (!user || !config.enableBackendIntegration) return;
-    
-    // Set up polling intervals for different sections based on their update frequency
-    const intervals = [
-      setInterval(() => syncFromBackend('user_profile'), 5 * 60 * 1000), // Every 5 minutes
-      setInterval(() => syncFromBackend('achievements'), 2 * 60 * 1000),  // Every 2 minutes
-      setInterval(() => syncFromBackend('streak'), 10 * 60 * 1000),       // Every 10 minutes
-    ];
-    
-    // Initial sync when component mounts
-    syncFromBackend('all');
-    
+    if (autoSync && isAuthenticated) {
+      // Initial sync
+      syncData();
+
+      // Set up interval
+      syncIntervalRef.current = setInterval(syncData, syncInterval);
+    }
+
     return () => {
-      intervals.forEach(interval => clearInterval(interval));
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
     };
-  }, [user, syncFromBackend, config.enableBackendIntegration]);
-  
+  }, [autoSync, isAuthenticated, syncInterval]);
+
   return {
-    ...syncState,
-    syncFromBackend,
-    isSyncing: syncState.syncInProgress
+    syncData,
+    lastSyncTime,
+    isSyncing,
+    error,
+    data: syncData
   };
 }

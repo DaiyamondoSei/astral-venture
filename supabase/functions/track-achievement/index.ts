@@ -1,255 +1,361 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+interface AchievementEvent {
+  eventType: string;
+  eventData?: Record<string, any>;
 }
 
-// Create a Supabase client with the auth context of the function
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+interface AchievementResponse {
+  unlockedAchievements: any[];
+  updatedProgress: Record<string, number>;
+  energyPoints: number;
+}
 
-// Achievement detection logic - moved from frontend to backend
-const detectAchievements = (eventType, eventData, userAchievements) => {
-  const newAchievements = [];
+// These are automatically injected when deployed on Supabase
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Achievement event processing
+async function processAchievementEvent(userId: string, event: AchievementEvent): Promise<AchievementResponse> {
+  const { eventType, eventData = {} } = event;
   
-  // Sample achievement rules
-  switch (eventType) {
-    case 'streak_updated':
-      const { currentStreak } = eventData;
-      
-      // Streak achievements
-      if (currentStreak >= 3 && !hasAchievement(userAchievements, 'streak_3_days')) {
-        newAchievements.push({
-          id: 'streak_3_days',
-          title: '3-Day Streak',
-          description: 'Maintained practice for 3 consecutive days',
-          points: 10,
-          icon: 'flame'
-        });
-      }
-      
-      if (currentStreak >= 7 && !hasAchievement(userAchievements, 'streak_7_days')) {
-        newAchievements.push({
-          id: 'streak_7_days',
-          title: 'Weekly Dedication',
-          description: 'Maintained practice for a full week',
-          points: 25,
-          icon: 'flame'
-        });
-      }
-      
-      if (currentStreak >= 30 && !hasAchievement(userAchievements, 'streak_30_days')) {
-        newAchievements.push({
-          id: 'streak_30_days',
-          title: 'Monthly Master',
-          description: 'Maintained practice for a full month',
-          points: 100,
-          icon: 'award'
-        });
-      }
-      break;
-      
-    case 'reflection_milestone':
-      const { count } = eventData;
-      
-      // Reflection count achievements
-      if (count >= 5 && !hasAchievement(userAchievements, 'reflection_5')) {
-        newAchievements.push({
-          id: 'reflection_5',
-          title: 'Reflection Beginner',
-          description: 'Completed 5 reflections',
-          points: 15,
-          icon: 'book'
-        });
-      }
-      
-      if (count >= 20 && !hasAchievement(userAchievements, 'reflection_20')) {
-        newAchievements.push({
-          id: 'reflection_20',
-          title: 'Reflection Explorer',
-          description: 'Completed 20 reflections',
-          points: 40,
-          icon: 'book'
-        });
-      }
-      
-      if (count >= 50 && !hasAchievement(userAchievements, 'reflection_50')) {
-        newAchievements.push({
-          id: 'reflection_50',
-          title: 'Reflection Master',
-          description: 'Completed 50 reflections',
-          points: 100,
-          icon: 'award'
-        });
-      }
-      break;
-      
-    case 'chakra_activated':
-      const { chakraId, totalActivated } = eventData;
-      
-      // Chakra activation achievements
-      if (totalActivated >= 3 && !hasAchievement(userAchievements, 'chakra_3')) {
-        newAchievements.push({
-          id: 'chakra_3',
-          title: 'Energy Awakening',
-          description: 'Activated 3 chakras',
-          points: 30,
-          icon: 'zap'
-        });
-      }
-      
-      if (totalActivated >= 7 && !hasAchievement(userAchievements, 'chakra_all')) {
-        newAchievements.push({
-          id: 'chakra_all',
-          title: 'Full Spectrum',
-          description: 'Activated all chakras',
-          points: 100,
-          icon: 'sun'
-        });
-      }
-      break;
-      
-    default:
-      // No achievements detected for this event type
-      break;
-  }
+  // Default response
+  const response: AchievementResponse = {
+    unlockedAchievements: [],
+    updatedProgress: {},
+    energyPoints: 0
+  };
   
-  return newAchievements;
-}
-
-// Helper to check if user already has an achievement
-const hasAchievement = (userAchievements, achievementId) => {
-  return userAchievements.some(a => a.achievement_id === achievementId && a.progress >= 1);
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-
   try {
-    // Get the authorization header from the request
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
-    }
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-    
-    if (userError || !user) {
-      throw new Error('Error getting user or user not found');
-    }
-    
-    // Get event data from request
-    const { eventType, eventData } = await req.json();
-    
-    if (!eventType) {
-      throw new Error('Missing event type');
-    }
-    
-    console.log(`Processing achievement event: ${eventType} for user ${user.id}`);
-    
-    // Record the event
-    const { data: eventData2, error: eventError } = await supabase
-      .from('achievement_events')
+    // First, record the activity
+    const { error: activityError } = await supabase
+      .from('user_activities')
       .insert({
-        user_id: user.id,
-        event_type: eventType,
-        event_data: eventData || {},
-        points_earned: 0, // Will be updated if achievements are earned
+        user_id: userId,
+        activity_type: eventType,
+        activity_data: eventData,
         created_at: new Date().toISOString()
       });
       
-    if (eventError) {
-      console.error('Error recording achievement event:', eventError);
+    if (activityError) {
+      console.error('Error recording activity:', activityError);
     }
     
-    // Get user's existing achievements
-    const { data: userAchievements, error: achievementsError } = await supabase
-      .from('user_achievements')
-      .select('*')
-      .eq('user_id', user.id);
-      
-    if (achievementsError) {
-      console.error('Error fetching user achievements:', achievementsError);
-      throw achievementsError;
-    }
+    // Update progress values based on event type
+    await updateProgressValues(userId, eventType, eventData, response);
     
-    // Detect achievements based on the event
-    const newAchievements = detectAchievements(
-      eventType, 
-      eventData, 
-      userAchievements || []
-    );
+    // Check for unlocked achievements
+    await checkAchievements(userId, response);
     
-    // Process new achievements
-    if (newAchievements.length > 0) {
-      // Insert new achievements
-      const achievementInserts = newAchievements.map(achievement => ({
-        user_id: user.id,
-        achievement_id: achievement.id,
-        unlocked_at: new Date().toISOString(),
-        progress: 1,
-        achievement_data: achievement
-      }));
-      
-      const { data: insertedAchievements, error: insertError } = await supabase
-        .from('user_achievements')
-        .insert(achievementInserts)
-        .select();
+    // Award energy points if achievements were unlocked
+    if (response.unlockedAchievements.length > 0) {
+      const pointsToAward = response.unlockedAchievements.reduce((sum, achievement) => 
+        sum + (achievement.points || 0), 0);
         
-      if (insertError) {
-        console.error('Error inserting achievements:', insertError);
-        throw insertError;
-      }
-      
-      // Calculate points earned
-      const pointsEarned = newAchievements.reduce((sum, achievement) => sum + (achievement.points || 0), 0);
-      
-      // If points were earned, update user profile
-      if (pointsEarned > 0) {
-        const { error: updateError } = await supabase.rpc('add_energy_points', {
-          user_id_param: user.id,
-          points_param: pointsEarned
-        });
-        
-        if (updateError) {
-          console.error('Error updating energy points:', updateError);
-        }
+      if (pointsToAward > 0) {
+        await awardEnergyPoints(userId, pointsToAward);
+        response.energyPoints = pointsToAward;
       }
     }
     
-    return new Response(
-      JSON.stringify({
-        success: true,
-        unlockedAchievements: newAchievements,
-        eventRecorded: !eventError
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
-    );
+    return response;
   } catch (error) {
     console.error('Error processing achievement event:', error);
+    throw error;
+  }
+}
+
+// Helper function to update progress values
+async function updateProgressValues(
+  userId: string, 
+  eventType: string, 
+  eventData: Record<string, any>,
+  response: AchievementResponse
+): Promise<void> {
+  // Get progress tracking
+  const progressUpdates: Record<string, number> = {};
+  
+  // Map event types to progress categories
+  switch (eventType) {
+    case 'reflection_completed':
+      progressUpdates.reflections = 1;
+      break;
+    case 'meditation_completed':
+      progressUpdates.meditation_minutes = eventData.duration || 1;
+      break;
+    case 'chakra_activated':
+      progressUpdates.chakras_activated = 1;
+      break;
+    case 'wisdom_explored':
+      progressUpdates.wisdom_resources_explored = 1;
+      break;
+    case 'streak_updated':
+      // Don't increment, just set to the current value
+      progressUpdates.streakDays = eventData.currentStreak || 0;
+      break;
+    // Add more cases as needed
+  }
+  
+  // Update the user_progress table with the new values
+  for (const [category, amount] of Object.entries(progressUpdates)) {
+    // First, check if the progress record exists
+    const { data: existingProgress } = await supabase
+      .from('user_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('category', category)
+      .single();
     
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
+    let newValue = amount;
+    
+    if (existingProgress) {
+      // If it exists, update it
+      if (eventType === 'streak_updated') {
+        // For streaks, we set the value directly
+        newValue = amount;
+      } else {
+        // For other types, we increment
+        newValue = (existingProgress.value || 0) + amount;
       }
+      
+      const { error: updateError } = await supabase
+        .from('user_progress')
+        .update({ value: newValue, updated_at: new Date().toISOString() })
+        .eq('id', existingProgress.id);
+        
+      if (updateError) {
+        console.error(`Error updating progress for ${category}:`, updateError);
+      }
+    } else {
+      // If it doesn't exist, create it
+      const { error: insertError } = await supabase
+        .from('user_progress')
+        .insert({
+          user_id: userId,
+          category,
+          value: newValue,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (insertError) {
+        console.error(`Error creating progress for ${category}:`, insertError);
+      }
+    }
+    
+    // Add to response
+    response.updatedProgress[category] = newValue;
+  }
+}
+
+// Helper function to check for unlocked achievements
+async function checkAchievements(userId: string, response: AchievementResponse): Promise<void> {
+  // Get all achievement definitions
+  const { data: achievementDefinitions, error: definitionsError } = await supabase
+    .from('achievements')
+    .select('*');
+    
+  if (definitionsError || !achievementDefinitions) {
+    console.error('Error fetching achievement definitions:', definitionsError);
+    return;
+  }
+  
+  // Get all user progress
+  const { data: userProgress, error: progressError } = await supabase
+    .from('user_progress')
+    .select('*')
+    .eq('user_id', userId);
+    
+  if (progressError) {
+    console.error('Error fetching user progress:', progressError);
+    return;
+  }
+  
+  // Get already unlocked achievements
+  const { data: userAchievements, error: achievementsError } = await supabase
+    .from('user_achievements')
+    .select('*')
+    .eq('user_id', userId);
+    
+  if (achievementsError) {
+    console.error('Error fetching user achievements:', achievementsError);
+    return;
+  }
+  
+  // Create progress map for easier lookup
+  const progressMap: Record<string, number> = {};
+  userProgress?.forEach(p => {
+    progressMap[p.category] = p.value;
+  });
+  
+  // Create set of already unlocked achievement IDs
+  const unlockedAchievementIds = new Set(
+    userAchievements?.filter(a => a.progress >= 1)
+      .map(a => a.achievement_id) || []
+  );
+  
+  // Check each achievement to see if it should be unlocked
+  for (const achievement of achievementDefinitions) {
+    // Skip if already unlocked
+    if (unlockedAchievementIds.has(achievement.id)) {
+      continue;
+    }
+    
+    // Calculate progress based on achievement type
+    let progress = 0;
+    let shouldUnlock = false;
+    
+    switch (achievement.type) {
+      case 'streak':
+        if (achievement.streak_days && progressMap.streakDays >= achievement.streak_days) {
+          progress = 1;
+          shouldUnlock = true;
+        } else if (achievement.streak_days) {
+          progress = progressMap.streakDays / achievement.streak_days;
+        }
+        break;
+        
+      case 'milestone':
+        if (achievement.tracked_value && achievement.threshold) {
+          const value = progressMap[achievement.tracked_value] || 0;
+          if (value >= achievement.threshold) {
+            progress = 1;
+            shouldUnlock = true;
+          } else {
+            progress = value / achievement.threshold;
+          }
+        }
+        break;
+        
+      // Add other achievement types as needed
+    }
+    
+    // Get existing achievement record
+    const existingAchievement = userAchievements?.find(a => a.achievement_id === achievement.id);
+    
+    if (existingAchievement) {
+      // If it exists and progress changed, update it
+      if (progress > existingAchievement.progress) {
+        const { error: updateError } = await supabase
+          .from('user_achievements')
+          .update({
+            progress,
+            unlocked_at: shouldUnlock ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingAchievement.id);
+          
+        if (updateError) {
+          console.error('Error updating achievement:', updateError);
+        }
+        
+        if (shouldUnlock) {
+          response.unlockedAchievements.push({
+            id: achievement.id,
+            title: achievement.title,
+            description: achievement.description,
+            icon: achievement.icon,
+            points: achievement.points,
+            type: achievement.type
+          });
+        }
+      }
+    } else if (progress > 0) {
+      // If it doesn't exist and progress is > 0, create it
+      const { error: insertError } = await supabase
+        .from('user_achievements')
+        .insert({
+          user_id: userId,
+          achievement_id: achievement.id,
+          progress,
+          unlocked_at: shouldUnlock ? new Date().toISOString() : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          achievement_data: {
+            title: achievement.title,
+            description: achievement.description,
+            icon: achievement.icon,
+            points: achievement.points,
+            type: achievement.type
+          }
+        });
+        
+      if (insertError) {
+        console.error('Error creating achievement:', insertError);
+      }
+      
+      if (shouldUnlock) {
+        response.unlockedAchievements.push({
+          id: achievement.id,
+          title: achievement.title,
+          description: achievement.description,
+          icon: achievement.icon,
+          points: achievement.points,
+          type: achievement.type
+        });
+      }
+    }
+  }
+}
+
+// Helper function to award energy points
+async function awardEnergyPoints(userId: string, points: number): Promise<void> {
+  try {
+    // Call the add_energy_points function
+    const { error } = await supabase.rpc('add_energy_points', {
+      user_id_param: userId,
+      points_param: points
+    });
+    
+    if (error) {
+      console.error('Error awarding energy points:', error);
+    }
+  } catch (error) {
+    console.error('Exception awarding energy points:', error);
+  }
+}
+
+// Main handler
+Deno.serve(async (req) => {
+  try {
+    // Check if the request has a valid JWT
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ message: 'Missing authorization header' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify the JWT and get the user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ message: 'Invalid token or user not found' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get the achievement event
+    const event = await req.json() as AchievementEvent;
+    
+    // Process the event
+    const response = await processAchievementEvent(user.id, event);
+
+    // Return the response
+    return new Response(
+      JSON.stringify(response),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error in track-achievement function:', error);
+    return new Response(
+      JSON.stringify({ message: 'Internal server error', error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-})
+});

@@ -9,7 +9,16 @@ import { Trash, RefreshCw, AlertTriangle, Clock, Zap, Cloud, Database } from 'lu
 import { usePerfConfig } from '@/hooks/usePerfConfig';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
-import { Database } from '@/types/supabase';
+
+// Define the PerformanceMetric type to avoid type errors
+interface PerformanceMetric {
+  component_name: string;
+  average_render_time: number;
+  total_renders: number;
+  slow_renders: number;
+  created_at: string;
+  [key: string]: any;
+}
 
 // Component for displaying performance insights and metrics
 const PerformanceInsights: React.FC = () => {
@@ -17,7 +26,7 @@ const PerformanceInsights: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [refreshKey, setRefreshKey] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [backendMetrics, setBackendMetrics] = useState<any[]>([]);
+  const [backendMetrics, setBackendMetrics] = useState<PerformanceMetric[]>([]);
   const [isLoadingBackend, setIsLoadingBackend] = useState(false);
   const config = usePerfConfig();
 
@@ -64,7 +73,7 @@ const PerformanceInsights: React.FC = () => {
       setIsLoadingBackend(true);
       
       const { data, error } = await supabase
-        .from('performance_metrics' as keyof Database['public']['Tables'])
+        .from('performance_metrics')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(5);

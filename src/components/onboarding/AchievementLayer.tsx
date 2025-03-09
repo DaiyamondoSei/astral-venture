@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAchievementTracker } from './hooks/achievement/useAchievementTracker';
 import { useAchievementNotification } from './hooks/useAchievementNotification';
 import AchievementNotification from './AchievementNotification';
 import AchievementProgressTracker from './AchievementProgressTracker';
-import { StepInteraction } from './hooks/achievement/types';
+import { StepInteraction } from '@/types/achievement';
 import { useUserStreak } from '@/hooks/useUserStreak';
 import { getPerformanceCategory } from '@/utils/performanceUtils';
 

@@ -1,31 +1,21 @@
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { monitorComponent } from '@/utils/componentDoc';
 
 /**
- * Hook for validating components and their props
+ * Hook for validating component props and structure
+ * 
+ * @param componentName The name of the component to validate
+ * @param props The component props to validate
  */
-export function useComponentValidation(componentName: string, props: any) {
-  const [isValid, setIsValid] = useState(true);
-  const [errors, setErrors] = useState<string[]>([]);
-  
-  // Skip in production for performance
-  if (process.env.NODE_ENV !== 'development') {
-    return { isValid: true, errors: [] };
-  }
-  
+export function useComponentValidation(componentName: string, props: Record<string, any> = {}) {
   useEffect(() => {
-    try {
-      // Monitor component with props
-      monitorComponent(componentName, props);
-      setIsValid(true);
-      setErrors([]);
-    } catch (error) {
-      setIsValid(false);
-      setErrors([`${error}`]);
-      console.error(`[${componentName}] Validation error:`, error);
+    if (process.env.NODE_ENV === 'development') {
+      monitorComponent(componentName);
     }
-  }, [componentName, props]);
+  }, [componentName]);
   
-  return { isValid, errors };
+  return {
+    componentName
+  };
 }

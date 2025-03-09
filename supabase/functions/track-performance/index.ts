@@ -1,122 +1,101 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+interface PerformanceMetric {
+  componentName: string;
+  averageRenderTime: number;
+  renderCount: number;
+  slowRenders: number;
+  timestamp: string;
 }
 
-// Create a Supabase client with the auth context of the function
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+interface PerformanceRequest {
+  metrics: PerformanceMetric[];
+  sessionId: string;
+  deviceInfo: {
+    userAgent: string;
+    screenWidth: number;
+    screenHeight: number;
+  };
+}
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+// These are automatically injected when deployed on Supabase
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+Deno.serve(async (req) => {
   try {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+    // Check if the request has a valid JWT
+    const authHeader = req.headers.get('Authorization');
+    let userId = 'anonymous';
     
-    // Get the authorization header from the request
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('Missing Authorization header')
-    }
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
-    
-    if (userError || !user) {
-      throw new Error('Error getting user or user not found')
-    }
-    
-    // Get the performance metrics from the request
-    const { metrics, sessionId, deviceInfo } = await req.json()
-    
-    if (!metrics || !Array.isArray(metrics)) {
-      throw new Error('Invalid metrics format')
-    }
-    
-    console.log(`Processing ${metrics.length} performance metrics for user ${user.id}`)
-    
-    // Group metrics by component name
-    const groupedMetrics = metrics.reduce((acc, metric) => {
-      const { componentName } = metric
-      if (!acc[componentName]) {
-        acc[componentName] = []
+    if (authHeader) {
+      // Verify the JWT and get the user
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      
+      if (!userError && user) {
+        userId = user.id;
       }
-      acc[componentName].push(metric)
-      return acc
-    }, {})
+    }
     
-    // Process and store the metrics for each component
-    const results = await Promise.all(
-      Object.entries(groupedMetrics).map(async ([componentName, componentMetrics]) => {
-        // Calculate aggregated metrics
-        const renderTimes = componentMetrics
-          .map(m => m.renderTime)
-          .filter(time => typeof time === 'number')
-        
-        if (renderTimes.length === 0) return null
-        
-        const totalRenders = renderTimes.length
-        const averageRenderTime = renderTimes.reduce((sum, time) => sum + time, 0) / totalRenders
-        const slowRenders = renderTimes.filter(time => time > 16).length
-        
-        // Store aggregated metrics in the database
-        const { data, error } = await supabase
-          .from('performance_metrics')
-          .insert({
-            user_id: user.id,
-            component_name: componentName,
-            average_render_time: averageRenderTime,
-            total_renders: totalRenders,
-            slow_renders: slowRenders,
-            metrics_data: componentMetrics,
-            session_id: sessionId,
-            device_info: deviceInfo
-          })
-        
-        if (error) {
-          console.error(`Error storing metrics for ${componentName}:`, error)
-          return { componentName, success: false, error: error.message }
-        }
-        
-        return { componentName, success: true, averageRenderTime, totalRenders }
-      })
-    )
+    // Get the performance metrics
+    const { metrics, sessionId, deviceInfo } = await req.json() as PerformanceRequest;
     
-    // Filter out null results
-    const validResults = results.filter(Boolean)
+    if (!metrics || !Array.isArray(metrics) || metrics.length === 0) {
+      return new Response(
+        JSON.stringify({ message: 'No metrics provided' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
     
+    // Process metrics and insert into database
+    const timestamp = new Date().toISOString();
+    
+    // Prepare metrics for insertion
+    const metricsToInsert = metrics.map(metric => ({
+      user_id: userId,
+      session_id: sessionId,
+      component_name: metric.componentName,
+      average_render_time: metric.averageRenderTime,
+      total_renders: metric.renderCount,
+      slow_renders: metric.slowRenders,
+      device_info: deviceInfo,
+      created_at: timestamp
+    }));
+    
+    // Insert metrics into database
+    const { error: insertError } = await supabase
+      .from('performance_metrics')
+      .insert(metricsToInsert);
+      
+    if (insertError) {
+      console.error('Error inserting performance metrics:', insertError);
+      
+      return new Response(
+        JSON.stringify({ 
+          message: 'Error inserting performance metrics', 
+          error: insertError.message 
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Return success response
     return new Response(
-      JSON.stringify({
-        success: true,
-        processedComponents: validResults.length,
-        results: validResults
+      JSON.stringify({ 
+        message: 'Performance metrics recorded successfully',
+        metricsCount: metricsToInsert.length
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
-    )
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error('Error processing performance metrics:', error)
+    console.error('Error in track-performance function:', error);
     
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      }
-    )
+      JSON.stringify({ message: 'Internal server error', error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
-})
+});

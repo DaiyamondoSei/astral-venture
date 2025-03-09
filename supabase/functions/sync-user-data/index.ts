@@ -1,184 +1,115 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+interface SyncRequest {
+  lastSyncTime: string | null;
 }
 
-// Create a Supabase client with the auth context of the function
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+interface SyncResponse {
+  achievements: any[];
+  userStats: any;
+  streak: any;
+  preferences: any;
+  timestamp: string;
+}
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+// These are automatically injected when deployed on Supabase
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+Deno.serve(async (req) => {
   try {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-    
-    // Get the authorization header from the request
-    const authHeader = req.headers.get('Authorization')
+    // Check if the request has a valid JWT
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('Missing Authorization header')
+      return new Response(
+        JSON.stringify({ message: 'Missing authorization header' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
     }
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
-    
+
+    // Verify the JWT and get the user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
     if (userError || !user) {
-      throw new Error('Error getting user or user not found')
+      return new Response(
+        JSON.stringify({ message: 'Invalid token or user not found' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
     }
-    
-    // Get request data
-    const { section, lastSyncTimestamp } = await req.json()
-    
-    // Default response data
-    let responseData = {}
-    
-    // Handle different sync sections
-    switch (section) {
-      case 'user_profile':
-        // Get user profile data
-        const { data: profileData, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-          
-        if (profileError) {
-          throw profileError
-        }
-        
-        responseData = { profile: profileData }
-        break
-        
-      case 'achievements':
-        // Get user achievements with changes since last sync
-        const { data: achievementsData, error: achievementsError } = await supabase
-          .from('user_achievements')
-          .select('*')
-          .eq('user_id', user.id)
-          .gte('updated_at', lastSyncTimestamp || '1970-01-01')
-          
-        if (achievementsError) {
-          throw achievementsError
-        }
-        
-        responseData = { achievements: achievementsData }
-        break
-        
-      case 'energy_reflections':
-        // Get reflections with changes since last sync
-        const { data: reflectionsData, error: reflectionsError } = await supabase
-          .from('energy_reflections')
-          .select('*')
-          .eq('user_id', user.id)
-          .gte('created_at', lastSyncTimestamp || '1970-01-01')
-          .order('created_at', { ascending: false })
-          
-        if (reflectionsError) {
-          throw reflectionsError
-        }
-        
-        responseData = { reflections: reflectionsData }
-        break
-        
-      case 'activity':
-        // Get activity data
-        const { data: activityData, error: activityError } = await supabase
-          .from('user_activities')
-          .select('*')
-          .eq('user_id', user.id)
-          .gte('created_at', lastSyncTimestamp || '1970-01-01')
-          .order('created_at', { ascending: false })
-          
-        if (activityError) {
-          throw activityError
-        }
-        
-        responseData = { activity: activityData }
-        break
-        
-      case 'streak':
-        // Get streak data
-        const { data: streakData, error: streakError } = await supabase
-          .from('user_streaks')
-          .select('*')
-          .eq('user_id', user.id)
-          .single()
-          
-        if (streakError) {
-          throw streakError
-        }
-        
-        responseData = { streak: streakData }
-        break
-        
-      case 'all':
-        // Fetch all user data (for initial sync)
-        const [
-          profileResult, 
-          achievementsResult, 
-          reflectionsResult,
-          activityResult,
-          streakResult
-        ] = await Promise.all([
-          supabase.from('user_profiles').select('*').eq('id', user.id).single(),
-          supabase.from('user_achievements').select('*').eq('user_id', user.id),
-          supabase.from('energy_reflections').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
-          supabase.from('user_activities').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
-          supabase.from('user_streaks').select('*').eq('user_id', user.id).single()
-        ])
-        
-        if (profileResult.error || achievementsResult.error || reflectionsResult.error || 
-            activityResult.error || streakResult.error) {
-          throw new Error('Error fetching user data')
-        }
-        
-        responseData = {
-          profile: profileResult.data,
-          achievements: achievementsResult.data,
-          reflections: reflectionsResult.data,
-          activity: activityResult.data,
-          streak: streakResult.data,
-        }
-        break
-        
-      default:
-        throw new Error(`Unknown sync section: ${section}`)
+
+    // Get the sync request data
+    const { lastSyncTime } = await req.json() as SyncRequest;
+
+    // Query for all user data that needs to be synced
+    const syncTimestamp = new Date().toISOString();
+    const modifiedSince = lastSyncTime || new Date(0).toISOString();
+
+    // Query for achievements
+    const { data: achievements, error: achievementsError } = await supabase
+      .from('user_achievements')
+      .select('*')
+      .eq('user_id', user.id)
+      .gt('updated_at', modifiedSince);
+
+    if (achievementsError) {
+      console.error('Error fetching achievements:', achievementsError);
     }
-    
-    // Add sync timestamp to response
-    responseData.syncTimestamp = new Date().toISOString()
-    
+
+    // Query for user stats
+    const { data: userStats, error: statsError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (statsError) {
+      console.error('Error fetching user stats:', statsError);
+    }
+
+    // Query for streak data
+    const { data: streak, error: streakError } = await supabase
+      .from('user_streaks')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (streakError) {
+      console.error('Error fetching streak data:', streakError);
+    }
+
+    // Query for user preferences
+    const { data: preferences, error: preferencesError } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (preferencesError) {
+      console.error('Error fetching user preferences:', preferencesError);
+    }
+
+    // Prepare the response
+    const syncResponse: SyncResponse = {
+      achievements: achievements || [],
+      userStats: userStats || null,
+      streak: streak || null,
+      preferences: preferences || null,
+      timestamp: syncTimestamp
+    };
+
+    // Return the synced data
     return new Response(
-      JSON.stringify({
-        success: true,
-        data: responseData
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
-    )
+      JSON.stringify(syncResponse),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error('Error syncing user data:', error)
-    
+    console.error('Error in sync-user-data function:', error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      }
-    )
+      JSON.stringify({ message: 'Internal server error', error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
-})
+});

@@ -87,7 +87,7 @@ export const AchievementProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
   
   // Get progress for a specific achievement
-  const getAchievementProgress = useCallback((id: string) => {
+  const getAchievementProgress = useCallback((id: string): number => {
     const achievement = state.achievements.find(a => a.id === id);
     return achievement?.progress || 0;
   }, [state.achievements]);

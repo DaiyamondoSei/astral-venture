@@ -11,7 +11,7 @@ export function useAchievementDetection(
   setEarnedAchievements: React.Dispatch<React.SetStateAction<AchievementData[]>>,
   setAchievementHistory: React.Dispatch<React.SetStateAction<Record<string, {awarded: boolean, timestamp: string, tier?: number}>>>
 ) {
-  const { completedSteps, stepInteractions, userId } = props;
+  const { userId, completedSteps = {}, stepInteractions = [] } = props;
   const { achievementHistory, progressTracking } = state;
   const { toast } = useToast();
 

@@ -1,6 +1,6 @@
 
 import { IAchievementData } from '../../data/types';
-import { StepInteraction } from '../../data/types';
+import { StepInteraction } from '@/types/achievement';
 
 /**
  * Achievement state for managing user progress and earned achievements
@@ -64,6 +64,8 @@ export interface AchievementTrackerProps {
   uniqueChakrasActivated?: number;
   totalPoints?: number;
   wisdomResourcesExplored?: number;
+  completedSteps?: Record<string, boolean>;
+  stepInteractions?: StepInteraction[];
 }
 
 /**
@@ -85,12 +87,4 @@ export interface AchievementTrackerResult {
 /**
  * Types of achievement events that can be tracked
  */
-export enum AchievementEventType {
-  REFLECTION_COMPLETED = 'reflection_completed',
-  MEDITATION_COMPLETED = 'meditation_completed',
-  PRACTICE_COMPLETED = 'practice_completed',
-  CHAKRA_ACTIVATED = 'chakra_activated',
-  WISDOM_EXPLORED = 'wisdom_explored',
-  STREAK_MILESTONE = 'streak_milestone',
-  POINTS_MILESTONE = 'points_milestone'
-}
+export { AchievementEventType } from '@/types/achievement';

@@ -7,7 +7,7 @@ export function useAchievementProgress(
   props: AchievementTrackerProps,
   state: AchievementState
 ) {
-  const { completedSteps } = props;
+  const { completedSteps = {} } = props;
   const { achievementHistory, progressTracking } = state;
 
   // Get achievement progress percentage for a specific achievement
@@ -60,6 +60,8 @@ export function useAchievementProgress(
         
         return 0;
     }
+    
+    return 0;
   }, [achievementHistory, completedSteps, progressTracking]);
 
   // Get total earned points

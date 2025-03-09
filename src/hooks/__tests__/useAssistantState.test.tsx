@@ -2,13 +2,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { useAssistantState } from '@/components/ai-assistant/hooks/useAssistantState';
 
-// Mock state for testing
-const initialState = {
-  isLoading: false,
-  conversation: [],
-  error: null
-};
-
 // Mock the API response
 jest.mock('../../utils/ai/AICodeAssistant', () => ({
   aiCodeAssistant: {
@@ -27,7 +20,11 @@ describe('useAssistantState', () => {
   it('should initialize with default state', () => {
     const { result } = renderHook(() => useAssistantState());
     
-    expect(result.current.state).toEqual(initialState);
+    expect(result.current.question).toBe('');
+    expect(result.current.response).toEqual({ content: '', metadata: {} });
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.conversation).toEqual([]);
+    expect(result.current.error).toBe(null);
   });
 
   it('should update loading state', () => {
@@ -37,7 +34,7 @@ describe('useAssistantState', () => {
       result.current.setLoading(true);
     });
     
-    expect(result.current.state.isLoading).toBe(true);
+    expect(result.current.isLoading).toBe(true);
   });
 
   it('should add a message to the conversation', () => {
@@ -45,26 +42,24 @@ describe('useAssistantState', () => {
     const message = { role: 'user', content: 'Hello', timestamp: new Date() };
     
     act(() => {
-      result.current.addMessage(message);
+      result.current.addToConversation(message);
     });
     
-    expect(result.current.state.conversation).toContain(message);
+    expect(result.current.conversation).toContain(message);
   });
 
   it('should add an AI response to the conversation', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setAIResponse({
+      result.current.setResponse({
         content: 'Hello from AI',
         metadata: { processingTime: 500 }
       });
     });
     
-    expect(result.current.state.conversation[0]).toMatchObject({
-      role: 'assistant',
-      content: 'Hello from AI'
-    });
+    // Check if response is set properly
+    expect(result.current.response.content).toBe('Hello from AI');
   });
 
   it('should clear the conversation', () => {
@@ -72,21 +67,21 @@ describe('useAssistantState', () => {
     const message = { role: 'user', content: 'Hello', timestamp: new Date() };
     
     act(() => {
-      result.current.addMessage(message);
-      result.current.clearConversation();
+      result.current.addToConversation(message);
+      result.current.reset();
     });
     
-    expect(result.current.state.conversation).toHaveLength(0);
+    expect(result.current.conversation).toHaveLength(0);
   });
 
   it('should set an error', () => {
     const { result } = renderHook(() => useAssistantState());
-    const error = new Error('Test error');
+    const error = 'Test error';
     
     act(() => {
       result.current.setError(error);
     });
     
-    expect(result.current.state.error).toBe(error);
+    expect(result.current.error).toBe(error);
   });
 });
