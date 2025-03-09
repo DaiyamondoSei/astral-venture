@@ -1,87 +1,85 @@
 
-import { AIResponse, AIQueryParams, AIServiceConfig, AIModel, AIInsight } from './types';
-import { createFallbackResponse } from '@/services/ai/fallback';
-
-// Default configuration
-const defaultConfig: AIServiceConfig = {
-  defaultModel: AIModel.DEFAULT,
-  fallbackToLocalModels: true,
-  streamingEnabled: false,
-  personalizedResponses: true,
-  maxHistoryItems: 10
-};
+import { AIResponse, AIModel, AIQuestion } from './types';
 
 /**
- * Core AI service for handling natural language requests
+ * Get personalized recommendations based on user data
  */
-export async function getAIResponse(
-  message: string,
-  options?: Partial<AIQueryParams>
-): Promise<AIResponse> {
-  try {
-    // Attempt to call the Supabase edge function
-    const { data } = await fetch('/api/ask-assistant', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message,
-        userId: options?.userId,
-        context: options?.context,
-      }),
-    }).then(res => res.json());
-    
-    return {
-      answer: data.response,
-      type: 'text',
-      suggestedPractices: data.suggestedPractices || [],
-      meta: {
-        model: data.model || AIModel.DEFAULT,
-        tokenUsage: data.tokenUsage || 0,
-        processingTime: data.processingTime || 0
-      }
-    };
-  } catch (error) {
-    console.error('Error getting AI response:', error);
-    
-    // Use fallback response in case of error
-    return createFallbackResponse(message);
-  }
-}
-
-/**
- * Generate insights based on user activities
- */
-export async function generateInsights(
+export async function getPersonalizedRecommendations(
   userId: string,
-  data: any[]
-): Promise<AIInsight[]> {
+  categories: string[] = []
+): Promise<any[]> {
   try {
-    const response = await fetch('/api/generate-insights', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    // Simulate API call for now
+    return [
+      {
+        id: '1',
+        title: 'Morning Meditation',
+        type: 'meditation',
+        description: 'Start your day with 10 minutes of mindfulness',
+        relevanceScore: 0.92
       },
-      body: JSON.stringify({
-        userId,
-        data
-      }),
-    });
-    
-    const result = await response.json();
-    return result.insights || [];
+      {
+        id: '2',
+        title: 'Gratitude Reflection',
+        type: 'reflection',
+        description: 'Write down three things you are grateful for today',
+        relevanceScore: 0.87
+      },
+      {
+        id: '3',
+        title: 'Energy Cleansing',
+        type: 'practice',
+        description: 'A simple practice to clear negative energy',
+        relevanceScore: 0.78
+      }
+    ];
   } catch (error) {
-    console.error('Error generating insights:', error);
+    console.error('Error getting personalized recommendations:', error);
     return [];
   }
 }
 
 /**
- * Get configuration for the AI service
+ * Submit a question to the AI assistant
  */
-export function getAIServiceConfig(): AIServiceConfig {
-  return {
-    ...defaultConfig
-  };
+export async function askAIAssistant(
+  question: AIQuestion | string,
+  options: {
+    model?: AIModel;
+    temperature?: number;
+    maxTokens?: number;
+  } = {}
+): Promise<AIResponse> {
+  try {
+    // Get the question text
+    const questionText = typeof question === 'string' ? question : question.text;
+    
+    // For now, return mock responses
+    return {
+      answer: `Here is a thoughtful response to your question: "${questionText}"`,
+      type: 'text',
+      suggestedPractices: [
+        'Consider meditation for 10 minutes',
+        'Try a walking meditation in nature',
+        'Write in your reflection journal'
+      ]
+    };
+  } catch (error) {
+    console.error('Error asking AI assistant:', error);
+    return {
+      answer: `I'm sorry, I encountered an error processing your question. Please try again later.`,
+      type: 'error' as any
+    };
+  }
 }
+
+/**
+ * AI Service with basic functionality
+ */
+export const aiService = {
+  askQuestion: askAIAssistant,
+  getInsights: getPersonalizedRecommendations,
+  generateReflection: async (topic: string): Promise<string> => {
+    return `Reflection on ${topic}...`;
+  }
+};

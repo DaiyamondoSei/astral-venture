@@ -1,10 +1,17 @@
 
 // AI Service Types
 
+export interface AIQuestion {
+  text: string;
+  context?: string;
+  userId?: string;
+}
+
 export interface AIResponse {
   answer: string;
-  type: 'text' | 'meditation' | 'reflection' | 'wisdom';
+  type: 'text' | 'meditation' | 'reflection' | 'wisdom' | 'error';
   suggestedPractices?: string[];
+  sources?: string[];
   meta?: {
     model?: string;
     tokenUsage?: number;

@@ -1,108 +1,97 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { featureTooltips, guidedTours, FeatureTooltipData, GuidedTourData } from '../data';
-import { useToast } from '@/components/ui/use-toast';
+import { useState, useEffect } from 'react';
+import { useOnboarding } from '@/contexts/onboarding';
+import { featureTooltips, guidedTours } from '../data';
+import { FeatureTooltipData, GuidedTourData } from '../hooks/achievement/types';
 
-export const useFeatureDiscovery = (hasCompletedOnboarding: boolean) => {
-  const [seenTooltips, setSeenTooltips] = useState<Record<string, boolean>>({});
-  const [completedTours, setCompletedTours] = useState<Record<string, boolean>>({});
-  const [showFeatureTooltips, setShowFeatureTooltips] = useState(false);
-  const [activeTour, setActiveTour] = useState<string>('');
+/**
+ * Hook to manage feature discovery tooltips and guided tours
+ */
+export function useFeatureDiscovery(hasCompletedOnboarding: boolean) {
   const [activeTooltips, setActiveTooltips] = useState<FeatureTooltipData[]>([]);
-  const { toast } = useToast();
+  const [activeTour, setActiveTour] = useState<string | null>(null);
+  const [dismissedTooltips, setDismissedTooltips] = useState<Record<string, boolean>>({});
+  const [dismissedTours, setDismissedTours] = useState<Record<string, boolean>>({});
   
-  // Load seen tooltips and completed tours
+  const { 
+    completedSteps, 
+    currentStep, 
+    hasCompletedAnyStep 
+  } = useOnboarding();
+
+  // Filter and show appropriate tooltips and tours
   useEffect(() => {
-    const userId = localStorage.getItem('userId') || 'anonymous';
-    const stored = localStorage.getItem(`seen-tooltips-${userId}`);
-    if (stored) {
-      setSeenTooltips(JSON.parse(stored));
-    }
+    if (!hasCompletedAnyStep) return;
     
-    const storedTours = localStorage.getItem(`completed-tours-${userId}`);
-    if (storedTours) {
-      setCompletedTours(JSON.parse(storedTours));
-    }
+    // Only allow one active tour at a time
+    if (activeTour) return;
     
-    // Only show tooltips if user has completed onboarding
-    setShowFeatureTooltips(hasCompletedOnboarding);
-  }, [hasCompletedOnboarding]);
-  
-  // Determine which tooltips to show
-  useEffect(() => {
-    if (!showFeatureTooltips) {
-      setActiveTooltips([]);
-      return;
-    }
-    
-    // Find eligible tooltips (not seen yet)
-    const eligibleTooltips = featureTooltips.filter(tooltip => 
-      !seenTooltips[tooltip.id] && 
-      (!tooltip.requiredStep || localStorage.getItem(`step-completed-${tooltip.requiredStep}`))
-    );
-    
-    // Limit to max 1 tooltip at a time
-    setActiveTooltips(eligibleTooltips.slice(0, 1));
-    
-    // Check if we should start a tour
-    if (eligibleTooltips.length === 0 && !activeTour) {
-      const eligibleTour = guidedTours.find(tour => 
-        !completedTours[tour.id] && 
-        (!tour.requiredStep || localStorage.getItem(`step-completed-${tour.requiredStep}`))
-      );
+    // Filter tooltips based on completed steps and conditions
+    const eligibleTooltips = featureTooltips.filter(tooltip => {
+      // Skip if already dismissed
+      if (dismissedTooltips[tooltip.id]) return false;
       
-      if (eligibleTour) {
-        setActiveTour(eligibleTour.id);
-        toast({
-          title: "Guided Tour Available",
-          description: `Learn about ${eligibleTour.title}`,
-          duration: 5000,
-        });
+      // Check if required step is completed
+      if (tooltip.requiredStep && completedSteps) {
+        if (!completedSteps[tooltip.requiredStep]) return false;
       }
-    }
-  }, [showFeatureTooltips, seenTooltips, completedTours, activeTour, toast]);
-  
-  const dismissTooltip = useCallback((tooltipId: string) => {
-    const userId = localStorage.getItem('userId') || 'anonymous';
-    const updatedSeenTooltips = { ...seenTooltips, [tooltipId]: true };
-    setSeenTooltips(updatedSeenTooltips);
-    localStorage.setItem(`seen-tooltips-${userId}`, JSON.stringify(updatedSeenTooltips));
-    
-    // Remove from active tooltips
-    setActiveTooltips(prev => prev.filter(t => t.id !== tooltipId));
-  }, [seenTooltips]);
-  
-  const dismissTour = useCallback((tourId: string) => {
-    const userId = localStorage.getItem('userId') || 'anonymous';
-    const updatedCompletedTours = { ...completedTours, [tourId]: true };
-    setCompletedTours(updatedCompletedTours);
-    localStorage.setItem(`completed-tours-${userId}`, JSON.stringify(updatedCompletedTours));
-    
-    // Clear active tour
-    setActiveTour('');
-    
-    toast({
-      title: "Tour Completed",
-      description: "You've completed this guided tour. Continue exploring!",
-      duration: 3000,
+      
+      // Check condition
+      if (tooltip.condition === 'isFirstLogin' && hasCompletedOnboarding) return false;
+      if (tooltip.condition === 'hasCompletedOnboarding' && !hasCompletedOnboarding) return false;
+      
+      return true;
     });
-  }, [completedTours, toast]);
+    
+    setActiveTooltips(eligibleTooltips);
+    
+    // Determine if any tour should be shown
+    const eligibleTour = guidedTours.find(tour => {
+      // Skip if already dismissed
+      if (dismissedTours[tour.id]) return false;
+      
+      // Check if required step is completed
+      if (tour.requiredStep && completedSteps) {
+        if (!completedSteps[tour.requiredStep]) return false;
+      }
+      
+      // Check condition
+      if (tour.condition === 'isFirstLogin' && hasCompletedOnboarding) return false;
+      if (tour.condition === 'hasCompletedOnboarding' && !hasCompletedOnboarding) return false;
+      
+      return true;
+    });
+    
+    if (eligibleTour) {
+      setActiveTour(eligibleTour.id);
+    }
+  }, [completedSteps, currentStep, dismissedTooltips, dismissedTours, activeTour, hasCompletedAnyStep, hasCompletedOnboarding]);
+
+  // Dismiss a tooltip
+  const dismissTooltip = (id: string) => {
+    setDismissedTooltips(prev => ({
+      ...prev,
+      [id]: true
+    }));
+    
+    setActiveTooltips(prev => prev.filter(tooltip => tooltip.id !== id));
+  };
   
-  // Handle existing methods for backward compatibility
-  const handleTooltipDismiss = useCallback((tooltipId: string) => dismissTooltip(tooltipId), [dismissTooltip]);
-  const handleTourComplete = useCallback((tourId: string) => dismissTour(tourId), [dismissTour]);
-  
+  // Dismiss a tour
+  const dismissTour = (id: string) => {
+    setDismissedTours(prev => ({
+      ...prev,
+      [id]: true
+    }));
+    
+    setActiveTour(null);
+  };
+
   return {
     activeTooltips,
     activeTour,
     guidedTours,
-    featureTooltips,
-    seenTooltips,
-    completedTours,
-    showFeatureTooltips,
     dismissTooltip,
-    dismissTour,
-    handleTooltipDismiss,
-    handleTourComplete
+    dismissTour
   };
-};
+}

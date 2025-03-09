@@ -1,5 +1,7 @@
 
-// Performance utility enum and helper functions
+/**
+ * Performance utility functions and device capability detection
+ */
 
 export enum DeviceCapability {
   LOW = 'low',
@@ -7,84 +9,6 @@ export enum DeviceCapability {
   HIGH = 'high'
 }
 
-/**
- * Get the device capability category based on device information
- */
-export function getPerformanceCategory(): DeviceCapability {
-  // Check for low memory devices
-  if (navigator.deviceMemory && navigator.deviceMemory < 4) {
-    return DeviceCapability.LOW;
-  }
-  
-  // Check for hardware concurrency (CPU cores)
-  if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) {
-    return DeviceCapability.LOW;
-  } else if (navigator.hardwareConcurrency && navigator.hardwareConcurrency >= 8) {
-    return DeviceCapability.HIGH;
-  }
-  
-  // Default to medium capability
-  return DeviceCapability.MEDIUM;
-}
-
-/**
- * Check if the device is likely to have low performance
- */
-export function isLowPerformanceDevice(): boolean {
-  return getPerformanceCategory() === DeviceCapability.LOW;
-}
-
-/**
- * Check if the device is likely to have high performance
- */
-export function isHighPerformanceDevice(): boolean {
-  return getPerformanceCategory() === DeviceCapability.HIGH;
-}
-
-/**
- * Set performance mode based on device capability
- */
-export function setPerformanceMode(capability: DeviceCapability | 'auto' = 'auto'): DeviceCapability {
-  if (capability === 'auto') {
-    return getPerformanceCategory();
-  }
-  return capability;
-}
-
-/**
- * Throttle a function call
- */
-export function throttle<T extends (...args: any[]) => any>(func: T, delay: number): (...args: Parameters<T>) => void {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= delay) {
-      lastCall = now;
-      func(...args);
-    }
-  };
-}
-
-/**
- * Debounce a function call
- */
-export function debounce<T extends (...args: any[]) => any>(func: T, delay: number): (...args: Parameters<T>) => void {
-  let timeoutId: number | undefined;
-  
-  return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    
-    timeoutId = window.setTimeout(() => {
-      func(...args);
-    }, delay);
-  };
-}
-
-/**
- * Define rendering frequency enum
- */
 export enum RenderFrequency {
   NORMAL = 'normal',
   FREQUENT = 'frequent',
@@ -92,16 +16,96 @@ export enum RenderFrequency {
 }
 
 /**
- * Calculate render frequency
+ * Detect device capability based on hardware and browser features
  */
-export function calculateRenderFrequency(renderCount: number, timeWindow: number = 1000): RenderFrequency {
-  const rendersPerSecond = (renderCount / timeWindow) * 1000;
+export function getPerformanceCategory(): DeviceCapability {
+  if (typeof window === 'undefined') return DeviceCapability.MEDIUM;
   
-  if (rendersPerSecond > 5) {
-    return RenderFrequency.EXCESSIVE;
-  } else if (rendersPerSecond > 2) {
-    return RenderFrequency.FREQUENT;
+  // Check if we already have a stored value
+  if ((window as any).__deviceCapability) {
+    return (window as any).__deviceCapability;
   }
   
-  return RenderFrequency.NORMAL;
+  // Check for known mobile devices
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Check for hardware concurrency (CPU cores)
+  const cpuCores = navigator.hardwareConcurrency || 0;
+  
+  // Device memory is not supported in all browsers
+  const memory = navigator.deviceMemory !== undefined ? navigator.deviceMemory : 4;
+  
+  // Use user agent for additional signals
+  const isOldBrowser = /MSIE|Trident/.test(navigator.userAgent);
+  
+  // Determine category based on hardware capabilities
+  if (isOldBrowser || (isMobile && (cpuCores <= 2 || memory <= 2))) {
+    return DeviceCapability.LOW;
+  } else if ((isMobile && cpuCores <= 4) || (!isMobile && cpuCores <= 2)) {
+    return DeviceCapability.MEDIUM;
+  } else {
+    return DeviceCapability.HIGH;
+  }
+}
+
+/**
+ * Start monitoring performance
+ */
+export function monitorPerformance(): void {
+  import('./performance/PerformanceMonitor').then(({ performanceMonitor }) => {
+    performanceMonitor.startMonitoring();
+  });
+}
+
+/**
+ * Create a performance throttled function
+ */
+export function throttleForPerformance<T extends (...args: any[]) => any>(
+  fn: T, 
+  deviceCapability: DeviceCapability, 
+  options: { low?: number; medium?: number; high?: number } = {}
+): (...args: Parameters<T>) => ReturnType<T> | undefined {
+  const { low = 500, medium = 250, high = 100 } = options;
+  
+  let lastCall = 0;
+  let timeoutId: NodeJS.Timeout | null = null;
+  let throttleTime: number;
+  
+  // Set throttle time based on device capability
+  switch (deviceCapability) {
+    case DeviceCapability.LOW:
+      throttleTime = low;
+      break;
+    case DeviceCapability.MEDIUM:
+      throttleTime = medium;
+      break;
+    case DeviceCapability.HIGH:
+      throttleTime = high;
+      break;
+    default:
+      throttleTime = medium;
+  }
+  
+  return function(...args: Parameters<T>): ReturnType<T> | undefined {
+    const now = Date.now();
+    
+    if (now - lastCall < throttleTime) {
+      // Clear any existing timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      // Schedule the function call
+      timeoutId = setTimeout(() => {
+        lastCall = Date.now();
+        timeoutId = null;
+        fn(...args);
+      }, throttleTime - (now - lastCall));
+      
+      return undefined;
+    }
+    
+    lastCall = now;
+    return fn(...args);
+  };
 }

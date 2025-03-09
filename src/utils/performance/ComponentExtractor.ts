@@ -1,121 +1,72 @@
 
 /**
- * Utility for extracting component information for analysis
+ * Utility class for extracting component information
  */
-
-interface ComponentInfo {
-  name: string;
-  complexity: number;
-  dependencies: string[];
-  hooks: string[];
-  childComponents: string[];
-}
-
-class ComponentExtractor {
-  private components: Map<string, ComponentInfo> = new Map();
-  
+export class ComponentExtractor {
   /**
-   * Extract component information from rendered components
+   * Extract component name from a component type
    */
-  extractComponentInfo(component: React.ComponentType<any> | string): ComponentInfo {
-    const name = this.getComponentName(component);
+  public static getComponentName(component: any): string {
+    if (!component) return 'Unknown';
     
-    // Check if we already have this component's info
-    if (this.components.has(name)) {
-      return this.components.get(name)!;
-    }
-    
-    // Create new component info
-    const componentInfo: ComponentInfo = {
-      name,
-      complexity: this.getComplexityScore(component),
-      dependencies: this.getDependencies(component),
-      hooks: this.getHooks(component),
-      childComponents: this.getChildComponents(component)
-    };
-    
-    // Store component info
-    this.components.set(name, componentInfo);
-    
-    return componentInfo;
-  }
-  
-  /**
-   * Get component name from component
-   */
-  getComponentName(component: React.ComponentType<any> | string): string {
     if (typeof component === 'string') {
       return component;
     }
     
-    return component.displayName || component.name || 'UnnamedComponent';
-  }
-  
-  /**
-   * Get complexity score for component
-   */
-  getComplexityScore(component: React.ComponentType<any> | string): number {
-    // This is a placeholder for a real complexity analysis
-    // In a real implementation, this would analyze the component's code
-    
-    if (typeof component === 'string') {
-      return 1; // Built-in components have low complexity
+    // Handle function or class components
+    if (component.displayName) {
+      return component.displayName;
     }
     
-    // Get component source code if possible
-    const source = this.getComponentSource(component);
-    
-    // Placeholder complexity calculation based on source length
-    return Math.min(10, Math.ceil((source.length / 1000) * 3));
-  }
-  
-  /**
-   * Get component dependencies
-   */
-  getDependencies(component: React.ComponentType<any> | string): string[] {
-    // Placeholder - in a real implementation, this would parse imports or use React DevTools
-    return [];
-  }
-  
-  /**
-   * Get hooks used by component
-   */
-  getHooks(component: React.ComponentType<any> | string): string[] {
-    // Placeholder - in a real implementation, this would analyze code for hook calls
-    return [];
-  }
-  
-  /**
-   * Get child components
-   */
-  getChildComponents(component: React.ComponentType<any> | string): string[] {
-    // Placeholder - in a real implementation, this would analyze rendering tree
-    return [];
-  }
-  
-  /**
-   * Get component source code if possible
-   */
-  private getComponentSource(component: React.ComponentType<any>): string {
-    // This is a placeholder - in a real implementation, this could
-    // use function.toString() with limitations or source maps
-    return component.toString();
-  }
-  
-  /**
-   * Static helper method to get component name
-   */
-  static getComponentName(component: React.ComponentType<any> | string): string {
-    if (typeof component === 'string') {
-      return component;
+    if (component.name) {
+      return component.name;
     }
     
-    return component.displayName || component.name || 'UnnamedComponent';
+    // Try to get name from the constructor
+    if (component.constructor && component.constructor.name) {
+      return component.constructor.name;
+    }
+    
+    // Last resort, use the component type
+    return typeof component;
+  }
+  
+  /**
+   * Get the complexity score for a component
+   */
+  public getComplexityScore(component: any): number {
+    // This would need to analyze the component AST or code
+    // For now, return a placeholder value
+    return 1;
+  }
+  
+  /**
+   * Get dependencies used by a component
+   */
+  public getDependencies(component: any): string[] {
+    // This would need to analyze the component imports
+    // For now, return an empty array
+    return [];
+  }
+  
+  /**
+   * Get hooks used in a component
+   */
+  public getHooks(component: any): string[] {
+    // This would need to analyze the component for React hooks
+    // For now, return an empty array
+    return [];
+  }
+  
+  /**
+   * Get child components used in a component
+   */
+  public getChildComponents(component: any): string[] {
+    // This would need to analyze the component's render method
+    // For now, return an empty array
+    return [];
   }
 }
 
-// Export a singleton instance
+// Export singleton instance
 export const componentExtractor = new ComponentExtractor();
-
-// Also export the class
-export default ComponentExtractor;

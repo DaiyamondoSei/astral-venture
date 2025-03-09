@@ -33,6 +33,7 @@ export interface FeatureTooltipData {
   elementId?: string;
   condition?: string;
   delay?: number;
+  targetElement?: string;
   
   // Additional properties used in the codebase
   targetSelector?: string;
@@ -44,8 +45,10 @@ export type AchievementData = IAchievementData;
 export interface GuidedTourData {
   id: string;
   title: string;
+  description?: string;
   steps: GuidedTourStep[];
   condition?: string;
+  requiredStep?: string;
 }
 
 export interface GuidedTourStep {
@@ -54,4 +57,15 @@ export interface GuidedTourStep {
   description: string;
   elementId: string;
   position: 'top' | 'right' | 'bottom' | 'left';
+  content?: string;
+  target?: string;
+}
+
+export interface TourStep {
+  id: string;
+  title: string;
+  content: string;
+  elementId: string;
+  position?: 'top' | 'bottom' | 'left' | 'right';
+  target?: string;
 }

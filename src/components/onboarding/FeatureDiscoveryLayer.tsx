@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { useFeatureDiscovery } from './hooks/useFeatureDiscovery';
 import FeatureTooltip from './FeatureTooltip';
 import GuidedTour from './GuidedTour';
+import { TourStep } from './hooks/achievement/types';
 
 interface FeatureDiscoveryLayerProps {
   hasCompletedOnboarding: boolean;
@@ -22,15 +24,21 @@ const FeatureDiscoveryLayer: React.FC<FeatureDiscoveryLayerProps> = ({
   if (activeTour) {
     const tourData = guidedTours.find(tour => tour.id === activeTour);
     if (tourData) {
+      const mappedSteps: TourStep[] = tourData.steps.map(step => ({
+        id: step.id,
+        title: step.title,
+        content: step.description, // Map description to content for the TourStep format
+        elementId: step.elementId,
+        position: step.position,
+        target: step.target // Map to expected prop name
+      }));
+      
       return (
         <GuidedTour 
           tourId={tourData.id}
           title={tourData.title}
           description={tourData.description}
-          steps={tourData.steps.map(step => ({
-            ...step,
-            targetSelector: step.target // Map to expected prop name
-          }))}
+          steps={mappedSteps}
           onComplete={() => dismissTour(tourData.id)}
         />
       );
