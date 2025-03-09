@@ -54,23 +54,23 @@ const ConsciousnessView: React.FC<ConsciousnessViewProps> = ({
           
           <div className="flex-1 overflow-y-auto">
             <TabsContent value="chakra" className="h-full">
-              <ChakraVisualization level={userLevel} />
+              <ChakraVisualization userLevel={userLevel} />
             </TabsContent>
             
             <TabsContent value="progress" className="h-full">
-              <ConsciousnessProgress level={userLevel} />
+              <ConsciousnessProgress userLevel={userLevel} />
             </TabsContent>
             
             <TabsContent value="practices" className="h-full">
-              <PracticeRecommendations level={userLevel} />
+              <PracticeRecommendations userLevel={userLevel} />
             </TabsContent>
             
             <TabsContent value="emotional" className="h-full">
-              <EmotionalMatrix level={userLevel} />
+              <EmotionalMatrix userLevel={userLevel} />
             </TabsContent>
             
             <TabsContent value="dreams" className="h-full">
-              <DreamIntegration level={userLevel} />
+              <DreamIntegration userLevel={userLevel} />
             </TabsContent>
           </div>
         </Tabs>

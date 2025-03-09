@@ -27,22 +27,25 @@ export function usePortalState(userId?: string) {
       setError(null);
       
       try {
-        const { data, error } = await supabase.rpc('get_user_portal_state', { 
-          user_id_param: userId 
-        });
+        // Query the user_energy_interactions table directly instead of using RPC
+        const { data, error } = await supabase
+          .from('user_energy_interactions')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
         
         if (error) {
           throw error;
         }
         
-        if (data && data.length > 0) {
+        if (data) {
           setPortalState({
-            portalEnergy: data[0].portal_energy || 0,
-            interactionCount: data[0].interaction_count || 0,
-            resonanceLevel: data[0].resonance_level || 1,
-            lastInteractionTime: data[0].last_interaction_time,
-            createdAt: data[0].created_at,
-            updatedAt: data[0].updated_at
+            portalEnergy: data.portal_energy || 0,
+            interactionCount: data.interaction_count || 0,
+            resonanceLevel: data.resonance_level || 1,
+            lastInteractionTime: data.last_interaction_time,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at
           });
         } else {
           // Set default state if no data exists

@@ -20,7 +20,7 @@ const HomePage: React.FC = () => {
         <SeedOfLifePortal className="max-w-md w-full" />
       </main>
       
-      {/* Swipeable panels controller */}
+      {/* Swipeable panels controller - only shown when authenticated */}
       {isAuthenticated && (
         <>
           <SwipeablePanelController />

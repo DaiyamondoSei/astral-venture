@@ -20,6 +20,11 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
   const [step, setStep] = useState(0);
   const [consciousnessScore, setConsciousnessScore] = useState<number | null>(null);
   
+  // Create a handler for CompleteStep
+  const handleCompleteStep = () => {
+    onComplete();
+  };
+  
   const steps = [
     { title: "Welcome", component: <WelcomeStep /> },
     { title: "Assessment", component: <ConsciousnessAssessment onComplete={setConsciousnessScore} /> },
@@ -28,7 +33,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
     { title: "Energy Points", component: <EnergyPointsStep /> },
     { title: "Meditation", component: <MeditationStep /> },
     { title: "Reflection", component: <ReflectionStep /> },
-    { title: "Complete", component: <CompleteStep onComplete={onComplete} /> }
+    { title: "Complete", component: <CompleteStep onComplete={handleCompleteStep} /> }
   ];
   
   const handleNext = () => {

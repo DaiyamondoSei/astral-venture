@@ -14,19 +14,6 @@ interface SwipeIndicatorProps {
  * A visual indicator showing users that they can swipe to reveal panels
  */
 const SwipeIndicator: React.FC<SwipeIndicatorProps> = ({ position, className }) => {
-  // Fixed animation variants to comply with framer-motion types
-  const variants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: [0.2, 0.6, 0.2], 
-      transition: { 
-        repeat: Infinity, 
-        duration: 2,
-        repeatType: "mirror" as const // Specify the correct type
-      } 
-    }
-  };
-
   return (
     <div 
       className={cn(
@@ -36,11 +23,17 @@ const SwipeIndicator: React.FC<SwipeIndicatorProps> = ({ position, className }) 
       )}
     >
       <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={variants}
+        initial={{ opacity: 0 }}
+        animate={{ 
+          opacity: [0.2, 0.6, 0.2]
+        }}
+        transition={{ 
+          repeat: Infinity, 
+          duration: 2,
+          repeatType: "mirror"
+        }}
         className={cn(
-          "w-12 h-1 rounded-full bg-white/40 backdrop-blur-sm",
+          "w-12 h-1 rounded-full bg-white/40 backdrop-blur-sm"
         )}
       />
     </div>
