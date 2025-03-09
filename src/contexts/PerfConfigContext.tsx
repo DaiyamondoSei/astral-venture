@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useCallback, useEffect } from 'react';
 import { detectDeviceCapability } from '@/utils/adaptiveRendering';
 
@@ -35,8 +34,22 @@ export interface PerfConfigContextType {
     enableParticles: boolean;
     enableComplexAnimations: boolean;
     enableHighResImages: boolean;
+    enableBlur: boolean;
+    enableShadows: boolean;
+    enableWebWorkers: boolean;
   };
   setManualPerformanceMode?: (mode: 'low' | 'medium' | 'high' | 'auto') => void;
+  enablePerformanceTracking?: boolean;
+  enableRenderTracking?: boolean;
+  enableValidation?: boolean;
+  enablePropTracking?: boolean;
+  enableDebugLogging?: boolean;
+  intelligentProfiling?: boolean;
+  inactiveTabThrottling?: boolean;
+  batchUpdates?: boolean;
+  samplingRate?: number;
+  throttleInterval?: number;
+  maxTrackedComponents?: number;
 }
 
 // Default configuration
@@ -66,7 +79,10 @@ const PerfConfigContext = createContext<PerfConfigContextType>({
   features: {
     enableParticles: true,
     enableComplexAnimations: true,
-    enableHighResImages: false
+    enableHighResImages: false,
+    enableBlur: true,
+    enableShadows: true,
+    enableWebWorkers: true
   }
 });
 
@@ -184,51 +200,14 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const features = {
     enableParticles: config.deviceCapability !== 'low',
     enableComplexAnimations: config.deviceCapability !== 'low',
-    enableHighResImages: config.deviceCapability === 'high'
+    enableHighResImages: config.deviceCapability === 'high',
+    enableBlur: config.deviceCapability !== 'low',
+    enableShadows: config.deviceCapability !== 'low',
+    enableWebWorkers: config.deviceCapability !== 'low'
   };
   
-  // Basic web vitals tracking
+  // Web vitals tracking
   const [webVitals, setWebVitals] = useState<Record<string, number>>({});
-  
-  // Track basic web vitals
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'performance' in window) {
-      const updateVitals = () => {
-        try {
-          // Check browser support for various APIs
-          if (performance.getEntriesByType && performance.getEntriesByName) {
-            const navEntries = performance.getEntriesByType('navigation');
-            const navTiming = navEntries.length > 0 ? navEntries[0] as PerformanceNavigationTiming : null;
-            
-            const fcpEntries = performance.getEntriesByName('first-contentful-paint');
-            const fcp = fcpEntries.length > 0 ? fcpEntries[0].startTime : 0;
-            
-            const vitals: Record<string, number> = {
-              fcp
-            };
-            
-            if (navTiming) {
-              vitals.ttfb = navTiming.responseStart - navTiming.requestStart;
-              vitals.domLoad = navTiming.domContentLoadedEventEnd - navTiming.fetchStart;
-              vitals.load = navTiming.loadEventEnd - navTiming.fetchStart;
-            }
-            
-            setWebVitals(vitals);
-          }
-        } catch (err) {
-          console.error('Error tracking web vitals:', err);
-        }
-      };
-      
-      // Update on load and after a delay
-      window.addEventListener('load', updateVitals);
-      setTimeout(updateVitals, 3000);
-      
-      return () => {
-        window.removeEventListener('load', updateVitals);
-      };
-    }
-  }, []);
 
   return (
     <PerfConfigContext.Provider 
@@ -240,7 +219,18 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         features,
         deviceCapability: config.deviceCapability,
         manualPerformanceMode: manualMode,
-        setManualPerformanceMode
+        setManualPerformanceMode,
+        enablePerformanceTracking: config.enablePerformanceTracking,
+        enableRenderTracking: config.enableRenderTracking,
+        enableValidation: config.enableValidation,
+        enablePropTracking: config.enablePropTracking,
+        enableDebugLogging: config.enableDebugLogging,
+        intelligentProfiling: config.intelligentProfiling,
+        inactiveTabThrottling: config.inactiveTabThrottling,
+        batchUpdates: config.batchUpdates,
+        samplingRate: config.samplingRate,
+        throttleInterval: config.throttleInterval,
+        maxTrackedComponents: config.maxTrackedComponents
       }}
     >
       {children}

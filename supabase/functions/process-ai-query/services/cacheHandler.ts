@@ -1,183 +1,152 @@
 
-import { 
-  getFromMemoryCache, 
-  storeInMemoryCache, 
-  clearMemoryCache,
-  getMemoryCacheSize
-} from "./cache/memoryCache.ts";
+/**
+ * Simple in-memory cache for responses
+ * In a production environment, this would be replaced with a proper cache service
+ */
 
-import {
-  getFromDatabaseCache,
-  storeInDatabaseCache,
-  clearExpiredDatabaseCache,
-  clearAllDatabaseCache
-} from "./cache/databaseCache.ts";
-
-import {
-  createJsonResponse,
-  createStreamingResponse
-} from "./cache/responseBuilder.ts";
-
-import { isCacheExpired } from "../utils/cacheUtils.ts";
+// In-memory cache (not persistent across function invocations)
+const cache = new Map<string, { data: any; timestamp: number; isStream: boolean }>();
 
 /**
- * Get a cached response if available and not expired
+ * Get cached response if available and not expired
  */
 export async function getCachedResponse(
-  cacheKey: string, 
-  isStreaming: boolean = false
+  key: string,
+  isStreamRequest: boolean
 ): Promise<Response | null> {
-  // Try memory cache first
-  const memoryCached = getFromMemoryCache(cacheKey);
-  
-  if (memoryCached) {
-    if (!isCacheExpired(memoryCached.timestamp, memoryCached.isStreaming)) {
-      try {
-        // For streaming responses
-        if (memoryCached.isStreaming) {
-          return createStreamingResponse(memoryCached.data);
-        }
-        
-        // For regular responses
-        return createJsonResponse(memoryCached.data);
-      } catch (error) {
-        console.error("Error recreating response from memory cache:", error);
-      }
-    }
-  }
-  
-  // Try to get from Supabase cache if memory cache misses
-  try {
-    const dbCacheItem = await getFromDatabaseCache(cacheKey);
-    
-    if (!dbCacheItem) {
-      return null;
-    }
-    
-    // Check if cache is expired
-    const createdAt = new Date(dbCacheItem.createdAt).getTime();
-    
-    if (isCacheExpired(createdAt, dbCacheItem.isStreaming)) {
-      // Clean up expired entry in background
-      EdgeRuntime.waitUntil(
-        clearExpiredDatabaseCache()
-      );
-      
-      return null;
-    }
-    
-    // Add to memory cache for faster access next time
-    try {
-      const encoder = new TextEncoder();
-      const encoded = encoder.encode(dbCacheItem.responseData);
-      
-      storeInMemoryCache(cacheKey, encoded, dbCacheItem.isStreaming);
-    } catch (error) {
-      console.error("Error adding response to memory cache:", error);
-    }
-    
-    // Return the appropriate response type
-    if (dbCacheItem.isStreaming) {
-      return createStreamingResponse(dbCacheItem.responseData);
-    }
-    
-    return createJsonResponse(dbCacheItem.responseData);
-  } catch (error) {
-    console.error("Error retrieving from cache:", error);
+  if (!cache.has(key)) {
     return null;
   }
+
+  const cachedItem = cache.get(key);
+  
+  // Check if cache is expired
+  if (isCacheExpired(cachedItem?.timestamp || 0, cachedItem?.isStream || false)) {
+    cache.delete(key);
+    return null;
+  }
+
+  // Return cached response
+  if (isStreamRequest && cachedItem?.isStream) {
+    // For streaming responses, need to recreate a new stream
+    return new Response(cachedItem.data, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
+  } else if (!isStreamRequest && !cachedItem?.isStream) {
+    // For regular responses
+    return new Response(JSON.stringify(cachedItem.data), {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+
+  // If request type doesn't match cache type, return null
+  return null;
 }
 
 /**
- * Cache a response for future requests
+ * Cache a response for future use
  */
 export async function cacheResponse(
-  cacheKey: string, 
-  response: Response, 
-  isStreaming: boolean,
-  ttl?: number
+  key: string,
+  response: Response,
+  isStream: boolean,
+  ttl: number = 30 * 60 * 1000 // Default 30 min TTL
 ): Promise<void> {
   try {
-    // Clone the response before reading it
-    const clonedResponse = response.clone();
-    
-    // For streaming responses, collect the entire stream
-    if (isStreaming) {
+    if (isStream) {
+      // For streaming responses, we need to clone and process the stream
+      const clonedResponse = response.clone();
       const reader = clonedResponse.body?.getReader();
+      
       if (!reader) return;
       
       let chunks: Uint8Array[] = [];
-      let totalSize = 0;
       
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-          totalSize += value.length;
-        }
-      } finally {
-        reader.releaseLock();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
       }
       
       // Combine all chunks
-      const allChunks = new Uint8Array(totalSize);
-      let position = 0;
-      for (const chunk of chunks) {
-        allChunks.set(chunk, position);
-        position += chunk.length;
-      }
+      const combinedChunks = concatenateUint8Arrays(chunks);
       
-      // Add to memory cache
-      storeInMemoryCache(cacheKey, allChunks, true, ttl);
+      // Store in cache
+      cache.set(key, {
+        data: combinedChunks,
+        timestamp: Date.now(),
+        isStream: true
+      });
+    } else {
+      // For regular JSON responses
+      const clonedResponse = response.clone();
+      const data = await clonedResponse.json();
       
-      // Save to persistent cache asynchronously
-      const decoder = new TextDecoder();
-      const streamContent = decoder.decode(allChunks);
-      
-      EdgeRuntime.waitUntil(
-        storeInDatabaseCache(cacheKey, streamContent, true)
-      );
-      
-      return;
+      cache.set(key, {
+        data,
+        timestamp: Date.now(),
+        isStream: false
+      });
     }
-    
-    // For regular responses
-    const responseData = await clonedResponse.text();
-    
-    // Add to memory cache
-    const encoder = new TextEncoder();
-    storeInMemoryCache(cacheKey, encoder.encode(responseData), false, ttl);
-    
-    // Save to persistent cache asynchronously
-    EdgeRuntime.waitUntil(
-      storeInDatabaseCache(cacheKey, responseData, false)
-    );
   } catch (error) {
     console.error("Error caching response:", error);
   }
 }
 
 /**
- * Clear all or expired cache entries
+ * Helper to concatenate Uint8Arrays
  */
-export async function clearResponseCache(clearAll: boolean = false): Promise<number> {
-  try {
-    // Always clear memory cache
-    const memoryCacheSize = clearMemoryCache();
-    
-    // Clear database cache
-    let dbCacheCleared = 0;
-    
-    if (!clearAll) {
-      dbCacheCleared = await clearExpiredDatabaseCache();
-    } else {
-      dbCacheCleared = await clearAllDatabaseCache();
-    }
-    
-    return memoryCacheSize + dbCacheCleared;
-  } catch (error) {
-    console.error("Error clearing cache:", error);
-    return 0;
+function concatenateUint8Arrays(arrays: Uint8Array[]): Uint8Array {
+  // Calculate total length
+  const totalLength = arrays.reduce((acc, array) => acc + array.length, 0);
+  
+  // Create a new array with the total length
+  const result = new Uint8Array(totalLength);
+  
+  // Copy each array into the result
+  let offset = 0;
+  for (const array of arrays) {
+    result.set(array, offset);
+    offset += array.length;
   }
+  
+  return result;
+}
+
+/**
+ * Check if a cache item has expired
+ */
+function isCacheExpired(timestamp: number, isStream: boolean): boolean {
+  const now = Date.now();
+  // Streaming responses expire sooner (10 minutes)
+  const ttl = isStream ? 10 * 60 * 1000 : 30 * 60 * 1000;
+  return now - timestamp > ttl;
+}
+
+/**
+ * Clear entire cache or remove expired items
+ */
+export async function cleanupCache(clearAll: boolean = false): Promise<number> {
+  if (clearAll) {
+    const count = cache.size;
+    cache.clear();
+    return count;
+  }
+  
+  // Remove only expired items
+  let removedCount = 0;
+  for (const [key, item] of cache.entries()) {
+    if (isCacheExpired(item.timestamp, item.isStream)) {
+      cache.delete(key);
+      removedCount++;
+    }
+  }
+  
+  return removedCount;
 }
