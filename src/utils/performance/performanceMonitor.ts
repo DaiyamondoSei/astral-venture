@@ -1,4 +1,8 @@
 
+/**
+ * Performance monitoring utility for tracking render times and performance metrics
+ */
+
 import { PerformanceMonitor } from './PerformanceMonitor';
 
 // Create and export a singleton instance for consistent monitoring
@@ -9,7 +13,8 @@ performanceMonitor.reportSlowRender = function(componentName: string, duration: 
   if (!componentName || typeof duration !== 'number') return;
   
   // Only report if we're in development or if explicitly configured to report in production
-  if (process.env.NODE_ENV === 'production' && !performanceMonitor.shouldReportInProduction) {
+  const shouldReportInProduction = false; // Default to false for production
+  if (process.env.NODE_ENV === 'production' && !shouldReportInProduction) {
     return;
   }
   

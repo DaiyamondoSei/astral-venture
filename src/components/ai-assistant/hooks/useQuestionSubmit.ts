@@ -119,9 +119,10 @@ export const useQuestionSubmit = ({
     if (!navigator.onLine) return false;
     
     // Check connection type if available
-    if (navigator.connection) {
-      const conn = navigator.connection as any;
-      const effectiveType = conn.effectiveType;
+    // Using optional chaining to avoid errors on browsers that don't support navigator.connection
+    const connection = (navigator as any).connection;
+    if (connection) {
+      const effectiveType = connection.effectiveType;
       return !['slow-2g', '2g'].includes(effectiveType);
     }
     
