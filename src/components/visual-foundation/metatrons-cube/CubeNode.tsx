@@ -1,86 +1,116 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { MetatronsNode, GlowIntensity } from './types';
+import { CubeTheme, GlowIntensity } from './types';
 
-interface CubeNodeProps {
-  node: MetatronsNode;
-  primaryColor: string;
-  secondaryColor: string;
+export interface CubeNodeProps {
+  node: {
+    id: string;
+    x: number;
+    y: number;
+    [key: string]: any;
+  };
   isActive?: boolean;
-  onClick?: (nodeId: string) => void;
-  glowIntensity: GlowIntensity;
-  isSimplified?: boolean;
+  onClick?: () => void;
+  variant?: CubeTheme;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  withAnimation?: boolean;
+  intensity?: number;
 }
 
-const getGlowStrength = (intensity: GlowIntensity): string => {
-  switch (intensity) {
-    case 'high': return '3';
-    case 'medium': return '2.5';
-    case 'low': return '1.5';
-    default: return '2';
-  }
+const getNodeSize = (size: string = 'md'): number => {
+  const sizes = {
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    full: 24
+  };
+  return sizes[size as keyof typeof sizes] || sizes.md;
 };
 
-const CubeNode: React.FC<CubeNodeProps> = ({
-  node,
-  primaryColor,
-  secondaryColor,
-  isActive = false,
-  onClick,
-  glowIntensity,
-  isSimplified = false
-}) => {
-  const nodeSize = isActive ? 12 : 8;
-  const filterId = `node-glow-${glowIntensity}`;
-  
-  const handleClick = () => {
-    if (onClick) {
-      onClick(node.id);
+const getNodeColor = (theme: CubeTheme = 'default', isActive: boolean = false): string => {
+  const themes = {
+    default: {
+      active: 'rgb(167, 139, 250)',
+      inactive: 'rgb(139, 92, 246, 0.5)'
+    },
+    cosmic: {
+      active: 'rgb(129, 140, 248)',
+      inactive: 'rgb(129, 140, 248, 0.5)'
+    },
+    ethereal: {
+      active: 'rgb(236, 72, 153)',
+      inactive: 'rgb(236, 72, 153, 0.5)'
+    },
+    quantum: {
+      active: 'rgb(6, 182, 212)',
+      inactive: 'rgb(6, 182, 212, 0.5)'
     }
   };
+
+  return isActive 
+    ? themes[theme].active 
+    : themes[theme].inactive;
+};
+
+const getGlowIntensity = (intensity: number = 5): GlowIntensity => {
+  if (intensity <= 3) return 'low';
+  if (intensity <= 7) return 'medium';
+  return 'high';
+};
+
+const CubeNode: React.FC<CubeNodeProps> = ({ 
+  node, 
+  isActive = false, 
+  onClick,
+  variant = 'default',
+  size = 'md',
+  withAnimation = false,
+  intensity = 5
+}) => {
+  const nodeSize = getNodeSize(size);
+  const nodeColor = getNodeColor(variant, isActive);
+  const glowIntensity = getGlowIntensity(intensity);
   
+  // Calculate glow filter based on intensity
+  const getGlowFilter = () => {
+    const intensityMap = {
+      low: 'blur(2px)',
+      medium: 'blur(4px)',
+      high: 'blur(6px)'
+    };
+    
+    return intensityMap[glowIntensity];
+  };
+
+  // Animation variants based on active state
+  const variants = {
+    active: { 
+      scale: 1.2, 
+      filter: `drop-shadow(0 0 ${nodeSize/2}px ${nodeColor})` 
+    },
+    inactive: { 
+      scale: 1,
+      filter: `drop-shadow(0 0 ${nodeSize/4}px ${nodeColor})`
+    }
+  };
+
   return (
-    <>
-      {!isSimplified && isActive && (
-        <svg width="0" height="0">
-          <defs>
-            <filter id={filterId}>
-              <feGaussianBlur stdDeviation={getGlowStrength(glowIntensity)} result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
-        </svg>
-      )}
-      
-      <motion.div
-        className={cn(
-          "absolute rounded-full cursor-pointer",
-          isActive ? "z-20" : "z-10"
-        )}
-        style={{
-          left: `${node.x}%`,
-          top: `${node.y}%`,
-          width: `${nodeSize}px`,
-          height: `${nodeSize}px`,
-          backgroundColor: isActive ? primaryColor : secondaryColor,
-          filter: isActive && !isSimplified ? `url(#${filterId})` : undefined,
-          transform: 'translate(-50%, -50%)'
-        }}
-        initial={{ scale: 0 }}
-        animate={{ 
-          scale: 1,
-          opacity: isActive ? 1 : 0.7
-        }}
-        transition={{ 
-          duration: 0.5,
-          delay: 0.1 * (parseInt(node.id) % 5)
-        }}
-        whileHover={{ scale: 1.2 }}
-        onClick={handleClick}
-      />
-    </>
+    <motion.circle
+      cx={node.x}
+      cy={node.y}
+      r={nodeSize / 2}
+      fill={nodeColor}
+      filter={`drop-shadow(0 0 ${nodeSize/4}px ${nodeColor})`}
+      initial="inactive"
+      animate={isActive ? "active" : "inactive"}
+      variants={withAnimation ? variants : undefined}
+      transition={{ duration: 0.3 }}
+      style={{ filter: `drop-shadow(0 0 ${nodeSize/3}px ${nodeColor})` }}
+      onClick={onClick}
+      className="cursor-pointer transition-all duration-300"
+    />
   );
 };
 

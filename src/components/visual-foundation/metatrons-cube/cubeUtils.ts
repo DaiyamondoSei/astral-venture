@@ -1,93 +1,93 @@
 
 import { CubeNode, CubeLine } from './types';
 
-/**
- * Calculates the node positions in the Metatron's Cube
- */
-export const getCubeNodes = (size: number): CubeNode[] => {
-  const center = size / 2;
-  const radius = size * 0.4;
+// Generates a centered grid of nodes for Metatron's Cube
+export const generateMetatronsNodes = (count: number = 7, radius: number = 150): CubeNode[] => {
+  const nodes: CubeNode[] = [];
   
-  // Central node
-  const nodes = [{ id: 0, x: center, y: center }];
+  // Always add center node
+  nodes.push({
+    id: "node-0",
+    x: 200,
+    y: 200,
+    radius: 5
+  });
   
-  // Inner hexagon (6 nodes)
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i;
+  if (count <= 1) return nodes;
+  
+  // Add nodes in a circular pattern
+  const angleIncrement = (2 * Math.PI) / (count - 1);
+  for (let i = 1; i < count; i++) {
+    const angle = i * angleIncrement;
     nodes.push({
-      id: i + 1,
-      x: center + radius * 0.5 * Math.cos(angle),
-      y: center + radius * 0.5 * Math.sin(angle)
-    });
-  }
-  
-  // Outer hexagon (6 nodes)
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i;
-    nodes.push({
-      id: i + 7,
-      x: center + radius * Math.cos(angle),
-      y: center + radius * Math.sin(angle)
+      id: `node-${i}`,
+      x: 200 + radius * Math.cos(angle),
+      y: 200 + radius * Math.sin(angle),
+      radius: 5
     });
   }
   
   return nodes;
 };
 
-/**
- * Generates the lines connecting the nodes in the Metatron's Cube
- */
-export const generateCubeLines = (): CubeLine[] => {
-  const lines = [];
+// Generate connections between nodes
+export const generateMetatronsConnections = (nodes: CubeNode[]): CubeLine[] => {
+  const connections: CubeLine[] = [];
   
-  // Connect center to inner hexagon
-  for (let i = 1; i <= 6; i++) {
-    lines.push({ from: 0, to: i });
+  // Connect each node to all others (for small counts)
+  if (nodes.length <= 9) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        connections.push({
+          id: `connection-${i}-${j}`,
+          from: nodes[i].id,
+          to: nodes[j].id
+        });
+      }
+    }
+  } else {
+    // For larger counts, be more selective to avoid visual clutter
+    // Connect center to all
+    for (let i = 1; i < nodes.length; i++) {
+      connections.push({
+        id: `connection-0-${i}`,
+        from: nodes[0].id,
+        to: nodes[i].id
+      });
+    }
+    
+    // Connect adjacent nodes in outer circle
+    for (let i = 1; i < nodes.length; i++) {
+      const nextIndex = i === nodes.length - 1 ? 1 : i + 1;
+      connections.push({
+        id: `connection-${i}-${nextIndex}`,
+        from: nodes[i].id,
+        to: nodes[nextIndex].id
+      });
+    }
   }
   
-  // Connect inner hexagon nodes to each other
-  for (let i = 1; i <= 6; i++) {
-    lines.push({ from: i, to: i === 6 ? 1 : i + 1 });
-  }
-  
-  // Connect inner hexagon to outer hexagon
-  for (let i = 1; i <= 6; i++) {
-    lines.push({ from: i, to: i + 6 });
-  }
-  
-  // Connect outer hexagon nodes to each other
-  for (let i = 7; i <= 12; i++) {
-    lines.push({ from: i, to: i === 12 ? 7 : i + 1 });
-  }
-  
-  // Connect additional inner lines for the full Metatron's Cube
-  lines.push({ from: 1, to: 9 });
-  lines.push({ from: 1, to: 11 });
-  lines.push({ from: 2, to: 10 });
-  lines.push({ from: 2, to: 12 });
-  lines.push({ from: 3, to: 11 });
-  lines.push({ from: 3, to: 7 });
-  lines.push({ from: 4, to: 12 });
-  lines.push({ from: 4, to: 8 });
-  lines.push({ from: 5, to: 7 });
-  lines.push({ from: 5, to: 9 });
-  lines.push({ from: 6, to: 8 });
-  lines.push({ from: 6, to: 10 });
-  
-  return lines;
+  return connections;
 };
 
-/**
- * Calculates the glow filter value based on intensity
- */
-export const getGlowFilter = (glowIntensity: 'none' | 'low' | 'medium' | 'high', glowColor: string, enableGlow: boolean): string => {
-  if (glowIntensity === 'none' || !enableGlow) return '';
+// Generate sample data for demonstration
+export const generateSampleMetatronsData = (nodeCount: number = 7) => {
+  const nodes = generateMetatronsNodes(nodeCount);
+  const connections = generateMetatronsConnections(nodes);
   
-  const intensityMap = {
-    low: 3,
-    medium: 6,
-    high: 10
-  };
-  
-  return `drop-shadow(0 0 ${intensityMap[glowIntensity]}px ${glowColor})`;
+  return { nodes, connections };
+};
+
+// Predefined node configurations
+export const nodeConfigurations = {
+  basic: generateMetatronsNodes(7, 150),
+  expanded: generateMetatronsNodes(9, 170),
+  complex: generateMetatronsNodes(12, 180)
+};
+
+export default {
+  generateMetatronsNodes,
+  generateMetatronsConnections,
+  generateSampleMetatronsData,
+  nodeConfigurations
 };

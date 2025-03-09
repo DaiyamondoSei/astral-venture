@@ -9,6 +9,26 @@ export enum DeviceCapability {
   HIGH = 'high'
 }
 
+// Performance features based on capability
+export interface PerformanceFeatures {
+  enableParticles: boolean;
+  enableComplexAnimations: boolean;
+  enableHighResImages: boolean;
+  enableBlur: boolean;
+  enableShadows: boolean;
+  enableWebWorkers: boolean;
+}
+
+// Web vitals metrics
+export interface WebVitals {
+  fcp?: number;
+  lcp?: number;
+  ttfb?: number;
+  domLoad?: number;
+  fullLoad?: number;
+  fps?: number;
+}
+
 // Simplified context type
 interface AdaptivePerformanceContextType {
   // Device capability
@@ -16,12 +36,8 @@ interface AdaptivePerformanceContextType {
   // Manual override for performance mode
   manualPerformanceMode: DeviceCapability | 'auto';
   // Feature flags based on device capability
-  features: {
-    enableParticles: boolean;
-    enableComplexAnimations: boolean;
-    enableHighResImages: boolean;
-  };
-  webVitals?: Record<string, number>;
+  features: PerformanceFeatures;
+  webVitals?: WebVitals;
   // Functions
   setManualPerformanceMode: (mode: DeviceCapability | 'auto') => void;
   adaptElementCount: (baseCount: number) => number;
@@ -53,7 +69,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   });
   
   // Basic web vitals tracking
-  const [webVitals, setWebVitals] = useState<Record<string, number>>({});
+  const [webVitals, setWebVitals] = useState<WebVitals>({});
   
   // Calculated device capability
   const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(() => {
@@ -65,17 +81,63 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   useEffect(() => {
     if (typeof window !== 'undefined' && 'performance' in window) {
       const updateVitals = () => {
-        const navTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-        if (navTiming) {
-          setWebVitals({
-            fcp: performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0,
-            lcp: 0, // Would need web-vitals library for this
-            ttfb: navTiming.responseStart - navTiming.requestStart,
-            domLoad: navTiming.domContentLoadedEventEnd - navTiming.fetchStart,
-            fullLoad: navTiming.loadEventEnd - navTiming.fetchStart,
-          });
+        try {
+          // Get navigation timing if available
+          let navTiming;
+          if (performance.getEntriesByType && performance.getEntriesByType('navigation').length > 0) {
+            navTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+          }
+          
+          // Get FCP if available
+          let fcp = 0;
+          const fcpEntry = performance.getEntriesByName && 
+                          performance.getEntriesByName('first-contentful-paint')[0];
+          if (fcpEntry) {
+            fcp = fcpEntry.startTime;
+          }
+          
+          // Create vitals object with available metrics
+          const vitals: WebVitals = { fcp };
+          
+          // Add navigation timing metrics if available
+          if (navTiming) {
+            vitals.ttfb = navTiming.responseStart - navTiming.requestStart;
+            vitals.domLoad = navTiming.domContentLoadedEventEnd - navTiming.fetchStart;
+            vitals.fullLoad = navTiming.loadEventEnd - navTiming.fetchStart;
+          }
+          
+          setWebVitals(vitals);
+        } catch (err) {
+          console.error('Error collecting performance metrics:', err);
         }
       };
+      
+      // Try to measure FPS
+      let frameCount = 0;
+      let lastTime = performance.now();
+      let fps = 0;
+      
+      const measureFps = () => {
+        frameCount++;
+        const currentTime = performance.now();
+        const elapsedTime = currentTime - lastTime;
+        
+        if (elapsedTime >= 1000) {
+          fps = Math.round((frameCount * 1000) / elapsedTime);
+          frameCount = 0;
+          lastTime = currentTime;
+          
+          setWebVitals(prev => ({
+            ...prev,
+            fps
+          }));
+        }
+        
+        requestAnimationFrame(measureFps);
+      };
+      
+      // Start FPS measurement
+      const fpsId = requestAnimationFrame(measureFps);
       
       // Update initially and on load
       window.addEventListener('load', updateVitals);
@@ -83,6 +145,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
       
       return () => {
         window.removeEventListener('load', updateVitals);
+        cancelAnimationFrame(fpsId);
       };
     }
   }, []);
@@ -119,10 +182,13 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   }, [deviceCapability]);
   
   // Compute derived feature flags
-  const features = {
+  const features: PerformanceFeatures = {
     enableParticles: deviceCapability !== DeviceCapability.LOW,
     enableComplexAnimations: deviceCapability !== DeviceCapability.LOW,
-    enableHighResImages: deviceCapability === DeviceCapability.HIGH
+    enableHighResImages: deviceCapability === DeviceCapability.HIGH,
+    enableBlur: deviceCapability !== DeviceCapability.LOW,
+    enableShadows: deviceCapability !== DeviceCapability.LOW,
+    enableWebWorkers: deviceCapability === DeviceCapability.HIGH
   };
   
   // Create context value

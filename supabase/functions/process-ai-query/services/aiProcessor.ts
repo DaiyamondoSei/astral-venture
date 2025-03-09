@@ -1,209 +1,334 @@
 
-import { corsHeaders } from "../../shared/responseUtils.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCachedResponse, cacheResponse } from "./cacheHandler.ts";
+import { corsHeaders } from "../../shared/responseUtils.ts";
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+// Types for AI query processing
+interface AIQueryRequest {
+  query: string;
+  context?: string;
+  userId?: string;
+  reflectionId?: string;
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    stream?: boolean;
+    useCache?: boolean;
+    cacheKey?: string;
+  }
+}
+
+interface AIQueryResponse {
+  answer: string;
+  insights?: any[];
+  metrics?: {
+    processingTime: number;
+    tokenUsage?: number;
+    model?: string;
+  }
+}
 
 /**
- * Process API request with caching and error handling
+ * Process an AI query, with optimized caching and error handling
  */
 export async function processAIQuery(user: any, req: Request): Promise<Response> {
   try {
+    // Start timing for performance tracking
+    const startTime = performance.now();
+    
     // Parse request body
+    const requestData: AIQueryRequest = await req.json();
     const { 
-      question, 
-      context = "",
-      reflectionIds = [], 
-      cacheKey = "",
-      maxTokens = 1200,
-      temperature = 0.7,
-      stream = false
-    } = await req.json();
+      query, 
+      context, 
+      userId, 
+      reflectionId,
+      options = {} 
+    } = requestData;
     
-    // Validate required parameters
-    if (!question) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Missing required parameter: question" 
-        }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400 
-        }
-      );
-    }
+    // Set defaults
+    const model = options.model || "gpt-4o-mini";
+    const temperature = options.temperature || 0.7;
+    const maxTokens = options.maxTokens || 1000;
+    const useCache = options.useCache !== false;
+    const stream = options.stream || false;
+    const cacheKey = options.cacheKey || createCacheKey(query, context, model);
     
-    // Check if we have a valid cache key and cached response
-    if (cacheKey) {
-      const cachedResponse = await getCachedResponse(cacheKey);
+    // Check cache first if caching is enabled
+    if (useCache) {
+      const cachedResponse = await getCachedResponse(cacheKey, stream);
       if (cachedResponse) {
         return cachedResponse;
       }
     }
     
-    // Process start time for tracking
-    const startTime = Date.now();
-    
-    // Create system prompt
-    const systemPrompt = createSystemPrompt(user);
-    
-    // Build prompt with context if provided
-    const fullPrompt = buildPrompt(question, context);
-    
-    // Handle streaming requests
-    if (stream) {
-      return handleStreamingRequest(fullPrompt, systemPrompt, temperature, maxTokens);
+    // Get OpenAI API key
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "OpenAI API key not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     
-    // Generate response from OpenAI
-    const responseData = await generateAIResponse(
-      fullPrompt,
-      systemPrompt,
-      temperature,
-      maxTokens
+    // Initialize Supabase client
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
     );
     
-    // Format response object
-    const responseObject = formatResponseObject(
-      responseData, 
-      reflectionIds, 
-      startTime
-    );
-    
-    // Create response
-    const response = new Response(
-      JSON.stringify(responseObject),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    // Get additional user context if userId is provided
+    let userContextData = {};
+    if (userId) {
+      try {
+        const { data: userProfile } = await supabaseAdmin
+          .from("user_profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
+        
+        if (userProfile) {
+          userContextData = {
+            userLevel: userProfile.astral_level,
+            energyPoints: userProfile.energy_points
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
       }
+    }
+    
+    // Get reflection data if reflectionId is provided
+    let reflectionData = {};
+    if (reflectionId) {
+      try {
+        const { data: reflection } = await supabaseAdmin
+          .from("energy_reflections")
+          .select("*")
+          .eq("id", reflectionId)
+          .single();
+        
+        if (reflection) {
+          reflectionData = {
+            reflectionContent: reflection.content,
+            dominantEmotion: reflection.dominant_emotion,
+            emotionalDepth: reflection.emotional_depth,
+            chakrasActivated: reflection.chakras_activated
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching reflection:", error);
+      }
+    }
+    
+    // Build rich context for the AI request
+    const richContext = `
+      ${context || ""}
+      ${Object.keys(userContextData).length > 0 ? `User Information: ${JSON.stringify(userContextData)}` : ""}
+      ${Object.keys(reflectionData).length > 0 ? `Reflection Information: ${JSON.stringify(reflectionData)}` : ""}
+    `.trim();
+    
+    // Prepare messages for the AI request
+    const messages = [
+      {
+        role: "system",
+        content: "You are a consciousness expansion assistant. Provide insightful, helpful responses that expand awareness. Be concise yet profound."
+      }
+    ];
+    
+    // Add context if available
+    if (richContext) {
+      messages.push({
+        role: "system",
+        content: `Additional context: ${richContext}`
+      });
+    }
+    
+    // Add the user query
+    messages.push({
+      role: "user",
+      content: query
+    });
+    
+    // Make request to OpenAI
+    const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        stream
+      })
+    });
+    
+    // Handle streaming response
+    if (stream) {
+      // For streaming, just pipe the response through
+      const streamResponse = new Response(openAIResponse.body, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream"
+        }
+      });
+      
+      // Cache the streaming response if caching is enabled
+      if (useCache) {
+        await cacheResponse(cacheKey, streamResponse.clone(), true);
+      }
+      
+      return streamResponse;
+    }
+    
+    // For non-streaming responses, process and format the data
+    if (!openAIResponse.ok) {
+      const errorData = await openAIResponse.json();
+      throw new Error(errorData.error?.message || "Error from OpenAI API");
+    }
+    
+    const responseData = await openAIResponse.json();
+    const answer = responseData.choices[0]?.message?.content || "";
+    
+    // Extract insights using a basic heuristic
+    const insights = extractInsights(answer);
+    
+    // Calculate processing time
+    const processingTime = performance.now() - startTime;
+    
+    // Prepare the final response
+    const result: AIQueryResponse = {
+      answer,
+      insights,
+      metrics: {
+        processingTime,
+        tokenUsage: responseData.usage?.total_tokens,
+        model: responseData.model
+      }
+    };
+    
+    // Create response object
+    const response = new Response(
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
     
-    // Store in cache if we have a valid cache key
-    if (cacheKey) {
-      await cacheResponse(cacheKey, responseObject);
+    // Cache the response if caching is enabled
+    if (useCache) {
+      await cacheResponse(cacheKey, response.clone(), false);
+    }
+    
+    // Track usage for billing/quotas if needed
+    if (userId) {
+      EdgeRuntime.waitUntil(
+        trackUsage(supabaseAdmin, userId, {
+          model,
+          tokensUsed: responseData.usage?.total_tokens || 0,
+          queryType: reflectionId ? "reflection_analysis" : "general_query"
+        })
+      );
     }
     
     return response;
-    
   } catch (error) {
-    console.error("Error in AI processing:", error);
+    console.error("Error processing AI query:", error);
+    
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Unknown error occurred"
+        error: "Failed to process AI query", 
+        details: error.message 
       }),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }
 }
 
 /**
- * Creates a personalized system prompt
+ * Create a cache key from query parameters
  */
-function createSystemPrompt(user: any): string {
-  return `You are an AI assistant specializing in personal growth, 
-  spiritual exploration, and emotional intelligence. Provide thoughtful, 
-  non-judgmental responses that help users gain deeper insights into their 
-  reflections and life journey. The user's ID is ${user.id}.`;
+function createCacheKey(query: string, context?: string, model?: string): string {
+  const normalizedQuery = query.trim().toLowerCase();
+  const contextHash = context ? hashString(context) : "";
+  const modelInfo = model || "default";
+  
+  return `query_${hashString(normalizedQuery)}_ctx_${contextHash}_model_${modelInfo}`;
 }
 
 /**
- * Build the full prompt with context if available
+ * Simple string hashing function
  */
-function buildPrompt(question: string, context: string): string {
-  if (context) {
-    return `Context: ${context}\n\nQuestion: ${question}`;
+function hashString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
   }
-  return question;
+  return Math.abs(hash).toString(16);
 }
 
 /**
- * Generate AI response from OpenAI
+ * Extract insights from an AI response
  */
-async function generateAIResponse(
-  prompt: string,
-  systemPrompt: string,
-  temperature: number,
-  maxTokens: number
-): Promise<any> {
-  if (!OPENAI_API_KEY) {
-    throw new Error("OpenAI API key is missing");
+function extractInsights(text: string): any[] {
+  const insights = [];
+  
+  // Look for patterns that might indicate insights
+  // 1. Numbered or bulleted lists
+  const listItemRegex = /(?:^|\n)(?:\d+\.\s|\*\s|-\s)(.+)(?:\n|$)/g;
+  let match;
+  while ((match = listItemRegex.exec(text)) !== null) {
+    insights.push({
+      type: "point",
+      content: match[1].trim()
+    });
   }
   
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: maxTokens,
-      temperature: temperature
-    })
+  // 2. Look for paragraphs that contain insight-like keywords
+  const paragraphs = text.split(/\n\n+/);
+  const insightKeywords = [
+    "important", "key", "significant", "essential", "critical",
+    "remember", "note", "consider", "insight", "reflection"
+  ];
+  
+  paragraphs.forEach(paragraph => {
+    const lowerPara = paragraph.toLowerCase();
+    if (insightKeywords.some(keyword => lowerPara.includes(keyword))) {
+      if (!insights.some(i => i.content === paragraph.trim())) {
+        insights.push({
+          type: "paragraph",
+          content: paragraph.trim()
+        });
+      }
+    }
   });
   
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`OpenAI API error: ${error.error?.message || "Unknown error"}`);
+  return insights;
+}
+
+/**
+ * Track AI usage for analytics
+ */
+async function trackUsage(supabase: any, userId: string, usageData: any): Promise<void> {
+  try {
+    await supabase
+      .from("ai_usage")
+      .insert({
+        user_id: userId,
+        model: usageData.model,
+        tokens_used: usageData.tokensUsed,
+        query_type: usageData.queryType,
+        timestamp: new Date().toISOString()
+      });
+  } catch (error) {
+    console.error("Error tracking AI usage:", error);
   }
-  
-  return await response.json();
-}
-
-/**
- * Format the response object with metrics
- */
-function formatResponseObject(
-  openAIData: any, 
-  reflectionIds: string[],
-  startTime: number
-): any {
-  const aiContent = openAIData.choices[0].message.content;
-  const processingTime = Date.now() - startTime;
-  
-  return {
-    answer: aiContent,
-    reflectionId: reflectionIds[0] || null,
-    processingTime,
-    meta: {
-      model: openAIData.model,
-      tokenUsage: openAIData.usage?.total_tokens || 0,
-      finishReason: openAIData.choices[0].finish_reason,
-      version: "1.0"
-    }
-  };
-}
-
-/**
- * Handle streaming requests (placeholder implementation)
- */
-function handleStreamingRequest(
-  prompt: string,
-  systemPrompt: string,
-  temperature: number,
-  maxTokens: number
-): Response {
-  // Streaming implementation would go here
-  return new Response(
-    JSON.stringify({ 
-      error: "Streaming not implemented in this example" 
-    }),
-    { 
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 501 
-    }
-  );
 }

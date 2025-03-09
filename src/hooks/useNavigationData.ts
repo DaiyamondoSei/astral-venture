@@ -73,3 +73,5 @@ export const useNavigationData = (userLevel = 1) => {
   
   return { nodes, connections, isLoading, error };
 };
+
+export default useNavigationData;

@@ -1,78 +1,66 @@
 
-import React, { memo } from 'react';
-import { CubeTheme, MetatronsNode, MetatronsConnection, CubeSize } from './types';
+import React, { useMemo } from 'react';
+import { MetatronsCubeProps, MetatronsNode } from './types';
 import CubeLines from './CubeLines';
 import CubeNode from './CubeNode';
-import { usePerfConfig } from '@/hooks/usePerfConfig';
 
-interface CubeRendererProps {
-  nodes: MetatronsNode[];
-  connections: MetatronsConnection[];
-  activeNodeId?: string;
-  onNodeClick?: (nodeId: string) => void;
-  size: CubeSize;
-  variant: CubeTheme;
-  intensity?: number;
-  withAnimation?: boolean;
-  className?: string;
-}
-
-const CubeRenderer: React.FC<CubeRendererProps> = ({ 
-  nodes, 
-  connections, 
-  activeNodeId, 
+const CubeRenderer: React.FC<MetatronsCubeProps> = ({
+  nodes,
+  connections,
+  activeNodeId,
   onNodeClick,
-  size,
-  variant,
-  intensity = 1,
-  withAnimation = true,
-  className
+  variant = 'default',
+  size = 'md',
+  withAnimation = false,
+  intensity = 5
 }) => {
-  const { config } = usePerfConfig();
-  const isLowPerformance = config.deviceCapability === 'low';
+  // Convert nodes array to a lookup object for faster access
+  const nodesLookup = useMemo(() => {
+    return nodes.reduce((acc, node) => {
+      acc[node.id] = node;
+      return acc;
+    }, {} as Record<string, MetatronsNode>);
+  }, [nodes]);
   
-  // For low-performance devices, reduce the number of nodes and connections
-  const renderNodes = isLowPerformance 
-    ? nodes.slice(0, Math.ceil(nodes.length * 0.6)) 
-    : nodes;
-    
-  const renderConnections = isLowPerformance 
-    ? connections.slice(0, Math.ceil(connections.length * 0.4)) 
-    : connections;
-  
-  // Disable animations for low-performance devices
-  const enableAnimations = withAnimation && !isLowPerformance;
-  
+  // Create a mapping of node id to position for the CubeLines component
+  const nodePositions = useMemo(() => {
+    return nodes.reduce((acc, node) => {
+      acc[node.id] = { x: node.x, y: node.y };
+      return acc;
+    }, {} as Record<string, { x: number; y: number }>);
+  }, [nodes]);
+
   return (
-    <div className={className}>
-      <svg
-        viewBox="0 0 100 100"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full"
-      >
-        <CubeLines 
-          connections={renderConnections} 
-          variant={variant} 
-          activeNodeId={activeNodeId}
-          withAnimation={enableAnimations}
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 400 400" 
+      className="w-full h-full"
+    >
+      {/* Draw connection lines */}
+      <CubeLines
+        connections={connections}
+        nodes={nodePositions}
+        activeNodeId={activeNodeId}
+        variant={variant}
+        withAnimation={withAnimation}
+        intensity={intensity}
+      />
+      
+      {/* Draw nodes */}
+      {nodes.map(node => (
+        <CubeNode
+          key={node.id}
+          node={node}
+          isActive={activeNodeId === node.id}
+          onClick={() => onNodeClick?.(node.id)}
+          variant={variant}
+          size={size}
+          withAnimation={withAnimation}
           intensity={intensity}
         />
-        
-        {renderNodes.map(node => (
-          <CubeNode
-            key={node.id}
-            node={node}
-            isActive={node.id === activeNodeId}
-            onClick={() => onNodeClick && onNodeClick(node.id)}
-            variant={variant}
-            size={size}
-            withAnimation={enableAnimations}
-            intensity={intensity}
-          />
-        ))}
-      </svg>
-    </div>
+      ))}
+    </svg>
   );
 };
 
-export default memo(CubeRenderer);
+export default CubeRenderer;
