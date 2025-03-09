@@ -6,7 +6,7 @@ import MetatronsCubeNavigation from '@/components/navigation/MetatronsCubeNaviga
 import { useQuantumTheme } from '@/components/visual-foundation';
 import GlassmorphicContainer from '@/components/visual-foundation/GlassmorphicContainer';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SacredGeometryIconType } from '../navigation/SacredGeometryIcon';
 

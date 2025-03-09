@@ -1,7 +1,7 @@
 
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
-import { SacredGeometryIcon, SacredGeometryIconType } from './SacredGeometryIcon';
+import SacredGeometryIcon, { SacredGeometryIconType } from './SacredGeometryIcon';
 import { useQuantumTheme } from '@/components/visual-foundation';
 import { cn } from '@/lib/utils';
 

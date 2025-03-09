@@ -1,7 +1,5 @@
-
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export type SacredGeometryIconType = 
@@ -201,17 +199,13 @@ const SacredGeometryIcon = memo(({
   // If there's a description, wrap in a tooltip
   if (description) {
     return (
-      <Tooltip delayDuration={300}>
-        <Tooltip.Trigger asChild>
-          {iconContent}
-        </Tooltip.Trigger>
-        <Tooltip.Content>
-          <div className="max-w-xs">
-            <h4 className="font-semibold">{label}</h4>
-            <p className="text-sm opacity-90">{description}</p>
-          </div>
-        </Tooltip.Content>
-      </Tooltip>
+      <div className="relative group">
+        {iconContent}
+        <div className="absolute z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-black/90 text-white text-xs rounded p-2 pointer-events-none">
+          <h4 className="font-semibold">{label}</h4>
+          <p className="text-sm opacity-90">{description}</p>
+        </div>
+      </div>
     );
   }
 
@@ -221,3 +215,4 @@ const SacredGeometryIcon = memo(({
 SacredGeometryIcon.displayName = 'SacredGeometryIcon';
 
 export default SacredGeometryIcon;
+export type { SacredGeometryIconProps };
