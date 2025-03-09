@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -46,12 +47,10 @@ export interface Database {
         Row: {
           category: string
           chakra_alignment: Json
+          content_text: string
           content_type: string
           created_at: string
-          description: string
           id: string
-          level: number
-          resource_url: string
           tags: string[]
           title: string
           updated_at: string
@@ -59,12 +58,10 @@ export interface Database {
         Insert: {
           category: string
           chakra_alignment?: Json
+          content_text: string
           content_type: string
           created_at?: string
-          description: string
           id?: string
-          level: number
-          resource_url: string
           tags?: string[]
           title: string
           updated_at?: string
@@ -72,12 +69,10 @@ export interface Database {
         Update: {
           category?: string
           chakra_alignment?: Json
+          content_text?: string
           content_type?: string
           created_at?: string
-          description?: string
           id?: string
-          level?: number
-          resource_url?: string
           tags?: string[]
           title?: string
           updated_at?: string
@@ -86,22 +81,25 @@ export interface Database {
       }
       emotional_analysis: {
         Row: {
-          analysis_data: Json
+          chakra_balance: Json
           created_at: string
+          emotional_patterns: Json
           id: string
           reflection_id: string
           user_id: string
         }
         Insert: {
-          analysis_data: Json
+          chakra_balance: Json
           created_at?: string
+          emotional_patterns: Json
           id?: string
           reflection_id: string
           user_id: string
         }
         Update: {
-          analysis_data?: Json
+          chakra_balance?: Json
           created_at?: string
+          emotional_patterns?: Json
           id?: string
           reflection_id?: string
           user_id?: string
@@ -123,28 +121,31 @@ export interface Database {
       }
       energy_reflections: {
         Row: {
-          content: string
           created_at: string
+          energy_level: number
+          energy_points: number
           id: string
-          mood_rating: number
+          reflection_text: string
           tags: string[]
           title: string
           user_id: string
         }
         Insert: {
-          content: string
           created_at?: string
+          energy_level?: number
+          energy_points?: number
           id?: string
-          mood_rating: number
+          reflection_text: string
           tags?: string[]
           title: string
           user_id: string
         }
         Update: {
-          content?: string
           created_at?: string
+          energy_level?: number
+          energy_points?: number
           id?: string
-          mood_rating?: number
+          reflection_text?: string
           tags?: string[]
           title?: string
           user_id?: string
@@ -161,42 +162,36 @@ export interface Database {
       performance_metrics: {
         Row: {
           id: string
-          user_id: string | null
+          user_id: string
+          session_id: string
           component_name: string
-          average_render_time: number | null
-          total_renders: number | null
-          slow_renders: number | null
-          metrics_data: Json | null
-          session_id: string | null
-          device_info: Json | null
-          created_at: string | null
-          updated_at: string | null
+          average_render_time: number
+          total_renders: number
+          slow_renders: number
+          device_info: Json
+          created_at: string
         }
         Insert: {
           id?: string
-          user_id?: string | null
+          user_id: string
+          session_id: string
           component_name: string
-          average_render_time?: number | null
-          total_renders?: number | null
-          slow_renders?: number | null
-          metrics_data?: Json | null
-          session_id?: string | null
-          device_info?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
+          average_render_time: number
+          total_renders: number
+          slow_renders: number
+          device_info: Json
+          created_at?: string
         }
         Update: {
           id?: string
-          user_id?: string | null
+          user_id?: string
+          session_id?: string
           component_name?: string
-          average_render_time?: number | null
-          total_renders?: number | null
-          slow_renders?: number | null
-          metrics_data?: Json | null
-          session_id?: string | null
-          device_info?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
+          average_render_time?: number
+          total_renders?: number
+          slow_renders?: number
+          device_info?: Json
+          created_at?: string
         }
         Relationships: [
           {
@@ -207,30 +202,100 @@ export interface Database {
           }
         ]
       }
+      personalization_metrics: {
+        Row: {
+          created_at: string
+          id: string
+          metric_data: Json
+          metric_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric_data: Json
+          metric_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric_data?: Json
+          metric_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personalization_metrics_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      quantum_downloads: {
+        Row: {
+          chakra_alignment: Json
+          created_at: string
+          download_count: number
+          energy_requirement: number
+          file_path: string
+          id: string
+          tags: string[]
+          title: string
+        }
+        Insert: {
+          chakra_alignment?: Json
+          created_at?: string
+          download_count?: number
+          energy_requirement: number
+          file_path: string
+          id?: string
+          tags?: string[]
+          title: string
+        }
+        Update: {
+          chakra_alignment?: Json
+          created_at?: string
+          download_count?: number
+          energy_requirement?: number
+          file_path?: string
+          id?: string
+          tags?: string[]
+          title?: string
+        }
+        Relationships: []
+      }
       user_achievements: {
         Row: {
           id: string
           user_id: string
           achievement_id: string
-          unlocked_at: string | null
+          achievement_data: Json
           progress: number
-          achievement_data: Json | null
+          unlocked_at: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
           achievement_id: string
+          achievement_data: Json
+          progress: number
           unlocked_at?: string | null
-          progress?: number
-          achievement_data?: Json | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           achievement_id?: string
-          unlocked_at?: string | null
+          achievement_data?: Json
           progress?: number
-          achievement_data?: Json | null
+          unlocked_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -243,28 +308,28 @@ export interface Database {
       }
       user_activities: {
         Row: {
+          activity_data: Json
+          activity_type: string
+          created_at: string
+          energy_points: number
           id: string
           user_id: string
-          activity_type: string
-          activity_data: Json | null
-          energy_points: number
-          created_at: string
         }
         Insert: {
+          activity_data?: Json
+          activity_type: string
+          created_at?: string
+          energy_points?: number
           id?: string
           user_id: string
-          activity_type: string
-          activity_data: Json | null
-          energy_points: number
-          created_at?: string
         }
         Update: {
+          activity_data?: Json
+          activity_type?: string
+          created_at?: string
+          energy_points?: number
           id?: string
           user_id?: string
-          activity_type?: string
-          activity_data?: Json | null
-          energy_points?: number
-          created_at?: string
         }
         Relationships: [
           {
@@ -275,33 +340,67 @@ export interface Database {
           }
         ]
       }
-      user_profiles: {
+      user_preferences: {
         Row: {
-          id: string
-          username: string | null
-          full_name: string | null
-          avatar_url: string | null
-          energy_points: number
           created_at: string
+          id: string
+          preferences: Json
           updated_at: string
+          user_id: string
         }
         Insert: {
-          id: string
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          energy_points?: number
           created_at?: string
+          id?: string
+          preferences: Json
           updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          energy_points?: number
           created_at?: string
+          id?: string
+          preferences?: Json
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      user_profiles: {
+        Row: {
+          astral_level: number
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          energy_points: number
+          id: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          astral_level?: number
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          energy_points?: number
+          id: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          astral_level?: number
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          energy_points?: number
+          id?: string
+          updated_at?: string
+          username?: string
         }
         Relationships: [
           {
@@ -312,36 +411,64 @@ export interface Database {
           }
         ]
       }
-      user_streaks: {
+      user_progress: {
         Row: {
-          id: string
-          user_id: string
-          current_streak: number
-          longest_streak: number
-          last_practiced: string | null
-          activated_chakras: Json | null
+          category: string
+          chakra: number | null
           created_at: string
+          id: string
+          progress_data: Json
           updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          current_streak?: number
-          longest_streak?: number
-          last_practiced?: string | null
-          activated_chakras?: Json | null
+          category: string
+          chakra?: number | null
           created_at?: string
+          id?: string
+          progress_data: Json
           updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          current_streak?: number
-          longest_streak?: number
-          last_practiced?: string | null
-          activated_chakras?: Json | null
+          category?: string
+          chakra?: number | null
           created_at?: string
+          id?: string
+          progress_data?: Json
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_progress_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      user_streaks: {
+        Row: {
+          created_at: string
+          current_streak: number
+          last_activity_date: string | null
+          longest_streak: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          last_activity_date?: string | null
+          longest_streak?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          last_activity_date?: string | null
+          longest_streak?: number
+          user_id?: string
         }
         Relationships: [
           {
@@ -357,13 +484,6 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      add_energy_points: {
-        Args: {
-          user_id_param: string
-          points_param: number
-        }
-        Returns: undefined
-      }
       [_ in never]: never
     }
     Enums: {
@@ -374,3 +494,8 @@ export interface Database {
     }
   }
 }
+
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
+export type Insertable<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
+export type Updatable<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
+export type Relationships<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Relationships']

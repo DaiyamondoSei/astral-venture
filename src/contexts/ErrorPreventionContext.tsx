@@ -86,7 +86,10 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
   const validateAllComponents = (): ValidationResult => {
     if (process.env.NODE_ENV === 'development') {
       const result = validateAllMonitoredComponents();
-      return result ? result : { valid: true, errors: [] };
+      return result ? { 
+        valid: result.valid, 
+        errors: result.errors || [] 
+      } : { valid: true, errors: [] };
     }
     return { valid: true, errors: [] };
   };

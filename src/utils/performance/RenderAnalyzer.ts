@@ -128,16 +128,18 @@ class RenderAnalyzer {
       }
     }
 
-    // Add other suggestions based on component metrics
+    // Add custom performance insights if available
     const componentMetrics = performanceMonitor.getComponentMetrics(component);
-    if (componentMetrics && componentMetrics.insights && componentMetrics.insights.length > 0) {
-      for (const insight of componentMetrics.insights) {
+    
+    // Don't try to access insights if they don't exist
+    if (componentMetrics && componentMetrics.customInsights) {
+      componentMetrics.customInsights.forEach((insight: string) => {
         suggestions.push({
-          type: 'insight',
+          type: 'custom',
           description: insight,
           priority: 'medium'
         });
-      }
+      });
     }
 
     return suggestions;

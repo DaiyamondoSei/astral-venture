@@ -1,104 +1,82 @@
+
 import { useEffect, useRef } from 'react';
 import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
-import { DeepPropAnalyzer } from '@/utils/error-prevention/DeepPropAnalyzer';
-import { monitorComponent } from '@/utils/componentDoc';
+import { usePerfConfig } from './usePerfConfig';
+
+interface ErrorPreventionOptions {
+  trackRenders?: boolean;
+  validateProps?: boolean;
+  trackPropChanges?: boolean;
+  throttleInterval?: number;
+}
 
 /**
- * Hook to enable error prevention on a component
+ * A hook to monitor component rendering and help prevent errors
  * 
- * @param componentName Unique name of the component
- * @param props Current props of the component
- * @param options Configuration options
+ * @param componentName The name of the component to monitor
+ * @param options Options for error prevention monitoring
  */
 export function useErrorPrevention(
   componentName: string,
-  props: Record<string, any> = {},
-  options: {
-    trackRenders?: boolean;
-    validateProps?: boolean;
-    trackPropChanges?: boolean;
-    trackStateChanges?: boolean;
-    throttleInterval?: number;
-    batchUpdates?: boolean;
-  } = {}
+  options: ErrorPreventionOptions = {}
 ) {
-  // Skip all tracking in production
-  if (process.env.NODE_ENV !== 'development') return { getComponentAnalysis: () => null };
+  const startTimeRef = useRef(performance.now());
+  const renderCountRef = useRef(0);
+  const perfConfig = usePerfConfig();
   
-  const {
-    trackRenders = true,
-    validateProps: shouldValidateProps = true,
-    trackPropChanges = true,
-    trackStateChanges = false,
-    throttleInterval = 1000, // Increase default throttle interval
-    batchUpdates = true
-  } = options;
-  
-  // Keep track of previous props for comparison
-  const prevPropsRef = useRef<Record<string, any> | null>(null);
-  
-  // Start tracking render time
-  const renderStartTimeRef = useRef<number>(0);
-  
-  // Skip tracking if outside throttle interval
-  const lastTrackTimeRef = useRef<number>(0);
-  const now = Date.now();
-  const shouldTrack = now - lastTrackTimeRef.current > throttleInterval;
-  
-  if (trackRenders && shouldTrack) {
-    renderStartTimeRef.current = performance.now();
-    lastTrackTimeRef.current = now;
+  // Skip most logic in production
+  if (process.env.NODE_ENV !== 'development') {
+    return;
   }
   
-  // Validate props if needed, but less frequently
+  const shouldTrack = perfConfig.enableRenderTracking && (options.trackRenders !== false);
+  
+  // Track render start time
   useEffect(() => {
-    // Only run if we should be tracking
     if (!shouldTrack) return;
     
-    if (shouldValidateProps) {
-      monitorComponent(componentName, props);
-    }
+    renderCountRef.current += 1;
+    const renderTime = performance.now() - startTimeRef.current;
     
-    // Track prop changes if needed, and we have previous props
-    if (trackPropChanges && prevPropsRef.current) {
-      const propChanges = DeepPropAnalyzer.analyzePropChanges(prevPropsRef.current, props);
+    // Only record if render took more than 5ms
+    if (renderTime > 5) {
+      renderCostAnalyzer.recordRender(componentName, renderTime);
       
-      // Only log if there are significant changes
-      const significantChanges = propChanges.filter(c => c.type === 'high');
-      if (significantChanges.length > 0) {
-        console.debug(`[${componentName}] Significant props changed:`, 
-          significantChanges.map(change => DeepPropAnalyzer.formatPropChange(change))
+      // Log slow renders
+      if (renderTime > 50 && perfConfig.enableDebugLogging) {
+        console.warn(
+          `[Performance] Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`
         );
       }
     }
     
-    // Update prevProps for next render
-    prevPropsRef.current = { ...props };
-  }, [componentName, props, shouldValidateProps, trackPropChanges, shouldTrack]);
-  
-  // Track render time when component renders
-  useEffect(() => {
-    // Skip if we're not tracking or outside throttle interval
-    if (!trackRenders || !shouldTrack) return;
+    // Reset for next render
+    startTimeRef.current = performance.now();
     
-    const renderEndTime = performance.now();
-    const renderDuration = renderEndTime - renderStartTimeRef.current;
-    
-    renderCostAnalyzer.recordRender(
-      componentName,
-      renderDuration,
-      props,
-      prevPropsRef.current
-    );
-    
-    // Only log very slow renders
-    if (renderDuration > 50) { // Increased threshold from 16ms to 50ms
-      console.warn(`[${componentName}] Very slow render: ${renderDuration.toFixed(2)}ms`);
+    // Simplified impact analysis - only run occasionally
+    if (renderCountRef.current % 10 === 0) {
+      const analysis = renderCostAnalyzer.getComponentAnalysis(componentName);
+      
+      if (analysis && analysis.suggestions.length > 0) {
+        const highPriorityIssues = analysis.suggestions.filter(s => s.priority === 'high' || s.priority === 'critical');
+        
+        if (highPriorityIssues.length > 0 && perfConfig.enableDebugLogging) {
+          console.warn(
+            `[Performance] Issues detected in ${componentName}:`,
+            highPriorityIssues.map(i => i.description).join('\n')
+          );
+        }
+      }
     }
-  }, [componentName, props, trackRenders, shouldTrack]);
+  });
+  
+  // Simplified props validation
+  if (perfConfig.enableValidation && options.validateProps) {
+    // This would use prop validation logic, simplified for now
+  }
   
   return {
-    // Expose any useful metrics or functions
-    getComponentAnalysis: () => renderCostAnalyzer.getComponentAnalysis(componentName)
+    componentName,
+    renderCount: renderCountRef.current
   };
 }

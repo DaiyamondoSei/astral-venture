@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -8,6 +7,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { PerformanceProvider } from './contexts/PerformanceContext';
 import { ErrorPreventionProvider } from './contexts/ErrorPreventionContext';
 import { PerfConfigProvider } from './contexts/PerfConfigContext';
+import AchievementContext from './contexts/AchievementContext';
 import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
 import PerformanceInsights from './components/dev-mode/PerformanceInsights';
 import RenderInsights from './components/dev-mode/RenderInsights';
@@ -49,41 +49,45 @@ function App() {
   // Use the combined code enhancement hook
   useCodeEnhancement('App');
 
+  const initialConfig = { 
+    enablePerformanceTracking: true,
+    enableRenderTracking: true,
+    enableValidation: true,
+    enablePropTracking: false,
+    enableDebugLogging: false
+  };
+
   return (
-    <PerfConfigProvider initialConfig={{ 
-      enablePerformanceTracking: true,
-      enableRenderTracking: true,
-      enableValidation: true,
-      enablePropTracking: false,
-      enableDebugLogging: false
-    }}>
+    <PerfConfigProvider initialConfig={initialConfig}>
       <PerformanceProvider>
         <ErrorPreventionProvider>
           <ErrorBoundary>
             <AuthProvider>
-              <OnboardingProvider>
-                <div className="relative min-h-screen overflow-hidden bg-white text-gray-800">
-                  {/* Background gradient */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50 to-white"></div>
-                  
-                  <BrowserRouter>
-                    <Suspense fallback={<PageLoader />}>
-                      <Routes>
-                        <Route path="/" element={<Index />} />
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/entry-animation" element={<EntryAnimationPage />} />
-                        <Route path="/dream-capture" element={<DreamCapture />} />
-                        <Route path="/astral-body-demo" element={<AstralBodyDemo />} />
-                        <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/preferences" element={<PersonalizationPage />} />
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </Suspense>
-                  </BrowserRouter>
-                  
-                  <Toaster />
-                </div>
-              </OnboardingProvider>
+              <AchievementContext>
+                <OnboardingProvider>
+                  <div className="relative min-h-screen overflow-hidden bg-white text-gray-800">
+                    {/* Background gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50 to-white"></div>
+                    
+                    <BrowserRouter>
+                      <Suspense fallback={<PageLoader />}>
+                        <Routes>
+                          <Route path="/" element={<Index />} />
+                          <Route path="/login" element={<Login />} />
+                          <Route path="/entry-animation" element={<EntryAnimationPage />} />
+                          <Route path="/dream-capture" element={<DreamCapture />} />
+                          <Route path="/astral-body-demo" element={<AstralBodyDemo />} />
+                          <Route path="/dashboard" element={<Dashboard />} />
+                          <Route path="/preferences" element={<PersonalizationPage />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Suspense>
+                    </BrowserRouter>
+                    
+                    <Toaster />
+                  </div>
+                </OnboardingProvider>
+              </AchievementContext>
             </AuthProvider>
           </ErrorBoundary>
           

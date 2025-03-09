@@ -72,28 +72,33 @@ const PerformanceInsights: React.FC = () => {
     try {
       setIsLoadingBackend(true);
       
+      // Check if the table exists first
       const { data, error } = await supabase
-        .from('performance_metrics')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .rpc('get_performance_metrics', { limit_count: 5 })
+        .catch(() => ({ data: null, error: new Error('Performance metrics table does not exist yet') }));
         
       if (error) {
         console.error('Error fetching backend metrics:', error);
+        setBackendMetrics([]);
         return;
       }
       
-      setBackendMetrics(data || []);
-      
-      if (data && data.length > 0) {
-        toast({
-          title: 'Performance data synchronized',
-          description: `Retrieved ${data.length} metrics from the server`,
-          duration: 2000
-        });
+      if (Array.isArray(data)) {
+        setBackendMetrics(data as PerformanceMetric[]);
+        
+        if (data.length > 0) {
+          toast({
+            title: 'Performance data synchronized',
+            description: `Retrieved ${data.length} metrics from the server`,
+            duration: 2000
+          });
+        }
+      } else {
+        setBackendMetrics([]);
       }
     } catch (error) {
       console.error('Error fetching backend metrics:', error);
+      setBackendMetrics([]);
     } finally {
       setIsLoadingBackend(false);
     }

@@ -1,270 +1,295 @@
 
-import { useEffect, useState, useCallback } from 'react';
-import { IAchievementData } from '../../data/types';
+import { useState, useEffect, useCallback } from 'react';
 import { useAchievementState } from './useAchievementState';
+import { useProgressTracking } from './useProgressTracking';
+import { AchievementTrackerProps, AchievementTrackerResult } from './types';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabaseClient';
-import { toast } from '@/components/ui/use-toast';
-import { AchievementTrackerProps } from './types';
+import { IAchievementData } from '../../data/types';
+import { AchievementEventType } from '@/types/achievement';
 
-export function useAchievementTracker({
-  userId,
-  onUnlock,
-  onProgress,
-  achievementList = [],
-  currentStreak = 0,
-  reflectionCount = 0,
-  meditationMinutes = 0,
-  uniqueChakrasActivated = 0,
-  totalPoints = 0,
-  wisdomResourcesExplored = 0
-}: AchievementTrackerProps) {
-  const [unlockedAchievements, setUnlockedAchievements] = useState<IAchievementData[]>([]);
-  const [inProgressAchievements, setInProgressAchievements] = useState<IAchievementData[]>([]);
-  const [earnedAchievements, setEarnedAchievements] = useState<IAchievementData[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [progressPercentage, setProgressPercentage] = useState(0);
-  const [totalEarnedPoints, setTotalEarnedPoints] = useState(0);
+/**
+ * Hook for tracking and managing user achievements
+ * 
+ * @param props Configuration properties for the achievement tracker
+ * @returns Object with methods for tracking and managing achievements
+ */
+export function useAchievementTracker(props: AchievementTrackerProps = {}): AchievementTrackerResult {
+  const { state, earnAchievement, updateAchievementHistory, setCurrentAchievement, dismissCurrentAchievement, setProgressTracking } = useAchievementState();
+  const [achievementList, setAchievementList] = useState<IAchievementData[]>(props.achievementList || []);
+  const [isLoading, setIsLoading] = useState(false);
+  const { trackProgress, resetProgress, logActivity, getProgressValue } = useProgressTracking(state, setProgressTracking);
+  const { user } = useAuth();
   
-  // Get achievement state from context
-  const { 
-    state,
-    updateAchievement,
-    unlockAchievement,
-    getAchievementProgress,
-  } = useAchievementState();
-
-  // Initialize by fetching user achievements from backend
+  // Load achievements from backend if not provided
   useEffect(() => {
-    if (!userId || isInitialized) return;
+    if (!props.achievementList && user) {
+      const fetchAchievements = async () => {
+        try {
+          setIsLoading(true);
+          // Fetch from database via Supabase function
+          const { data, error } = await supabase.from('user_achievements').select('*').eq('user_id', user.id);
+          
+          if (error) {
+            console.error('Error fetching achievements:', error);
+            return;
+          }
+          
+          if (data) {
+            // Transform the achievement data
+            const processedAchievements = data.map(achievement => {
+              // Check if achievement_data exists and is not null
+              if (achievement.achievement_data) {
+                return {
+                  ...achievement.achievement_data,
+                  id: achievement.achievement_id,
+                  progress: achievement.progress,
+                };
+              }
+              
+              // Default fallback if data is missing
+              return {
+                id: achievement.achievement_id,
+                title: 'Unknown Achievement',
+                description: 'Achievement details not available',
+                icon: 'trophy',
+                category: 'general',
+                points: 10,
+                tier: 1,
+                requiredAmount: 1,
+                progress: achievement.progress,
+              };
+            });
+            
+            setAchievementList(processedAchievements);
+          }
+        } catch (err) {
+          console.error('Failed to fetch achievements:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchAchievements();
+    }
+  }, [user, props.achievementList]);
 
-    const fetchUserAchievements = async () => {
+  // Track achievement progress
+  const trackAchievementProgress = useCallback(
+    async (achievementId: string, progress: number): Promise<void> => {
+      if (!user) return;
+      
       try {
-        const { data, error } = await supabase
-          .from('user_achievements')
-          .select('*')
-          .eq('user_id', userId);
-
+        // Find the achievement
+        const achievement = achievementList.find(a => a.id === achievementId);
+        if (!achievement) {
+          console.warn(`Achievement ${achievementId} not found`);
+          return;
+        }
+        
+        // Update achievement history
+        updateAchievementHistory(achievementId, {
+          progress,
+          awarded: state.earnedAchievements.includes(achievementId),
+          timestamp: new Date().toISOString()
+        });
+        
+        // Call progress callback if provided
+        props.onProgress?.(achievement, progress);
+        
+        // Check if achievement should be unlocked
+        if (
+          progress >= (achievement.requiredAmount || 1) && 
+          !state.earnedAchievements.includes(achievementId)
+        ) {
+          unlockAchievement(achievementId);
+        }
+        
+        // Update backend
+        const { error } = await supabase.functions.invoke('track-achievement', {
+          body: {
+            achievementId,
+            progress,
+            action: 'progress'
+          }
+        });
+        
         if (error) {
-          console.error('Error fetching user achievements:', error);
+          console.error('Error tracking achievement progress:', error);
+        }
+      } catch (err) {
+        console.error('Error in trackAchievementProgress:', err);
+      }
+    },
+    [user, achievementList, state.earnedAchievements, updateAchievementHistory, props]
+  );
+
+  // Unlock an achievement
+  const unlockAchievement = useCallback(
+    async (achievementId: string): Promise<void> => {
+      if (!user) return;
+      
+      try {
+        // Find the achievement
+        const achievement = achievementList.find(a => a.id === achievementId);
+        if (!achievement) {
+          console.warn(`Achievement ${achievementId} not found for unlocking`);
           return;
         }
 
-        if (data?.length) {
-          // Process unlocked achievements
-          const unlocked = data
-            .filter(a => a.progress >= 1)
-            .map(a => {
-              const achievementData = a.achievement_data || {};
-              return {
-                id: a.achievement_id,
-                title: achievementData.title || 'Achievement',
-                description: achievementData.description || '',
-                type: achievementData.type || 'general',
-                points: achievementData.points || 0,
-                unlocked: true,
-                icon: achievementData.icon || 'trophy'
-              };
-            });
-
-          // Process in-progress achievements
-          const inProgress = data
-            .filter(a => a.progress > 0 && a.progress < 1)
-            .map(a => {
-              const achievementData = a.achievement_data || {};
-              return {
-                id: a.achievement_id,
-                title: achievementData.title || 'Achievement',
-                description: achievementData.description || '',
-                type: achievementData.type || 'general',
-                points: achievementData.points || 0,
-                unlocked: false,
-                progress: a.progress,
-                icon: achievementData.icon || 'star'
-              };
-            });
-
-          // Calculate total earned points
-          const points = unlocked.reduce((sum, a) => sum + (a.points || 0), 0);
-
-          // Update state
-          setUnlockedAchievements(unlocked);
-          setInProgressAchievements(inProgress);
-          setTotalEarnedPoints(points);
-
-          // Calculate overall progress
-          const totalAchievements = achievementList.length || 20; // Default to 20 if no list provided
-          const progress = (unlocked.length / totalAchievements) * 100;
-          setProgressPercentage(Math.min(100, progress));
+        // Add to earned achievements
+        earnAchievement(achievementId);
+        
+        // Set as current achievement to display notification
+        setCurrentAchievement(achievementId);
+        
+        // Update achievement history
+        updateAchievementHistory(achievementId, {
+          awarded: true,
+          timestamp: new Date().toISOString(),
+          progress: achievement.requiredAmount || 1
+        });
+        
+        // Call unlock callback if provided
+        props.onUnlock?.(achievement);
+        
+        // Add achievement points to total
+        if (achievement.points) {
+          trackProgress('total_energy_points', achievement.points);
         }
-      } catch (error) {
-        console.error('Error in achievement initialization:', error);
-      } finally {
-        setIsInitialized(true);
+        
+        // Update backend
+        const { error } = await supabase.functions.invoke('track-achievement', {
+          body: {
+            achievementId,
+            unlocked: true,
+            action: 'unlock'
+          }
+        });
+        
+        if (error) {
+          console.error('Error unlocking achievement:', error);
+        }
+      } catch (err) {
+        console.error('Error in unlockAchievement:', err);
       }
-    };
+    },
+    [user, achievementList, earnAchievement, setCurrentAchievement, updateAchievementHistory, props, trackProgress]
+  );
 
-    fetchUserAchievements();
-  }, [userId, isInitialized, achievementList]);
-
-  // Track activity via backend
-  const trackActivity = useCallback(async (
-    eventType: string, 
-    eventData?: Record<string, any>
-  ) => {
-    if (!userId) return;
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('track-achievement', {
-        body: { eventType, eventData }
-      });
+  // Log activity and check for achievement unlocks
+  const logActivityWithAchievementCheck = useCallback(
+    (activityType: string, details?: Record<string, any>): void => {
+      // Log the activity first
+      logActivity(activityType, details);
       
-      if (error) {
-        console.error('Error tracking achievement activity:', error);
-        return;
+      // Get the updated progress for relevant metrics
+      let progressType = '';
+      let progressValue = 0;
+      
+      switch (activityType) {
+        case AchievementEventType.REFLECTION_COMPLETED:
+          progressType = 'reflections';
+          progressValue = getProgressValue(progressType);
+          break;
+        case AchievementEventType.MEDITATION_COMPLETED:
+          progressType = 'meditation_minutes';
+          progressValue = getProgressValue(progressType);
+          break;
+        case AchievementEventType.CHAKRA_ACTIVATED:
+          progressType = 'chakras_activated';
+          progressValue = getProgressValue(progressType);
+          break;
+        case AchievementEventType.WISDOM_EXPLORED:
+          progressType = 'wisdom_resources_explored';
+          progressValue = getProgressValue(progressType);
+          break;
+        case AchievementEventType.STREAK_MILESTONE:
+          progressType = 'streakDays';
+          progressValue = getProgressValue(progressType);
+          break;
+        default:
+          break;
       }
       
-      // Process newly unlocked achievements
-      if (data?.unlockedAchievements?.length > 0) {
-        const newAchievements = data.unlockedAchievements.map((a: any) => ({
-          id: a.id,
-          title: a.title,
-          description: a.description || '',
-          points: a.points,
-          unlocked: true,
-          icon: a.icon || 'trophy',
-          isNew: true
-        }));
-        
-        // Update state with new achievements
-        setEarnedAchievements(prev => [...prev, ...newAchievements]);
-        
-        // Update unlocked achievements
-        setUnlockedAchievements(prev => [...prev, ...newAchievements]);
-        
-        // Remove from in-progress if needed
-        setInProgressAchievements(prev => 
-          prev.filter(a => !newAchievements.some(na => na.id === a.id))
-        );
-        
-        // Call onUnlock callback for each new achievement
-        if (onUnlock) {
-          newAchievements.forEach(achievement => onUnlock(achievement));
-        }
-        
-        // Show toast notification
-        if (newAchievements.length > 0) {
-          toast({
-            title: '🏆 Achievement Unlocked!',
-            description: `You've earned: ${newAchievements[0].title}`,
-            duration: 4000
-          });
-        }
+      // Check all achievements related to this activity type
+      if (progressType) {
+        achievementList.forEach(achievement => {
+          if (
+            achievement.trackingType === progressType &&
+            !state.earnedAchievements.includes(achievement.id)
+          ) {
+            trackAchievementProgress(achievement.id, progressValue);
+          }
+        });
       }
-    } catch (error) {
-      console.error('Error in tracking achievement activity:', error);
-    }
-  }, [userId, onUnlock]);
-  
-  // Use effect to track streak changes
-  useEffect(() => {
-    if (!userId || !isInitialized || currentStreak <= 0) return;
-    
-    trackActivity('streak_updated', { currentStreak });
-  }, [userId, isInitialized, currentStreak, trackActivity]);
-  
-  // Use effect to track reflection count
-  useEffect(() => {
-    if (!userId || !isInitialized || reflectionCount <= 0) return;
-    
-    // Only track when reflection count changes to significant values (5, 10, 20, etc.)
-    if (reflectionCount === 5 || reflectionCount === 10 || 
-        reflectionCount === 20 || reflectionCount === 50 || 
-        reflectionCount === 100 || reflectionCount % 25 === 0) {
-      trackActivity('reflection_milestone', { count: reflectionCount });
-    }
-  }, [userId, isInitialized, reflectionCount, trackActivity]);
-  
-  // Handle achievement unlocking (frontend)
-  const handleUnlockAchievement = useCallback((achievement: IAchievementData) => {
-    if (!achievement || !userId) return;
-    
-    // Call the backend to track the unlock
-    trackActivity('achievement_unlocked', { 
-      achievementId: achievement.id,
-      title: achievement.title
-    });
-    
-    // Update local state
-    unlockAchievement(achievement.id);
-    
-    if (onUnlock) {
-      onUnlock(achievement);
-    }
-    
-    // Update local state
-    setUnlockedAchievements(prev => [...prev, achievement]);
-    setInProgressAchievements(prev => 
-      prev.filter(a => a.id !== achievement.id)
-    );
-  }, [userId, trackActivity, unlockAchievement, onUnlock]);
-  
-  // Track progress for progressive achievements (frontend side)
-  const trackProgress = useCallback((achievement: IAchievementData, progress: number) => {
-    if (!achievement || !userId) return;
-    
-    // Call the backend to track progress
-    trackActivity('achievement_progress', { 
-      achievementId: achievement.id,
-      progress
-    });
-    
-    // Update local state
-    updateAchievement(achievement.id, { progress });
-    
-    if (onProgress) {
-      onProgress(achievement, progress);
-    }
-    
-    // If achievement is complete, unlock it
-    if (progress >= 1) {
-      handleUnlockAchievement(achievement);
-    } else if (!inProgressAchievements.some(a => a.id === achievement.id)) {
-      // Add to in-progress if not already there
-      setInProgressAchievements(prev => [...prev, achievement]);
-    }
-  }, [userId, trackActivity, updateAchievement, onProgress, handleUnlockAchievement, inProgressAchievements]);
-  
-  // Log simple activity without tracking progress
-  const logActivity = useCallback((activityType: string, details?: Record<string, any>) => {
-    if (!userId) return;
-    
-    trackActivity(activityType, details);
-  }, [userId, trackActivity]);
+      
+      // Send activity to backend
+      if (user) {
+        supabase.functions.invoke('track-achievement', {
+          body: {
+            activityType,
+            details,
+            action: 'activity'
+          }
+        }).catch(err => {
+          console.error('Error logging activity to backend:', err);
+        });
+      }
+    },
+    [logActivity, getProgressValue, achievementList, state.earnedAchievements, trackAchievementProgress, user]
+  );
 
-  // Function to dismiss achievements (for notifications)
-  const dismissAchievement = useCallback((id: string) => {
-    setEarnedAchievements(prev => prev.filter(a => a.id !== id));
-  }, []);
-  
+  // Get achievement progress
+  const getAchievementProgress = useCallback(
+    (id: string): number => {
+      const achievement = achievementList.find(a => a.id === id);
+      if (!achievement) return 0;
+      
+      const history = state.achievementHistory[id];
+      if (history && typeof history.progress === 'number') {
+        return history.progress;
+      }
+      
+      // If no specific progress is tracked, calculate based on tracking type
+      if (achievement.trackingType) {
+        return getProgressValue(achievement.trackingType);
+      }
+      
+      return 0;
+    },
+    [state.achievementHistory, achievementList, getProgressValue]
+  );
+
+  // Get total points earned
+  const getTotalPoints = useCallback((): number => {
+    return getProgressValue('total_energy_points');
+  }, [getProgressValue]);
+
+  // Get overall progress percentage across all achievements
+  const getProgressPercentage = useCallback((): number => {
+    if (achievementList.length === 0) return 0;
+    
+    const totalAchievements = achievementList.length;
+    const earnedCount = state.earnedAchievements.length;
+    
+    return Math.round((earnedCount / totalAchievements) * 100);
+  }, [achievementList, state.earnedAchievements]);
+
   return {
-    unlockedAchievements,
-    inProgressAchievements,
-    earnedAchievements,
+    earnedAchievements: state.earnedAchievements.map(id => 
+      achievementList.find(a => a.id === id)
+    ).filter(Boolean) as any[],
+    currentAchievement: state.currentAchievement 
+      ? achievementList.find(a => a.id === state.currentAchievement) 
+      : null,
+    dismissAchievement: dismissCurrentAchievement,
     trackProgress,
-    unlockAchievement: handleUnlockAchievement,
-    getProgress: getAchievementProgress,
-    logActivity,
-    trackActivity,
-    dismissAchievement,
-    getProgressPercentage: () => progressPercentage,
-    getTotalPoints: () => totalEarnedPoints,
-    progressTracking: {
-      streakDays: currentStreak,
-      reflections: reflectionCount,
-      meditation_minutes: meditationMinutes,
-      chakras_activated: uniqueChakrasActivated,
-      wisdom_resources_explored: wisdomResourcesExplored,
-      total_energy_points: totalPoints
-    }
+    logActivity: logActivityWithAchievementCheck,
+    getAchievementProgress,
+    getTotalPoints,
+    getProgressPercentage,
+    achievementHistory: state.achievementHistory,
+    progressTracking: state.progressTracking
   };
 }

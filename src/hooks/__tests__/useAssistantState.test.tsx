@@ -22,8 +22,8 @@ describe('useAssistantState', () => {
     
     expect(result.current.question).toBe('');
     expect(result.current.response).toEqual({ content: '', metadata: {} });
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.conversation).toEqual([]);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.messages).toEqual([]);
     expect(result.current.error).toBe(null);
   });
 
@@ -34,7 +34,7 @@ describe('useAssistantState', () => {
       result.current.setLoading(true);
     });
     
-    expect(result.current.isLoading).toBe(true);
+    expect(result.current.loading).toBe(true);
   });
 
   it('should add a message to the conversation', () => {
@@ -42,10 +42,10 @@ describe('useAssistantState', () => {
     const message = { role: 'user', content: 'Hello', timestamp: new Date() };
     
     act(() => {
-      result.current.addToConversation(message);
+      result.current.addMessage(message);
     });
     
-    expect(result.current.conversation).toContain(message);
+    expect(result.current.messages).toContain(message);
   });
 
   it('should add an AI response to the conversation', () => {
@@ -67,11 +67,11 @@ describe('useAssistantState', () => {
     const message = { role: 'user', content: 'Hello', timestamp: new Date() };
     
     act(() => {
-      result.current.addToConversation(message);
+      result.current.addMessage(message);
       result.current.reset();
     });
     
-    expect(result.current.conversation).toHaveLength(0);
+    expect(result.current.messages).toHaveLength(0);
   });
 
   it('should set an error', () => {

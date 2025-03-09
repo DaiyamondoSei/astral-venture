@@ -1,124 +1,74 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/hooks/useAuth';
-import { toast } from '@/components/ui/use-toast';
+import { useAuth } from './useAuth';
 
-interface DataSyncOptions {
-  syncInterval?: number;
-  autoSync?: boolean;
-  showToasts?: boolean;
-  onSyncComplete?: (data: any) => void;
-  onSyncError?: (error: Error) => void;
-}
+export function useDataSync() {
+  const { user } = useAuth();
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<any>({
+    achievements: [],
+    userStats: null,
+    streak: null,
+    preferences: null
+  });
 
-/**
- * Hook for syncing user data with the server
- */
-export function useDataSync(options: DataSyncOptions = {}) {
-  const { 
-    syncInterval = 300000, // 5 minutes
-    autoSync = true,
-    showToasts = false,
-    onSyncComplete,
-    onSyncError
-  } = options;
-  
-  const { user, isAuthenticated } = useAuth();
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [syncData, setSyncData] = useState<any>(null);
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Function to sync data with the server
-  const syncData = async () => {
-    if (!isAuthenticated || !user) {
-      setError(new Error('User not authenticated'));
-      return;
+  const syncData = useCallback(async (force = false) => {
+    if (!user) {
+      setError('User not authenticated');
+      return null;
     }
 
     try {
-      setIsSyncing(true);
+      setIsLoading(true);
       setError(null);
 
-      // Call the sync-user-data edge function
-      const { data, error } = await supabase.functions.invoke('sync-user-data', {
-        body: {
-          lastSyncTime: lastSyncTime?.toISOString()
-        }
+      const { data: syncResponse, error: syncError } = await supabase.functions.invoke('sync-user-data', {
+        body: { lastSyncTime: force ? null : lastSyncTime }
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (syncError) {
+        console.error('Error syncing data:', syncError);
+        setError(syncError.message);
+        return null;
       }
 
-      // Update the last sync time
-      setLastSyncTime(new Date());
-      setSyncData(data);
-
-      // Call the onSyncComplete callback
-      if (onSyncComplete) {
-        onSyncComplete(data);
-      }
-
-      // Show success toast if enabled
-      if (showToasts) {
-        toast({
-          title: 'Data synced',
-          description: 'Your data has been successfully synchronized',
-          duration: 3000
+      if (syncResponse) {
+        setData({
+          achievements: syncResponse.achievements || [],
+          userStats: syncResponse.userStats,
+          streak: syncResponse.streak,
+          preferences: syncResponse.preferences
         });
-      }
-
-      return data;
-    } catch (err: any) {
-      const errorObj = new Error(err.message || 'Error syncing data');
-      setError(errorObj);
-      
-      // Call the onSyncError callback
-      if (onSyncError) {
-        onSyncError(errorObj);
-      }
-
-      // Show error toast if enabled
-      if (showToasts) {
-        toast({
-          title: 'Sync error',
-          description: errorObj.message,
-          variant: 'destructive',
-          duration: 5000
-        });
+        setLastSyncTime(syncResponse.timestamp);
+        return syncResponse;
       }
 
       return null;
+    } catch (err: any) {
+      console.error('Data sync error:', err);
+      setError(err.message || 'Failed to sync data');
+      return null;
     } finally {
-      setIsSyncing(false);
+      setIsLoading(false);
     }
-  };
+  }, [user, lastSyncTime]);
 
-  // Set up automatic sync interval
+  // Initial sync on component mount
   useEffect(() => {
-    if (autoSync && isAuthenticated) {
-      // Initial sync
+    if (user && !lastSyncTime) {
       syncData();
-
-      // Set up interval
-      syncIntervalRef.current = setInterval(syncData, syncInterval);
     }
-
-    return () => {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-      }
-    };
-  }, [autoSync, isAuthenticated, syncInterval]);
+  }, [user]);
 
   return {
     syncData,
+    forceSync: () => syncData(true),
     lastSyncTime,
-    isSyncing,
+    isLoading,
     error,
-    data: syncData
+    data
   };
 }
