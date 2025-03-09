@@ -18,6 +18,15 @@ const bootstrap = () => {
   // Initialize memory management after initial render
   setTimeout(initMemoryManagement, 1000);
 
+  // Create root element if missing
+  const rootElement = document.getElementById('root');
+  if (!rootElement) {
+    console.error('Root element not found, creating one');
+    const newRoot = document.createElement('div');
+    newRoot.id = 'root';
+    document.body.appendChild(newRoot);
+  }
+
   // Render the app with only one router
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

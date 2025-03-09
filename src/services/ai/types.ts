@@ -47,6 +47,7 @@ export interface AIInsight {
   id: string;
   type: 'chakra' | 'emotion' | 'practice' | 'wisdom';
   text: string;
+  content?: string;
   confidence: number;
   relevance: number;
   title: string;
@@ -65,6 +66,8 @@ export interface AssistantSuggestion {
   autoFixAvailable: boolean;
   created: string;
   status: 'pending' | 'applied' | 'dismissed';
+  context?: string;
+  codeExample?: string;
 }
 
 /**
@@ -77,13 +80,15 @@ export interface AssistantIntent {
   componentId: string;
   status: 'pending' | 'completed' | 'failed';
   created: string;
+  relatedComponents?: string[];
 }
 
 /**
  * Types for AI Code Assistant
  */
 export interface UseAICodeAssistantProps {
-  component: string;
+  component?: string;
+  initialComponents?: string[];
   options?: {
     autoAnalyze?: boolean;
     analysisDepth?: 'simple' | 'detailed';
@@ -97,4 +102,69 @@ export interface ChakraInsightsOptions {
   includeRecommendations?: boolean;
   detailLevel?: 'basic' | 'detailed';
   timeframe?: 'recent' | 'all';
+}
+
+/**
+ * CodeQualityStats interface for code quality metrics
+ */
+export interface CodeQualityStats {
+  issueCount: number;
+  componentsAnalyzed: number;
+  highPriorityIssues: number;
+  lastUpdated: Date;
+}
+
+/**
+ * CodeQualityIssue interface for code quality issues
+ */
+export interface CodeQualityIssue {
+  id: string;
+  component: string;
+  type: 'security' | 'pattern' | 'complexity' | 'performance' | 'architecture' | 'render';
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  suggestions: string[];
+}
+
+/**
+ * ComponentMetrics interface for component performance metrics
+ */
+export interface ComponentMetrics {
+  componentName: string;
+  renderCount: number;
+  averageRenderTime: number;
+  totalRenderTime: number;
+  lastRenderTime: number;
+  firstRenderTime: number;
+}
+
+/**
+ * Achievement data interface
+ */
+export interface IAchievementData {
+  id: string;
+  title: string;
+  description: string;
+  type?: 'discovery' | 'completion' | 'interaction' | 'streak' | 'progressive' | 'milestone';
+  category?: string;
+  icon?: string;
+  progress: number;
+  maxProgress?: number;
+  completed: boolean;
+  completedAt?: string;
+  tier?: number;
+  points?: number;
+}
+
+/**
+ * Feature tooltip data interface
+ */
+export interface FeatureTooltipData {
+  id: string;
+  title: string;
+  description: string;
+  element: string;
+  position: 'top' | 'bottom' | 'left' | 'right';
+  priority: number;
+  dismissible: boolean;
 }

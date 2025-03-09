@@ -1,76 +1,167 @@
 
 import { AIInsight, ChakraInsightsOptions } from '@/services/ai/types';
-import { generateRandomId } from '@/utils/idGenerator';
+import { queryAI } from '@/services/ai/aiService';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Service for providing insights about chakra energies
- * and their relationships with emotional patterns
+ * Service for generating and managing chakra-related insights
  */
 class ChakraInsightsService {
   /**
-   * Get insights about specific chakras based on user data
-   * 
-   * @param userId User identifier
-   * @param chakras Optional specific chakras to analyze
-   * @param options Configuration options
-   * @returns Promise with chakra insights
+   * Generate insights about chakra balance based on reflection content
    */
-  async getChakraInsights(
-    userId: string,
-    chakras?: Record<string, number>,
-    options?: ChakraInsightsOptions
-  ): Promise<AIInsight[]> {
-    // In a real implementation, this would call an API or process data
-    // For now, return mock data
-    return this.generateMockChakraInsights(chakras);
+  async generateChakraInsights(reflectionContent: string, options: ChakraInsightsOptions = {}): Promise<AIInsight[]> {
+    try {
+      // Set default options
+      const { 
+        includeRecommendations = true,
+        detailLevel = 'detailed',
+        timeframe = 'recent'
+      } = options;
+      
+      // Build prompt for AI
+      const prompt = `
+        Analyze this reflection and identify the chakra energies present: 
+        "${reflectionContent}"
+        
+        ${includeRecommendations ? 'Include recommendations for balancing each chakra.' : ''}
+        ${detailLevel === 'detailed' ? 'Provide detailed analysis of each chakra mentioned.' : 'Provide a brief summary.'}
+        ${timeframe === 'recent' ? 'Focus on current energy patterns.' : 'Consider long-term patterns.'}
+      `;
+      
+      // Query AI service
+      const response = await queryAI(prompt);
+      
+      if (!response || !response.answer) {
+        return [];
+      }
+      
+      // Parse insights from response
+      const insights = this.parseChakraInsights(response.answer);
+      return insights;
+    } catch (error) {
+      console.error('Error generating chakra insights:', error);
+      return [];
+    }
   }
   
   /**
-   * Generate recommendations for balancing chakras
-   * 
-   * @param userId User identifier
-   * @param imbalancedChakras Map of chakras and their imbalance scores
-   * @returns Promise with practice recommendations
+   * Parse chakra insights from AI response text
    */
-  async getChakraRecommendations(
-    userId: string,
-    imbalancedChakras: Record<string, number>
-  ): Promise<string[]> {
-    // Mock recommendations
-    return [
-      'Root chakra meditation with grounding visualizations',
-      'Throat chakra sound healing with blue light visualization',
-      'Heart chakra yoga poses focusing on opening the chest'
-    ];
-  }
-  
-  /**
-   * Internal method to generate mock data for development
-   */
-  private generateMockChakraInsights(chakras?: Record<string, number>): AIInsight[] {
+  private parseChakraInsights(responseText: string): AIInsight[] {
     const insights: AIInsight[] = [];
     
-    // Root chakra insight
-    insights.push({
-      id: generateRandomId(),
-      type: 'chakra',
-      text: 'Your root chakra shows signs of underactivity, which may manifest as anxiety and fear about basic survival needs.',
-      confidence: 0.85,
-      relevance: 0.9,
-      title: 'Root Chakra Imbalance'
-    });
+    // Extract chakra-related paragraphs
+    const paragraphs = responseText.split('\n\n').filter(p => p.trim().length > 0);
     
-    // Heart chakra insight
-    insights.push({
-      id: generateRandomId(),
-      type: 'chakra',
-      text: 'Your heart chakra is very active, indicating a period of emotional openness and healing.',
-      confidence: 0.78,
-      relevance: 0.82,
-      title: 'Heart Chakra Activation'
+    // Map common chakra terms to formal chakra types
+    const chakraMap: Record<string, string> = {
+      'root': 'chakra',
+      'sacral': 'chakra',
+      'solar plexus': 'chakra',
+      'heart': 'chakra',
+      'throat': 'chakra',
+      'third eye': 'chakra',
+      'crown': 'chakra',
+      'base': 'chakra',
+      'muladhara': 'chakra',
+      'svadhisthana': 'chakra',
+      'manipura': 'chakra',
+      'anahata': 'chakra',
+      'vishuddha': 'chakra',
+      'ajna': 'chakra',
+      'sahasrara': 'chakra'
+    };
+    
+    // Process each paragraph
+    paragraphs.forEach(paragraph => {
+      // Skip very short paragraphs
+      if (paragraph.length < 20) return;
+      
+      // Determine if paragraph is about chakras
+      const chakraMatch = Object.keys(chakraMap).find(term => 
+        paragraph.toLowerCase().includes(term)
+      );
+      
+      if (chakraMatch) {
+        // Determine insight type
+        let insightType: 'chakra' | 'emotion' | 'practice' | 'wisdom' = 'chakra';
+        
+        if (paragraph.toLowerCase().includes('practice') || 
+            paragraph.toLowerCase().includes('exercise') ||
+            paragraph.toLowerCase().includes('technique')) {
+          insightType = 'practice';
+        } else if (paragraph.toLowerCase().includes('feeling') || 
+                  paragraph.toLowerCase().includes('emotion') ||
+                  paragraph.toLowerCase().includes('mood')) {
+          insightType = 'emotion';
+        }
+        
+        // Extract a title from the first sentence or create one
+        const sentences = paragraph.split(/[.!?]/).filter(s => s.trim().length > 0);
+        const firstSentence = sentences[0] || '';
+        const title = firstSentence.length > 50 
+          ? firstSentence.substring(0, 50) + '...' 
+          : firstSentence;
+        
+        // Add the insight
+        insights.push({
+          id: uuidv4(),
+          type: insightType,
+          text: paragraph,
+          title: title || `${chakraMatch.charAt(0).toUpperCase() + chakraMatch.slice(1)} Insight`,
+          confidence: 0.85,
+          relevance: 0.9,
+          content: paragraph // Include full content
+        });
+      }
     });
     
     return insights;
+  }
+  
+  /**
+   * Get chakra recommendations based on activated chakras
+   */
+  async getChakraRecommendations(activatedChakras: number[]): Promise<string[]> {
+    try {
+      const chakraNames = [
+        'Root (Muladhara)',
+        'Sacral (Svadhisthana)',
+        'Solar Plexus (Manipura)',
+        'Heart (Anahata)',
+        'Throat (Vishuddha)',
+        'Third Eye (Ajna)',
+        'Crown (Sahasrara)'
+      ];
+      
+      const activatedNames = activatedChakras.map(index => chakraNames[index]);
+      const inactiveNames = chakraNames.filter((_, index) => !activatedChakras.includes(index));
+      
+      if (activatedNames.length === 0) {
+        return [
+          'Begin your chakra activation journey with grounding practices',
+          'Try meditation focused on your base/root chakra',
+          'Practice deep breathing to prepare your energy centers'
+        ];
+      }
+      
+      // Generate recommendations based on active and inactive chakras
+      const recommendations = [
+        `Continue working with your ${activatedNames.join(', ')} chakras`,
+        `Consider practices to activate your ${inactiveNames.join(', ')} chakras`,
+        'Maintain a regular energy balancing practice for holistic harmony'
+      ];
+      
+      return recommendations;
+    } catch (error) {
+      console.error('Error getting chakra recommendations:', error);
+      return [
+        'Practice regular chakra meditation',
+        'Balance your energy through mindful activities',
+        'Consider energy healing modalities for chakra alignment'
+      ];
+    }
   }
 }
 
