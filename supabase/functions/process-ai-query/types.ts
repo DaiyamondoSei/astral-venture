@@ -11,6 +11,7 @@ export interface AIQueryRequest {
     stream?: boolean;
     useCache?: boolean;
     cacheKey?: string;
+    cacheTtl?: number;
   }
 }
 
@@ -28,14 +29,12 @@ export interface ContextData {
   userProfile?: {
     userLevel: number;
     energyPoints: number;
-    [key: string]: any;
+    username?: string;
   };
   reflection?: {
     content: string;
     dominantEmotion?: string;
     emotionalDepth?: number;
-    chakrasActivated?: string[];
-    [key: string]: any;
+    chakrasActivated?: string[] | string;
   };
-  [key: string]: any;
 }
