@@ -33,13 +33,13 @@ export function getPerformanceCategory(): DeviceCapability {
   const cpuCores = navigator.hardwareConcurrency || 0;
   
   // Device memory is not supported in all browsers
-  const memory = (navigator as any).deviceMemory !== undefined ? (navigator as any).deviceMemory : 4;
+  const deviceMemory = (navigator as any).deviceMemory !== undefined ? (navigator as any).deviceMemory : 4;
   
   // Use user agent for additional signals
   const isOldBrowser = /MSIE|Trident/.test(navigator.userAgent);
   
   // Determine category based on hardware capabilities
-  if (isOldBrowser || (isMobile && (cpuCores <= 2 || memory <= 2))) {
+  if (isOldBrowser || (isMobile && (cpuCores <= 2 || deviceMemory <= 2))) {
     return DeviceCapability.LOW;
   } else if ((isMobile && cpuCores <= 4) || (!isMobile && cpuCores <= 2)) {
     return DeviceCapability.MEDIUM;

@@ -3,11 +3,11 @@ export interface IAchievementData {
   id: string;
   title: string;
   description: string;
-  icon: string;
-  category: string;
+  icon?: string; // Make icon optional to match hook/achievement/types
+  category?: string;
   points: number;
-  tier: number;
-  requiredAmount: number;
+  tier?: number;
+  requiredAmount?: number;
   progress?: number;
   trackingType?: string;
   awarded?: boolean;

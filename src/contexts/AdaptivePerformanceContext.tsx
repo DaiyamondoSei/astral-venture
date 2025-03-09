@@ -4,11 +4,14 @@ import { getPerformanceCategory, DeviceCapability } from '@/utils/performanceUti
 import { initAdaptiveRendering, isFeatureEnabled } from '@/utils/adaptiveRendering';
 import { initWebVitals, getWebVitalsMetrics } from '@/utils/webVitalsMonitor';
 
+// Helper type for the manual performance mode
+type PerformanceMode = DeviceCapability | 'auto';
+
 interface AdaptivePerformanceContextType {
   // Device capability
   deviceCapability: DeviceCapability;
   // Manual override for performance mode
-  manualPerformanceMode: DeviceCapability | 'auto';
+  manualPerformanceMode: PerformanceMode;
   // Feature flags based on device capability
   features: {
     enableParticles: boolean;
@@ -21,7 +24,7 @@ interface AdaptivePerformanceContextType {
   // Web vitals metrics
   webVitals: ReturnType<typeof getWebVitalsMetrics>;
   // Functions
-  setManualPerformanceMode: (mode: DeviceCapability | 'auto') => void;
+  setManualPerformanceMode: (mode: PerformanceMode) => void;
   adaptElementCount: (baseCount: number) => number;
   adaptUpdateInterval: (baseIntervalMs: number) => number;
 }
@@ -42,9 +45,9 @@ interface AdaptivePerformanceProviderProps {
 
 export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderProps> = ({ children }) => {
   // State for manual performance mode
-  const [manualMode, setManualMode] = useState<DeviceCapability | 'auto'>('auto');
+  const [manualMode, setManualMode] = useState<PerformanceMode>('auto');
   // Calculated device capability
-  const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>('medium');
+  const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(DeviceCapability.MEDIUM);
   // Web vitals metrics
   const [webVitals, setWebVitals] = useState(getWebVitalsMetrics());
   
@@ -77,7 +80,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   // Load saved preference
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedMode = localStorage.getItem('performanceMode') as DeviceCapability | 'auto' | null;
+      const savedMode = localStorage.getItem('performanceMode') as PerformanceMode | null;
       if (savedMode) {
         setManualMode(savedMode);
       }
@@ -85,7 +88,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   }, []);
   
   // Manual mode setter
-  const setManualPerformanceMode = (mode: DeviceCapability | 'auto') => {
+  const setManualPerformanceMode = (mode: PerformanceMode) => {
     setManualMode(mode);
     
     // Store preference in localStorage for persistence
@@ -96,20 +99,20 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   
   // Helper functions for adapting rendering based on performance
   const adaptElementCount = (baseCount: number): number => {
-    const factors = {
-      low: 0.3,
-      medium: 0.7,
-      high: 1.0
+    const factors: Record<DeviceCapability, number> = {
+      [DeviceCapability.LOW]: 0.3,
+      [DeviceCapability.MEDIUM]: 0.7,
+      [DeviceCapability.HIGH]: 1.0
     };
     
     return Math.max(3, Math.floor(baseCount * factors[deviceCapability]));
   };
   
   const adaptUpdateInterval = (baseIntervalMs: number): number => {
-    const factors = {
-      low: 3,
-      medium: 1.5,
-      high: 1
+    const factors: Record<DeviceCapability, number> = {
+      [DeviceCapability.LOW]: 3,
+      [DeviceCapability.MEDIUM]: 1.5,
+      [DeviceCapability.HIGH]: 1
     };
     
     return Math.max(16, Math.floor(baseIntervalMs * factors[deviceCapability]));
@@ -117,8 +120,8 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   
   // Compute derived feature flags
   const features = useMemo(() => {
-    const isLowPerformance = deviceCapability === 'low';
-    const isHighPerformance = deviceCapability === 'high';
+    const isLowPerformance = deviceCapability === DeviceCapability.LOW;
+    const isHighPerformance = deviceCapability === DeviceCapability.HIGH;
     
     return {
       enableParticles: !isLowPerformance,

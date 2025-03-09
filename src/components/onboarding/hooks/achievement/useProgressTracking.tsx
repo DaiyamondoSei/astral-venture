@@ -1,156 +1,138 @@
 
-import { useCallback } from 'react';
-import { AchievementState, ProgressTrackingResult, AchievementEventType, IAchievementData } from './types';
+import { useState, useCallback, useMemo } from 'react';
+import { AchievementEventType, IAchievementData, ProgressTrackingResult } from './types';
+
+interface UseProgressTrackingProps {
+  userId?: string;
+  onProgress?: (type: string, value: number, previousValue: number) => void;
+}
 
 /**
- * Hook for tracking user progress in various achievement categories
- * 
- * @param state The current achievement state
- * @param setProgressTracking Function to update the progress tracking state
- * @returns Object with methods for tracking and retrieving progress
+ * Hook to track progress for various achievement types
  */
-export function useProgressTracking(
-  state: AchievementState,
-  setProgressTracking: (value: Record<string, number>) => void
-): ProgressTrackingResult {
-  // Get the current value for a specific progress type
-  const getProgressValue = useCallback((type: string): number => {
-    return state.progressTracking[type] || 0;
-  }, [state.progressTracking]);
-
+export function useProgressTracking({ 
+  userId, 
+  onProgress 
+}: UseProgressTrackingProps): ProgressTrackingResult {
+  // State to track progress values
+  const [progress, setProgress] = useState<Record<string, number>>({});
+  const [unlockedAchievements, setUnlockedAchievements] = useState<IAchievementData[]>([]);
+  const [earnedPoints, setEarnedPoints] = useState<number>(0);
+  const [activityLog, setActivityLog] = useState<Record<string, any>[]>([]);
+  
   // Track progress for a specific type
-  const trackProgress = useCallback((type: string, amount: number): void => {
-    // If amount is 0, no need to update
-    if (amount === 0) return;
-    
-    // Calculate new value, ensuring it doesn't go below 0
-    const currentValue = getProgressValue(type);
-    const newValue = Math.max(0, currentValue + amount);
-    
-    // Only update if the value has changed
-    if (newValue === currentValue) return;
-    
-    // Create a new object with the updated value
-    const updatedProgress = {
-      ...state.progressTracking,
-      [type]: newValue
-    };
-    
-    // Call the setter with the new object
-    setProgressTracking(updatedProgress);
-    
-    // Log meaningful progress updates
-    if (amount > 0) {
-      console.log(`Progress tracked: ${type} increased by ${amount} to ${newValue}`);
-    } else {
-      console.log(`Progress decreased: ${type} changed by ${amount} to ${newValue}`);
-    }
-  }, [state.progressTracking, setProgressTracking, getProgressValue]);
-
-  // Reset a specific progress type to zero
-  const resetProgress = useCallback((type: string): void => {
-    // Only reset if the current value is not already 0
-    if (getProgressValue(type) === 0) return;
-    
-    const updatedProgress = {
-      ...state.progressTracking,
-      [type]: 0
-    };
-    
-    setProgressTracking(updatedProgress);
-    console.log(`Progress reset: ${type} set to 0`);
-  }, [state.progressTracking, setProgressTracking, getProgressValue]);
-
-  // Log activity with optional details
-  const logActivity = useCallback((activityType: string, details?: Record<string, any>): void => {
-    // Extract numeric value from details if available
-    let value = 1; // Default value
-
-    if (details) {
-      if (typeof details.value === 'number') {
-        value = details.value;
-      } else if (typeof details.amount === 'number') {
-        value = details.amount;
+  const trackProgress = useCallback((type: string, amount: number) => {
+    setProgress(prev => {
+      const currentValue = prev[type] || 0;
+      const newValue = currentValue + amount;
+      
+      // Call the onProgress callback if provided
+      if (onProgress) {
+        onProgress(type, newValue, currentValue);
       }
-    }
-
-    // Map activity types to progress tracking types
-    let progressType = activityType;
+      
+      return {
+        ...prev,
+        [type]: newValue
+      };
+    });
+  }, [onProgress]);
+  
+  // Reset progress for a specific type
+  const resetProgress = useCallback((type: string) => {
+    setProgress(prev => {
+      const newProgress = { ...prev };
+      delete newProgress[type];
+      return newProgress;
+    });
+  }, []);
+  
+  // Log activity for tracking and analysis
+  const logActivity = useCallback((activityType: string, details: Record<string, any> = {}) => {
+    const activity = {
+      type: activityType,
+      timestamp: new Date().toISOString(),
+      userId,
+      ...details
+    };
     
-    // Handle standard achievement event types
+    // Add to activity log
+    setActivityLog(prev => [...prev, activity]);
+    
+    // Track progress based on activity type
     switch (activityType) {
       case AchievementEventType.REFLECTION_COMPLETED:
-        progressType = 'reflections';
+        trackProgress('reflections', 1);
         break;
       case AchievementEventType.MEDITATION_COMPLETED:
-        progressType = 'meditation_minutes';
-        value = details?.duration || value;
+        trackProgress('meditation_minutes', details.duration || 5);
         break;
       case AchievementEventType.CHAKRA_ACTIVATED:
-        progressType = 'chakras_activated';
+        trackProgress('chakras_activated', 1);
         break;
       case AchievementEventType.WISDOM_EXPLORED:
-        progressType = 'wisdom_resources_explored';
+        trackProgress('wisdom_resources', 1);
         break;
       default:
-        // Use the original activity type
-        break;
+        // If it's a generic tracked event, increment by 1
+        if (activityType.startsWith('track_')) {
+          const trackType = activityType.replace('track_', '');
+          trackProgress(trackType, 1);
+        }
     }
-
-    // Track the activity with the extracted or default value
-    trackProgress(progressType, value);
-
-    // Additional logging or processing
-    console.log(`Activity logged: ${activityType}`, {
-      progressType,
-      value,
-      details,
-      timestamp: new Date().toISOString()
-    });
-  }, [trackProgress]);
-
+  }, [trackProgress, userId]);
+  
+  // Get progress value for a specific type
+  const getProgressValue = useCallback((type: string): number => {
+    return progress[type] || 0;
+  }, [progress]);
+  
   // Track multiple progress types at once
-  const trackMultipleProgress = useCallback((progressUpdates: Record<string, number>): void => {
-    // Skip if empty updates object
-    if (Object.keys(progressUpdates).length === 0) return;
-    
-    // Find changes that need to be applied
-    const changedValues = Object.entries(progressUpdates).filter(([type, amount]) => {
-      const currentValue = state.progressTracking[type] || 0;
-      return Math.max(0, currentValue + amount) !== currentValue;
+  const trackMultipleProgress = useCallback((progressUpdates: Record<string, number>) => {
+    setProgress(prev => {
+      const newProgress = { ...prev };
+      let updated = false;
+      
+      // Update each progress type
+      Object.entries(progressUpdates).forEach(([type, amount]) => {
+        const currentValue = prev[type] || 0;
+        const newValue = currentValue + amount;
+        
+        // Call the onProgress callback if provided
+        if (onProgress) {
+          onProgress(type, newValue, currentValue);
+        }
+        
+        newProgress[type] = newValue;
+        updated = true;
+      });
+      
+      return updated ? newProgress : prev;
     });
-    
-    // Skip if no actual changes
-    if (changedValues.length === 0) return;
-    
-    const updatedProgress = { ...state.progressTracking };
-    
-    // Process each update
-    changedValues.forEach(([type, amount]) => {
-      const currentValue = updatedProgress[type] || 0;
-      updatedProgress[type] = Math.max(0, currentValue + amount);
-    });
-    
-    setProgressTracking(updatedProgress);
-    
-    // Log the batch update
-    console.log('Multiple progress updates:', changedValues);
-  }, [state.progressTracking, setProgressTracking]);
-
-  // Create empty achievement array for type safety
-  const emptyAchievements: IAchievementData[] = [];
-
-  return {
+  }, [onProgress]);
+  
+  // Create the result object
+  const result = useMemo((): ProgressTrackingResult => ({
+    earnedPoints,
+    progress,
+    didUnlockAchievement: unlockedAchievements.length > 0,
+    unlockedAchievements,
+    updated: false,
     trackProgress,
     resetProgress,
     logActivity,
     getProgressValue,
-    trackMultipleProgress,
-    // Add required properties to match ProgressTrackingResult
-    earnedPoints: 0,
-    didUnlockAchievement: false,
-    unlockedAchievements: emptyAchievements,
-    progress: state.progressTracking || {},
-    updated: false
-  };
+    trackMultipleProgress
+  }), [
+    earnedPoints, 
+    progress, 
+    unlockedAchievements, 
+    trackProgress, 
+    resetProgress, 
+    logActivity,
+    getProgressValue,
+    trackMultipleProgress
+  ]);
+  
+  return result;
 }

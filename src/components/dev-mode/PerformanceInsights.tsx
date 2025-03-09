@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -104,7 +105,7 @@ const PerformanceInsights: React.FC = () => {
 
   // Filter to only show the most important metrics
   const componentsSortedByRenderTime = Object.values(metrics)
-    .filter(m => m.averageRenderTime !== undefined && m.averageRenderTime > 10) // Only show components above 10ms
+    .filter(m => typeof m.averageRenderTime === 'number' && m.averageRenderTime > 10) // Only show components above 10ms
     .sort((a, b) => (b.averageRenderTime || 0) - (a.averageRenderTime || 0))
     .slice(0, 5); // Show only top 5
 
@@ -130,7 +131,7 @@ const PerformanceInsights: React.FC = () => {
       // Use a direct call to the performance monitoring API
       await supabase.functions.invoke('track-performance', {
         body: {
-          metrics: performanceMonitor.getMetrics().queuedMetrics || [],
+          metrics: (performanceMonitor.getMetrics() as any).queuedMetrics || [],
           sessionId: 'manual-flush',
           deviceInfo: {
             userAgent: navigator.userAgent,
@@ -174,7 +175,8 @@ const PerformanceInsights: React.FC = () => {
   }
 
   // Get queued metrics count
-  const queuedMetrics = performanceMonitor.getMetrics().queuedMetrics || 0;
+  const queuedMetrics = (performanceMonitor.getMetrics() as any).queuedMetrics || 0;
+  const queuedMetricsCount = typeof queuedMetrics.length === 'number' ? queuedMetrics.length : 0;
 
   return (
     <Card className="fixed bottom-4 left-4 w-80 h-80 z-50 shadow-xl overflow-hidden opacity-90 hover:opacity-100">
@@ -212,13 +214,13 @@ const PerformanceInsights: React.FC = () => {
               <h3 className="text-sm font-medium">Local Components Tracked</h3>
               <div className="text-2xl font-bold">{Object.keys(metrics).length}</div>
               
-              {queuedMetrics > 0 && (
+              {queuedMetricsCount > 0 && (
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-sm flex items-center">
                     <Cloud className="h-3 w-3 mr-1" />
                     Metrics queue
                   </span>
-                  <span className="text-sm font-medium">{queuedMetrics}</span>
+                  <span className="text-sm font-medium">{queuedMetricsCount}</span>
                 </div>
               )}
 

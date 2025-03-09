@@ -3,12 +3,11 @@ import React from 'react';
 import { toast } from '@/components/ui/use-toast';
 
 /**
- * Context provider that wraps the AchievementProvider and adds error handling
+ * Context provider that wraps the achievement functionality and adds error handling
  */
 export const AchievementContext: React.FC<{children: React.ReactNode}> = ({ children }) => {
   return (
     <ErrorBoundary>
-      {/* Implement children directly since AchievementProvider doesn't exist */}
       {children}
     </ErrorBoundary>
   );

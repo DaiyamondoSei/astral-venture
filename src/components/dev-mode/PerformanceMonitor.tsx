@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings } from 'lucide-react';
 import { usePerformance } from '@/contexts/PerformanceContext';
+import { DeviceCapability } from '@/utils/performanceUtils';
 
 /**
  * PerformanceMonitor
@@ -98,20 +99,20 @@ const PerformanceMonitor = () => {
               
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === 'low' ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode('low')}
+                  className={`px-2 py-1 rounded text-xs ${deviceCapability === DeviceCapability.LOW ? 'bg-quantum-600' : 'bg-black/40'}`}
+                  onClick={() => setManualPerformanceMode(DeviceCapability.LOW)}
                 >
                   Low
                 </button>
                 <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === 'medium' ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode('medium')}
+                  className={`px-2 py-1 rounded text-xs ${deviceCapability === DeviceCapability.MEDIUM ? 'bg-quantum-600' : 'bg-black/40'}`}
+                  onClick={() => setManualPerformanceMode(DeviceCapability.MEDIUM)}
                 >
                   Medium
                 </button>
                 <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === 'high' ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode('high')}
+                  className={`px-2 py-1 rounded text-xs ${deviceCapability === DeviceCapability.HIGH ? 'bg-quantum-600' : 'bg-black/40'}`}
+                  onClick={() => setManualPerformanceMode(DeviceCapability.HIGH)}
                 >
                   High
                 </button>

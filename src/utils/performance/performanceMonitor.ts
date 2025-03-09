@@ -3,5 +3,6 @@
 export * from './PerformanceMonitor';
 
 // Re-export the singleton instance
-export { performanceMonitor } from './PerformanceMonitor';
+import { performanceMonitor } from './PerformanceMonitor';
+export { performanceMonitor };
 export default performanceMonitor;

@@ -12,12 +12,12 @@ const EDGE_FUNCTION_URL = '/api/ask-assistant';
 /**
  * Fetch a response from the AI assistant
  */
-export async function fetchAssistantResponse(question: AIQuestion): Promise<AIResponse> {
+async function fetchAssistantResponse(question: AIQuestion): Promise<AIResponse> {
   try {
     // Check if online before attempting fetch
     if (!navigator.onLine) {
       console.warn('Offline: Using fallback AI response');
-      return createFallbackResponse(question.question);
+      return createFallbackResponse(question.question || question.text || '');
     }
     
     const response = await fetch(EDGE_FUNCTION_URL, {
@@ -54,7 +54,7 @@ export async function fetchAssistantResponse(question: AIQuestion): Promise<AIRe
     console.error('Error fetching AI response:', error);
     
     // Return a graceful fallback response
-    return createFallbackResponse(question.question);
+    return createFallbackResponse(question.question || question.text || '');
   }
 }
 
@@ -68,6 +68,7 @@ export async function processQuestion(
 ): Promise<AIResponse> {
   try {
     const aiQuestion: AIQuestion = {
+      text: question,
       question,
       context,
       stream: false
@@ -89,7 +90,7 @@ export async function processQuestion(
  * This function is a compatibility layer for the old askAIAssistant function
  */
 export const askAIAssistant = async (
-  question: AIQuestion,
+  question: AIQuestion | string,
   userId?: string
 ): Promise<AIResponse> => {
   try {
@@ -98,9 +99,27 @@ export const askAIAssistant = async (
       console.log(`Processing question for user ${userId}`);
     }
     
-    return await fetchAssistantResponse(question);
+    // Handle case where question is a string
+    if (typeof question === 'string') {
+      return await fetchAssistantResponse({
+        text: question,
+        question,
+        userId
+      });
+    }
+    
+    // Make sure text field is always present for backward compatibility
+    const enhancedQuestion: AIQuestion = {
+      ...question,
+      text: question.text || question.question,
+      question: question.question || question.text
+    };
+    
+    return await fetchAssistantResponse(enhancedQuestion);
   } catch (error) {
     console.error('Error in askAIAssistant:', error);
-    return createFallbackResponse(question.question);
+    return createFallbackResponse(
+      typeof question === 'string' ? question : (question.question || question.text || '')
+    );
   }
 };

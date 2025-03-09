@@ -3,18 +3,12 @@ import { render, renderHook, act } from '@testing-library/react';
 import { useAssistantState } from '@/components/ai-assistant/hooks/useAssistantState';
 
 // Mock data for testing
-type AIResponse = {
-  text: string;
-  sources?: string[];
-  type?: 'text' | 'error' | 'loading';
-};
-
 describe('useAssistantState', () => {
   it('should initialize with default state', () => {
     const { result } = renderHook(() => useAssistantState());
     
     expect(result.current.question).toBe('');
-    expect(result.current.response).toEqual({ text: '', type: 'text' });
+    expect(result.current.response).toBeNull();
     expect(result.current.isSubmitting).toBe(false);
     expect(result.current.hasError).toBe(false);
   });
@@ -34,12 +28,12 @@ describe('useAssistantState', () => {
     
     act(() => {
       result.current.setResponse({ 
-        text: 'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.',
+        answer: 'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.',
         type: 'text'
       });
     });
     
-    expect(result.current.response.text).toBe(
+    expect(result.current.response?.answer).toBe(
       'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.'
     );
   });
@@ -65,14 +59,14 @@ describe('useAssistantState', () => {
     
     act(() => {
       result.current.setResponse({ 
-        text: 'Failed to process your request. Please try again.',
+        answer: 'Failed to process your request. Please try again.',
         type: 'error'
       });
       result.current.setHasError(true);
     });
     
     expect(result.current.hasError).toBe(true);
-    expect(result.current.response.type).toBe('error');
+    expect(result.current.response?.type).toBe('error');
   });
 
   it('should reset state', () => {
@@ -82,7 +76,7 @@ describe('useAssistantState', () => {
     act(() => {
       result.current.setQuestion('How do I meditate?');
       result.current.setResponse({ 
-        text: 'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.',
+        answer: 'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.',
         type: 'text'
       });
       result.current.setIsSubmitting(true);
@@ -96,7 +90,7 @@ describe('useAssistantState', () => {
     
     // Verify reset state
     expect(result.current.question).toBe('');
-    expect(result.current.response).toEqual({ text: '', type: 'text' });
+    expect(result.current.response).toBeNull();
     expect(result.current.isSubmitting).toBe(false);
     expect(result.current.hasError).toBe(false);
   });

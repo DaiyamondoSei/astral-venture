@@ -1,4 +1,3 @@
-
 // Achievement tracker types
 
 export interface AchievementTrackerProps {
@@ -8,7 +7,10 @@ export interface AchievementTrackerProps {
   stepInteractions?: any[];
   userId?: string;
   currentStreak?: number;
-  reflectionCount?: number; // Add missing property
+  reflectionCount?: number;
+  meditationMinutes?: number;
+  wisdomResourcesCount?: number;
+  totalPoints?: number;
 }
 
 export interface AchievementTrackerResult {
@@ -38,7 +40,7 @@ export interface IAchievementData {
   id: string;
   title: string;
   description: string;
-  icon?: string; // Make icon optional
+  icon?: string;
   type: 'discovery' | 'completion' | 'interaction' | 'streak' | 'progressive' | 'milestone';
   category?: string;
   points: number;
@@ -49,7 +51,6 @@ export interface IAchievementData {
   secret?: boolean;
   tier?: number;
   
-  // Additional achievement properties
   requiredStep?: string;
   requiredSteps?: string[];
   requiredInteraction?: string;
@@ -67,7 +68,6 @@ export interface ProgressTrackingResult {
   unlockedAchievements: IAchievementData[];
   updated?: boolean;
   
-  // Add missing methods for compatibility with tests
   trackProgress: (type: string, amount: number) => void;
   resetProgress: (type: string) => void;
   logActivity: (activityType: string, details?: Record<string, any>) => void;
@@ -80,11 +80,15 @@ export enum AchievementEventType {
   INTERACTION = 'interaction',
   STREAK_UPDATED = 'streak_updated',
   PROGRESS_TRACKED = 'progress_tracked',
-  // Add missing event types
   REFLECTION_COMPLETED = 'reflection_completed',
   MEDITATION_COMPLETED = 'meditation_completed',
   CHAKRA_ACTIVATED = 'chakra_activated',
-  WISDOM_EXPLORED = 'wisdom_explored'
+  WISDOM_EXPLORED = 'wisdom_explored',
+  LOGIN_STREAK = 'login_streak',
+  ENERGY_MILESTONE = 'energy_milestone',
+  ONBOARDING_COMPLETED = 'onboarding_completed',
+  PROFILE_COMPLETED = 'profile_completed',
+  STREAK_MILESTONE = 'streak_milestone'
 }
 
 export interface FeatureTooltipData {
@@ -97,8 +101,6 @@ export interface FeatureTooltipData {
   showOnce?: boolean;
   showAfterStep?: string;
   priority?: number;
-  
-  // Additional properties
   condition?: string;
   delay?: number;
   elementId?: string;
