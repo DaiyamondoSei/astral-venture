@@ -8,17 +8,7 @@ import AchievementHeader from './achievement/AchievementHeader';
 import AchievementFilter from './achievement/AchievementFilter';
 import AchievementItem from './achievement/AchievementItem';
 import EmptyAchievementList from './achievement/EmptyAchievementList';
-import { getPlaceholderAchievements } from '@/utils/achievementUtils';
-
-interface AchievementType {
-  id: string;
-  title: string;
-  description: string;
-  category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special';
-  progress?: number;
-  awarded?: boolean;
-  icon?: 'star' | 'trophy' | 'award' | 'check';
-}
+import { getPlaceholderAchievements, Achievement } from '@/utils/achievementUtils';
 
 interface AchievementsPanelProps {
   className?: string;
@@ -34,15 +24,18 @@ const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ className }) => {
       try {
         // First check if the user_achievements table exists using our function
         const { data: userAchievements, error } = await supabase
-          .rpc('get_user_achievements', { user_id_param: (await supabase.auth.getUser()).data.user?.id })
+          .rpc('get_user_achievements', { 
+            user_id_param: (await supabase.auth.getUser()).data.user?.id 
+          });
         
-        if (error) throw error
+        if (error) throw error;
         
         // If we don't have actual achievements yet, return placeholder data
         if (!userAchievements || userAchievements.length === 0) {
           return getPlaceholderAchievements();
         }
         
+        // Transform data to match our Achievement interface
         return userAchievements.map((a: any) => ({
           id: a.achievement_id,
           title: a.achievement_data?.title || 'Unknown Achievement',
@@ -51,7 +44,7 @@ const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ className }) => {
           progress: a.progress,
           awarded: a.awarded,
           icon: a.achievement_data?.icon || 'award'
-        }));
+        })) as Achievement[];
       } catch (error) {
         console.error('Error fetching achievements:', error);
         // Return placeholder data if there's an error
@@ -64,7 +57,7 @@ const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ className }) => {
   // Filter achievements by category
   const filteredAchievements = activeTab === 'all' 
     ? achievements 
-    : achievements.filter((a: AchievementType) => a.category === activeTab);
+    : achievements.filter((a: Achievement) => a.category === activeTab);
   
   // Animation variants
   const containerVariants = {
@@ -93,7 +86,7 @@ const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ className }) => {
   return (
     <div className={cn("pb-4", className)}>
       <AchievementHeader 
-        unlockedCount={achievements.filter((a: AchievementType) => a.awarded).length} 
+        unlockedCount={achievements.filter((a: Achievement) => a.awarded).length} 
         totalCount={achievements.length} 
       />
       
@@ -108,7 +101,7 @@ const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ className }) => {
         {filteredAchievements.length === 0 ? (
           <EmptyAchievementList />
         ) : (
-          filteredAchievements.map((achievement: AchievementType) => (
+          filteredAchievements.map((achievement: Achievement) => (
             <AchievementItem key={achievement.id} achievement={achievement} />
           ))
         )}

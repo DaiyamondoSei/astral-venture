@@ -1,5 +1,5 @@
 
-interface AchievementType {
+export interface Achievement {
   id: string;
   title: string;
   description: string;
@@ -10,9 +10,9 @@ interface AchievementType {
 }
 
 /**
- * Generate placeholder achievement data for development and fallback scenarios
+ * Get placeholder achievements for when the database doesn't have any yet
  */
-export function getPlaceholderAchievements(): AchievementType[] {
+export function getPlaceholderAchievements(): Achievement[] {
   return [
     {
       id: 'first-meditation',
@@ -28,7 +28,7 @@ export function getPlaceholderAchievements(): AchievementType[] {
       title: 'Consistent Mind',
       description: 'Complete meditations for 3 days in a row',
       category: 'meditation',
-      progress: 0.33,
+      progress: 0,
       awarded: false,
       icon: 'star'
     },
@@ -46,7 +46,7 @@ export function getPlaceholderAchievements(): AchievementType[] {
       title: 'Energy Awakening',
       description: 'Activate your first chakra',
       category: 'practice',
-      progress: 0.5,
+      progress: 0,
       awarded: false,
       icon: 'trophy'
     },
@@ -55,7 +55,7 @@ export function getPlaceholderAchievements(): AchievementType[] {
       title: 'Ancient Knowledge',
       description: 'Unlock your first wisdom insight',
       category: 'wisdom',
-      progress: 0.2,
+      progress: 0,
       awarded: false,
       icon: 'star'
     }
@@ -63,30 +63,28 @@ export function getPlaceholderAchievements(): AchievementType[] {
 }
 
 /**
- * Calculate the progress percentage for a specific achievement
+ * Calculate progress percentage from achievement progress
  */
-export function calculateAchievementProgress(
-  currentValue: number, 
-  targetValue: number
-): number {
-  if (targetValue <= 0) return 0;
-  const progress = currentValue / targetValue;
-  return Math.min(1, Math.max(0, progress));
+export function calculateProgressPercentage(progress: number): number {
+  return Math.min(100, Math.max(0, progress * 100));
 }
 
 /**
- * Format achievements for display with correct progress values
+ * Get a suitable color for an achievement category
  */
-export function formatAchievementsForDisplay(
-  achievements: any[]
-): AchievementType[] {
-  return achievements.map(achievement => ({
-    id: achievement.id,
-    title: achievement.title || 'Unknown Achievement',
-    description: achievement.description || 'Description not available',
-    category: achievement.category || 'special',
-    progress: achievement.progress || 0,
-    awarded: achievement.awarded || false,
-    icon: achievement.icon || 'award'
-  }));
+export function getCategoryColor(category: string): string {
+  switch (category) {
+    case 'meditation':
+      return 'from-blue-400 to-blue-600';
+    case 'practice':
+      return 'from-green-400 to-green-600';
+    case 'reflection':
+      return 'from-purple-400 to-purple-600';
+    case 'wisdom':
+      return 'from-amber-400 to-amber-600';
+    case 'special':
+      return 'from-pink-400 to-pink-600';
+    default:
+      return 'from-gray-400 to-gray-600';
+  }
 }

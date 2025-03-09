@@ -21,7 +21,7 @@ const SwipeIndicator: React.FC<SwipeIndicatorProps> = ({ position, className }) 
       transition: { 
         repeat: Infinity, 
         duration: 2,
-        repeatType: "mirror" as const
+        repeatType: "mirror"
       } 
     }
   };

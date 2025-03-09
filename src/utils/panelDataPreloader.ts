@@ -37,13 +37,33 @@ export async function preloadPanelData() {
       queryKey: ['achievements'],
       queryFn: async () => {
         try {
-          const { data, error } = await supabase
-            .rpc('get_user_achievements', { user_id_param: user.id })
-            
+          // Use RPC function to get achievements
+          const { data, error } = await supabase.rpc('get_user_achievements', { 
+            user_id_param: user.id 
+          })
+          
           if (error) throw error
           return data || []
         } catch (error) {
           console.error('Error pre-fetching achievements:', error)
+          return []
+        }
+      }
+    })
+    
+    // Pre-fetch portal state for seed of life portal
+    queryClient.prefetchQuery({
+      queryKey: ['portal-state', user.id],
+      queryFn: async () => {
+        try {
+          const { data, error } = await supabase.rpc('get_user_portal_state', { 
+            user_id_param: user.id 
+          })
+          
+          if (error) throw error
+          return data || []
+        } catch (error) {
+          console.error('Error pre-fetching portal state:', error)
           return []
         }
       }

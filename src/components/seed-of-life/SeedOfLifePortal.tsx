@@ -1,66 +1,51 @@
-
 import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { useSeedOfLifeInteraction } from '@/hooks/useSeedOfLifeInteraction';
 import SeedOfLifeGeometry from './SeedOfLifeGeometry';
 import PortalTransition from './PortalTransition';
 import ConsciousnessView from './ConsciousnessView';
-import { cn } from '@/lib/utils';
+import { useSeedOfLifeInteraction } from '@/hooks/useSeedOfLifeInteraction';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SeedOfLifePortalProps {
-  userLevel?: number;
-  onActivate?: () => void;
   className?: string;
 }
 
 /**
- * Interactive Seed of Life portal that serves as the gateway to the consciousness view
- * Features energy accumulation through user interaction and visual feedback
+ * The central Seed of Life Portal component
+ * Serves as the main interaction point for users to access the consciousness view
  */
-const SeedOfLifePortal: React.FC<SeedOfLifePortalProps> = ({
-  userLevel = 1,
-  onActivate,
-  className
-}) => {
-  const [isTransitioning, setIsTransitioning] = useState(false);
+const SeedOfLifePortal: React.FC<SeedOfLifePortalProps> = ({ className }) => {
+  const [isPortalActive, setIsPortalActive] = useState(false);
   const [showConsciousnessView, setShowConsciousnessView] = useState(false);
-  const [isInteracting, setIsInteracting] = useState(false);
+  const { user } = useAuth();
   
-  // Use the seed of life interaction hook
-  const {
-    portalEnergy,
-    resonanceLevel,
-    handlePortalInteraction,
-    resetInteraction
+  // Get user profile data to determine level
+  const userLevel = 1; // Default to level 1 if not available
+  
+  // Use the interaction hook for portal state management
+  const { 
+    portalEnergy, 
+    resonanceLevel, 
+    handlePortalInteraction 
   } = useSeedOfLifeInteraction(userLevel);
   
-  // Handle portal click - accumulate energy
+  // Handle portal click
   const handlePortalClick = useCallback(async () => {
-    if (isTransitioning) return;
+    if (showConsciousnessView) return;
     
-    setIsInteracting(true);
-    const result = await handlePortalInteraction();
-    
-    // If energy is at 100%, trigger the portal activation
-    if (result.newEnergy >= 100) {
-      setIsTransitioning(true);
-      onActivate?.();
-      
-      // After a delay, reset the portal for future use
-      setTimeout(() => {
-        resetInteraction();
-      }, 2000);
+    if (portalEnergy >= 100) {
+      // If portal is fully charged, activate it
+      setIsPortalActive(true);
+    } else {
+      // Otherwise, increment energy
+      await handlePortalInteraction();
     }
-    
-    setTimeout(() => {
-      setIsInteracting(false);
-    }, 300);
-  }, [isTransitioning, handlePortalInteraction, onActivate, resetInteraction]);
+  }, [portalEnergy, handlePortalInteraction, showConsciousnessView]);
   
-  // Handle transition completion - show consciousness view
+  // Handle transition completion
   const handleTransitionComplete = useCallback(() => {
-    setIsTransitioning(false);
     setShowConsciousnessView(true);
+    setIsPortalActive(false);
   }, []);
   
   // Handle return from consciousness view
@@ -68,73 +53,57 @@ const SeedOfLifePortal: React.FC<SeedOfLifePortalProps> = ({
     setShowConsciousnessView(false);
   }, []);
   
-  if (showConsciousnessView) {
-    return (
-      <ConsciousnessView
-        userLevel={userLevel}
-        onReturn={handleReturnFromConsciousness}
-      />
-    );
-  }
-  
   return (
-    <>
-      <motion.div
-        className={cn(
-          "relative flex items-center justify-center",
-          className
-        )}
-        animate={{
-          scale: isInteracting ? [1, 1.02, 1] : 1
-        }}
-        transition={{ duration: 0.3 }}
+    <motion.div 
+      className={`relative flex items-center justify-center ${className}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <PortalTransition 
+        isActive={isPortalActive}
+        onTransitionComplete={handleTransitionComplete}
       >
-        {/* Energy field around the portal */}
-        <motion.div
-          className="absolute rounded-full"
-          style={{
-            width: 240,
-            height: 240,
-            background: `radial-gradient(circle, rgba(138, 43, 226, ${
-              0.05 + (portalEnergy / 100) * 0.2
-            }) 0%, transparent 70%)`
-          }}
-          animate={{
-            scale: [1, 1.05, 1],
-            opacity: [
-              0.6 + (portalEnergy / 100) * 0.4,
-              0.8 + (portalEnergy / 100) * 0.2,
-              0.6 + (portalEnergy / 100) * 0.4
-            ]
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-        />
-        
-        {/* Interactive Seed of Life geometry */}
-        <SeedOfLifeGeometry
-          size={200}
-          energy={portalEnergy}
-          resonanceLevel={resonanceLevel}
-          isActive={portalEnergy > 0}
-          onClick={handlePortalClick}
-        />
-        
-        {/* Resonance level indicator */}
-        <div className="absolute bottom-0 translate-y-full mt-4 text-center text-white/70 text-sm">
-          <span>Resonance Level: </span>
-          <span className="text-purple-300 font-medium">{resonanceLevel}</span>
-        </div>
-      </motion.div>
-      
-      {/* Portal transition effect */}
-      {isTransitioning && (
-        <PortalTransition onComplete={handleTransitionComplete} />
-      )}
-    </>
+        {showConsciousnessView ? (
+          <ConsciousnessView 
+            onReturn={handleReturnFromConsciousness}
+            userLevel={userLevel}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center">
+            <SeedOfLifeGeometry 
+              energy={portalEnergy}
+              resonanceLevel={resonanceLevel}
+              size={280}
+              onClick={handlePortalClick}
+            />
+            
+            <motion.div 
+              className="mt-4 text-center text-white/80 text-sm max-w-xs"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <p>
+                {portalEnergy < 30 ? (
+                  "Tap the Seed of Life to begin activating the portal"
+                ) : portalEnergy < 70 ? (
+                  "Continue tapping to increase portal energy"
+                ) : portalEnergy < 100 ? (
+                  "The portal is almost activated! Keep tapping..."
+                ) : (
+                  "Portal fully charged! Tap to enter your consciousness"
+                )}
+              </p>
+              
+              <div className="mt-2 text-xs text-white/60">
+                Resonance Level: {resonanceLevel}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </PortalTransition>
+    </motion.div>
   );
 };
 

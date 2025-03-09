@@ -1,343 +1,278 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Sparkles, Brain, Heart, Star, Moon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useQuantumTheme } from '@/components/visual-foundation';
-import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ArrowLeft } from 'lucide-react';
 
 interface ConsciousnessViewProps {
-  userLevel?: number;
   onReturn: () => void;
+  userLevel: number;
 }
 
 /**
- * The main consciousness view that appears after activating the Seed of Life portal
- * Features tabbed interface for different aspects of consciousness development
+ * Displays the Consciousness View after entering the Seed of Life portal
  */
 const ConsciousnessView: React.FC<ConsciousnessViewProps> = ({
-  userLevel = 1,
-  onReturn
+  onReturn,
+  userLevel
 }) => {
-  const [activeTab, setActiveTab] = useState('chakras');
-  const { theme } = useQuantumTheme();
-  
-  // Get theme color for styling elements
-  const getThemeColor = () => {
-    switch (theme) {
-      case 'ethereal': return 'from-ethereal-400 to-ethereal-600';
-      case 'astral': return 'from-astral-400 to-astral-600';
-      case 'quantum': 
-      default: return 'from-quantum-400 to-quantum-600';
-    }
-  };
+  const [activeTab, setActiveTab] = useState('chakra');
   
   return (
     <motion.div
-      className="relative w-full max-w-4xl mx-auto"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
+      exit={{ opacity: 0 }}
+      className="relative w-full h-full bg-gradient-to-b from-purple-900/30 to-indigo-900/30 backdrop-blur-sm rounded-lg p-4 overflow-hidden"
     >
-      {/* Back button */}
-      <div className="absolute top-0 left-0 z-10">
-        <Button
-          variant="glass"
-          size="icon"
-          onClick={onReturn}
-          className="rounded-full bg-black/20"
-        >
-          <ArrowLeft className="text-white" size={18} />
-        </Button>
-      </div>
-      
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h2 className="text-2xl md:text-3xl font-semibold text-white mb-2">
-          Consciousness Explorer
-        </h2>
-        <p className="text-white/70 max-w-md mx-auto">
-          Journey through your inner realms and discover the dimensions of your consciousness
-        </p>
-      </div>
-      
-      {/* Tabs navigation */}
-      <Tabs 
-        defaultValue="chakras" 
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="w-full"
+      {/* Return button */}
+      <button
+        onClick={onReturn}
+        className="absolute top-4 left-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
       >
-        <TabsList className="grid grid-cols-5 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg p-1 mb-6">
-          <TabsTrigger value="chakras" className="data-[state=active]:bg-gradient-to-r data-[state=active]:text-white">
-            <Sparkles size={16} className="mr-2" />
-            <span className="hidden sm:inline">Chakras</span>
-          </TabsTrigger>
-          <TabsTrigger value="progress" className="data-[state=active]:bg-gradient-to-r data-[state=active]:text-white">
-            <Brain size={16} className="mr-2" />
-            <span className="hidden sm:inline">Progress</span>
-          </TabsTrigger>
-          <TabsTrigger value="practices" className="data-[state=active]:bg-gradient-to-r data-[state=active]:text-white">
-            <Star size={16} className="mr-2" />
-            <span className="hidden sm:inline">Practices</span>
-          </TabsTrigger>
-          <TabsTrigger value="emotional" className="data-[state=active]:bg-gradient-to-r data-[state=active]:text-white">
-            <Heart size={16} className="mr-2" />
-            <span className="hidden sm:inline">Emotional</span>
-          </TabsTrigger>
-          <TabsTrigger value="dreams" className="data-[state=active]:bg-gradient-to-r data-[state=active]:text-white">
-            <Moon size={16} className="mr-2" />
-            <span className="hidden sm:inline">Dreams</span>
-          </TabsTrigger>
-        </TabsList>
+        <ArrowLeft className="h-5 w-5 text-white" />
+      </button>
+      
+      <div className="flex flex-col h-full">
+        <h2 className="text-xl font-bold text-white text-center mb-4">
+          Consciousness Portal
+        </h2>
         
-        {/* Tab content */}
-        <div className="p-4 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg">
-          <TabsContent value="chakras" className="mt-0">
-            <ChakraVisualization userLevel={userLevel} />
-          </TabsContent>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+          <TabsList className="grid grid-cols-5 bg-white/10 backdrop-blur border-white/10">
+            <TabsTrigger value="chakra" className="text-white text-xs">Chakras</TabsTrigger>
+            <TabsTrigger value="progress" className="text-white text-xs">Progress</TabsTrigger>
+            <TabsTrigger value="practices" className="text-white text-xs">Practices</TabsTrigger>
+            <TabsTrigger value="emotional" className="text-white text-xs">Emotional</TabsTrigger>
+            <TabsTrigger value="dreams" className="text-white text-xs">Dreams</TabsTrigger>
+          </TabsList>
           
-          <TabsContent value="progress" className="mt-0">
-            <ConsciousnessProgress userLevel={userLevel} />
-          </TabsContent>
-          
-          <TabsContent value="practices" className="mt-0">
-            <PracticeRecommendations userLevel={userLevel} />
-          </TabsContent>
-          
-          <TabsContent value="emotional" className="mt-0">
-            <EmotionalMatrix userLevel={userLevel} />
-          </TabsContent>
-          
-          <TabsContent value="dreams" className="mt-0">
-            <DreamIntegration userLevel={userLevel} />
-          </TabsContent>
-        </div>
-      </Tabs>
+          <div className="flex-1 overflow-y-auto">
+            <TabsContent value="chakra" className="h-full">
+              <ChakraVisualization level={userLevel} />
+            </TabsContent>
+            
+            <TabsContent value="progress" className="h-full">
+              <ConsciousnessProgress level={userLevel} />
+            </TabsContent>
+            
+            <TabsContent value="practices" className="h-full">
+              <PracticeRecommendations level={userLevel} />
+            </TabsContent>
+            
+            <TabsContent value="emotional" className="h-full">
+              <EmotionalMatrix level={userLevel} />
+            </TabsContent>
+            
+            <TabsContent value="dreams" className="h-full">
+              <DreamIntegration level={userLevel} />
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
     </motion.div>
   );
 };
 
-// Tab content components
-const ChakraVisualization: React.FC<{ userLevel: number }> = ({ userLevel }) => (
-  <div className="text-center p-4">
-    <h3 className="text-xl text-white mb-2">Chakra System</h3>
-    <p className="text-white/70 mb-6">Visualization of your activated energy centers</p>
-    
-    <div className="flex justify-center">
-      <div className="relative w-64 h-96 bg-gradient-to-b from-black/30 to-purple-900/10 rounded-full backdrop-blur-sm">
-        {/* Placeholder for chakra visualization */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-red-500/50 blur-sm"></div>
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-orange-500/50 blur-sm"></div>
-        <div className="absolute bottom-40 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-yellow-500/50 blur-sm"></div>
-        <div className="absolute bottom-56 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-green-500/50 blur-sm"></div>
-        <div className="absolute bottom-72 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-blue-500/50 blur-sm"></div>
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-indigo-500/50 blur-sm"></div>
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-violet-500/50 blur-sm"></div>
-      </div>
-    </div>
-  </div>
-);
-
-const ConsciousnessProgress: React.FC<{ userLevel: number }> = ({ userLevel }) => (
-  <div className="text-center p-4">
-    <h3 className="text-xl text-white mb-2">Consciousness Level: {userLevel}</h3>
-    <p className="text-white/70 mb-6">Your journey through expanding awareness</p>
-    
-    <div className="space-y-4">
-      <div className="bg-black/30 p-4 rounded-lg">
-        <h4 className="text-white mb-2">Awareness</h4>
-        <div className="w-full h-2 bg-gray-700 rounded-full">
-          <div 
-            className="h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full"
-            style={{ width: `${Math.min(100, userLevel * 20)}%` }}
-          ></div>
-        </div>
-      </div>
-      
-      <div className="bg-black/30 p-4 rounded-lg">
-        <h4 className="text-white mb-2">Integration</h4>
-        <div className="w-full h-2 bg-gray-700 rounded-full">
-          <div 
-            className="h-full bg-gradient-to-r from-green-400 to-teal-500 rounded-full"
-            style={{ width: `${Math.min(100, userLevel * 15)}%` }}
-          ></div>
-        </div>
-      </div>
-      
-      <div className="bg-black/30 p-4 rounded-lg">
-        <h4 className="text-white mb-2">Intuition</h4>
-        <div className="w-full h-2 bg-gray-700 rounded-full">
-          <div 
-            className="h-full bg-gradient-to-r from-purple-400 to-pink-500 rounded-full"
-            style={{ width: `${Math.min(100, userLevel * 18)}%` }}
-          ></div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const PracticeRecommendations: React.FC<{ userLevel: number }> = ({ userLevel }) => (
-  <div className="text-center p-4">
-    <h3 className="text-xl text-white mb-2">Recommended Practices</h3>
-    <p className="text-white/70 mb-6">Activities to deepen your consciousness</p>
-    
-    <div className="space-y-4">
-      <div className="bg-black/30 p-4 rounded-lg text-left">
-        <h4 className="text-white mb-2">Morning Meditation</h4>
-        <p className="text-white/70 text-sm">Start your day with 10 minutes of mindfulness to center your energy</p>
-        <Button variant="outline" size="sm" className="mt-2">
-          Start Practice
-        </Button>
-      </div>
-      
-      <div className="bg-black/30 p-4 rounded-lg text-left">
-        <h4 className="text-white mb-2">Chakra Balancing</h4>
-        <p className="text-white/70 text-sm">Focus on harmonizing your energy centers with guided visualization</p>
-        <Button variant="outline" size="sm" className="mt-2">
-          Start Practice
-        </Button>
-      </div>
-      
-      <div className="bg-black/30 p-4 rounded-lg text-left">
-        <h4 className="text-white mb-2">Dream Journaling</h4>
-        <p className="text-white/70 text-sm">Record and analyze your dreams to access your subconscious wisdom</p>
-        <Button variant="outline" size="sm" className="mt-2">
-          Start Practice
-        </Button>
-      </div>
-    </div>
-  </div>
-);
-
-const EmotionalMatrix: React.FC<{ userLevel: number }> = ({ userLevel }) => (
-  <div className="text-center p-4">
-    <h3 className="text-xl text-white mb-2">Emotional Intelligence</h3>
-    <p className="text-white/70 mb-6">Your emotional awareness and regulation</p>
-    
-    <div className="grid grid-cols-2 gap-4">
-      <div className="bg-black/30 p-4 rounded-lg">
-        <h4 className="text-white mb-2">Self-Awareness</h4>
-        <div className="relative pt-1">
-          <div className="flex mb-2 items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-purple-600 bg-purple-200">
-                {Math.min(100, userLevel * 15)}%
-              </span>
-            </div>
-          </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full">
-            <div 
-              className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full"
-              style={{ width: `${Math.min(100, userLevel * 15)}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-black/30 p-4 rounded-lg">
-        <h4 className="text-white mb-2">Empathy</h4>
-        <div className="relative pt-1">
-          <div className="flex mb-2 items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
-                {Math.min(100, userLevel * 12)}%
-              </span>
-            </div>
-          </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full">
-            <div 
-              className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full"
-              style={{ width: `${Math.min(100, userLevel * 12)}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-black/30 p-4 rounded-lg">
-        <h4 className="text-white mb-2">Emotional Regulation</h4>
-        <div className="relative pt-1">
-          <div className="flex mb-2 items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-teal-600 bg-teal-200">
-                {Math.min(100, userLevel * 10)}%
-              </span>
-            </div>
-          </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full">
-            <div 
-              className="h-full bg-gradient-to-r from-teal-400 to-teal-600 rounded-full"
-              style={{ width: `${Math.min(100, userLevel * 10)}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-black/30 p-4 rounded-lg">
-        <h4 className="text-white mb-2">Social Navigation</h4>
-        <div className="relative pt-1">
-          <div className="flex mb-2 items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-pink-600 bg-pink-200">
-                {Math.min(100, userLevel * 14)}%
-              </span>
-            </div>
-          </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full">
-            <div 
-              className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full"
-              style={{ width: `${Math.min(100, userLevel * 14)}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const DreamIntegration: React.FC<{ userLevel: number }> = ({ userLevel }) => (
-  <div className="text-center p-4">
-    <h3 className="text-xl text-white mb-2">Dream Integration</h3>
-    <p className="text-white/70 mb-6">Connecting your aspirations with quantum consciousness</p>
-    
-    <div className="bg-black/30 p-6 rounded-lg">
-      <div className="mb-4">
-        <h4 className="text-white mb-2">Your Dream Essence</h4>
-        <p className="text-white/70 italic">
-          "To achieve harmony between mind, body, and spirit through conscious living."
+/**
+ * Displays the chakra visualization component
+ */
+const ChakraVisualization: React.FC<{ level: number }> = ({ level }) => {
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-4">
+      <div className="bg-white/5 rounded-lg p-4 backdrop-blur text-white w-full">
+        <h3 className="text-lg font-semibold mb-2">Chakra System - Level {level}</h3>
+        <p className="text-white/70 mb-4">
+          Your energetic centers are developing as you progress on your journey.
         </p>
-      </div>
-      
-      <div className="mb-4">
-        <h4 className="text-white mb-2">Manifestation Progress</h4>
-        <div className="w-full h-4 bg-gray-700 rounded-full">
-          <div 
-            className="h-full bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-500 rounded-full"
-            style={{ width: `${Math.min(100, userLevel * 10)}%` }}
-          ></div>
+        
+        <div className="space-y-3">
+          {/* Placeholder for chakra visualization that will be improved later */}
+          {['Root', 'Sacral', 'Solar Plexus', 'Heart', 'Throat', 'Third Eye', 'Crown'].map((chakra, index) => (
+            <div key={chakra} className="flex items-center space-x-3">
+              <div 
+                className="w-4 h-4 rounded-full"
+                style={{ 
+                  background: `hsl(${index * 51}, 70%, 50%)`,
+                  boxShadow: `0 0 10px hsl(${index * 51}, 70%, 50%)`
+                }}
+              />
+              <div className="flex-1">
+                <div className="flex justify-between">
+                  <span>{chakra}</span>
+                  <span>{Math.min(100, Math.max(10, (level * 20) - (7-index) * 10))}%</span>
+                </div>
+                <div className="w-full bg-white/10 rounded-full h-1 mt-1">
+                  <div 
+                    className="h-1 rounded-full" 
+                    style={{ 
+                      width: `${Math.min(100, Math.max(10, (level * 20) - (7-index) * 10))}%`,
+                      background: `hsl(${index * 51}, 70%, 50%)`
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-        <p className="text-white/70 text-sm mt-2">
-          {Math.min(100, userLevel * 10)}% alignment with quantum field
-        </p>
-      </div>
-      
-      <div>
-        <h4 className="text-white mb-2">Next Integration Step</h4>
-        <p className="text-white/70 text-sm">
-          Focus on heart-centered practices to deepen your connection with your dream essence.
-        </p>
-        <Button 
-          variant="default" 
-          size="sm" 
-          className="mt-2 bg-gradient-to-r from-indigo-500 to-purple-600"
-        >
-          Begin Integration
-        </Button>
       </div>
     </div>
-  </div>
-);
+  );
+};
+
+/**
+ * Displays the consciousness progress component
+ */
+const ConsciousnessProgress: React.FC<{ level: number }> = ({ level }) => {
+  const abilities = [
+    { name: 'Awareness', level: 1, description: 'Basic awareness of energy and consciousness' },
+    { name: 'Presence', level: 2, description: 'Sustained present-moment awareness' },
+    { name: 'Insight', level: 3, description: 'Deep insights into patterns and connections' },
+    { name: 'Integration', level: 4, description: 'Integration of wisdom into daily life' },
+    { name: 'Transcendence', level: 5, description: 'Transcending limited perspectives' }
+  ];
+  
+  return (
+    <div className="flex flex-col p-4">
+      <div className="bg-white/5 rounded-lg p-4 backdrop-blur text-white">
+        <h3 className="text-lg font-semibold mb-2">Consciousness Progress</h3>
+        <p className="text-white/70 mb-4">
+          Your journey through expanding consciousness unlocks new abilities.
+        </p>
+        
+        <div className="space-y-3">
+          {abilities.map((ability) => (
+            <div key={ability.name} className="p-3 rounded-lg bg-white/5 relative overflow-hidden">
+              {ability.level <= level ? (
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20" />
+              ) : (
+                <div className="absolute inset-0 bg-white/5" />
+              )}
+              <div className="relative z-10">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">{ability.name}</h4>
+                  <div className={`text-xs px-2 py-0.5 rounded-full ${
+                    ability.level <= level ? 'bg-green-500/20 text-green-300' : 'bg-white/10 text-white/50'
+                  }`}>
+                    {ability.level <= level ? 'Unlocked' : `Level ${ability.level}`}
+                  </div>
+                </div>
+                <p className="text-sm text-white/70 mt-1">{ability.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Displays practice recommendations component
+ */
+const PracticeRecommendations: React.FC<{ level: number }> = ({ level }) => {
+  const practices = [
+    { name: 'Basic Mindfulness', duration: '5 min', benefit: 'Increases present awareness' },
+    { name: 'Chakra Balancing', duration: '10 min', benefit: 'Harmonizes energy centers' },
+    { name: 'Quantum Coherence', duration: '15 min', benefit: 'Creates coherent thought patterns' },
+    { name: 'Cosmic Connection', duration: '20 min', benefit: 'Links individual to universal consciousness' }
+  ];
+
+  return (
+    <div className="flex flex-col p-4">
+      <div className="bg-white/5 rounded-lg p-4 backdrop-blur text-white">
+        <h3 className="text-lg font-semibold mb-2">Recommended Practices</h3>
+        <p className="text-white/70 mb-4">
+          These practices are tailored to your current consciousness level.
+        </p>
+        
+        <div className="space-y-3">
+          {practices.map((practice, index) => (
+            <div 
+              key={practice.name} 
+              className="p-3 rounded-lg bg-gradient-to-r from-white/5 to-white/10 flex justify-between items-center"
+            >
+              <div>
+                <h4 className="font-medium">{practice.name}</h4>
+                <p className="text-xs text-white/70">{practice.benefit}</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-white/50">{practice.duration}</span>
+                <button 
+                  className="px-3 py-1 rounded bg-purple-500/20 hover:bg-purple-500/40 text-xs text-white transition-colors"
+                >
+                  Start
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Displays emotional matrix component
+ */
+const EmotionalMatrix: React.FC<{ level: number }> = ({ level }) => {
+  return (
+    <div className="flex flex-col p-4">
+      <div className="bg-white/5 rounded-lg p-4 backdrop-blur text-white">
+        <h3 className="text-lg font-semibold mb-2">Emotional Intelligence Matrix</h3>
+        <p className="text-white/70 mb-4">
+          Your emotional development is tracked across these dimensions.
+        </p>
+        
+        <div className="space-y-4">
+          {[
+            { name: 'Self-Awareness', value: Math.min(100, level * 20 + 10), color: 'bg-blue-500' },
+            { name: 'Self-Regulation', value: Math.min(100, level * 18 + 5), color: 'bg-green-500' },
+            { name: 'Emotional Processing', value: Math.min(100, level * 19), color: 'bg-purple-500' },
+            { name: 'Empathic Connection', value: Math.min(100, level * 17 + 15), color: 'bg-pink-500' }
+          ].map((dimension) => (
+            <div key={dimension.name} className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-sm">{dimension.name}</span>
+                <span className="text-sm">{dimension.value}%</span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full ${dimension.color}/60`}
+                  style={{ width: `${dimension.value}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Displays dream integration component
+ */
+const DreamIntegration: React.FC<{ level: number }> = ({ level }) => {
+  return (
+    <div className="flex flex-col p-4">
+      <div className="bg-white/5 rounded-lg p-4 backdrop-blur text-white">
+        <h3 className="text-lg font-semibold mb-2">Dream Integration</h3>
+        <p className="text-white/70 mb-4">
+          See how your dreams are manifesting through quantum consciousness.
+        </p>
+        
+        <div className="p-4 rounded-lg bg-white/5 text-center">
+          <p className="text-white/70 italic">
+            "As you reach higher consciousness levels, your dreams will appear here, showing your journey toward manifestation."
+          </p>
+          <button className="mt-4 px-4 py-2 rounded bg-purple-500/30 hover:bg-purple-500/50 text-white transition-colors">
+            Add Dream/Goal
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default ConsciousnessView;

@@ -37,23 +37,22 @@ export function useSeedOfLifeInteraction(userLevel: number = 1) {
       if (!user) return;
       
       try {
+        // Use RPC function to avoid TypeScript issues with table access
         const { data, error } = await supabase
-          .from('user_energy_interactions')
-          .select('portal_energy, interaction_count, resonance_level, last_interaction_time')
-          .eq('user_id', user.id)
-          .single();
+          .rpc('get_user_portal_state', { user_id_param: user.id });
           
-        if (error && error.code !== 'PGRST116') {
+        if (error) {
           console.error('Error fetching interaction state:', error);
           return;
         }
         
-        if (data) {
+        if (data && data.length > 0) {
+          const portalData = data[0];
           setState({
-            portalEnergy: data.portal_energy,
-            interactionCount: data.interaction_count,
-            resonanceLevel: data.resonance_level,
-            lastInteractionTime: data.last_interaction_time ? new Date(data.last_interaction_time).getTime() : null
+            portalEnergy: portalData.portal_energy || 0,
+            interactionCount: portalData.interaction_count || 0,
+            resonanceLevel: portalData.resonance_level || 1,
+            lastInteractionTime: portalData.last_interaction_time ? new Date(portalData.last_interaction_time).getTime() : null
           });
         }
       } catch (error) {
@@ -110,7 +109,7 @@ export function useSeedOfLifeInteraction(userLevel: number = 1) {
     // Persist to backend if user is authenticated
     if (user) {
       try {
-        // Offload to backend using supabase edges
+        // Offload to backend using supabase edge function
         await supabase.functions.invoke('update-portal-interaction', {
           body: {
             userId: user.id,
@@ -132,6 +131,12 @@ export function useSeedOfLifeInteraction(userLevel: number = 1) {
           });
           
           toast.success(`Portal activated! +${pointsToAdd} energy points added.`);
+          
+          // Reset portal energy after activation
+          setState(prevState => ({
+            ...prevState,
+            portalEnergy: 0
+          }));
         }
       } catch (error) {
         console.error('Error persisting interaction state:', error);
@@ -157,15 +162,16 @@ export function useSeedOfLifeInteraction(userLevel: number = 1) {
     // Persist reset to backend if user is authenticated
     if (user) {
       try {
-        await supabase
-          .from('user_energy_interactions')
-          .upsert({
-            user_id: user.id,
-            portal_energy: 0,
-            interaction_count: 0,
-            resonance_level: 1,
-            last_interaction_time: null
-          });
+        // Use the edge function for consistency
+        await supabase.functions.invoke('update-portal-interaction', {
+          body: {
+            userId: user.id,
+            portalEnergy: 0,
+            interactionCount: 0,
+            resonanceLevel: 1,
+            lastInteractionTime: null
+          }
+        });
       } catch (error) {
         console.error('Error resetting interaction state:', error);
       }
@@ -186,17 +192,17 @@ export function useSeedOfLifeInteraction(userLevel: number = 1) {
     // Persist to backend if user is authenticated
     if (user) {
       try {
-        await supabase
-          .from('user_energy_interactions')
-          .upsert({
-            user_id: user.id,
-            portal_energy: clampedEnergy,
-            interaction_count: state.interactionCount,
-            resonance_level: state.resonanceLevel,
-            last_interaction_time: state.lastInteractionTime 
+        await supabase.functions.invoke('update-portal-interaction', {
+          body: {
+            userId: user.id,
+            portalEnergy: clampedEnergy,
+            interactionCount: state.interactionCount,
+            resonanceLevel: state.resonanceLevel,
+            lastInteractionTime: state.lastInteractionTime 
               ? new Date(state.lastInteractionTime).toISOString() 
               : null
-          });
+          }
+        });
       } catch (error) {
         console.error('Error updating energy level:', error);
       }

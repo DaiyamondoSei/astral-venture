@@ -1,225 +1,196 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { usePerfConfig } from '@/hooks/usePerfConfig';
-import { cn } from '@/lib/utils';
 
 interface SeedOfLifeGeometryProps {
+  energy: number;
+  resonanceLevel: number;
   size?: number;
-  energy?: number;
-  resonanceLevel?: number;
-  isActive?: boolean;
-  className?: string;
   onClick?: () => void;
+  className?: string;
 }
 
 /**
- * A geometrically accurate Seed of Life sacred geometry pattern
- * with animated energy levels and resonance visualization
+ * Renders the Sacred Geometry pattern of the Seed of Life
+ * with interactive energy visualization
  */
 const SeedOfLifeGeometry: React.FC<SeedOfLifeGeometryProps> = ({
-  size = 200,
-  energy = 0,
-  resonanceLevel = 1,
-  isActive = false,
-  className,
-  onClick
+  energy,
+  resonanceLevel,
+  size = 300,
+  onClick,
+  className
 }) => {
-  const { config } = usePerfConfig();
-  const isLowPerfDevice = config.deviceCapability === 'low';
+  // Calculate dimensions
+  const center = size / 2;
+  const radius = size / 4;
   
-  // Calculate radius and center point
-  const radius = size / 2;
-  const centerX = radius;
-  const centerY = radius;
+  // Generate the circles for the Seed of Life pattern
+  const circles = useMemo(() => {
+    // Center circle plus 6 circles arranged in a hexagonal pattern
+    const points = [];
+    // Center circle
+    points.push({ cx: center, cy: center });
+    
+    // Surrounding circles
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i;
+      const x = center + radius * Math.cos(angle);
+      const y = center + radius * Math.sin(angle);
+      points.push({ cx: x, cy: y });
+    }
+    
+    return points;
+  }, [center, radius]);
+
+  // Calculate energy-based properties
+  const energyOpacity = 0.2 + (energy / 100) * 0.8;
+  const energyScale = 0.9 + (energy / 100) * 0.3;
+  const glowIntensity = (energy / 100) * 15;
   
-  // Generate the 7 circles of the Seed of Life
-  const circles = [];
+  // Resonance level affects color and complexity
+  const getResonanceColor = (level: number) => {
+    switch(level) {
+      case 1: return '#A78BFA'; // Purple
+      case 2: return '#60A5FA'; // Blue
+      case 3: return '#34D399'; // Green
+      case 4: return '#F472B6'; // Pink
+      case 5: return '#FBBF24'; // Gold
+      default: return '#A78BFA';
+    }
+  };
   
-  // Center circle
-  circles.push({ cx: centerX, cy: centerY, r: radius / 3 });
-  
-  // Outer 6 circles
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i;
-    const x = centerX + (radius / 3) * Math.cos(angle);
-    const y = centerY + (radius / 3) * Math.sin(angle);
-    circles.push({ cx: x, cy: y, r: radius / 3 });
-  }
-  
-  // Calculate energy fill percentage
-  const energyPercentage = energy / 100;
-  
-  // Generate resonance rings based on resonance level
-  const resonanceRings = [];
-  for (let i = 0; i < resonanceLevel; i++) {
-    const ringRadius = radius + (i + 1) * 5;
-    resonanceRings.push(ringRadius);
-  }
-  
-  // Simple version for low performance devices
-  if (isLowPerfDevice) {
-    return (
-      <motion.div
-        className={cn(
-          "relative cursor-pointer rounded-full flex items-center justify-center bg-black/20 backdrop-blur-sm",
-          className
-        )}
-        style={{
-          width: size,
-          height: size,
-          border: `2px solid rgba(255, 255, 255, ${0.2 + energyPercentage * 0.5})`,
-        }}
-        animate={{
-          boxShadow: isActive
-            ? [
-                `0 0 ${10 + energyPercentage * 20}px rgba(138, 43, 226, ${0.2 + energyPercentage * 0.6})`,
-                `0 0 ${20 + energyPercentage * 30}px rgba(138, 43, 226, ${0.3 + energyPercentage * 0.5})`,
-                `0 0 ${10 + energyPercentage * 20}px rgba(138, 43, 226, ${0.2 + energyPercentage * 0.6})`
-              ]
-            : `0 0 ${5 + energyPercentage * 10}px rgba(138, 43, 226, ${0.1 + energyPercentage * 0.3})`
-        }}
-        transition={{ 
-          duration: 2, 
-          repeat: isActive ? Infinity : 0,
-          repeatType: "reverse"
-        }}
-        onClick={onClick}
-      >
-        <div className="text-white text-lg font-semibold">
-          {Math.round(energy)}%
-        </div>
-      </motion.div>
-    );
-  }
+  const baseColor = getResonanceColor(resonanceLevel);
   
   return (
     <motion.div 
-      className={cn("relative cursor-pointer", className)}
-      style={{ width: size, height: size }}
+      className={`relative cursor-pointer ${className}`}
       onClick={onClick}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
     >
-      {/* Resonance rings */}
-      {resonanceRings.map((ringRadius, index) => (
-        <motion.div
-          key={`ring-${index}`}
-          className="absolute rounded-full border-purple-400"
-          style={{
-            width: ringRadius * 2,
-            height: ringRadius * 2,
-            top: size / 2 - ringRadius,
-            left: size / 2 - ringRadius,
-            borderWidth: 1,
-            opacity: 0.2 + (index * 0.1),
-          }}
-          animate={{
-            opacity: [0.2 + (index * 0.1), 0.5 + (index * 0.1), 0.2 + (index * 0.1)],
-            scale: [1, 1.05, 1],
-            borderColor: [
-              'rgba(168, 85, 247, 0.4)',
-              'rgba(168, 85, 247, 0.7)',
-              'rgba(168, 85, 247, 0.4)'
-            ]
-          }}
-          transition={{
-            duration: 3 + index,
-            repeat: Infinity,
-            repeatType: "reverse",
-            delay: index * 0.5
-          }}
-        />
-      ))}
-      
-      {/* SVG for Seed of Life pattern */}
-      <svg 
-        width={size} 
-        height={size} 
+      <svg
+        width={size}
+        height={size}
         viewBox={`0 0 ${size} ${size}`}
-        className="absolute top-0 left-0"
+        style={{ 
+          filter: `drop-shadow(0 0 ${glowIntensity}px ${baseColor})`,
+          transition: 'filter 0.5s ease'
+        }}
       >
-        {/* Background circle */}
-        <motion.circle
-          cx={centerX}
-          cy={centerY}
-          r={radius - 5}
-          fill={`rgba(0, 0, 0, ${0.2 + energyPercentage * 0.3})`}
-          stroke={`rgba(255, 255, 255, ${0.3 + energyPercentage * 0.5})`}
-          strokeWidth={1.5}
-          animate={{
-            fill: isActive 
-              ? [
-                  `rgba(0, 0, 0, ${0.2 + energyPercentage * 0.3})`,
-                  `rgba(55, 0, 179, ${0.15 + energyPercentage * 0.2})`,
-                  `rgba(0, 0, 0, ${0.2 + energyPercentage * 0.3})`
-                ]
-              : `rgba(0, 0, 0, ${0.2 + energyPercentage * 0.3})`,
-            stroke: isActive
-              ? [
-                  `rgba(255, 255, 255, ${0.3 + energyPercentage * 0.5})`,
-                  `rgba(186, 104, 200, ${0.6 + energyPercentage * 0.4})`,
-                  `rgba(255, 255, 255, ${0.3 + energyPercentage * 0.5})`
-                ]
-              : `rgba(255, 255, 255, ${0.3 + energyPercentage * 0.5})`
-          }}
-          transition={{ 
-            duration: 3, 
-            repeat: isActive ? Infinity : 0,
-            repeatType: "reverse" 
-          }}
-        />
+        <defs>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation={resonanceLevel * 1.5} result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          
+          <linearGradient id="circleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={baseColor} stopOpacity={energyOpacity} />
+            <stop offset="100%" stopColor={baseColor} stopOpacity={energyOpacity * 0.7} />
+          </linearGradient>
+          
+          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={baseColor} stopOpacity={0.8} />
+            <stop offset="100%" stopColor={baseColor} stopOpacity={0.3} />
+          </linearGradient>
+        </defs>
         
-        {/* Seed of Life circles */}
-        <g>
+        {/* Background circles */}
+        <g opacity={energyOpacity}>
           {circles.map((circle, index) => (
-            <motion.circle
+            <circle
               key={`circle-${index}`}
               cx={circle.cx}
               cy={circle.cy}
-              r={circle.r}
+              r={radius}
               fill="none"
-              stroke={`rgba(255, 255, 255, ${0.2 + energyPercentage * 0.8})`}
-              strokeWidth={1}
-              strokeDasharray={circle.r * 2 * Math.PI}
-              strokeDashoffset={circle.r * 2 * Math.PI * (1 - Math.min(1, energyPercentage + 0.2))}
-              animate={{
-                strokeDashoffset: isActive
-                  ? [
-                      circle.r * 2 * Math.PI * (1 - Math.min(1, energyPercentage + 0.2)),
-                      circle.r * 2 * Math.PI * (1 - Math.min(1, energyPercentage + 0.1)),
-                      circle.r * 2 * Math.PI * (1 - Math.min(1, energyPercentage + 0.2))
-                    ]
-                  : circle.r * 2 * Math.PI * (1 - Math.min(1, energyPercentage + 0.2)),
-                stroke: isActive
-                  ? [
-                      `rgba(255, 255, 255, ${0.2 + energyPercentage * 0.8})`,
-                      `rgba(186, 104, 200, ${0.3 + energyPercentage * 0.7})`,
-                      `rgba(255, 255, 255, ${0.2 + energyPercentage * 0.8})`
-                    ]
-                  : `rgba(255, 255, 255, ${0.2 + energyPercentage * 0.8})`
-              }}
-              transition={{ 
-                duration: 2 + index * 0.5, 
-                repeat: isActive ? Infinity : 0,
-                repeatType: "reverse",
-                delay: index * 0.1
-              }}
+              stroke="url(#circleGradient)"
+              strokeWidth={2}
+              opacity={index === 0 ? 1 : 0.8}
             />
           ))}
         </g>
         
-        {/* Energy text in the center */}
-        <text
-          x={centerX}
-          y={centerY}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill={`rgba(255, 255, 255, ${0.7 + energyPercentage * 0.3})`}
-          fontSize={radius / 4}
-          fontWeight="bold"
-        >
-          {Math.round(energy)}%
-        </text>
+        {/* Connection lines */}
+        <g opacity={energyOpacity * 0.7}>
+          {circles.map((circle, i) => (
+            circles.map((target, j) => {
+              // Only draw each line once
+              if (j <= i) return null;
+              
+              return (
+                <line
+                  key={`line-${i}-${j}`}
+                  x1={circle.cx}
+                  y1={circle.cy}
+                  x2={target.cx}
+                  y2={target.cy}
+                  stroke="url(#lineGradient)"
+                  strokeWidth={1}
+                  opacity={0.6}
+                />
+              );
+            })
+          ))}
+        </g>
+        
+        {/* Energy pulse */}
+        <motion.circle
+          cx={center}
+          cy={center}
+          r={radius * 1.5}
+          fill="none"
+          stroke={baseColor}
+          strokeWidth={3}
+          strokeOpacity={0.7}
+          initial={{ scale: 0.8, opacity: 0.2 }}
+          animate={{ 
+            scale: energyScale,
+            opacity: energyOpacity
+          }}
+          transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+        />
+        
+        {/* Resonance indicators */}
+        {Array.from({ length: resonanceLevel }).map((_, index) => (
+          <motion.circle
+            key={`resonance-${index}`}
+            cx={center}
+            cy={center}
+            r={radius * 0.3 * (index + 1)}
+            fill="none"
+            stroke={baseColor}
+            strokeWidth={1.5}
+            strokeOpacity={0.5}
+            initial={{ scale: 0.9, opacity: 0.5 }}
+            animate={{ 
+              scale: [0.9, 1.1, 0.9], 
+              opacity: [0.5, 0.8, 0.5],
+              rotate: [0, 180, 360]
+            }}
+            transition={{ 
+              duration: 4, 
+              repeat: Infinity, 
+              repeatType: "reverse",
+              delay: index * 0.5
+            }}
+          />
+        ))}
       </svg>
+      
+      {/* Energy percentage indicator */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center text-white font-medium"
+        style={{ 
+          fontSize: size * 0.08,
+          textShadow: `0 0 10px ${baseColor}`
+        }}
+      >
+        {Math.round(energy)}%
+      </div>
     </motion.div>
   );
 };

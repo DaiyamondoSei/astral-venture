@@ -1,106 +1,33 @@
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { User, Award } from 'lucide-react';
-import HomeNavigation from '@/components/home/HomeNavigation';
-import VisualSystem from '@/components/visual-foundation/VisualSystem';
-import { useQuantumTheme } from '@/components/visual-foundation';
-import { usePerfConfig } from '@/hooks/usePerfConfig';
-import { usePanel } from '@/contexts/PanelContext';
-import { Button } from '@/components/ui/button';
-import SeedOfLifePortal from '@/components/seed-of-life/SeedOfLifePortal';
-import SwipeIndicator from '@/components/panels/SwipeIndicator';
-import SwipeablePanelController from '@/components/panels/SwipeablePanelController';
-import { preloadPanelData } from '@/utils/panelDataPreloader';
-import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import SeedOfLifePortal from '@/components/seed-of-life/SeedOfLifePortal';
+import CosmicBackground from '@/components/visual-foundation/CosmicBackground';
+import SwipeablePanelController from '@/components/panels/SwipeablePanelController';
+import SwipeIndicator from '@/components/panels/SwipeIndicator';
 
 const HomePage: React.FC = () => {
-  const { cosmicIntensity } = useQuantumTheme();
-  const { config } = usePerfConfig();
-  const { togglePanel } = usePanel();
-  const { user } = useAuth();
-  
-  // Get user level from authentication context
-  const userLevel = user?.user_metadata?.astral_level || 1;
-
-  // Preload panel data for smoother experience
-  React.useEffect(() => {
-    preloadPanelData().catch(console.error);
-  }, []);
-  
-  // Handle Seed of Life portal activation
-  const handlePortalActivate = () => {
-    toast.success("Seed of Life activated! Your consciousness journey begins.", {
-      duration: 3000,
-    });
-  };
+  const { isAuthenticated } = useAuth();
   
   return (
-    <VisualSystem 
-      showBackground={true}
-      showMetatronsCube={config.deviceCapability !== 'low'}
-      backgroundIntensity={cosmicIntensity}
-    >
-      {/* Profile panel trigger at top of screen */}
-      <div className="fixed top-4 right-4 z-30">
-        <Button 
-          variant="glass" 
-          size="icon"
-          className="rounded-full"
-          onClick={() => togglePanel('profile')}
-        >
-          <User className="text-white" />
-        </Button>
-      </div>
-      
-      {/* Achievements panel trigger at bottom of screen */}
-      <div className="fixed bottom-4 right-4 z-30">
-        <Button 
-          variant="glass" 
-          size="icon"
-          className="rounded-full"
-          onClick={() => togglePanel('achievements')}
-        >
-          <Award className="text-white" />
-        </Button>
-      </div>
-      
-      {/* Swipe indicators for mobile users */}
-      <SwipeIndicator position="top" />
-      <SwipeIndicator position="bottom" />
+    <div className="relative min-h-screen overflow-hidden">
+      {/* Background */}
+      <CosmicBackground className="absolute inset-0 z-0" />
       
       {/* Main content */}
-      <motion.div
-        className="min-h-screen w-full py-8 px-4 flex flex-col items-center justify-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-      >
-        <div className="flex flex-col items-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-display font-medium text-white mb-2">
-            Quantum Consciousness
-          </h1>
-          <p className="text-white/70 max-w-md mx-auto text-center">
-            Navigate the cosmic web of consciousness development through sacred geometry
-          </p>
-        </div>
-        
-        {/* Central Seed of Life Portal */}
-        <div className="mb-8">
-          <SeedOfLifePortal
-            userLevel={userLevel}
-            onActivate={handlePortalActivate}
-          />
-        </div>
-        
-        {/* Navigation System */}
-        <HomeNavigation />
-      </motion.div>
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4">
+        <SeedOfLifePortal className="max-w-md w-full" />
+      </main>
       
-      {/* Swipeable panels */}
-      <SwipeablePanelController />
-    </VisualSystem>
+      {/* Swipeable panels controller */}
+      {isAuthenticated && (
+        <>
+          <SwipeablePanelController />
+          <SwipeIndicator position="top" />
+          <SwipeIndicator position="bottom" />
+        </>
+      )}
+    </div>
   );
 };
 

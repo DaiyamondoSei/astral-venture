@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          icon: string | null
+          id: string
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          icon?: string | null
+          id: string
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          icon?: string | null
+          id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       chakra_systems: {
         Row: {
           chakras: Json
@@ -246,6 +273,33 @@ export type Database = {
         }
         Relationships: []
       }
+      energy_points_history: {
+        Row: {
+          created_at: string
+          id: string
+          new_total: number
+          points_added: number
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_total: number
+          points_added: number
+          source: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_total?: number
+          points_added?: number
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       energy_reflections: {
         Row: {
           chakras_activated: Json | null
@@ -342,6 +396,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          awarded: boolean
+          awarded_at: string | null
+          created_at: string
+          id: string
+          progress: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          awarded?: boolean
+          awarded_at?: string | null
+          created_at?: string
+          id?: string
+          progress?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          awarded?: boolean
+          awarded_at?: string | null
+          created_at?: string
+          id?: string
+          progress?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_activities: {
         Row: {
           activity_type: string
@@ -374,6 +469,39 @@ export type Database = {
           id?: string
           metadata?: Json | null
           timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_energy_interactions: {
+        Row: {
+          created_at: string
+          id: string
+          interaction_count: number
+          last_interaction_time: string | null
+          portal_energy: number
+          resonance_level: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          interaction_count?: number
+          last_interaction_time?: string | null
+          portal_energy?: number
+          resonance_level?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          interaction_count?: number
+          last_interaction_time?: string | null
+          portal_energy?: number
+          resonance_level?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -485,7 +613,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_achievements: {
+        Args: {
+          user_id_param: string
+        }
+        Returns: {
+          achievement_id: string
+          progress: number
+          awarded: boolean
+          awarded_at: string
+          achievement_data: Json
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

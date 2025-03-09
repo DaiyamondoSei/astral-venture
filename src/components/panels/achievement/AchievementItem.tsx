@@ -1,93 +1,69 @@
 
 import React from 'react';
-import { Star, Trophy, Award, CheckCircle } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { useQuantumTheme } from '@/components/visual-foundation';
+import { Award, Check, Star, Trophy } from 'lucide-react';
+import { calculateProgressPercentage, getCategoryColor } from '@/utils/achievementUtils';
 
-interface AchievementType {
-  id: string;
-  title: string;
-  description: string;
-  category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special';
-  progress?: number;
-  awarded?: boolean;
-  icon?: 'star' | 'trophy' | 'award' | 'check';
+interface AchievementProps {
+  achievement: {
+    id: string;
+    title: string;
+    description: string;
+    category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special';
+    progress?: number;
+    awarded?: boolean;
+    icon?: 'star' | 'trophy' | 'award' | 'check';
+  };
 }
 
-interface AchievementItemProps {
-  achievement: AchievementType;
-}
-
-const AchievementItem: React.FC<AchievementItemProps> = ({ achievement }) => {
-  const { theme } = useQuantumTheme();
+const AchievementItem: React.FC<AchievementProps> = ({ achievement }) => {
+  const progressPercentage = calculateProgressPercentage(achievement.progress || 0);
+  const categoryColorClass = getCategoryColor(achievement.category);
   
-  const renderAchievementIcon = (icon?: string) => {
-    switch (icon) {
-      case 'star': return <Star className="text-yellow-400" size={18} />;
-      case 'trophy': return <Trophy className="text-amber-500" size={18} />;
-      case 'check': return <CheckCircle className="text-green-400" size={18} />;
-      case 'award':
-      default: return <Award className="text-purple-400" size={18} />;
-    }
+  const iconMap = {
+    star: <Star className="h-5 w-5" />,
+    trophy: <Trophy className="h-5 w-5" />,
+    award: <Award className="h-5 w-5" />,
+    check: <Check className="h-5 w-5" />
   };
   
+  const icon = achievement.icon ? iconMap[achievement.icon] : <Award className="h-5 w-5" />;
+  
   return (
-    <motion.div 
-      key={achievement.id}
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={cn(
-        "p-3 rounded-lg border transition-colors",
-        achievement.awarded 
-          ? "bg-white/15 backdrop-blur border-white/20" 
-          : "bg-white/5 backdrop-blur border-white/10"
-      )}
+      exit={{ opacity: 0, y: -20 }}
+      className="bg-white/5 backdrop-blur-md rounded-lg p-4 hover:bg-white/10 transition-colors"
     >
-      <div className="flex items-center space-x-3">
-        <div className={cn(
-          "h-10 w-10 rounded-full flex items-center justify-center",
-          achievement.awarded 
-            ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white" 
-            : "bg-white/10 text-white/50"
-        )}>
-          {renderAchievementIcon(achievement.icon)}
+      <div className="flex justify-between items-start">
+        <div className="flex items-start space-x-3">
+          <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${categoryColorClass} flex items-center justify-center text-white`}>
+            {icon}
+          </div>
+          <div>
+            <h3 className="font-medium text-white text-base">{achievement.title}</h3>
+            <p className="text-white/70 text-sm">{achievement.description}</p>
+          </div>
         </div>
-        
-        <div className="flex-1">
-          <h4 className={cn(
-            "font-medium",
-            achievement.awarded ? "text-white" : "text-white/70"
-          )}>
-            {achievement.title}
-          </h4>
-          <p className="text-white/60 text-sm">
-            {achievement.description}
-          </p>
-          
-          {!achievement.awarded && achievement.progress !== undefined && (
-            <div className="mt-2">
-              <div className="flex justify-between text-xs text-white/70 mb-1">
-                <span>Progress</span>
-                <span>{Math.round(achievement.progress * 100)}%</span>
-              </div>
-              <Progress 
-                value={achievement.progress * 100} 
-                className="h-1.5 bg-white/10"
-                indicatorClassName={
-                  theme === 'ethereal' 
-                    ? "bg-gradient-to-r from-ethereal-400 to-ethereal-600" 
-                    : theme === 'astral' 
-                      ? "bg-gradient-to-r from-astral-400 to-astral-600"
-                      : "bg-gradient-to-r from-quantum-400 to-quantum-600"
-                }
-              />
-            </div>
-          )}
-        </div>
+        {achievement.awarded && (
+          <div className="bg-green-500/20 rounded-full p-1">
+            <Check className="h-4 w-4 text-green-500" />
+          </div>
+        )}
       </div>
+      
+      {!achievement.awarded && (
+        <div className="mt-3">
+          <div className="w-full bg-white/10 rounded-full h-2 mt-1">
+            <div 
+              className={`h-2 rounded-full bg-gradient-to-r ${categoryColorClass}`}
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+          <p className="text-white/60 text-xs mt-1">{progressPercentage}% complete</p>
+        </div>
+      )}
     </motion.div>
   );
 };
