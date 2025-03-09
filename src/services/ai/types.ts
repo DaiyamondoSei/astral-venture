@@ -41,10 +41,11 @@ export interface AIResponse {
 export interface AIInsight {
   id: string;
   text: string;
-  type: 'chakra' | 'emotion' | 'practice' | 'wisdom' | 'general';
+  type: 'chakra' | 'emotion' | 'practice' | 'wisdom' | 'general' | 'reflection' | 'meditation';
   confidence: number;
   relevance: number;
   source?: string;
+  title?: string; // Added to support existing code
 }
 
 export interface AssistantSuggestion {
@@ -67,7 +68,7 @@ export interface AssistantIntent {
   description: string;
   confidence: number;
   created: Date;
-  status?: 'active' | 'completed' | 'dismissed';
+  status?: 'active' | 'completed' | 'dismissed' | 'pending' | 'implemented';
   relatedComponents?: string[];
 }
 

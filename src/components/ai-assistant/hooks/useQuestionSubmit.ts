@@ -203,7 +203,8 @@ export const useQuestionSubmit = ({
         question,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         context: reflectionContext || '',
-        stream: useStreaming // Only enable streaming if online and connection is good
+        stream: useStreaming, // Only enable streaming if online and connection is good
+        userId // Pass the userId for backend context
       };
       
       // Create options object with timeout and cacheKey
