@@ -1,161 +1,144 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAdaptivePerformance } from '@/contexts/AdaptivePerformanceContext';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
 
+// Theme types
 export type QuantumTheme = 'quantum' | 'astral' | 'ethereal' | 'default';
 export type QuantumAccent = 'purple' | 'blue' | 'green' | 'pink' | 'gold';
 export type QuantumContrast = 'low' | 'medium' | 'high';
 export type QuantumAnimationLevel = 'minimal' | 'balanced' | 'immersive';
 
+// Context type
 interface QuantumThemeContextType {
+  // Theme state
   theme: QuantumTheme;
   accent: QuantumAccent;
   contrast: QuantumContrast;
-  animationLevel: QuantumAnimationLevel;
-  glassmorphismLevel: 'low' | 'medium' | 'high';
   cosmicIntensity: 'low' | 'medium' | 'high';
+  glassmorphismLevel: 'low' | 'medium' | 'high';
+  animationLevel: QuantumAnimationLevel;
+  
+  // Theme setters
   setTheme: (theme: QuantumTheme) => void;
   setAccent: (accent: QuantumAccent) => void;
   setContrast: (contrast: QuantumContrast) => void;
-  setAnimationLevel: (level: QuantumAnimationLevel) => void;
-  setGlassmorphismLevel: (level: 'low' | 'medium' | 'high') => void;
   setCosmicIntensity: (intensity: 'low' | 'medium' | 'high') => void;
+  setGlassmorphismLevel: (level: 'low' | 'medium' | 'high') => void;
+  setAnimationLevel: (level: QuantumAnimationLevel) => void;
+  
+  // Helper functions
   getPrimaryColor: () => string;
   getSecondaryColor: () => string;
-  getBackgroundGradient: () => string;
-  getTextColor: () => string;
+  getAccentColor: () => string;
 }
 
-const defaultContextValue: QuantumThemeContextType = {
+// Create context with default values
+const QuantumThemeContext = createContext<QuantumThemeContextType>({
   theme: 'quantum',
   accent: 'purple',
   contrast: 'medium',
-  animationLevel: 'balanced',
-  glassmorphismLevel: 'medium',
   cosmicIntensity: 'medium',
+  glassmorphismLevel: 'medium',
+  animationLevel: 'balanced',
+  
   setTheme: () => {},
   setAccent: () => {},
   setContrast: () => {},
-  setAnimationLevel: () => {},
-  setGlassmorphismLevel: () => {},
   setCosmicIntensity: () => {},
-  getPrimaryColor: () => '#7C3AED',
-  getSecondaryColor: () => '#A78BFA',
-  getBackgroundGradient: () => 'from-[#221F26] via-[#2C2B33] to-[#191A23]',
-  getTextColor: () => '#FFFFFF',
-};
+  setGlassmorphismLevel: () => {},
+  setAnimationLevel: () => {},
+  
+  getPrimaryColor: () => '#A855F7',
+  getSecondaryColor: () => '#3B82F6',
+  getAccentColor: () => '#8B5CF6',
+});
 
-const QuantumThemeContext = createContext<QuantumThemeContextType>(defaultContextValue);
-
-export const useQuantumTheme = () => useContext(QuantumThemeContext);
-
+// Provider component
 interface QuantumThemeProviderProps {
-  children: React.ReactNode;
-  initialTheme?: QuantumTheme;
-  initialAccent?: QuantumAccent;
-  initialContrast?: QuantumContrast;
+  children: ReactNode;
+  defaultTheme?: QuantumTheme;
+  defaultAccent?: QuantumAccent;
 }
 
-export const QuantumThemeProvider: React.FC<QuantumThemeProviderProps> = ({
+const QuantumThemeProvider: React.FC<QuantumThemeProviderProps> = ({
   children,
-  initialTheme = 'quantum',
-  initialAccent = 'purple',
-  initialContrast = 'medium',
+  defaultTheme = 'quantum',
+  defaultAccent = 'purple',
 }) => {
-  const [theme, setTheme] = useState<QuantumTheme>(initialTheme);
-  const [accent, setAccent] = useState<QuantumAccent>(initialAccent);
-  const [contrast, setContrast] = useState<QuantumContrast>(initialContrast);
-  const [animationLevel, setAnimationLevel] = useState<QuantumAnimationLevel>('balanced');
-  const [glassmorphismLevel, setGlassmorphismLevel] = useState<'low' | 'medium' | 'high'>('medium');
+  const { config } = usePerfConfig();
+  
+  // State for theme properties
+  const [theme, setTheme] = useState<QuantumTheme>(defaultTheme);
+  const [accent, setAccent] = useState<QuantumAccent>(defaultAccent);
+  const [contrast, setContrast] = useState<QuantumContrast>('medium');
   const [cosmicIntensity, setCosmicIntensity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [glassmorphismLevel, setGlassmorphismLevel] = useState<'low' | 'medium' | 'high'>('medium');
+  const [animationLevel, setAnimationLevel] = useState<QuantumAnimationLevel>('balanced');
   
-  const adaptivePerf = useAdaptivePerformance();
-  
-  // Adjust visual settings based on device capability
+  // Adjust settings based on device capability
   useEffect(() => {
-    if (!adaptivePerf) return;
-    
-    const { deviceCapability } = adaptivePerf;
-    
-    // Adapt animation level based on device capability
-    if (deviceCapability === 'LOW') {
-      setAnimationLevel('minimal');
-      setGlassmorphismLevel('low');
+    // Handle low-end devices
+    if (config.deviceCapability === 'low') {
       setCosmicIntensity('low');
-    } else if (deviceCapability === 'MEDIUM') {
-      setAnimationLevel('balanced');
-      setGlassmorphismLevel('medium');
-      setCosmicIntensity('medium');
-    } else {
-      setAnimationLevel('immersive');
-      setGlassmorphismLevel('high');
-      setCosmicIntensity('high');
+      setGlassmorphismLevel('low');
+      setAnimationLevel('minimal');
     }
-  }, [adaptivePerf]);
+    // Handle mid-range devices
+    else if (config.deviceCapability === 'medium') {
+      if (animationLevel === 'immersive') {
+        setAnimationLevel('balanced');
+      }
+    }
+    // High-end devices can handle all settings
+  }, [config.deviceCapability]);
   
-  // Theme color mapping functions
-  const getPrimaryColor = () => {
-    // Map theme and accent to primary colors
-    if (theme === 'quantum') {
-      return accent === 'purple' ? '#7C3AED' : 
-             accent === 'blue' ? '#3B82F6' : 
-             accent === 'green' ? '#10B981' : 
-             accent === 'pink' ? '#EC4899' : '#F59E0B';
-    } else if (theme === 'astral') {
-      return accent === 'purple' ? '#6D28D9' : 
-             accent === 'blue' ? '#2563EB' : 
-             accent === 'green' ? '#059669' : 
-             accent === 'pink' ? '#DB2777' : '#D97706';
-    } else if (theme === 'ethereal') {
-      return accent === 'purple' ? '#8B5CF6' : 
-             accent === 'blue' ? '#60A5FA' : 
-             accent === 'green' ? '#34D399' : 
-             accent === 'pink' ? '#F472B6' : '#FBBF24';
+  // Color getters
+  const getPrimaryColor = (): string => {
+    switch (theme) {
+      case 'quantum':
+        return accent === 'purple' ? '#A855F7' : 
+               accent === 'blue' ? '#3B82F6' : 
+               accent === 'green' ? '#10B981' : 
+               accent === 'pink' ? '#EC4899' : 
+               accent === 'gold' ? '#F59E0B' : '#A855F7';
+      case 'astral':
+        return accent === 'purple' ? '#8B5CF6' : 
+               accent === 'blue' ? '#60A5FA' : 
+               accent === 'green' ? '#34D399' : 
+               accent === 'pink' ? '#F472B6' : 
+               accent === 'gold' ? '#FBBF24' : '#60A5FA';
+      case 'ethereal':
+        return accent === 'purple' ? '#C4B5FD' : 
+               accent === 'blue' ? '#93C5FD' : 
+               accent === 'green' ? '#6EE7B7' : 
+               accent === 'pink' ? '#F9A8D4' : 
+               accent === 'gold' ? '#FCD34D' : '#6EE7B7';
+      default:
+        return '#A855F7';
     }
-    return '#7C3AED'; // Default
   };
   
-  const getSecondaryColor = () => {
-    // Map theme and accent to secondary colors
-    if (theme === 'quantum') {
-      return accent === 'purple' ? '#A78BFA' : 
-             accent === 'blue' ? '#93C5FD' : 
-             accent === 'green' ? '#6EE7B7' : 
-             accent === 'pink' ? '#F9A8D4' : '#FCD34D';
-    } else if (theme === 'astral') {
-      return accent === 'purple' ? '#8B5CF6' : 
-             accent === 'blue' ? '#60A5FA' : 
-             accent === 'green' ? '#34D399' : 
-             accent === 'pink' ? '#F472B6' : '#FBBF24';
-    } else if (theme === 'ethereal') {
-      return accent === 'purple' ? '#C4B5FD' : 
-             accent === 'blue' ? '#BFDBFE' : 
-             accent === 'green' ? '#A7F3D0' : 
-             accent === 'pink' ? '#FBCFE8' : '#FDE68A';
+  const getSecondaryColor = (): string => {
+    switch (theme) {
+      case 'quantum':
+        return '#3B82F6';
+      case 'astral':
+        return '#8B5CF6';
+      case 'ethereal':
+        return '#06B6D4';
+      default:
+        return '#3B82F6';
     }
-    return '#A78BFA'; // Default
   };
   
-  const getBackgroundGradient = () => {
-    // Map theme to background gradients
-    if (theme === 'quantum') {
-      return 'from-[#221F26] via-[#2C2B33] to-[#191A23]';
-    } else if (theme === 'astral') {
-      return 'from-[#030014] via-[#0F0527] to-[#10031c]';
-    } else if (theme === 'ethereal') {
-      return 'from-[#040720] via-[#0F1A40] to-[#0A0F33]';
-    }
-    return 'from-[#221F26] via-[#2C2B33] to-[#191A23]'; // Default
-  };
-  
-  const getTextColor = () => {
-    // Map contrast to text colors
-    if (contrast === 'low') {
-      return '#E5E7EB';
-    } else if (contrast === 'medium') {
-      return '#FFFFFF';
-    } else {
-      return '#FFFFFF';
+  const getAccentColor = (): string => {
+    switch (accent) {
+      case 'purple': return '#8B5CF6';
+      case 'blue': return '#3B82F6';
+      case 'green': return '#10B981';
+      case 'pink': return '#EC4899';
+      case 'gold': return '#F59E0B';
+      default: return '#8B5CF6';
     }
   };
   
@@ -163,19 +146,18 @@ export const QuantumThemeProvider: React.FC<QuantumThemeProviderProps> = ({
     theme,
     accent,
     contrast,
-    animationLevel,
-    glassmorphismLevel,
     cosmicIntensity,
+    glassmorphismLevel,
+    animationLevel,
     setTheme,
     setAccent,
     setContrast,
-    setAnimationLevel,
-    setGlassmorphismLevel,
     setCosmicIntensity,
+    setGlassmorphismLevel,
+    setAnimationLevel,
     getPrimaryColor,
     getSecondaryColor,
-    getBackgroundGradient,
-    getTextColor,
+    getAccentColor,
   };
   
   return (
@@ -183,6 +165,15 @@ export const QuantumThemeProvider: React.FC<QuantumThemeProviderProps> = ({
       {children}
     </QuantumThemeContext.Provider>
   );
+};
+
+// Custom hook to use the theme context
+export const useQuantumTheme = () => {
+  const context = useContext(QuantumThemeContext);
+  if (!context) {
+    throw new Error('useQuantumTheme must be used within a QuantumThemeProvider');
+  }
+  return context;
 };
 
 export default QuantumThemeProvider;

@@ -1,219 +1,106 @@
 
-import React from 'react';
-import { motion, MotionProps } from 'framer-motion';
+import React, { ReactNode } from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useAdaptivePerformance } from '@/contexts/AdaptivePerformanceContext';
 
-export type GlassmorphicVariant = 
-  | 'default'
-  | 'light'  
-  | 'dark'
-  | 'purple'
-  | 'blue'
-  | 'quantum'
-  | 'astral'
-  | 'ethereal';
-
+// Define variants for glassmorphic containers
+export type GlassmorphicVariant = 'default' | 'light' | 'dark' | 'quantum' | 'astral' | 'ethereal';
 export type GlassmorphicIntensity = 'low' | 'medium' | 'high';
 
-export interface GlassmorphicContainerProps extends React.HTMLAttributes<HTMLDivElement>, MotionProps {
-  children: React.ReactNode;
+export interface GlassmorphicContainerProps {
+  children: ReactNode;
+  className?: string;
   variant?: GlassmorphicVariant;
   intensity?: GlassmorphicIntensity;
-  glowColor?: string;
-  borderColor?: string;
-  backgroundOpacity?: number;
   withGlow?: boolean;
+  glowColor?: string;
   withMotion?: boolean;
   interactive?: boolean;
-  cornerSharpness?: 'sharp' | 'rounded' | 'smooth' | 'pill';
-  enableBlur?: boolean;
 }
 
 const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
   children,
-  className,
+  className = '',
   variant = 'default',
   intensity = 'medium',
-  glowColor,
-  borderColor,
-  backgroundOpacity,
   withGlow = false,
+  glowColor = 'rgba(139, 92, 246, 0.4)',
   withMotion = false,
   interactive = false,
-  cornerSharpness = 'rounded',
-  enableBlur,
-  ...props
 }) => {
-  const adaptivePerf = useAdaptivePerformance();
-  
-  // Use performance context to determine if blur should be enabled
-  const shouldEnableBlur = () => {
-    if (enableBlur !== undefined) return enableBlur;
-    if (!adaptivePerf) return true;
-    return adaptivePerf.features.enableBlur;
+  // Base glass styles with varying intensity levels
+  const baseGlassStyles = {
+    low: 'backdrop-blur-sm bg-opacity-10 border-opacity-20',
+    medium: 'backdrop-blur-md bg-opacity-15 border-opacity-30',
+    high: 'backdrop-blur-lg bg-opacity-20 border-opacity-40',
   };
   
-  const blurEnabled = shouldEnableBlur();
-  
-  // Map intensity to opacity and blur values
-  const getIntensityStyles = () => {
-    const opacityMap = {
-      low: { bg: 0.05, border: 0.1 },
-      medium: { bg: 0.1, border: 0.2 },
-      high: { bg: 0.15, border: 0.3 }
-    };
-    
-    const blurMap = {
-      low: '4px',
-      medium: '8px',
-      high: '12px'
-    };
-    
-    return {
-      opacity: backgroundOpacity ?? opacityMap[intensity].bg,
-      borderOpacity: opacityMap[intensity].border,
-      blur: blurEnabled ? blurMap[intensity] : '0px'
-    };
+  // Variant-specific styles
+  const variantStyles = {
+    default: 'bg-white/10 border-white/10',
+    light: 'bg-white/20 border-white/20',
+    dark: 'bg-black/30 border-white/10',
+    quantum: 'bg-purple-900/20 border-purple-500/20',
+    astral: 'bg-blue-900/20 border-blue-500/20',
+    ethereal: 'bg-teal-900/20 border-teal-400/20',
   };
   
-  // Map cornerSharpness to border-radius values
-  const getBorderRadiusClass = () => {
-    const radiusMap = {
-      sharp: 'rounded-none',
-      rounded: 'rounded-md',
-      smooth: 'rounded-xl',
-      pill: 'rounded-full'
+  // Glow effect styles
+  const getGlowStyles = () => {
+    if (!withGlow) return '';
+    
+    const intensityMap = {
+      low: '0 0 10px',
+      medium: '0 0 15px',
+      high: '0 0 25px'
     };
     
-    return radiusMap[cornerSharpness];
+    return `shadow-[${intensityMap[intensity]} ${glowColor}]`;
   };
   
-  // Map variant to color values
-  const getVariantStyles = () => {
-    const { opacity, borderOpacity } = getIntensityStyles();
-    
-    const baseStyle = {
-      background: `rgba(255, 255, 255, ${opacity})`,
-      borderColor: borderColor || `rgba(255, 255, 255, ${borderOpacity})`,
-      boxShadow: withGlow ? `0 0 20px ${glowColor || 'rgba(255, 255, 255, 0.1)'}` : 'none',
-    };
-    
-    switch (variant) {
-      case 'light':
-        return {
-          ...baseStyle,
-          background: `rgba(255, 255, 255, ${opacity * 1.5})`,
-        };
-        
-      case 'dark':
-        return {
-          ...baseStyle,
-          background: `rgba(0, 0, 0, ${opacity * 1.5})`,
-          borderColor: borderColor || `rgba(255, 255, 255, ${borderOpacity / 2})`,
-        };
-        
-      case 'purple':
-        return {
-          ...baseStyle,
-          background: `rgba(139, 92, 246, ${opacity})`,
-          borderColor: borderColor || `rgba(167, 139, 250, ${borderOpacity})`,
-          boxShadow: withGlow ? `0 0 20px ${glowColor || 'rgba(139, 92, 246, 0.2)'}` : 'none',
-        };
-        
-      case 'blue':
-        return {
-          ...baseStyle,
-          background: `rgba(59, 130, 246, ${opacity})`,
-          borderColor: borderColor || `rgba(96, 165, 250, ${borderOpacity})`,
-          boxShadow: withGlow ? `0 0 20px ${glowColor || 'rgba(59, 130, 246, 0.2)'}` : 'none',
-        };
-        
-      case 'quantum':
-        return {
-          ...baseStyle,
-          background: `rgba(124, 58, 237, ${opacity})`,
-          borderColor: borderColor || `rgba(167, 139, 250, ${borderOpacity})`,
-          boxShadow: withGlow ? `0 0 20px ${glowColor || 'rgba(124, 58, 237, 0.25)'}` : 'none',
-        };
-        
-      case 'astral':
-        return {
-          ...baseStyle,
-          background: `rgba(79, 70, 229, ${opacity})`,
-          borderColor: borderColor || `rgba(129, 140, 248, ${borderOpacity})`,
-          boxShadow: withGlow ? `0 0 20px ${glowColor || 'rgba(79, 70, 229, 0.25)'}` : 'none',
-        };
-        
-      case 'ethereal':
-        return {
-          ...baseStyle,
-          background: `rgba(52, 211, 153, ${opacity})`,
-          borderColor: borderColor || `rgba(110, 231, 183, ${borderOpacity})`,
-          boxShadow: withGlow ? `0 0 20px ${glowColor || 'rgba(52, 211, 153, 0.25)'}` : 'none',
-        };
-        
-      default:
-        return baseStyle;
-    }
-  };
-  
-  const variantStyles = getVariantStyles();
-  const { blur } = getIntensityStyles();
-  const borderRadiusClass = getBorderRadiusClass();
-  
+  // Hover effect for interactive containers
+  const hoverStyles = interactive
+    ? 'transition-all duration-300 hover:scale-[1.01] hover:bg-opacity-30 hover:border-opacity-50'
+    : '';
+
+  // Combine all styles
+  const containerStyles = cn(
+    'rounded-xl border',
+    baseGlassStyles[intensity],
+    variantStyles[variant],
+    getGlowStyles(),
+    hoverStyles,
+    className
+  );
+
   // Animation variants for motion
   const motionVariants = {
-    hover: interactive ? {
-      scale: 1.02,
-      boxShadow: `0 0 30px ${glowColor || 'rgba(255, 255, 255, 0.2)'}`,
-      transition: { duration: 0.3 }
-    } : {},
-    tap: interactive ? {
-      scale: 0.98,
-      transition: { duration: 0.1 }
-    } : {},
-  };
-
-  // Apply styles
-  const containerStyle = {
-    ...variantStyles,
-    backdropFilter: blurEnabled ? `blur(${blur})` : 'none',
-    WebkitBackdropFilter: blurEnabled ? `blur(${blur})` : 'none',
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -10 },
+    hover: interactive ? { scale: 1.01, y: -2 } : {},
   };
 
   // Render with or without motion
   if (withMotion) {
     return (
       <motion.div
-        className={cn(
-          'border',
-          borderRadiusClass,
-          interactive && 'cursor-pointer',
-          className
-        )}
-        style={containerStyle}
-        whileHover={interactive ? 'hover' : undefined}
-        whileTap={interactive ? 'tap' : undefined}
+        className={containerStyles}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        whileHover={interactive ? "hover" : undefined}
+        transition={{ duration: 0.3 }}
         variants={motionVariants}
-        {...props}
       >
         {children}
       </motion.div>
     );
   }
 
+  // Static rendering
   return (
-    <div
-      className={cn(
-        'border',
-        borderRadiusClass,
-        interactive && 'cursor-pointer',
-        className
-      )}
-      style={containerStyle}
-      {...props}
-    >
+    <div className={containerStyles}>
       {children}
     </div>
   );
