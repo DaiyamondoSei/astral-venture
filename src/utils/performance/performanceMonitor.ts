@@ -1,5 +1,5 @@
 
-// Export from the properly cased file
+// Export the class directly
 export * from './PerformanceMonitor';
 
 // Create and export a singleton instance

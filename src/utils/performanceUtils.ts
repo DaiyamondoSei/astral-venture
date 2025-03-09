@@ -59,7 +59,7 @@ export function getPerformanceCategory(): DeviceCapability {
 }
 
 /**
- * Throttle a function based on performance category
+ * Generic throttle function
  */
 export function throttle<T extends (...args: any[]) => any>(
   func: T,

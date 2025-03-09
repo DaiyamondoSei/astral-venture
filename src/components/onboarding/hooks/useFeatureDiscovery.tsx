@@ -1,97 +1,95 @@
 
 import { useState, useEffect } from 'react';
-import { useOnboarding } from '@/contexts/onboarding';
-import { featureTooltips, guidedTours } from '../data';
-import { FeatureTooltipData, GuidedTourData } from '../hooks/achievement/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { featureTooltips } from '../data';
+import type { FeatureTooltipData } from './achievement/types';
 
 /**
- * Hook to manage feature discovery tooltips and guided tours
+ * Hook for handling feature discovery tooltips
  */
-export function useFeatureDiscovery(hasCompletedOnboarding: boolean) {
-  const [activeTooltips, setActiveTooltips] = useState<FeatureTooltipData[]>([]);
-  const [activeTour, setActiveTour] = useState<string | null>(null);
-  const [dismissedTooltips, setDismissedTooltips] = useState<Record<string, boolean>>({});
-  const [dismissedTours, setDismissedTours] = useState<Record<string, boolean>>({});
-  
-  const { 
-    completedSteps, 
-    currentStep, 
-    hasCompletedAnyStep 
-  } = useOnboarding();
+export const useFeatureDiscovery = () => {
+  const { user } = useAuth();
+  const [visibleTooltips, setVisibleTooltips] = useState<FeatureTooltipData[]>([]);
+  const [activeTooltip, setActiveTooltip] = useState<FeatureTooltipData | null>(null);
+  const [discoveredFeatures, setDiscoveredFeatures] = useState<string[]>([]);
 
-  // Filter and show appropriate tooltips and tours
+  // Load discovered features from localStorage on mount
   useEffect(() => {
-    if (!hasCompletedAnyStep) return;
+    if (!user) return;
     
-    // Only allow one active tour at a time
-    if (activeTour) return;
-    
-    // Filter tooltips based on completed steps and conditions
-    const eligibleTooltips = featureTooltips.filter(tooltip => {
-      // Skip if already dismissed
-      if (dismissedTooltips[tooltip.id]) return false;
-      
-      // Check if required step is completed
-      if (tooltip.requiredStep && completedSteps) {
-        if (!completedSteps[tooltip.requiredStep]) return false;
+    try {
+      const stored = localStorage.getItem(`discovered_features_${user.id}`);
+      if (stored) {
+        setDiscoveredFeatures(JSON.parse(stored));
       }
-      
-      // Check condition
-      if (tooltip.condition === 'isFirstLogin' && hasCompletedOnboarding) return false;
-      if (tooltip.condition === 'hasCompletedOnboarding' && !hasCompletedOnboarding) return false;
-      
-      return true;
-    });
-    
-    setActiveTooltips(eligibleTooltips);
-    
-    // Determine if any tour should be shown
-    const eligibleTour = guidedTours.find(tour => {
-      // Skip if already dismissed
-      if (dismissedTours[tour.id]) return false;
-      
-      // Check if required step is completed
-      if (tour.requiredStep && completedSteps) {
-        if (!completedSteps[tour.requiredStep]) return false;
-      }
-      
-      // Check condition
-      if (tour.condition === 'isFirstLogin' && hasCompletedOnboarding) return false;
-      if (tour.condition === 'hasCompletedOnboarding' && !hasCompletedOnboarding) return false;
-      
-      return true;
-    });
-    
-    if (eligibleTour) {
-      setActiveTour(eligibleTour.id);
+    } catch (error) {
+      console.error('Error loading discovered features:', error);
     }
-  }, [completedSteps, currentStep, dismissedTooltips, dismissedTours, activeTour, hasCompletedAnyStep, hasCompletedOnboarding]);
+  }, [user]);
 
-  // Dismiss a tooltip
-  const dismissTooltip = (id: string) => {
-    setDismissedTooltips(prev => ({
-      ...prev,
-      [id]: true
-    }));
+  // Determine which tooltips should be shown based on conditions
+  useEffect(() => {
+    if (!user) return;
     
-    setActiveTooltips(prev => prev.filter(tooltip => tooltip.id !== id));
+    // Filter tooltips based on discovery conditions and already seen
+    const eligible = featureTooltips.filter(tooltip => {
+      // Skip already discovered features
+      if (discoveredFeatures.includes(tooltip.id)) return false;
+      
+      // Evaluate condition (simplified for now)
+      const condition = tooltip.condition;
+      // You can add your condition evaluation logic here
+      // For now, we'll just show all undiscovered tooltips
+      return true;
+    });
+    
+    setVisibleTooltips(eligible);
+  }, [user, discoveredFeatures]);
+
+  // Mark a feature as discovered
+  const markDiscovered = (tooltipId: string) => {
+    if (!user) return;
+    
+    const updated = [...discoveredFeatures, tooltipId];
+    setDiscoveredFeatures(updated);
+    
+    // Remove from visible tooltips
+    setVisibleTooltips(prev => prev.filter(t => t.id !== tooltipId));
+    
+    // Clear active tooltip if it was the one discovered
+    if (activeTooltip?.id === tooltipId) {
+      setActiveTooltip(null);
+    }
+    
+    // Save to localStorage
+    try {
+      localStorage.setItem(`discovered_features_${user.id}`, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error saving discovered features:', error);
+    }
   };
-  
-  // Dismiss a tour
-  const dismissTour = (id: string) => {
-    setDismissedTours(prev => ({
-      ...prev,
-      [id]: true
-    }));
-    
-    setActiveTour(null);
+
+  // Show a specific tooltip
+  const showTooltip = (tooltipId: string) => {
+    const tooltip = visibleTooltips.find(t => t.id === tooltipId);
+    if (tooltip) {
+      setActiveTooltip(tooltip);
+    }
+  };
+
+  // Hide the active tooltip
+  const hideTooltip = () => {
+    setActiveTooltip(null);
   };
 
   return {
-    activeTooltips,
-    activeTour,
-    guidedTours,
-    dismissTooltip,
-    dismissTour
+    visibleTooltips,
+    activeTooltip,
+    discoveredFeatures,
+    markDiscovered,
+    showTooltip,
+    hideTooltip,
   };
-}
+};
+
+export default useFeatureDiscovery;
