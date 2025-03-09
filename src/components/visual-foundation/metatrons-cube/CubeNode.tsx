@@ -1,60 +1,86 @@
 
 import React from 'react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { MetatronsNode, GlowIntensity } from './types';
 
 interface CubeNodeProps {
-  x: number;
-  y: number;
-  id: number;
-  size: number;
-  isActive: boolean;
-  isHovered: boolean;
-  nodeColor: string;
-  activeNodeColor: string;
-  interactive: boolean;
-  onNodeClick?: (nodeId: number) => void;
-  onNodeHover?: (nodeId: number | null) => void;
+  node: MetatronsNode;
+  primaryColor: string;
+  secondaryColor: string;
+  isActive?: boolean;
+  onClick?: (nodeId: string) => void;
+  glowIntensity: GlowIntensity;
+  isSimplified?: boolean;
 }
 
+const getGlowStrength = (intensity: GlowIntensity): string => {
+  switch (intensity) {
+    case 'high': return '3';
+    case 'medium': return '2.5';
+    case 'low': return '1.5';
+    default: return '2';
+  }
+};
+
 const CubeNode: React.FC<CubeNodeProps> = ({
-  x,
-  y,
-  id,
-  size,
-  isActive,
-  isHovered,
-  nodeColor,
-  activeNodeColor,
-  interactive,
-  onNodeClick,
-  onNodeHover
+  node,
+  primaryColor,
+  secondaryColor,
+  isActive = false,
+  onClick,
+  glowIntensity,
+  isSimplified = false
 }) => {
-  const nodeSize = id === 0 ? 6 : isActive ? 5 : 3;
+  const nodeSize = isActive ? 12 : 8;
+  const filterId = `node-glow-${glowIntensity}`;
+  
+  const handleClick = () => {
+    if (onClick) {
+      onClick(node.id);
+    }
+  };
   
   return (
-    <g key={`node-${id}`}>
-      {/* Outer glow for active nodes */}
-      {(isActive || isHovered) && (
-        <circle
-          cx={x}
-          cy={y}
-          r={nodeSize * 2}
-          fill={activeNodeColor}
-          opacity={0.4}
-        />
+    <>
+      {!isSimplified && isActive && (
+        <svg width="0" height="0">
+          <defs>
+            <filter id={filterId}>
+              <feGaussianBlur stdDeviation={getGlowStrength(glowIntensity)} result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+        </svg>
       )}
       
-      {/* Node circle */}
-      <circle
-        cx={x}
-        cy={y}
-        r={nodeSize}
-        fill={isActive ? activeNodeColor : nodeColor}
-        style={{ cursor: interactive ? 'pointer' : 'default' }}
-        onClick={() => interactive && onNodeClick && onNodeClick(id)}
-        onMouseEnter={() => interactive && onNodeHover && onNodeHover(id)}
-        onMouseLeave={() => interactive && onNodeHover && onNodeHover(null)}
+      <motion.div
+        className={cn(
+          "absolute rounded-full cursor-pointer",
+          isActive ? "z-20" : "z-10"
+        )}
+        style={{
+          left: `${node.x}%`,
+          top: `${node.y}%`,
+          width: `${nodeSize}px`,
+          height: `${nodeSize}px`,
+          backgroundColor: isActive ? primaryColor : secondaryColor,
+          filter: isActive && !isSimplified ? `url(#${filterId})` : undefined,
+          transform: 'translate(-50%, -50%)'
+        }}
+        initial={{ scale: 0 }}
+        animate={{ 
+          scale: 1,
+          opacity: isActive ? 1 : 0.7
+        }}
+        transition={{ 
+          duration: 0.5,
+          delay: 0.1 * (parseInt(node.id) % 5)
+        }}
+        whileHover={{ scale: 1.2 }}
+        onClick={handleClick}
       />
-    </g>
+    </>
   );
 };
 

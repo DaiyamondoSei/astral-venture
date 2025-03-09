@@ -1,183 +1,122 @@
 
-/**
- * Optimized adaptive rendering utilities
- * 
- * This module provides functionality to adjust rendering quality and performance
- * based on device capabilities and current application state.
- */
-
-import { PerfConfig } from '@/contexts/PerfConfigContext';
-
-// Flag to track if adaptive rendering is initialized
-let isInitialized = false;
-
-// Default thresholds for device capability detection
-const cpuThresholds = {
-  low: 2,    // 2 cores or fewer
-  medium: 4, // 3-4 cores
-  high: 8    // 8+ cores
-};
-
-// Memory thresholds in MB (if available)
-const memoryThresholds = {
-  low: 2048,    // 2GB or less
-  medium: 4096, // 4GB
-  high: 8192    // 8GB+
-};
-
-/**
- * Device capability detection using available browser APIs
- */
-export function detectDeviceCapability(): 'low' | 'medium' | 'high' {
-  if (typeof window === 'undefined') return 'medium';
-  
-  // Check for mobile devices first
-  const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
-  
-  // CPU cores
-  const cpuCores = navigator.hardwareConcurrency || 4;
-  
-  // Memory (if available)
-  let memory: number | undefined;
-  if ('deviceMemory' in navigator) {
-    memory = (navigator as any).deviceMemory * 1024;
+// Detect device capability based on available resources
+export const detectDeviceCapability = (): 'low' | 'medium' | 'high' => {
+  // Server-side rendering check
+  if (typeof window === 'undefined') {
+    return 'medium'; // Default for SSR
   }
   
-  // Battery status (if available)
-  let isBatteryLow = false;
-  if ('getBattery' in navigator) {
+  // Check for hardware concurrency (CPU cores)
+  const cpuCores = navigator.hardwareConcurrency || 0;
+  
+  // Check for device memory
+  const deviceMemory = (navigator as any).deviceMemory || 0;
+  
+  // Check if device is mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Check for battery status if available
+  const hasBatteryAPI = 'getBattery' in navigator;
+  let isBatteryConstrained = false;
+  
+  if (hasBatteryAPI) {
+    // We'll check battery status in a non-blocking way
     (navigator as any).getBattery().then((battery: any) => {
-      isBatteryLow = battery.level < 0.2 && !battery.charging;
+      if (battery.charging === false && battery.level < 0.2) {
+        isBatteryConstrained = true;
+        // We could trigger an update to the performance config here
+        console.log('Battery is low and not charging, reducing performance settings');
+      }
     }).catch(() => {
       // Ignore errors with battery API
     });
   }
   
-  // Check performance timing API for navigation timing
-  let navigationTime = 0;
-  if (performance && performance.timing) {
-    navigationTime = 
-      performance.timing.domContentLoadedEventEnd - 
-      performance.timing.navigationStart;
-  }
-  
-  // Determine capability level based on all factors
+  // Determine device capability
   if (
-    isMobile || 
-    (cpuCores <= cpuThresholds.low) || 
-    (memory && memory <= memoryThresholds.low) ||
-    isBatteryLow ||
-    navigationTime > 2000 // Slow initial page load
+    (cpuCores <= 2) || 
+    (deviceMemory > 0 && deviceMemory <= 2) || 
+    (isMobile && (cpuCores <= 4 || deviceMemory <= 4))
   ) {
     return 'low';
   } else if (
-    (cpuCores >= cpuThresholds.high) && 
-    (memory === undefined || memory >= memoryThresholds.high) &&
-    navigationTime < 1000 // Fast initial page load
+    (cpuCores > 2 && cpuCores <= 4) || 
+    (deviceMemory > 2 && deviceMemory <= 6) || 
+    isMobile
   ) {
-    return 'high';
-  } else {
     return 'medium';
+  } else {
+    return 'high';
   }
-}
+};
 
-/**
- * Create initial performance configuration based on device capability
- */
-export function createInitialPerfConfig(): PerfConfig {
-  const deviceCapability = detectDeviceCapability();
-  
-  return {
-    enableVirtualization: true,
-    enableLazyLoading: true,
-    deviceCapability: deviceCapability
-  };
-}
+// Utility function to determine if a feature should be enabled based on device capability
+export const getAdaptiveSetting = <T>(
+  lowOption: T,
+  mediumOption: T,
+  highOption: T,
+  deviceCapability: 'low' | 'medium' | 'high'
+): T => {
+  switch (deviceCapability) {
+    case 'low':
+      return lowOption;
+    case 'medium':
+      return mediumOption;
+    case 'high':
+      return highOption;
+    default:
+      return mediumOption;
+  }
+};
 
-/**
- * Initialize adaptive rendering system
- */
-export function initAdaptiveRendering(): void {
-  if (isInitialized) return;
-  
-  // Feature detection and capability-based adjustments
-  const deviceCapability = detectDeviceCapability();
-  
-  // Apply body classes for CSS-based optimizations
-  if (typeof document !== 'undefined') {
-    document.body.classList.add(`device-${deviceCapability}`);
-    
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      document.body.classList.add('reduced-motion');
+// Utility function to check if a feature should be enabled based on device capability
+export const isFeatureEnabled = (
+  featureName: string,
+  deviceCapability: 'low' | 'medium' | 'high'
+): boolean => {
+  const featureSettings: Record<string, Record<'low' | 'medium' | 'high', boolean>> = {
+    'animations': {
+      low: false,
+      medium: true,
+      high: true
+    },
+    'particleEffects': {
+      low: false,
+      medium: true,
+      high: true
+    },
+    'glowEffects': {
+      low: false,
+      medium: true,
+      high: true
+    },
+    'complexGradients': {
+      low: false,
+      medium: false,
+      high: true
+    },
+    'advancedShaders': {
+      low: false,
+      medium: false,
+      high: true
+    },
+    'realTimeInformation': {
+      low: false,
+      medium: true,
+      high: true
     }
-  }
-  
-  // Set up resize observer for adaptive layout changes
-  if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
-    const resizeObserver = new ResizeObserver(throttle(() => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      
-      // Update layout classes based on viewport dimensions
-      document.body.classList.remove('viewport-xs', 'viewport-sm', 'viewport-md', 'viewport-lg', 'viewport-xl');
-      
-      if (width < 640) document.body.classList.add('viewport-xs');
-      else if (width < 768) document.body.classList.add('viewport-sm');
-      else if (width < 1024) document.body.classList.add('viewport-md');
-      else if (width < 1280) document.body.classList.add('viewport-lg');
-      else document.body.classList.add('viewport-xl');
-      
-      // Add tall/wide viewport indicators
-      document.body.classList.remove('viewport-tall', 'viewport-wide');
-      if (height > width) document.body.classList.add('viewport-tall');
-      else document.body.classList.add('viewport-wide');
-    }, 200));
-    
-    resizeObserver.observe(document.body);
-  }
-  
-  console.log('Adaptive rendering initialized with capability:', deviceCapability);
-  
-  isInitialized = true;
-}
-
-/**
- * Helper function to throttle function calls
- */
-function throttle<T extends (...args: any[]) => any>(func: T, limit: number): (...funcArgs: Parameters<T>) => ReturnType<T> | undefined {
-  let inThrottle = false;
-  let lastResult: ReturnType<T> | undefined;
-  
-  return function(this: any, ...args: Parameters<T>): ReturnType<T> | undefined {
-    if (!inThrottle) {
-      lastResult = func.apply(this, args);
-      inThrottle = true;
-      
-      setTimeout(() => {
-        inThrottle = false;
-      }, limit);
-    }
-    
-    return lastResult;
-  };
-}
-
-/**
- * Adjust element count based on device capability
- */
-export function adaptElementCount(baseCount: number, deviceCapability: 'low' | 'medium' | 'high'): number {
-  const factors: Record<'low' | 'medium' | 'high', number> = {
-    low: 0.3,
-    medium: 0.7,
-    high: 1.0
   };
   
-  return Math.max(3, Math.floor(baseCount * factors[deviceCapability]));
-}
+  if (featureName in featureSettings) {
+    return featureSettings[featureName][deviceCapability];
+  }
+  
+  // Default to true for medium and high, false for low
+  return deviceCapability !== 'low';
+};
 
 export default {
-  init: initAdaptiveRendering,
   detectDeviceCapability,
-  createInitialPerfConfig,
-  adaptElementCount
+  getAdaptiveSetting,
+  isFeatureEnabled
 };

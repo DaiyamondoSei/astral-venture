@@ -2,7 +2,7 @@
 import { useContext } from 'react';
 import PerfConfigContext, { PerfConfigContextType } from '@/contexts/PerfConfigContext';
 
-// Simplified custom hook to use the performance configuration
+// Custom hook to use the performance configuration
 export const usePerfConfig = (): PerfConfigContextType => {
   const context = useContext(PerfConfigContext);
   if (!context) {

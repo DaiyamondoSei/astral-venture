@@ -1,26 +1,30 @@
 
-export interface MetatronsCubeProps {
-  size?: number;
-  strokeWidth?: number;
-  color?: string;
-  glowColor?: string;
-  glowIntensity?: 'none' | 'low' | 'medium' | 'high';
-  interactive?: boolean;
-  spinSpeed?: number;
-  nodeColor?: string;
-  activeNodeColor?: string;
-  onNodeClick?: (nodeId: number) => void;
-  activeNodes?: number[];
-  className?: string;
-}
+export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'quantum';
+export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type GlowIntensity = 'low' | 'medium' | 'high';
 
-export interface CubeNode {
-  id: number;
+export interface MetatronsNode {
+  id: string;
   x: number;
   y: number;
+  [key: string]: any;
 }
 
-export interface CubeLine {
-  from: number;
-  to: number;
+export interface MetatronsConnection {
+  id: string;
+  from: string;
+  to: string;
+  [key: string]: any;
+}
+
+export interface MetatronsCubeProps {
+  className?: string;
+  size?: CubeSize;
+  variant?: CubeTheme;
+  nodes: MetatronsNode[];
+  connections: MetatronsConnection[];
+  activeNodeId?: string;
+  onNodeClick?: (nodeId: string) => void;
+  withAnimation?: boolean;
+  intensity?: number;
 }

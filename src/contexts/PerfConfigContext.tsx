@@ -1,7 +1,7 @@
 import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
 import { detectDeviceCapability } from '@/utils/adaptiveRendering';
 
-// Simplified performance configuration type
+// Performance configuration type
 export interface PerfConfig {
   enableVirtualization: boolean;
   enableLazyLoading: boolean;
@@ -77,15 +77,6 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       {children}
     </PerfConfigContext.Provider>
   );
-};
-
-// Custom hook for using the config
-export const usePerfConfig = (): PerfConfigContextType => {
-  const context = useContext(PerfConfigContext);
-  if (!context) {
-    throw new Error('usePerfConfig must be used within a PerfConfigProvider');
-  }
-  return context;
 };
 
 export default PerfConfigContext;
