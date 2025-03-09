@@ -5,6 +5,10 @@ import { Toaster } from '@/components/ui/toaster';
 import { PerfConfigProvider } from '@/contexts/PerfConfigContext';
 import { AdaptivePerformanceProvider } from '@/contexts/AdaptivePerformanceContext';
 import { QuantumThemeProvider } from '@/components/visual-foundation';
+import { PanelProvider } from '@/contexts/PanelContext';
+import SwipeablePanelController from '@/components/panels/SwipeablePanelController';
+import SwipeIndicator from '@/components/panels/SwipeIndicator';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 import LandingPage from '@/pages/LandingPage';
 import HomePage from '@/pages/HomePage';
@@ -13,9 +17,11 @@ import DashboardPage from '@/pages/DashboardPage';
 import DesignSystemDemo from '@/pages/DesignSystemDemo';
 import NotFoundPage from '@/pages/NotFoundPage';
 import OnboardingPage from '@/pages/OnboardingPage';
+import { useEffect } from 'react';
+import { preloadPanelData } from '@/utils/panelDataPreloader';
 
 // Create Query Client with defaults
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
@@ -26,23 +32,55 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  // Preload panel data when the app starts
+  useEffect(() => {
+    preloadPanelData()
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <PerfConfigProvider>
         <AdaptivePerformanceProvider>
           <QuantumThemeProvider>
-            <Router>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/home" element={<HomePage />} />
-                <Route path="/entry-animation" element={<EntryAnimationPage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/design-system" element={<DesignSystemDemo />} />
-                <Route path="/onboarding" element={<OnboardingPage />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </Router>
-            <Toaster />
+            <AuthProvider>
+              <PanelProvider>
+                <Router>
+                  {/* Swipeable panels controller */}
+                  <SwipeablePanelController />
+                  
+                  {/* Swipe indicators */}
+                  <Routes>
+                    <Route 
+                      path="/home" 
+                      element={
+                        <>
+                          <SwipeIndicator position="top" />
+                          <SwipeIndicator position="bottom" />
+                          <HomePage />
+                        </>
+                      } 
+                    />
+                    <Route 
+                      path="/dashboard" 
+                      element={
+                        <>
+                          <SwipeIndicator position="top" />
+                          <SwipeIndicator position="bottom" />
+                          <DashboardPage />
+                        </>
+                      } 
+                    />
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/entry-animation" element={<EntryAnimationPage />} />
+                    <Route path="/design-system" element={<DesignSystemDemo />} />
+                    <Route path="/onboarding" element={<OnboardingPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                  
+                  <Toaster />
+                </Router>
+              </PanelProvider>
+            </AuthProvider>
           </QuantumThemeProvider>
         </AdaptivePerformanceProvider>
       </PerfConfigProvider>

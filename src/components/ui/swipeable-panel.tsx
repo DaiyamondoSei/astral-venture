@@ -1,174 +1,252 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, PanInfo, useAnimation } from 'framer-motion';
-import { cn } from '@/lib/utils';
+"use client"
 
-interface SwipeablePanelProps {
-  position: 'top' | 'bottom' | 'left' | 'right';
-  isOpen: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-  size?: 'small' | 'medium' | 'large' | 'full';
-  className?: string;
-  closeThreshold?: number;
-  allowOutsideClick?: boolean;
-  showHandle?: boolean;
+import React, { useRef, useState, useEffect } from 'react'
+import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { cn } from '@/lib/utils'
+
+export type PanelPosition = 'top' | 'bottom'
+export type PanelState = 'closed' | 'peek' | 'half' | 'full'
+
+export interface SwipeablePanelProps {
+  position: PanelPosition
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  children: React.ReactNode
+  className?: string
+  initialState?: PanelState
+  showHandle?: boolean
+  backdropClassName?: string
+  onStateChange?: (state: PanelState) => void
+  height?: {
+    peek?: number | string
+    half?: number | string
+    full?: number | string
+  }
 }
 
-export const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
-  position = 'bottom',
+const SwipeablePanel = ({
+  position,
   isOpen,
-  onClose,
+  onOpenChange,
   children,
-  size = 'medium',
   className,
-  closeThreshold = 0.5,
-  allowOutsideClick = true,
-  showHandle = true
-}) => {
-  const controls = useAnimation();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  initialState = 'half',
+  showHandle = true,
+  backdropClassName,
+  onStateChange,
+  height = {
+    peek: '15%',
+    half: '50%',
+    full: '90%',
+  }
+}: SwipeablePanelProps) => {
+  const isMobile = useMediaQuery('(max-width: 768px)')
+  const [panelState, setPanelState] = useState<PanelState>(isOpen ? initialState : 'closed')
+  const panelRef = useRef<HTMLDivElement>(null)
   
-  // Calculate panel sizes based on position
-  const getSizeStyle = () => {
-    // Vertical panels (top/bottom)
-    if (position === 'top' || position === 'bottom') {
-      switch (size) {
-        case 'small': return 'max-h-[25vh]';
-        case 'medium': return 'max-h-[40vh]';
-        case 'large': return 'max-h-[75vh]';
-        case 'full': return 'h-full';
-        default: return 'max-h-[40vh]';
-      }
-    }
-    // Horizontal panels (left/right)
-    else {
-      switch (size) {
-        case 'small': return 'max-w-[25vw]';
-        case 'medium': return 'max-w-[40vw]';
-        case 'large': return 'max-w-[75vw]';
-        case 'full': return 'w-full';
-        default: return 'max-w-[40vw]';
-      }
-    }
-  };
+  // Motion values for tracking drag
+  const y = useMotionValue(0)
+  const dragY = useMotionValue(0)
   
-  // Get position styles
-  const getPositionStyle = () => {
-    switch (position) {
-      case 'top': return 'top-0 left-0 right-0';
-      case 'bottom': return 'bottom-0 left-0 right-0';
-      case 'left': return 'left-0 top-0 bottom-0';
-      case 'right': return 'right-0 top-0 bottom-0';
-      default: return 'bottom-0 left-0 right-0';
-    }
-  };
+  // Spring animations for smooth transitions
+  const springConfig = { damping: 30, stiffness: 300 }
+  const animatedY = useSpring(y, springConfig)
   
-  // Handle drag end
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    setIsDragging(false);
+  // Calculate panel heights for different states
+  const getPanelHeight = (state: PanelState): number => {
+    if (!panelRef.current) return 0
+    const viewportHeight = window.innerHeight
     
-    // Check if drag distance exceeds threshold
-    const shouldClose = position === 'top' 
-      ? info.offset.y < 0 && info.offset.y < -panelRef.current!.offsetHeight * closeThreshold
-      : position === 'bottom'
-      ? info.offset.y > 0 && info.offset.y > panelRef.current!.offsetHeight * closeThreshold
-      : position === 'left'
-      ? info.offset.x < 0 && info.offset.x < -panelRef.current!.offsetWidth * closeThreshold
-      : position === 'right'
-      ? info.offset.x > 0 && info.offset.x > panelRef.current!.offsetWidth * closeThreshold
-      : false;
+    if (state === 'closed') return 0
+    if (state === 'peek') {
+      return typeof height.peek === 'string' && height.peek.includes('%')
+        ? (viewportHeight * parseFloat(height.peek) / 100)
+        : typeof height.peek === 'number' ? height.peek : 100
+    }
+    if (state === 'half') {
+      return typeof height.half === 'string' && height.half.includes('%')
+        ? (viewportHeight * parseFloat(height.half) / 100)
+        : typeof height.half === 'number' ? height.half : 300
+    }
+    // Full state
+    return typeof height.full === 'string' && height.full.includes('%')
+      ? (viewportHeight * parseFloat(height.full) / 100)
+      : typeof height.full === 'number' ? height.full : 500
+  }
+  
+  // Transform y position based on panel position (top/bottom)
+  const panelY = useTransform(() => {
+    const height = getPanelHeight(panelState)
     
-    if (shouldClose) {
-      onClose();
+    if (position === 'top') {
+      // For top panel, 0 is fully visible, negative is hidden upward
+      if (panelState === 'closed') return -height
+      return animatedY.get()
     } else {
-      // Reset position
-      controls.start('animate');
+      // For bottom panel, 0 is fully visible, positive is hidden downward
+      if (panelState === 'closed') return height
+      return animatedY.get()
     }
-  };
+  })
   
-  // Close when clicking outside
-  useEffect(() => {
-    if (!isOpen || !allowOutsideClick) return;
+  // Update panel state based on current position
+  const updateStateFromPosition = (currentY: number) => {
+    const viewportHeight = window.innerHeight
+    const peekHeight = getPanelHeight('peek')
+    const halfHeight = getPanelHeight('half')
+    const fullHeight = getPanelHeight('full')
     
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node) && !isDragging) {
-        onClose();
+    // Different logic based on panel position
+    if (position === 'top') {
+      // For top panel
+      if (currentY < -halfHeight) {
+        setPanelState('closed')
+        onOpenChange(false)
+      } else if (currentY < -peekHeight / 2) {
+        setPanelState('peek')
+      } else if (currentY < -fullHeight / 3) {
+        setPanelState('half')
+      } else {
+        setPanelState('full')
       }
-    };
-    
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [isOpen, onClose, allowOutsideClick, isDragging]);
-  
-  // Synchronize controls with isOpen
-  useEffect(() => {
-    if (isOpen) {
-      controls.start('animate');
     } else {
-      controls.start('exit');
+      // For bottom panel
+      if (currentY > halfHeight) {
+        setPanelState('closed')
+        onOpenChange(false)
+      } else if (currentY > peekHeight / 2) {
+        setPanelState('peek')
+      } else if (currentY > fullHeight / 3) {
+        setPanelState('half')
+      } else {
+        setPanelState('full')
+      }
     }
-  }, [isOpen, controls]);
+  }
   
-  // Get orientation based on position
-  const isVertical = position === 'top' || position === 'bottom';
+  // Handle drag gestures
+  const handleDragEnd = (_, info) => {
+    const velocity = position === 'top' ? info.velocity.y : -info.velocity.y
+    const offset = dragY.get()
+    
+    // Fast swipe detection
+    if (Math.abs(velocity) > 500) {
+      if (velocity > 0) {
+        // Swiping to open more
+        if (panelState === 'peek') setPanelState('half')
+        else if (panelState === 'half') setPanelState('full')
+      } else {
+        // Swiping to close more
+        if (panelState === 'full') setPanelState('half')
+        else if (panelState === 'half') setPanelState('peek')
+        else if (panelState === 'peek') {
+          setPanelState('closed')
+          onOpenChange(false)
+        }
+      }
+    } else {
+      // Normal position-based state update
+      updateStateFromPosition(offset)
+    }
+    
+    dragY.set(0)
+  }
   
-  if (!isOpen) return null;
+  // Update y position based on panel state
+  useEffect(() => {
+    if (!isOpen && panelState !== 'closed') {
+      setPanelState('closed')
+    } else if (isOpen && panelState === 'closed') {
+      setPanelState(initialState)
+    }
+    
+    // Notify about state changes
+    onStateChange?.(panelState)
+    
+    // Update animation target
+    if (panelState === 'closed') {
+      y.set(position === 'top' ? -getPanelHeight('full') : getPanelHeight('full'))
+    } else if (panelState === 'peek') {
+      y.set(position === 'top' ? -getPanelHeight('full') + getPanelHeight('peek') : getPanelHeight('full') - getPanelHeight('peek'))
+    } else if (panelState === 'half') {
+      y.set(position === 'top' ? -getPanelHeight('full') + getPanelHeight('half') : getPanelHeight('full') - getPanelHeight('half'))
+    } else if (panelState === 'full') {
+      y.set(0)
+    }
+  }, [panelState, isOpen, initialState, position])
   
-  // Define motion variants
-  const variants = {
-    initial: position === 'top' ? { y: '-100%' } :
-             position === 'bottom' ? { y: '100%' } :
-             position === 'left' ? { x: '-100%' } :
-             { x: '100%' },
-    animate: { x: 0, y: 0 },
-    exit: position === 'top' ? { y: '-100%' } :
-          position === 'bottom' ? { y: '100%' } :
-          position === 'left' ? { x: '-100%' } :
-          { x: '100%' }
-  };
+  // Handle backdrop clicks
+  const handleBackdropClick = () => {
+    setPanelState('closed')
+    onOpenChange(false)
+  }
+  
+  // Calculate drag constraints based on panel position
+  const getDragConstraints = () => {
+    const fullHeight = getPanelHeight('full')
+    
+    if (position === 'top') {
+      return { top: -fullHeight, bottom: 0 }
+    } else {
+      return { top: 0, bottom: fullHeight }
+    }
+  }
   
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+    <>
+      {/* Backdrop overlay */}
+      {isOpen && (
+        <motion.div
+          className={cn(
+            "fixed inset-0 z-40 bg-black/40 backdrop-blur-sm",
+            backdropClassName
+          )}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: panelState === 'closed' ? 0 : 0.5 }}
+          exit={{ opacity: 0 }}
+          onClick={handleBackdropClick}
+        />
+      )}
       
+      {/* Panel */}
       <motion.div
         ref={panelRef}
         className={cn(
-          "absolute bg-gradient-to-b from-quantum-900/90 to-black/80 backdrop-blur-md",
-          "border border-white/10 overflow-auto",
-          isVertical ? "rounded-t-xl" : "rounded-l-xl",
-          getPositionStyle(),
-          getSizeStyle(),
-          "shadow-2xl",
+          "fixed z-50 left-0 right-0 flex flex-col overflow-hidden bg-background shadow-lg",
+          position === 'top' ? "top-0 rounded-b-xl" : "bottom-0 rounded-t-xl",
           className
         )}
-        initial="initial"
-        animate={controls}
-        exit="exit"
-        variants={variants}
-        drag={isVertical ? "y" : "x"}
-        dragConstraints={{ 
-          top: position === 'bottom' ? -1000 : 0, 
-          bottom: position === 'top' ? 1000 : 0,
-          left: position === 'right' ? -1000 : 0,
-          right: position === 'left' ? 1000 : 0
+        style={{
+          y: panelY,
+          height: getPanelHeight('full'),
+          touchAction: 'none'
         }}
-        dragElastic={0.2}
-        onDragStart={() => setIsDragging(true)}
+        initial={position === 'top' ? { y: -getPanelHeight('full') } : { y: getPanelHeight('full') }}
+        drag="y"
+        dragElastic={0.1}
+        dragMomentum={false}
+        dragConstraints={getDragConstraints()}
+        onDrag={(_, info) => {
+          dragY.set(info.point.y)
+        }}
         onDragEnd={handleDragEnd}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
       >
+        {/* Handle */}
         {showHandle && (
-          <div className="flex justify-center py-2">
-            <div className="w-10 h-1 bg-white/30 rounded-full" />
+          <div className="flex justify-center p-2">
+            <div className="w-12 h-1.5 rounded-full bg-muted-foreground/30" />
           </div>
         )}
-        {children}
+        
+        {/* Content */}
+        <div className="flex-1 overflow-auto px-4">
+          {children}
+        </div>
       </motion.div>
-    </div>
-  );
-};
+    </>
+  )
+}
 
-export default SwipeablePanel;
+export default SwipeablePanel
