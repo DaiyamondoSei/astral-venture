@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
@@ -8,6 +8,7 @@ import { AdaptivePerformanceProvider } from '@/contexts/AdaptivePerformanceConte
 import { initWebVitals } from '@/utils/webVitalsMonitor';
 import { initAdaptiveRendering } from '@/utils/adaptiveRendering';
 import { initMemoryManagement } from '@/utils/memoryManager';
+import LoadingScreen from '@/components/LoadingScreen';
 
 // Create a performance-optimized bootstrapping sequence
 const bootstrap = () => {
@@ -27,15 +28,28 @@ const bootstrap = () => {
     document.body.appendChild(newRoot);
   }
 
-  // Render the app with only one router
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <AdaptivePerformanceProvider>
-        <App />
-        <Toaster />
-      </AdaptivePerformanceProvider>
-    </React.StrictMode>
-  );
+  // Create root and render loading screen first
+  const root = ReactDOM.createRoot(document.getElementById('root')!);
+  
+  // State to track if loading is complete
+  const [loadingComplete, setLoadingComplete] = useState(false);
+
+  // Wrapper component to handle loading state
+  const AppWithLoading = () => {
+    return loadingComplete ? (
+      <React.StrictMode>
+        <AdaptivePerformanceProvider>
+          <App />
+          <Toaster />
+        </AdaptivePerformanceProvider>
+      </React.StrictMode>
+    ) : (
+      <LoadingScreen onLoadComplete={() => setLoadingComplete(true)} />
+    );
+  };
+  
+  // Render with loading management
+  root.render(<AppWithLoading />);
   
   // Mark when app is fully loaded
   window.addEventListener('load', () => {

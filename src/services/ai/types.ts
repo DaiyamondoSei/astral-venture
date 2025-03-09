@@ -38,6 +38,7 @@ export interface AIResponse {
     model?: string;
   };
   sources?: any[];
+  response?: string;  // Added for compatibility
 }
 
 /**

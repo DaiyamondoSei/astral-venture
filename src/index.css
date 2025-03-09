@@ -2,113 +2,87 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import './styles/global-styles.css';
 
 @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
-
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
-
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
+    --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
     
-    /* Font variables */
-    --font-heading: 'Inter', sans-serif;
-    --font-body: 'Inter', sans-serif;
+    /* Quantum theme colors */
+    --quantum-50: 250 95% 98%;
+    --quantum-100: 250 95% 95%;
+    --quantum-200: 252 95% 90%;
+    --quantum-300: 254 95% 82%;
+    --quantum-400: 256 96% 74%;
+    --quantum-500: 258 96% 66%;
+    --quantum-600: 260 85% 58%;
+    --quantum-700: 262 75% 50%;
+    --quantum-800: 264 70% 40%;
+    --quantum-900: 266 72% 30%;
     
-    /* Chakra colors as CSS variables for consistent use */
-    --chakra-color-0: #ff0000;  /* Root */
-    --chakra-color-1: #ff8c00;  /* Sacral */
-    --chakra-color-2: #ffff00;  /* Solar Plexus */
-    --chakra-color-3: #00ff00;  /* Heart */
-    --chakra-color-4: #00bfff;  /* Throat */
-    --chakra-color-5: #0000ff;  /* Third Eye */
-    --chakra-color-6: #8a2be2;  /* Crown */
+    /* Astral theme colors */
+    --astral-50: 280 95% 98%;
+    --astral-100: 280 95% 95%;
+    --astral-200: 282 95% 90%;
+    --astral-300: 284 95% 82%;
+    --astral-400: 286 96% 74%;
+    --astral-500: 288 96% 66%;
+    --astral-600: 290 85% 58%;
+    --astral-700: 292 75% 50%;
+    --astral-800: 294 70% 40%;
+    --astral-900: 296 72% 30%;
     
-    /* Sacred Geometry Theme Colors */
-    --quantum-color-100: #e0d7f7;
-    --quantum-color-200: #c2aff0;
-    --quantum-color-300: #a487e8;
-    --quantum-color-400: #865fe1;
-    --quantum-color-500: #6837d9;
-    --quantum-color-600: #532cae;
-    --quantum-color-700: #3e2182;
-    --quantum-color-800: #291657;
-    --quantum-color-900: #150b2b;
-    
-    --astral-color-100: #d6e0f5;
-    --astral-color-200: #adc2eb;
-    --astral-color-300: #84a3e1;
-    --astral-color-400: #5b85d7;
-    --astral-color-500: #3266cd;
-    --astral-color-600: #2852a4;
-    --astral-color-700: #1e3d7b;
-    --astral-color-800: #142952;
-    --astral-color-900: #0a1429;
-    
-    --ethereal-color-100: #d7f9f3;
-    --ethereal-color-200: #aff3e7;
-    --ethereal-color-300: #87eddb;
-    --ethereal-color-400: #5fe7cf;
-    --ethereal-color-500: #37e1c3;
-    --ethereal-color-600: #2cb49c;
-    --ethereal-color-700: #218775;
-    --ethereal-color-800: #165a4e;
-    --ethereal-color-900: #0b2d27;
+    /* Ethereal theme colors */
+    --ethereal-50: 220 95% 98%;
+    --ethereal-100: 220 95% 95%;
+    --ethereal-200: 222 95% 90%;
+    --ethereal-300: 224 95% 82%;
+    --ethereal-400: 226 96% 74%;
+    --ethereal-500: 228 96% 66%;
+    --ethereal-600: 230 85% 58%;
+    --ethereal-700: 232 75% 50%;
+    --ethereal-800: 234 70% 40%;
+    --ethereal-900: 236 72% 30%;
   }
-
+ 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
-
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 224.3 76.3% 48%;
   }
 }
 
@@ -116,140 +90,105 @@
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-body);
-    font-size: var(--font-size-base);
-    line-height: var(--line-height-normal);
   }
-  h1 {
-    @apply text-4xl font-bold font-display;
-    font-size: var(--font-size-4xl);
-    line-height: var(--line-height-tight);
-  }
-  h2 {
-    @apply text-3xl font-semibold font-display;
-    font-size: var(--font-size-3xl);
-    line-height: var(--line-height-tight);
-  }
-  h3 {
-    @apply text-2xl font-semibold font-display;
-    font-size: var(--font-size-2xl);
-    line-height: var(--line-height-snug);
-  }
-  h4 {
-    @apply text-xl font-medium font-display;
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-snug);
-  }
-  h5 {
-    @apply text-lg font-medium font-display;
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-normal);
-  }
-  p {
-    margin-bottom: 1rem;
+  
+  /* Font settings */
+  .font-display {
+    @apply font-sans tracking-wide;
   }
 }
 
-/* Custom Application Styles - Light Theme Default */
-body {
-  @apply bg-white text-gray-800 min-h-screen;
+@layer components {
+  /* Glassmorphic styles */
+  .glass {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
+  }
+  
+  .glass-card {
+    @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-lg;
+  }
+  
+  /* Quantum button */
+  .astral-button {
+    @apply bg-gradient-to-r from-quantum-500 to-quantum-600 hover:from-quantum-400 hover:to-quantum-500 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg;
+  }
+  
+  /* Subtle glow effects */
+  .glow-text {
+    @apply relative;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+  }
+  
+  .glow-border {
+    @apply relative border border-white/30;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+  }
 }
 
-/* Glassmorphism Cards and UI Components */
-.glass-card {
-  @apply bg-white/90 backdrop-blur-md rounded-xl border border-gray-200 shadow-lg;
+@layer utilities {
+  /* Custom animations */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 2.5s infinite;
+  }
+  
+  .animate-twinkle {
+    animation: twinkle 3s infinite;
+  }
+  
+  .animate-spin-slow {
+    animation: spin 20s linear infinite;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+  
+  /* Utility for centering items */
+  .center-content {
+    @apply flex items-center justify-center;
+  }
 }
 
-.glass-button {
-  @apply bg-gray-100 backdrop-blur-md hover:bg-gray-200 transition-all duration-300;
-}
-
-.glass-input {
-  @apply bg-white/90 backdrop-blur-md border border-gray-300 focus:border-gray-400 transition-all;
-}
-
-/* Animated Backgrounds */
-.orb {
-  @apply absolute rounded-full bg-gradient-to-br opacity-40 blur-3xl animate-pulse;
-  animation-duration: 15s;
-}
-
-.wave-container {
-  @apply absolute bottom-0 left-0 right-0 h-60 overflow-hidden opacity-60;
-}
-
-.wave {
-  @apply absolute bottom-0 left-0 w-full h-24 min-w-[1000px];
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 88.7'%3E%3Cpath d='M800 56.9c-155.5 0-204.9-50-405.5-49.9-200 0-250 49.9-394.5 49.9v31.8h800v-31.8z' fill='%23ECF0F1' opacity='0.3'/%3E%3C/svg%3E");
-  background-position: center;
-  background-repeat: repeat-x;
-}
-
-.wave-1 {
-  animation: wave 30s -3s linear infinite;
-  opacity: 0.3;
-  bottom: 0;
-}
-
-.wave-2 {
-  animation: wave 25s linear reverse infinite;
-  opacity: 0.2;
-  bottom: 5px;
-}
-
-.wave-3 {
-  animation: wave 20s -1s linear infinite;
-  opacity: 0.1;
-  bottom: 10px;
-}
-
-@keyframes wave {
-  0% {
-    transform: translateX(0);
+/* Keyframes */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
   }
   50% {
-    transform: translateX(-25%);
-  }
-  100% {
-    transform: translateX(-50%);
+    transform: translateY(-10px);
   }
 }
 
-/* Sacred Geometry Animations */
-@keyframes pulse-slow {
+@keyframes twinkle {
   0%, 100% {
-    opacity: 0.7;
-    transform: scale(1);
+    opacity: 0.2;
   }
   50% {
     opacity: 1;
-    transform: scale(1.05);
   }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes draw {
+@keyframes shimmer {
   0% {
-    stroke-dasharray: 1000;
-    stroke-dashoffset: 1000;
+    transform: translateX(-100%);
   }
   100% {
-    stroke-dasharray: 1000;
-    stroke-dashoffset: 0;
+    transform: translateX(100%);
   }
 }
 
-.animate-draw {
-  animation: draw 8s ease forwards;
-}
-
-/* Other animations */
-@keyframes fade-in {
+@keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -260,65 +199,32 @@ body {
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
-}
-
-/* Chakra visualization styles for the silhouette */
-.astral-body-part {
-  fill: url(#silhouetteGradient);
-  stroke: rgba(100, 100, 100, 0.5);
-  stroke-width: 0.5;
-}
-
-.astral-body-silhouette {
-  filter: drop-shadow(0 0 8px rgba(138, 92, 246, 0.4));
-}
-
-/* Standardized focus styles for interactive elements */
-.focus-outline {
-  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-quantum-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-}
-
-/* Button states for better visual feedback */
-.btn-state-hover {
-  @apply hover:bg-opacity-90 hover:scale-[1.02] transition-all;
-}
-
-.btn-state-active {
-  @apply active:scale-[0.98] transition-all;
-}
-
-/* Form input states */
-.input-focus {
-  @apply focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20 transition-all;
-}
-
-.input-error {
-  @apply border-red-500/70 focus:border-red-500 focus:ring-red-500/20;
-}
-
-/* Improved scrollbars for better usability */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(104, 55, 217, 0.5) rgba(0, 0, 0, 0.1);
-}
-
-.custom-scrollbar::-webkit-scrollbar {
+/* Add custom scrollbar */
+::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(104, 55, 217, 0.5);
-  border-radius: 4px;
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(104, 55, 217, 0.7);
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Base styles */
+html, body {
+  @apply overflow-x-hidden;
+  scrollbar-width: thin;
+}
+
+body {
+  @apply bg-black text-white;
 }

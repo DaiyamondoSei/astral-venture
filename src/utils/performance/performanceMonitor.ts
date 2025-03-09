@@ -4,5 +4,7 @@ import { PerformanceMonitor, performanceMonitor } from './PerformanceMonitor';
 
 // Export the singleton
 export { performanceMonitor };
-export default performanceMonitor;
 export { PerformanceMonitor };
+export type { ComponentMetrics } from './PerformanceMonitor';
+
+export default performanceMonitor;
