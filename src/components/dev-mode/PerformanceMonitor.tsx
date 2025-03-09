@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Settings } from 'lucide-react';
 import { usePerformance } from '@/contexts/PerformanceContext';
 import { DeviceCapability } from '@/utils/performanceUtils';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
+import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
 /**
  * PerformanceMonitor
@@ -14,8 +16,10 @@ const PerformanceMonitor = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [fps, setFps] = useState(0);
   const [memoryUsage, setMemoryUsage] = useState<number | null>(null);
+  const [slowestComponents, setSlowestComponents] = useState<any[]>([]);
   const frameCountRef = useRef(0);
   const lastTimeRef = useRef(0);
+  
   const { 
     deviceCapability, 
     enableParticles, 
@@ -24,6 +28,8 @@ const PerformanceMonitor = () => {
     enableShadows,
     setManualPerformanceMode 
   } = usePerformance();
+  
+  const { config, updateConfig, applyPreset } = usePerfConfig();
 
   // Performance monitoring
   useEffect(() => {
@@ -45,6 +51,9 @@ const PerformanceMonitor = () => {
         if ((performance as any).memory) {
           setMemoryUsage((performance as any).memory.usedJSHeapSize / (1024 * 1024));
         }
+        
+        // Get slowest components
+        setSlowestComponents(performanceMonitor.getSlowestComponents(5));
       }
       
       rafId = requestAnimationFrame(countFrame);
@@ -71,7 +80,7 @@ const PerformanceMonitor = () => {
       </button>
       
       {isOpen && (
-        <div className="bg-black/80 text-white/90 p-4 mb-2 rounded-lg text-xs w-56">
+        <div className="bg-black/80 text-white/90 p-4 mb-2 rounded-lg text-xs w-80">
           <h3 className="font-medium mb-2">Performance Monitor</h3>
           
           <div className="space-y-2">
@@ -93,6 +102,22 @@ const PerformanceMonitor = () => {
               <span>Device Category:</span>
               <span>{deviceCapability}</span>
             </div>
+            
+            {slowestComponents.length > 0 && (
+              <div className="mt-2">
+                <h4 className="font-medium text-xs">Slowest Components:</h4>
+                <div className="max-h-32 overflow-y-auto text-[10px] mt-1">
+                  {slowestComponents.map((comp, i) => (
+                    <div key={i} className="flex justify-between mb-1">
+                      <span>{comp.componentName}</span>
+                      <span className={comp.averageRenderTime > 16 ? 'text-red-400' : 'text-yellow-400'}>
+                        {comp.averageRenderTime.toFixed(1)}ms
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             <div className="pt-2 space-y-2">
               <h4 className="font-medium">Performance Settings</h4>
@@ -124,6 +149,36 @@ const PerformanceMonitor = () => {
                 </button>
               </div>
               
+              <div className="mt-2">
+                <h4 className="font-medium text-xs">Performance Presets:</h4>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    className="px-2 py-1 rounded text-xs bg-black/40"
+                    onClick={() => applyPreset('comprehensive')}
+                  >
+                    Comprehensive
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-xs bg-quantum-600"
+                    onClick={() => applyPreset('balanced')}
+                  >
+                    Balanced
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-xs bg-black/40"
+                    onClick={() => applyPreset('minimal')}
+                  >
+                    Minimal
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded text-xs bg-black/40"
+                    onClick={() => applyPreset('disabled')}
+                  >
+                    Disabled
+                  </button>
+                </div>
+              </div>
+              
               <div className="pt-2 space-y-1">
                 <div className="flex justify-between items-center">
                   <span>Features Enabled:</span>
@@ -141,7 +196,22 @@ const PerformanceMonitor = () => {
                   <li className={enableShadows ? 'text-green-400' : 'text-red-400'}>
                     Shadows: {enableShadows ? 'On' : 'Off'}
                   </li>
+                  <li className={config.enableRenderTracking ? 'text-green-400' : 'text-red-400'}>
+                    Render Tracking: {config.enableRenderTracking ? 'On' : 'Off'}
+                  </li>
                 </ul>
+              </div>
+              
+              <div className="text-[10px] mt-2 pt-2 border-t border-white/10">
+                <button 
+                  className="text-quantum-400 underline"
+                  onClick={() => {
+                    performanceMonitor.resetMetrics();
+                    setSlowestComponents([]);
+                  }}
+                >
+                  Reset Metrics
+                </button>
               </div>
             </div>
           </div>

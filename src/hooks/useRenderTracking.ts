@@ -1,6 +1,6 @@
 
 import { useRef, useEffect, useCallback } from 'react';
-import { RenderAnalyzer } from '@/utils/performance/RenderAnalyzer';
+import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 import { usePerfConfig } from './usePerfConfig';
 
 interface RenderTrackingOptions {
@@ -36,7 +36,7 @@ export function useRenderTracking(
   } = options;
   
   // Get additional config
-  const config = usePerfConfig();
+  const { config } = usePerfConfig();
   
   // Skip if tracking is disabled
   if (!enabled || !config.enableRenderTracking) return;
@@ -60,13 +60,8 @@ export function useRenderTracking(
       return;
     }
     
-    // Use RenderAnalyzer instead of renderCostAnalyzer
-    const analyzer = RenderAnalyzer.getInstance();
-    analyzer.analyzeComponent({
-      componentName,
-      renderTime: duration,
-      renderCount: renderCountRef.current
-    });
+    // Record the render in the monitoring system
+    performanceMonitor.recordRender(componentName, duration);
     
     lastRecordTimeRef.current = now;
     
@@ -82,17 +77,23 @@ export function useRenderTracking(
     
     // Only check for optimizations occasionally and for problematic components
     if (renderCountRef.current % 10 === 0 && (complexity > 1 || duration > 16)) {
-      const analysis = analyzer.analyzeComponent({
-        componentName,
-        renderTime: duration,
-        renderCount: renderCountRef.current
-      });
-      
-      if (analysis && analysis.possibleOptimizations.some(s => s.includes('critical'))) {
-        console.warn(`[${componentName}] Critical optimization suggestions:`);
+      if (config.enableDetailedLogging) {
+        console.log(`[${componentName}] Render analysis for render #${renderCountRef.current}:`);
+        
+        if (complexity > 2) {
+          console.log(`- High complexity component (${complexity}), consider breaking into smaller components`);
+        }
+        
+        if (childComponents.length > 3) {
+          console.log(`- Contains ${childComponents.length} child components, consider memoization`);
+        }
+        
+        if (hooks.includes('useState') && hooks.includes('useEffect') && duration > 20) {
+          console.log(`- Contains state and effects with slow render time, check effect dependencies`);
+        }
       }
     }
-  }, [componentName, complexity, childComponents, dependencies, hooks, throttleInterval]);
+  }, [componentName, complexity, childComponents, dependencies, hooks, throttleInterval, config.enableDetailedLogging]);
   
   // Track render completion with throttling
   useEffect(() => {

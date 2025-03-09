@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
+import { usePerfConfig } from './usePerfConfig';
 
 interface PerformanceTrackingOptions {
   logSlowRenders?: boolean;
@@ -23,16 +24,19 @@ export function usePerformanceTracking(
   componentName: string,
   options: PerformanceTrackingOptions = {}
 ) {
-  // Skip in production for performance
-  if (process.env.NODE_ENV === 'production') return;
+  // Skip in production for performance unless explicitly enabled
+  if (process.env.NODE_ENV === 'production' && !options.enabled) return;
+  
+  // Get config
+  const { config } = usePerfConfig();
   
   const {
     logSlowRenders = true,
     logSlowRenderThreshold = 16, // 1 frame at 60fps
     reportToAnalytics = false,
-    enabled = true,
+    enabled = config.enableRenderTracking,
     throttleInterval = 0,
-    batchUpdates = true,
+    batchUpdates = config.batchRenderUpdates,
     maxBatchSize = 20
   } = options;
   
@@ -43,7 +47,7 @@ export function usePerformanceTracking(
   const lastRenderTimeRef = useRef<number>(0);
   const lastRecordTimeRef = useRef<number>(0);
   const recordedThisRenderRef = useRef(false);
-  const batchQueueRef = useRef<{time: number, duration: number}[]>([]);
+  const batchQueueRef = useRef<number[]>([]);
   const batchTimeoutRef = useRef<number | null>(null);
   
   // Start render timing when component renders
@@ -55,7 +59,11 @@ export function usePerformanceTracking(
     if (batchQueueRef.current.length === 0) return;
     
     // Use the optimized batch recording method
-    performanceMonitor.recordRenderBatch(componentName, [...batchQueueRef.current]);
+    performanceMonitor.recordRenderBatch(
+      componentName, 
+      batchQueueRef.current
+    );
+    
     batchQueueRef.current = [];
     
     // Clear timeout reference
@@ -76,7 +84,7 @@ export function usePerformanceTracking(
     
     if (batchUpdates) {
       // Add to batch queue
-      batchQueueRef.current.push({ time: now, duration });
+      batchQueueRef.current.push(duration);
       
       // Process batch if getting too large
       if (batchQueueRef.current.length >= maxBatchSize) {
@@ -101,7 +109,6 @@ export function usePerformanceTracking(
     // Report to analytics if enabled, only for very slow renders
     if (reportToAnalytics && duration > logSlowRenderThreshold * 2) {
       // This would be implemented with a real analytics service
-      // Using backend performance tracking endpoint instead
       if (navigator.onLine && Math.random() < 0.1) { // Sample 10% of events to reduce traffic
         performanceMonitor.reportSlowRender(componentName, duration);
       }
@@ -153,3 +160,5 @@ export function usePerformanceTracking(
     flushMetrics: processBatch
   };
 }
+
+export default usePerformanceTracking;

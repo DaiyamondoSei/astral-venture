@@ -1,349 +1,314 @@
+
 /**
  * Animation Scheduler
- * Centralizes and optimizes all animations across the application
- * to prevent excessive redraws and improve performance
+ * 
+ * Optimizes animation frame requests by batching and prioritizing animations
+ * to improve performance and reduce CPU/GPU load.
  */
 
-type Priority = 'high' | 'medium' | 'low';
 type AnimationCallback = (time: number) => void;
+type AnimationPriority = 'high' | 'medium' | 'low';
 
-interface AnimationTask {
+interface AnimationEntry {
   id: string;
   callback: AnimationCallback;
-  priority: Priority;
-  interval: number; // 0 means every frame, otherwise in ms
+  priority: AnimationPriority;
   lastRun: number;
-  active: boolean;
+  interval: number; // 0 means run every frame
+  isActive: boolean;
 }
 
+/**
+ * Animation Scheduler class
+ * Manages multiple animation callbacks with different priorities
+ * and optimizes frame requests for better performance
+ */
 class AnimationScheduler {
-  private tasks: Map<string, AnimationTask> = new Map();
-  private frameId: number | null = null;
-  private frameTimes: number[] = [];
+  private static instance: AnimationScheduler;
+  private animations: Map<string, AnimationEntry> = new Map();
   private isRunning: boolean = false;
-  private isPaused: boolean = false;
-  private lowPriorityFrameSkip: number = 0;
-  private mediumPriorityFrameSkip: number = 0;
-  private lastTime: number = 0;
-  private fps: number = 60;
-  private loadFactor: number = 0;
-  
-  constructor() {
-    // Start the animation loop
-    this.start();
-    
-    // Adjust scheduling based on visibility
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-          this.pause();
-        } else {
-          this.resume();
-        }
-      });
-    }
-    
-    // Monitor for janky frames and adjust accordingly
-    this.monitorPerformance();
+  private frameId: number | null = null;
+  private priorityIntervals: Record<AnimationPriority, number> = {
+    high: 0,    // Run every frame
+    medium: 2,  // Run every 2-3 frames at 60fps
+    low: 5      // Run every 5-6 frames at 60fps
+  };
+  private frameCount: number = 0;
+  private lastFrameTime: number = 0;
+  private frameDeltaHistory: number[] = [];
+  private adaptivePriorities: boolean = true;
+
+  private constructor() {
+    // Private constructor to enforce singleton
   }
-  
+
   /**
-   * Register an animation task with the scheduler
+   * Get the singleton instance
+   */
+  public static getInstance(): AnimationScheduler {
+    if (!AnimationScheduler.instance) {
+      AnimationScheduler.instance = new AnimationScheduler();
+    }
+    return AnimationScheduler.instance;
+  }
+
+  /**
+   * Register an animation callback
+   * 
+   * @param id Unique identifier for this animation
+   * @param callback Function to call on animation frames
+   * @param priority Priority level for this animation
+   * @param interval Optional interval in ms (0 means every frame)
+   * @returns The animation ID
    */
   public register(
     id: string, 
     callback: AnimationCallback, 
-    priority: Priority = 'medium',
+    priority: AnimationPriority = 'medium',
     interval: number = 0
-  ): void {
-    this.tasks.set(id, {
+  ): string {
+    this.animations.set(id, {
       id,
       callback,
       priority,
-      interval,
       lastRun: 0,
-      active: true
+      interval,
+      isActive: true
     });
     
-    if (!this.isRunning && this.tasks.size > 0) {
+    // Start the animation loop if it's not running
+    if (!this.isRunning) {
       this.start();
     }
+    
+    return id;
   }
-  
+
   /**
-   * Unregister an animation task from the scheduler
+   * Unregister an animation callback
+   * 
+   * @param id The animation ID to remove
    */
   public unregister(id: string): void {
-    this.tasks.delete(id);
+    this.animations.delete(id);
     
-    if (this.isRunning && this.tasks.size === 0) {
+    // Stop the animation loop if there are no animations left
+    if (this.animations.size === 0 && this.isRunning) {
       this.stop();
     }
   }
-  
+
   /**
-   * Pause a specific animation task
+   * Pause a specific animation
+   * 
+   * @param id The animation ID to pause
    */
-  public pauseTask(id: string): void {
-    const task = this.tasks.get(id);
-    if (task) {
-      task.active = false;
+  public pause(id: string): void {
+    const animation = this.animations.get(id);
+    if (animation) {
+      animation.isActive = false;
+      this.animations.set(id, animation);
     }
   }
-  
+
   /**
-   * Resume a specific animation task
+   * Resume a specific animation
+   * 
+   * @param id The animation ID to resume
    */
-  public resumeTask(id: string): void {
-    const task = this.tasks.get(id);
-    if (task) {
-      task.active = true;
-      task.lastRun = performance.now();
+  public resume(id: string): void {
+    const animation = this.animations.get(id);
+    if (animation) {
+      animation.isActive = true;
+      animation.lastRun = 0; // Reset to ensure it runs next frame
+      this.animations.set(id, animation);
     }
   }
-  
+
   /**
-   * Start the animation scheduler
+   * Update the priority for an animation
+   * 
+   * @param id The animation ID
+   * @param priority The new priority
    */
-  public start(): void {
+  public updatePriority(id: string, priority: AnimationPriority): void {
+    const animation = this.animations.get(id);
+    if (animation) {
+      animation.priority = priority;
+      this.animations.set(id, animation);
+    }
+  }
+
+  /**
+   * Enable or disable adaptive priority adjustments
+   * 
+   * @param enabled Whether to enable adaptive priorities
+   */
+  public setAdaptivePriorities(enabled: boolean): void {
+    this.adaptivePriorities = enabled;
+  }
+
+  /**
+   * Start the animation loop
+   */
+  private start(): void {
     if (this.isRunning) return;
     
     this.isRunning = true;
-    this.isPaused = false;
-    this.lastTime = performance.now();
-    this.animate(this.lastTime);
+    this.frameCount = 0;
+    this.lastFrameTime = 0;
+    this.frameDeltaHistory = [];
+    
+    // Start the animation frame loop
+    this.tick(performance.now());
   }
-  
+
   /**
-   * Stop the animation scheduler
+   * Stop the animation loop
    */
-  public stop(): void {
+  private stop(): void {
     if (!this.isRunning) return;
     
     this.isRunning = false;
+    
     if (this.frameId !== null) {
       cancelAnimationFrame(this.frameId);
       this.frameId = null;
     }
   }
-  
+
   /**
-   * Pause all animations
+   * The main animation tick function
+   * 
+   * @param time Current timestamp
    */
-  public pause(): void {
-    this.isPaused = true;
-  }
-  
-  /**
-   * Resume all animations
-   */
-  public resume(): void {
-    this.isPaused = false;
-    this.lastTime = performance.now();
-  }
-  
-  /**
-   * The main animation loop
-   */
-  private animate = (time: number): void => {
-    this.frameId = requestAnimationFrame(this.animate);
+  private tick(time: number): void {
+    this.frameId = requestAnimationFrame(this.tick.bind(this));
     
-    // Don't run if paused
-    if (this.isPaused) return;
+    // Calculate delta time and update frame count
+    this.frameCount++;
+    const delta = this.lastFrameTime ? time - this.lastFrameTime : 16.67;
+    this.lastFrameTime = time;
     
-    // Calculate time delta
-    const delta = time - this.lastTime;
-    this.lastTime = time;
+    // Update frame delta history for adaptive scheduling
+    this.frameDeltaHistory.push(delta);
+    if (this.frameDeltaHistory.length > 60) {
+      this.frameDeltaHistory.shift();
+    }
     
-    // Update FPS tracking
-    this.updateFps(delta);
+    // Adjust priority intervals based on frame rate if adaptive
+    if (this.adaptivePriorities && this.frameCount % 60 === 0) {
+      this.adjustPriorityIntervals();
+    }
     
-    // Update frame skipping based on current FPS
-    this.updateFrameSkipping();
-    
-    // Track start time for load factor calculation
-    const frameStartTime = performance.now();
-    
-    // Process all tasks
-    let highPriorityTasksRun = 0;
-    let mediumPriorityTasksRun = 0;
-    let lowPriorityTasksRun = 0;
-    
-    for (const task of this.tasks.values()) {
-      if (!task.active) continue;
+    // Process animations based on priority and interval
+    for (const [id, animation] of this.animations.entries()) {
+      if (!animation.isActive) continue;
       
-      // Skip frames for lower priority tasks based on current performance
-      if (task.priority === 'low' && this.lowPriorityFrameSkip > 0) {
-        this.lowPriorityFrameSkip--;
-        continue;
-      }
+      const shouldRunByInterval = animation.interval === 0 || 
+        (time - animation.lastRun >= animation.interval);
       
-      if (task.priority === 'medium' && this.mediumPriorityFrameSkip > 0) {
-        this.mediumPriorityFrameSkip--;
-        continue;
-      }
+      const shouldRunByPriority = this.shouldRunAnimationByPriority(
+        animation.priority, 
+        this.frameCount
+      );
       
-      // Handle interval-based tasks
-      if (task.interval > 0) {
-        if (time - task.lastRun >= task.interval) {
-          task.callback(time);
-          task.lastRun = time;
-          
-          // Count tasks run
-          if (task.priority === 'high') highPriorityTasksRun++;
-          else if (task.priority === 'medium') mediumPriorityTasksRun++;
-          else lowPriorityTasksRun++;
+      if (shouldRunByInterval && shouldRunByPriority) {
+        try {
+          animation.callback(time);
+          animation.lastRun = time;
+        } catch (error) {
+          console.error(`Error in animation ${id}:`, error);
         }
-      } else {
-        // Run every-frame tasks
-        task.callback(time);
-        task.lastRun = time;
-        
-        // Count tasks run
-        if (task.priority === 'high') highPriorityTasksRun++;
-        else if (task.priority === 'medium') mediumPriorityTasksRun++;
-        else lowPriorityTasksRun++;
       }
     }
-    
-    // Calculate load factor (processing time / frame time)
-    const processingTime = performance.now() - frameStartTime;
-    const targetFrameTime = 1000 / 60; // 16.67ms for 60fps
-    this.loadFactor = processingTime / targetFrameTime;
-    
-    // Log detailed performance metrics in development
-    if (process.env.NODE_ENV === 'development' && time % 3000 < 16.67) {
-      console.debug('Animation Scheduler Metrics:', {
-        fps: Math.round(this.fps),
-        loadFactor: this.loadFactor.toFixed(2),
-        tasks: this.tasks.size,
-        tasksRun: {
-          high: highPriorityTasksRun,
-          medium: mediumPriorityTasksRun,
-          low: lowPriorityTasksRun
-        },
-        frameSkipping: {
-          medium: this.mediumPriorityFrameSkip > 0,
-          low: this.lowPriorityFrameSkip > 0
-        }
-      });
-    }
-  };
-  
-  /**
-   * Update FPS calculation based on recent frames
-   */
-  private updateFps(deltaTime: number): void {
-    // Keep last 60 frame times for averaging
-    this.frameTimes.push(deltaTime);
-    if (this.frameTimes.length > 60) {
-      this.frameTimes.shift();
-    }
-    
-    // Calculate average FPS from frame times
-    if (this.frameTimes.length > 0) {
-      const averageDelta = this.frameTimes.reduce((sum, time) => sum + time, 0) / this.frameTimes.length;
-      this.fps = 1000 / averageDelta;
-    }
   }
-  
+
   /**
-   * Update frame skipping settings based on current performance
+   * Determine if an animation should run based on its priority
+   * 
+   * @param priority The animation priority
+   * @param frameCount The current frame count
+   * @returns Whether the animation should run this frame
    */
-  private updateFrameSkipping(): void {
-    // If frames are dropping (low FPS) or high load factor, increase frame skipping
-    if (this.fps < 30 || this.loadFactor > 0.8) {
-      this.lowPriorityFrameSkip = 3; // Skip 3 frames for low priority tasks
-      this.mediumPriorityFrameSkip = 1; // Skip 1 frame for medium priority tasks
+  private shouldRunAnimationByPriority(
+    priority: AnimationPriority, 
+    frameCount: number
+  ): boolean {
+    const interval = this.priorityIntervals[priority];
+    
+    // Always run high priority animations
+    if (priority === 'high') return true;
+    
+    // Run medium priority animations every few frames
+    if (priority === 'medium') {
+      return frameCount % (interval + 1) === 0;
+    }
+    
+    // Run low priority animations even less frequently
+    if (priority === 'low') {
+      return frameCount % (interval + 1) === 0;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Adjust priority intervals based on performance
+   */
+  private adjustPriorityIntervals(): void {
+    // Calculate average frame time
+    const avgFrameTime = this.frameDeltaHistory.reduce((sum, time) => sum + time, 0) / 
+      this.frameDeltaHistory.length;
+    
+    // Target for 60fps is ~16.67ms per frame
+    // If frame time is higher, increase intervals to reduce work
+    if (avgFrameTime > 20) { // Significantly below 60fps
+      this.priorityIntervals.medium = Math.min(4, this.priorityIntervals.medium + 1);
+      this.priorityIntervals.low = Math.min(10, this.priorityIntervals.low + 2);
     } 
-    // If frames are moderately dropping
-    else if (this.fps < 45 || this.loadFactor > 0.5) {
-      this.lowPriorityFrameSkip = 2; // Skip 2 frames for low priority
-      this.mediumPriorityFrameSkip = 0; // Don't skip medium priority
-    }
-    // Performance is good
-    else {
-      this.lowPriorityFrameSkip = 0;
-      this.mediumPriorityFrameSkip = 0;
+    // If frame time is good, gradually decrease intervals for smoother animation
+    else if (avgFrameTime < 16.67 && this.frameCount > 300) { // After initial settling
+      this.priorityIntervals.medium = Math.max(1, this.priorityIntervals.medium - 1);
+      this.priorityIntervals.low = Math.max(3, this.priorityIntervals.low - 1);
     }
   }
-  
+
   /**
-   * Monitor overall animation performance
+   * Get the current scheduler statistics
    */
-  private monitorPerformance(): void {
-    if (typeof window === 'undefined') return;
+  public getStats(): {
+    animationCount: number,
+    averageFrameTime: number,
+    estimatedFps: number,
+    priorityLevels: Record<AnimationPriority, number>
+  } {
+    const avgFrameTime = this.frameDeltaHistory.length > 0 
+      ? this.frameDeltaHistory.reduce((sum, time) => sum + time, 0) / this.frameDeltaHistory.length
+      : 0;
+      
+    const highPriorityCount = Array.from(this.animations.values())
+      .filter(a => a.isActive && a.priority === 'high').length;
+      
+    const mediumPriorityCount = Array.from(this.animations.values())
+      .filter(a => a.isActive && a.priority === 'medium').length;
+      
+    const lowPriorityCount = Array.from(this.animations.values())
+      .filter(a => a.isActive && a.priority === 'low').length;
     
-    // Set up a slow interval to avoid performance impact
-    setInterval(() => {
-      // If we're consistently below 30fps or high load factor, reduce animations
-      if ((this.fps < 30 && this.loadFactor > 0.9) || this.loadFactor > 1.2) {
-        this.throttleAllAnimations();
-      }
-    }, 5000);
-  }
-  
-  /**
-   * Throttle all animations when performance is poor
-   */
-  private throttleAllAnimations(): void {
-    // Increase intervals for all non-critical animations
-    for (const task of this.tasks.values()) {
-      if (task.priority !== 'high') {
-        // Double the interval of non-high priority tasks
-        if (task.interval > 0) {
-          task.interval = Math.min(task.interval * 2, 500); // Cap at 500ms
-        } else {
-          task.interval = 32; // ~30fps
-        }
-      }
-    }
-    
-    console.warn('Performance issues detected - throttling animations');
-  }
-  
-  /**
-   * Get current performance metrics
-   */
-  public getMetrics() {
     return {
-      fps: this.fps,
-      loadFactor: this.loadFactor,
-      taskCount: this.tasks.size,
-      isThrottled: this.lowPriorityFrameSkip > 0
+      animationCount: this.animations.size,
+      averageFrameTime: avgFrameTime,
+      estimatedFps: avgFrameTime > 0 ? Math.min(60, Math.round(1000 / avgFrameTime)) : 60,
+      priorityLevels: {
+        high: highPriorityCount,
+        medium: mediumPriorityCount,
+        low: lowPriorityCount
+      }
     };
   }
 }
 
-// Create a singleton instance
-export const animationScheduler = new AnimationScheduler();
-
-// Export a convenience function for one-off animations
-export function animateTimed(
-  callback: (progress: number, elapsed: number) => void,
-  duration: number = 1000,
-  easing: (t: number) => number = t => t
-): { cancel: () => void } {
-  const id = `timed-${Math.random().toString(36).substring(2, 9)}`;
-  const startTime = performance.now();
-  let isCancelled = false;
-  
-  animationScheduler.register(id, (time) => {
-    const elapsed = time - startTime;
-    const rawProgress = Math.min(elapsed / duration, 1);
-    const progress = easing(rawProgress);
-    
-    callback(progress, elapsed);
-    
-    if (rawProgress >= 1 || isCancelled) {
-      animationScheduler.unregister(id);
-    }
-  }, 'medium');
-  
-  return {
-    cancel: () => {
-      isCancelled = true;
-      animationScheduler.unregister(id);
-    }
-  };
-}
+// Export singleton instance
+export const animationScheduler = AnimationScheduler.getInstance();
+export default animationScheduler;

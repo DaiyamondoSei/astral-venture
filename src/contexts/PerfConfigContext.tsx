@@ -1,130 +1,195 @@
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
+// Performance configuration interface
 export interface PerfConfig {
-  enablePerformanceTracking: boolean;
+  // Core settings
   enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  // Additional properties needed by components
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
+  enableMemoryMonitoring: boolean;
+  enablePerformanceReporting: boolean;
+  
+  // Animation settings
+  particleDensity: number;
+  enableComplexAnimations: boolean;
+  animationFrameSkip: number;
+  
+  // Visual settings
+  enableBlur: boolean;
+  enableGlow: boolean;
+  enableShadows: boolean;
+  enableParticles: boolean;
+  
+  // Component optimization
+  enableVirtualization: boolean;
+  lazyLoadThreshold: number;
+  batchRenderUpdates: boolean;
+  
+  // Debug settings
+  showPerformanceMetrics: boolean;
+  enableDetailedLogging: boolean;
 }
 
-export interface PerfConfigContextType {
+// Preset configurations for different performance levels
+const performancePresets: Record<string, Partial<PerfConfig>> = {
+  comprehensive: {
+    enableRenderTracking: true,
+    enableMemoryMonitoring: true,
+    enablePerformanceReporting: true,
+    particleDensity: 1.0,
+    enableComplexAnimations: true,
+    animationFrameSkip: 0,
+    enableBlur: true,
+    enableGlow: true,
+    enableShadows: true,
+    enableParticles: true,
+    enableVirtualization: true,
+    lazyLoadThreshold: 200,
+    batchRenderUpdates: true,
+    showPerformanceMetrics: false,
+    enableDetailedLogging: process.env.NODE_ENV === 'development'
+  },
+  
+  balanced: {
+    enableRenderTracking: process.env.NODE_ENV === 'development',
+    enableMemoryMonitoring: true,
+    enablePerformanceReporting: true,
+    particleDensity: 0.7,
+    enableComplexAnimations: true,
+    animationFrameSkip: 1,
+    enableBlur: true,
+    enableGlow: false,
+    enableShadows: true,
+    enableParticles: true,
+    enableVirtualization: true,
+    lazyLoadThreshold: 300,
+    batchRenderUpdates: true,
+    showPerformanceMetrics: false,
+    enableDetailedLogging: false
+  },
+  
+  minimal: {
+    enableRenderTracking: false,
+    enableMemoryMonitoring: true,
+    enablePerformanceReporting: false,
+    particleDensity: 0.3,
+    enableComplexAnimations: false,
+    animationFrameSkip: 2,
+    enableBlur: false,
+    enableGlow: false,
+    enableShadows: false,
+    enableParticles: false,
+    enableVirtualization: true,
+    lazyLoadThreshold: 500,
+    batchRenderUpdates: true,
+    showPerformanceMetrics: false,
+    enableDetailedLogging: false
+  },
+  
+  disabled: {
+    enableRenderTracking: false,
+    enableMemoryMonitoring: false,
+    enablePerformanceReporting: false,
+    particleDensity: 0.1,
+    enableComplexAnimations: false,
+    animationFrameSkip: 3,
+    enableBlur: false,
+    enableGlow: false,
+    enableShadows: false,
+    enableParticles: false,
+    enableVirtualization: false,
+    lazyLoadThreshold: 1000,
+    batchRenderUpdates: false,
+    showPerformanceMetrics: false,
+    enableDetailedLogging: false
+  }
+};
+
+// Default configuration (balanced preset)
+const defaultConfig: PerfConfig = {
+  ...performancePresets.balanced
+} as PerfConfig;
+
+// Context type definition
+interface PerfConfigContextType {
   config: PerfConfig;
   updateConfig: (updates: Partial<PerfConfig>) => void;
   applyPreset: (preset: 'comprehensive' | 'balanced' | 'minimal' | 'disabled') => void;
 }
 
-const defaultConfig: PerfConfig = {
-  enablePerformanceTracking: process.env.NODE_ENV === 'development',
-  enableRenderTracking: process.env.NODE_ENV === 'development',
-  enableValidation: process.env.NODE_ENV === 'development',
-  enablePropTracking: false,
-  enableDebugLogging: false,
-  samplingRate: 0.3, // 30% sampling by default
-  throttleInterval: 500, // 500ms throttle by default
-  maxTrackedComponents: 20,
-  intelligentProfiling: true,
-  inactiveTabThrottling: true,
-  batchUpdates: true
-};
-
-export const PerfConfigContext = createContext<PerfConfigContextType>({
+// Create context with default values
+const PerfConfigContext = createContext<PerfConfigContextType>({
   config: defaultConfig,
   updateConfig: () => {},
   applyPreset: () => {}
 });
 
-interface PerfConfigProviderProps {
-  children: React.ReactNode;
-  initialConfig?: Partial<PerfConfig>;
-}
-
-export const PerfConfigProvider: React.FC<PerfConfigProviderProps> = ({ 
-  children, 
-  initialConfig = {} 
-}) => {
-  const [config, setConfig] = useState<PerfConfig>({
-    ...defaultConfig,
-    ...initialConfig
-  });
-
+// Context provider component
+export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Initialize state with default config
+  const [config, setConfig] = useState<PerfConfig>(defaultConfig);
+  
+  // Load saved configuration on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const savedConfig = localStorage.getItem('perfConfig');
+        if (savedConfig) {
+          const parsedConfig = JSON.parse(savedConfig);
+          setConfig(current => ({ ...current, ...parsedConfig }));
+        } else {
+          // No saved config, detect device capability and apply appropriate preset
+          const { getPerformanceCategory } = await import('@/utils/performanceUtils');
+          const capability = getPerformanceCategory();
+          
+          let preset: keyof typeof performancePresets;
+          
+          switch (capability) {
+            case 'high':
+              preset = 'comprehensive';
+              break;
+            case 'medium':
+              preset = 'balanced';
+              break;
+            case 'low':
+              preset = 'minimal';
+              break;
+            default:
+              preset = 'balanced';
+          }
+          
+          setConfig(current => ({ ...current, ...performancePresets[preset] }));
+        }
+      } catch (error) {
+        console.error('Error loading performance config:', error);
+        // Fall back to default config
+      }
+    };
+    
+    loadConfig();
+  }, []);
+  
+  // Update configuration
   const updateConfig = (updates: Partial<PerfConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
+    setConfig(current => {
+      const newConfig = { ...current, ...updates };
+      // Save to localStorage
+      try {
+        localStorage.setItem('perfConfig', JSON.stringify(newConfig));
+      } catch (e) {
+        console.error('Error saving performance config:', e);
+      }
+      return newConfig;
+    });
   };
-
+  
+  // Apply a preset configuration
   const applyPreset = (preset: 'comprehensive' | 'balanced' | 'minimal' | 'disabled') => {
-    let presetConfig: Partial<PerfConfig> = {};
-    
-    switch (preset) {
-      case 'comprehensive':
-        presetConfig = {
-          enablePerformanceTracking: true,
-          enableRenderTracking: true,
-          enableValidation: true,
-          enablePropTracking: true,
-          enableDebugLogging: true,
-          samplingRate: 1.0,
-          throttleInterval: 300,
-          intelligentProfiling: true,
-          inactiveTabThrottling: true,
-          batchUpdates: true
-        };
-        break;
-      case 'balanced':
-        presetConfig = {
-          enablePerformanceTracking: true,
-          enableRenderTracking: true,
-          enableValidation: true,
-          enablePropTracking: false,
-          enableDebugLogging: false,
-          samplingRate: 0.3,
-          throttleInterval: 500,
-          intelligentProfiling: true,
-          inactiveTabThrottling: true,
-          batchUpdates: true
-        };
-        break;
-      case 'minimal':
-        presetConfig = {
-          enablePerformanceTracking: true,
-          enableRenderTracking: false,
-          enableValidation: false,
-          enablePropTracking: false,
-          enableDebugLogging: false,
-          samplingRate: 0.1,
-          throttleInterval: 1000,
-          intelligentProfiling: false,
-          inactiveTabThrottling: true,
-          batchUpdates: false
-        };
-        break;
-      case 'disabled':
-        presetConfig = {
-          enablePerformanceTracking: false,
-          enableRenderTracking: false,
-          enableValidation: false,
-          enablePropTracking: false,
-          enableDebugLogging: false,
-          samplingRate: 0,
-          throttleInterval: 2000,
-          intelligentProfiling: false,
-          inactiveTabThrottling: false,
-          batchUpdates: false
-        };
-        break;
+    const presetConfig = performancePresets[preset];
+    if (presetConfig) {
+      updateConfig(presetConfig);
     }
-    
-    setConfig(prev => ({ ...prev, ...presetConfig }));
   };
-
+  
   return (
     <PerfConfigContext.Provider value={{ config, updateConfig, applyPreset }}>
       {children}
@@ -132,8 +197,13 @@ export const PerfConfigProvider: React.FC<PerfConfigProviderProps> = ({
   );
 };
 
-// This export is deprecated and will be removed in future versions
-export const usePerfConfig = () => useContext(PerfConfigContext).config;
+// Custom hook to use the performance config
+export const usePerfConfig = (): PerfConfigContextType => {
+  const context = useContext(PerfConfigContext);
+  if (!context) {
+    throw new Error('usePerfConfig must be used within a PerfConfigProvider');
+  }
+  return context;
+};
 
-// Correct way to use the context
-export const usePerfConfigContext = () => useContext(PerfConfigContext);
+export default PerfConfigContext;
