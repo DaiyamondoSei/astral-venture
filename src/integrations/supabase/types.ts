@@ -369,6 +369,92 @@ export type Database = {
         }
         Relationships: []
       }
+      practice_completions: {
+        Row: {
+          chakras_activated: string[] | null
+          completed_at: string
+          duration: number
+          energy_points_earned: number
+          id: string
+          practice_id: string
+          practice_type: string | null
+          reflection: string | null
+          user_id: string
+        }
+        Insert: {
+          chakras_activated?: string[] | null
+          completed_at?: string
+          duration: number
+          energy_points_earned: number
+          id?: string
+          practice_id: string
+          practice_type?: string | null
+          reflection?: string | null
+          user_id: string
+        }
+        Update: {
+          chakras_activated?: string[] | null
+          completed_at?: string
+          duration?: number
+          energy_points_earned?: number
+          id?: string
+          practice_id?: string
+          practice_type?: string | null
+          reflection?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_completions_practice_id_fkey"
+            columns: ["practice_id"]
+            isOneToOne: false
+            referencedRelation: "practices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      practices: {
+        Row: {
+          category: string
+          chakra_association: string[] | null
+          created_at: string
+          description: string
+          duration: number
+          energy_points: number
+          id: string
+          instructions: string[] | null
+          level: number
+          title: string
+          type: string
+        }
+        Insert: {
+          category: string
+          chakra_association?: string[] | null
+          created_at?: string
+          description: string
+          duration?: number
+          energy_points?: number
+          id?: string
+          instructions?: string[] | null
+          level?: number
+          title: string
+          type: string
+        }
+        Update: {
+          category?: string
+          chakra_association?: string[] | null
+          created_at?: string
+          description?: string
+          duration?: number
+          energy_points?: number
+          id?: string
+          instructions?: string[] | null
+          level?: number
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       quantum_downloads: {
         Row: {
           category: string
@@ -613,6 +699,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_total_points: {
+        Args: {
+          user_id_param: string
+        }
+        Returns: number
+      }
       get_user_achievements: {
         Args: {
           user_id_param: string
@@ -624,6 +716,13 @@ export type Database = {
           awarded_at: string
           achievement_data: Json
         }[]
+      }
+      increment_points: {
+        Args: {
+          row_id: string
+          points_to_add: number
+        }
+        Returns: number
       }
     }
     Enums: {

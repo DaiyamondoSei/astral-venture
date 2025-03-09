@@ -1,120 +1,139 @@
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Practice, PracticeProgress } from '@/services/practice/practiceService';
 import PracticeCard from './PracticeCard';
-import { Practice, PracticeCompletion } from '@/services/practice/practiceService';
-import { Zap, Star, Activity, RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Activity, Star, Zap } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface PracticeListProps {
   practices: Practice[];
-  completedPractices?: PracticeCompletion[];
+  completedPracticeIds?: string[];
+  progress?: PracticeProgress | null;
   onSelectPractice: (id: string) => void;
-  onRefresh?: () => void;
-  isLoading?: boolean;
   className?: string;
 }
 
 const PracticeList: React.FC<PracticeListProps> = ({
   practices,
-  completedPractices = [],
+  completedPracticeIds = [],
+  progress,
   onSelectPractice,
-  onRefresh,
-  isLoading = false,
   className
 }) => {
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState<string>('all');
   
-  // Filter practices based on tab
-  const filteredPractices = practices.filter(practice => {
-    if (activeTab === 'all') return true;
-    return practice.type === activeTab;
-  });
+  // Group practices by type
+  const meditationPractices = practices.filter(p => p.type === 'meditation');
+  const taskPractices = practices.filter(p => p.type === 'quantum-task');
+  const integrationPractices = practices.filter(p => p.type === 'integration');
   
-  // Check if a practice is completed
-  const isPracticeCompleted = (id: string) => {
-    return completedPractices.some(completion => completion.practiceId === id);
+  // Get practices based on active tab
+  const getFilteredPractices = () => {
+    switch (activeTab) {
+      case 'meditation':
+        return meditationPractices;
+      case 'quantum-task':
+        return taskPractices;
+      case 'integration':
+        return integrationPractices;
+      default:
+        return practices;
+    }
   };
   
-  // Count practices by type
-  const typeCounts = {
-    meditation: practices.filter(p => p.type === 'meditation').length,
-    'quantum-task': practices.filter(p => p.type === 'quantum-task').length,
-    integration: practices.filter(p => p.type === 'integration').length
+  // Container animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+  
+  // Item animation variants
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
   };
   
   return (
-    <div className={className}>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-display font-bold text-white/90">Practices</h2>
-        
-        {onRefresh && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="text-white/70 hover:text-white hover:bg-white/10"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        )}
-      </div>
+    <div className={cn("space-y-6", className)}>
+      {/* Progress summary */}
+      {progress && (
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-gray-900/40 rounded-lg p-4 text-center">
+            <div className="text-2xl font-semibold text-white">{progress.totalCompleted}</div>
+            <div className="text-xs text-white/60">Practices Completed</div>
+          </div>
+          
+          <div className="bg-gray-900/40 rounded-lg p-4 text-center">
+            <div className="text-2xl font-semibold text-white">{progress.streakCount}</div>
+            <div className="text-xs text-white/60">Day Streak</div>
+          </div>
+          
+          <div className="bg-gray-900/40 rounded-lg p-4 text-center">
+            <div className="text-2xl font-semibold capitalize text-white">
+              {progress.favoriteType !== 'none' ? 
+                (progress.favoriteType === 'quantum-task' ? 'Tasks' : progress.favoriteType)
+                : 'None'}
+            </div>
+            <div className="text-xs text-white/60">Favorite Type</div>
+          </div>
+        </div>
+      )}
       
-      <Tabs defaultValue="all" onValueChange={setActiveTab}>
-        <TabsList className="mb-6 bg-gray-800/40 border border-gray-700/30">
-          <TabsTrigger value="all" className="data-[state=active]:bg-gray-700/50">
+      {/* Practice tabs */}
+      <Tabs 
+        defaultValue="all" 
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="w-full"
+      >
+        <TabsList className="w-full mb-6">
+          <TabsTrigger value="all" className="flex-1">
             <Activity className="h-4 w-4 mr-2" />
-            All ({practices.length})
+            All
           </TabsTrigger>
-          <TabsTrigger value="meditation" className="data-[state=active]:bg-gray-700/50">
+          <TabsTrigger value="meditation" className="flex-1">
             <Star className="h-4 w-4 mr-2" />
-            Meditation ({typeCounts.meditation})
+            Meditation
           </TabsTrigger>
-          <TabsTrigger value="quantum-task" className="data-[state=active]:bg-gray-700/50">
+          <TabsTrigger value="quantum-task" className="flex-1">
             <Zap className="h-4 w-4 mr-2" />
-            Tasks ({typeCounts['quantum-task']})
+            Tasks
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value={activeTab} className="mt-0">
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div 
-                  key={i} 
-                  className="rounded-xl bg-gray-800/20 border border-gray-700/30 h-40 animate-pulse"
-                />
-              ))}
-            </div>
-          ) : filteredPractices.length > 0 ? (
-            <motion.div 
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ staggerChildren: 0.1 }}
-            >
-              {filteredPractices.map((practice) => (
+        <TabsContent value={activeTab}>
+          <motion.div 
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {getFilteredPractices().map(practice => (
+              <motion.div key={practice.id} variants={itemVariants}>
                 <PracticeCard
-                  key={practice.id}
                   practice={practice}
                   onClick={() => onSelectPractice(practice.id)}
-                  isCompleted={isPracticeCompleted(practice.id)}
+                  isCompleted={completedPracticeIds.includes(practice.id)}
                 />
-              ))}
-            </motion.div>
-          ) : (
-            <div className="text-center py-10">
-              <h3 className="text-white/70 mb-2">No practices available</h3>
-              <p className="text-white/50 text-sm">
-                {activeTab === 'all'
-                  ? 'No practices are currently available for your level.'
-                  : `No ${activeTab} practices are available yet.`}
-              </p>
-            </div>
-          )}
+              </motion.div>
+            ))}
+            
+            {getFilteredPractices().length === 0 && (
+              <motion.div 
+                className="col-span-2 p-8 text-center text-white/60"
+                variants={itemVariants}
+              >
+                No practices available in this category yet.
+              </motion.div>
+            )}
+          </motion.div>
         </TabsContent>
       </Tabs>
     </div>

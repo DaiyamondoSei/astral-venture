@@ -1,181 +1,207 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Timer, Zap, Brain, Star } from 'lucide-react';
+import { Check, Clock, RotateCcw, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { Practice } from '@/services/practice/practiceService';
 
 interface QuantumTaskProps {
-  id: string;
-  title: string;
-  description: string;
-  duration: number;
-  energyPoints: number;
-  instructions?: string[];
-  onComplete: (reflection?: string) => Promise<void>;
+  practice: Practice;
+  onComplete: (duration: number, reflection?: string) => void;
   className?: string;
 }
 
-const QuantumTask: React.FC<QuantumTaskProps> = ({
-  id,
-  title,
-  description,
-  duration,
-  energyPoints,
-  instructions = [],
+const QuantumTask: React.FC<QuantumTaskProps> = ({ 
+  practice, 
   onComplete,
-  className
+  className 
 }) => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [reflection, setReflection] = useState('');
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [currentStep, setCurrentStep] = useState<number>(0);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [reflection, setReflection] = useState<string>('');
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
   
-  const handleNext = () => {
-    if (currentStep < instructions.length) {
-      setCurrentStep(currentStep + 1);
+  // Start task and record start time
+  const startTask = () => {
+    setStartTime(Date.now());
+  };
+  
+  // Move to next step
+  const nextStep = () => {
+    if (currentStep < (practice.instructions?.length || 0) - 1) {
+      setCurrentStep(prev => prev + 1);
     }
   };
   
-  const handlePrevious = () => {
+  // Move to previous step
+  const prevStep = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      setCurrentStep(prev => prev - 1);
     }
   };
   
-  const handleTaskComplete = async () => {
-    setIsCompleting(true);
-    try {
-      await onComplete(reflection);
-      setIsCompleted(true);
-    } catch (error) {
-      console.error('Error completing task:', error);
-    } finally {
-      setIsCompleting(false);
+  // Complete the task
+  const completeTask = () => {
+    if (!startTime) return;
+    
+    // Calculate duration in minutes
+    const durationMs = Date.now() - startTime;
+    const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+    
+    setIsCompleted(true);
+    onComplete(durationMinutes, reflection);
+  };
+  
+  // Reset the task
+  const resetTask = () => {
+    setCurrentStep(0);
+    setStartTime(null);
+    setReflection('');
+    setIsCompleted(false);
+  };
+  
+  // Render steps or completion state
+  const renderContent = () => {
+    if (isCompleted) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center"
+        >
+          <div className="flex justify-center mb-4">
+            <div className="h-16 w-16 rounded-full bg-green-500/20 flex items-center justify-center">
+              <Check className="h-8 w-8 text-green-400" />
+            </div>
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Quantum Task Completed</h3>
+          <p className="text-white/70 mb-6">
+            You've earned {practice.energyPoints} energy points!
+          </p>
+          <Button 
+            variant="outline"
+            onClick={resetTask}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Start Again
+          </Button>
+        </motion.div>
+      );
     }
+    
+    // If no start time, show intro
+    if (!startTime) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center"
+        >
+          <h3 className="text-xl font-semibold mb-2">{practice.title}</h3>
+          <p className="text-white/70 mb-6">{practice.description}</p>
+          
+          <div className="flex justify-center space-x-4 mb-6">
+            <div className="flex items-center text-white/60 text-sm">
+              <Clock className="h-4 w-4 mr-1" />
+              {practice.duration} min
+            </div>
+            <div className="flex items-center text-purple-300 text-sm">
+              <Zap className="h-4 w-4 mr-1" />
+              {practice.energyPoints} points
+            </div>
+          </div>
+          
+          <Button 
+            onClick={startTask}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            Begin Task
+          </Button>
+        </motion.div>
+      );
+    }
+    
+    // Show instructions steps
+    return (
+      <motion.div
+        key={currentStep}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+      >
+        <div className="mb-6">
+          <h3 className="text-xl font-semibold mb-2">
+            Step {currentStep + 1} of {practice.instructions?.length}
+          </h3>
+          <p className="text-white/90">
+            {practice.instructions?.[currentStep]}
+          </p>
+        </div>
+        
+        {/* Navigation between steps */}
+        <div className="flex justify-between mb-8">
+          <Button 
+            variant="ghost" 
+            onClick={prevStep}
+            disabled={currentStep === 0}
+          >
+            Previous
+          </Button>
+          
+          {currentStep < (practice.instructions?.length || 0) - 1 ? (
+            <Button onClick={nextStep}>
+              Next
+            </Button>
+          ) : (
+            <Button 
+              variant="outline"
+              onClick={() => setCurrentStep((practice.instructions?.length || 0))}
+            >
+              Continue
+            </Button>
+          )}
+        </div>
+        
+        {/* Final step - reflection and completion */}
+        {currentStep >= (practice.instructions?.length || 0) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-4"
+          >
+            <h3 className="text-lg font-medium">Reflection (Optional)</h3>
+            <p className="text-white/70 text-sm">
+              Share your experience, insights, or observations from this practice:
+            </p>
+            
+            <Textarea
+              value={reflection}
+              onChange={(e) => setReflection(e.target.value)}
+              placeholder="What did you notice during this practice? Any insights or awareness?"
+              className="h-32"
+            />
+            
+            <Button
+              onClick={completeTask}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              Complete Task
+            </Button>
+          </motion.div>
+        )}
+      </motion.div>
+    );
   };
   
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn("p-6 rounded-xl bg-black/30 border border-gray-700/30", className)}
-    >
-      {/* Task Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-display font-bold mb-2 text-white/90">{title}</h2>
-        <p className="text-white/70">{description}</p>
-        
-        <div className="flex flex-wrap gap-3 mt-3">
-          <div className="flex items-center bg-gray-800/40 px-3 py-1 rounded-full text-white/70 text-sm">
-            <Timer className="h-4 w-4 mr-1" />
-            {duration} minutes
-          </div>
-          <div className="flex items-center bg-purple-900/40 px-3 py-1 rounded-full text-purple-300 text-sm">
-            <Zap className="h-4 w-4 mr-1" />
-            {energyPoints} energy points
-          </div>
-        </div>
-      </div>
-      
-      {!isCompleted ? (
-        <>
-          {/* Instructions */}
-          {instructions.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-medium mb-2 text-white/80 flex items-center">
-                <Brain className="h-4 w-4 mr-2" />
-                Instructions ({currentStep + 1}/{instructions.length})
-              </h3>
-              
-              <motion.div 
-                key={currentStep}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="bg-gray-800/40 p-4 rounded-lg mb-3"
-              >
-                <p className="text-white/80">{instructions[currentStep]}</p>
-              </motion.div>
-              
-              <div className="flex justify-between">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handlePrevious}
-                  disabled={currentStep === 0}
-                  className="bg-transparent border-gray-700"
-                >
-                  Previous
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleNext}
-                  disabled={currentStep === instructions.length - 1}
-                  className="bg-transparent border-gray-700"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Reflection Input */}
-          <div className="mb-6">
-            <h3 className="font-medium mb-2 text-white/80 flex items-center">
-              <Star className="h-4 w-4 mr-2" />
-              Your Reflection
-            </h3>
-            <textarea
-              className="w-full p-3 bg-gray-800/40 border border-gray-700/50 rounded-lg text-white/80 resize-none focus:ring-2 focus:ring-purple-500/50 focus:outline-none"
-              placeholder="Share your insights from this practice..."
-              rows={4}
-              value={reflection}
-              onChange={(e) => setReflection(e.target.value)}
-            />
-            <p className="text-xs text-white/50 mt-2">Reflecting on your practice deepens the experience and increases energy points.</p>
-          </div>
-          
-          {/* Complete Button */}
-          <Button
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
-            onClick={handleTaskComplete}
-            disabled={isCompleting}
-          >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            {isCompleting ? "Completing..." : "Complete Task"}
-          </Button>
-        </>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center py-8"
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-            className="mx-auto mb-4 w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center"
-          >
-            <CheckCircle className="h-8 w-8 text-white" />
-          </motion.div>
-          <h3 className="text-xl font-semibold text-white mb-2">Task Completed!</h3>
-          <p className="text-white/70 mb-6">
-            You've earned {energyPoints} energy points for your quantum consciousness journey.
-          </p>
-          <Button
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
-            onClick={() => window.location.reload()}
-          >
-            Return to Practice List
-          </Button>
-        </motion.div>
-      )}
-    </motion.div>
+    <div className={cn(
+      "p-6 bg-gray-900/60 backdrop-blur-lg rounded-xl border border-gray-800/50",
+      className
+    )}>
+      {renderContent()}
+    </div>
   );
 };
 

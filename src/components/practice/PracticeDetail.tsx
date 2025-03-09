@@ -1,17 +1,28 @@
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Clock, Zap, Award, Target } from 'lucide-react';
+import { ArrowLeft, Clock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Practice } from '@/services/practice/practiceService';
 import MeditationTimer from './MeditationTimer';
 import QuantumTask from './QuantumTask';
-import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+
+// Chakra color mapping
+const chakraColors: Record<string, string> = {
+  root: '#FF5757',
+  sacral: '#FF9E43',
+  solar: '#FFDE59',
+  heart: '#7ED957',
+  throat: '#5CC9F5',
+  'third-eye': '#A85CFF',
+  crown: '#C588FF'
+};
 
 interface PracticeDetailProps {
   practice: Practice;
   onBack: () => void;
-  onComplete: (duration: number, reflection?: string) => Promise<boolean>;
+  onComplete: (duration: number, reflection?: string) => void;
   className?: string;
 }
 
@@ -21,111 +32,135 @@ const PracticeDetail: React.FC<PracticeDetailProps> = ({
   onComplete,
   className
 }) => {
-  const [reflection, setReflection] = useState('');
-  const [isCompleting, setIsCompleting] = useState(false);
+  const [showPractice, setShowPractice] = useState(false);
   
-  const handleMeditationComplete = async (duration: number) => {
-    setIsCompleting(true);
-    try {
-      await onComplete(duration, reflection);
-    } catch (error) {
-      console.error('Error completing meditation:', error);
-    } finally {
-      setIsCompleting(false);
-    }
+  // Get chakra colors from practice if available
+  const practiceChakraColors = practice.chakraAssociation?.map(
+    chakra => chakraColors[chakra]
+  ) || [];
+  
+  // Start the practice
+  const startPractice = () => {
+    setShowPractice(true);
   };
   
-  const handleTaskComplete = async (taskReflection?: string) => {
-    setIsCompleting(true);
-    try {
-      await onComplete(practice.duration, taskReflection);
-    } catch (error) {
-      console.error('Error completing task:', error);
-    } finally {
-      setIsCompleting(false);
+  // Render appropriate practice component based on type
+  const renderPracticeComponent = () => {
+    switch (practice.type) {
+      case 'meditation':
+        return (
+          <MeditationTimer
+            initialDuration={practice.duration}
+            onComplete={onComplete}
+            chakraColors={practiceChakraColors}
+          />
+        );
+      case 'quantum-task':
+      case 'integration':
+        return (
+          <QuantumTask
+            practice={practice}
+            onComplete={onComplete}
+          />
+        );
+      default:
+        return <div>Unknown practice type</div>;
     }
   };
   
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn("p-6 rounded-xl bg-black/30 border border-gray-700/30", className)}
-    >
-      {/* Header with back button */}
-      <div className="flex items-center mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
+    <div className={cn(
+      "space-y-6",
+      className
+    )}>
+      <div className="flex items-center">
+        <Button 
+          variant="ghost" 
+          size="sm" 
           onClick={onBack}
-          className="mr-3 text-white/70 hover:text-white hover:bg-white/10"
+          className="mr-2"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-4 w-4 mr-1" />
           Back
         </Button>
-        <h2 className="text-2xl font-display font-bold text-white/90">{practice.title}</h2>
+        
+        <h2 className="text-xl font-semibold flex-grow">{practice.title}</h2>
       </div>
       
-      {/* Practice details */}
-      <div className="mb-6">
-        <p className="text-white/70 mb-4">{practice.description}</p>
-        
-        <div className="flex flex-wrap gap-3 mb-4">
-          <div className="flex items-center bg-gray-800/40 px-3 py-1 rounded-full text-white/70 text-sm">
-            <Clock className="h-4 w-4 mr-1" />
-            {practice.duration} minutes
+      {!showPractice ? (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gray-900/60 backdrop-blur-lg rounded-xl border border-gray-800/50 p-6"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">{practice.title}</h3>
+              <p className="text-white/70 text-sm">{practice.type === 'quantum-task' ? 'Quantum Task' : practice.type === 'integration' ? 'Integration Practice' : 'Meditation'}</p>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center text-white/60 text-sm">
+                <Clock className="h-4 w-4 mr-1" />
+                {practice.duration} min
+              </div>
+              <div className="flex items-center text-purple-300 text-sm">
+                <Zap className="h-4 w-4 mr-1" />
+                {practice.energyPoints} points
+              </div>
+            </div>
           </div>
-          <div className="flex items-center bg-purple-900/40 px-3 py-1 rounded-full text-purple-300 text-sm">
-            <Zap className="h-4 w-4 mr-1" />
-            {practice.energyPoints} energy points
-          </div>
-          <div className="flex items-center bg-blue-900/40 px-3 py-1 rounded-full text-blue-300 text-sm">
-            <Award className="h-4 w-4 mr-1" />
-            Level {practice.level}
-          </div>
+          
+          <p className="text-white/80 mb-6">{practice.description}</p>
+          
+          {/* Chakra associations */}
           {practice.chakraAssociation && practice.chakraAssociation.length > 0 && (
-            <div className="flex items-center bg-indigo-900/40 px-3 py-1 rounded-full text-indigo-300 text-sm">
-              <Target className="h-4 w-4 mr-1" />
-              {practice.chakraAssociation.join(', ')} Chakra
+            <div className="mb-6">
+              <h4 className="text-sm font-medium mb-2">Chakra Association:</h4>
+              <div className="flex flex-wrap gap-2">
+                {practice.chakraAssociation.map(chakra => (
+                  <div 
+                    key={chakra}
+                    className="px-3 py-1 rounded-full text-xs font-medium"
+                    style={{ 
+                      backgroundColor: `${chakraColors[chakra]}30`,
+                      color: chakraColors[chakra]
+                    }}
+                  >
+                    {chakra.charAt(0).toUpperCase() + chakra.slice(1)}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-        </div>
-      </div>
-      
-      {/* Practice content */}
-      {practice.type === 'meditation' ? (
-        <div className="flex flex-col items-center justify-center space-y-6">
-          <MeditationTimer
-            initialDuration={practice.duration}
-            onComplete={handleMeditationComplete}
-          />
           
-          {/* Reflection textarea */}
-          <div className="w-full">
-            <h3 className="font-medium mb-2 text-white/80">Post-Meditation Reflection</h3>
-            <textarea
-              className="w-full p-3 bg-gray-800/40 border border-gray-700/50 rounded-lg text-white/80 resize-none focus:ring-2 focus:ring-purple-500/50 focus:outline-none"
-              placeholder="Share your insights from this meditation..."
-              rows={4}
-              value={reflection}
-              onChange={(e) => setReflection(e.target.value)}
-              disabled={isCompleting}
-            />
-            <p className="text-xs text-white/50 mt-2">Reflecting on your experience deepens the practice and increases energy points.</p>
-          </div>
-        </div>
+          {/* Instructions overview */}
+          {practice.instructions && practice.instructions.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-medium mb-2">Instructions:</h4>
+              <ul className="list-disc list-inside text-white/70 space-y-1">
+                {practice.instructions.map((instruction, index) => (
+                  <li key={index} className="text-sm">
+                    {instruction}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          <Button 
+            onClick={startPractice}
+            className="w-full bg-purple-600 hover:bg-purple-700"
+          >
+            Begin Practice
+          </Button>
+        </motion.div>
       ) : (
-        <QuantumTask
-          id={practice.id}
-          title={practice.title}
-          description={practice.description}
-          duration={practice.duration}
-          energyPoints={practice.energyPoints}
-          instructions={practice.instructions}
-          onComplete={handleTaskComplete}
-        />
+        <div>
+          {renderPracticeComponent()}
+        </div>
       )}
-    </motion.div>
+    </div>
   );
 };
 

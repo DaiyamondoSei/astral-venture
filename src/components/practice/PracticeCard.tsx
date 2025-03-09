@@ -19,7 +19,7 @@ const chakraColors: Record<string, string> = {
   solar: '#FFDE59',
   heart: '#7ED957',
   throat: '#5CC9F5',
-  third-eye: '#A85CFF',
+  'third-eye': '#A85CFF',
   crown: '#C588FF'
 };
 
