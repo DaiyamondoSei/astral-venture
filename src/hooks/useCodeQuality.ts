@@ -1,51 +1,86 @@
 
-import { useEffect, useState } from 'react';
-import { useErrorPrevention } from '@/contexts/ErrorPreventionContext';
+import { useState, useEffect } from 'react';
+import { ComponentExtractor } from '@/utils/codeAnalysis/ComponentExtractor';
 import { RenderAnalyzer } from '@/utils/performance/RenderAnalyzer';
 
-/**
- * Hook for code quality analysis and suggestions
- */
-export function useCodeQuality(componentName: string) {
+export interface CodeQualityIssue {
+  id: string;
+  component: string;
+  type: 'performance' | 'complexity' | 'pattern' | 'security';
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  suggestions: string[];
+  location?: {
+    file?: string;
+    line?: number;
+  };
+}
+
+export interface CodeQualityStats {
+  totalIssues: number;
+  criticalIssues: number;
+  fixableIssues: number;
+  componentsWithIssues: number;
+}
+
+export interface CodeQualityResult {
+  complexity: number;
+  suggestions: string[];
+  isComplexComponent: boolean;
+  issues?: CodeQualityIssue[];
+  stats?: CodeQualityStats;
+}
+
+export function useCodeQuality(componentName?: string): CodeQualityResult {
+  const [issues, setIssues] = useState<CodeQualityIssue[]>([]);
+  const [complexity, setComplexity] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [complexity, setComplexity] = useState<number>(0);
-  const errorPrevention = useErrorPrevention();
-  
-  // Get the analyzer instance
-  const analyzer = RenderAnalyzer.getInstance();
-  
+
   useEffect(() => {
-    // Simulate complexity analysis with static score
-    setComplexity(Math.floor(Math.random() * 5) + 1);
-    
-    // Simulate analysis with example suggestions
-    const exampleSuggestions = [
-      'Consider using React.memo to prevent unnecessary re-renders',
-      'Review dependency arrays in useEffect hooks',
-      'Check for conditional hooks which may cause render errors',
-      'Review prop drilling depth, consider using context',
-      'Consider extracting complex logic into custom hooks'
-    ];
-    
-    // Randomly select 1-3 suggestions
-    const count = Math.floor(Math.random() * 3) + 1;
-    const selectedSuggestions = [];
-    
-    for (let i = 0; i < count; i++) {
-      const index = Math.floor(Math.random() * exampleSuggestions.length);
-      selectedSuggestions.push(exampleSuggestions[index]);
-      exampleSuggestions.splice(index, 1);
-      
-      if (exampleSuggestions.length === 0) break;
+    if (!componentName) return;
+
+    // Analyze component complexity
+    try {
+      // For demonstration, calculate complexity based on name length
+      // In a real implementation, you would do proper static analysis
+      const calculatedComplexity = componentName.length / 5;
+      setComplexity(calculatedComplexity);
+
+      // Generate suggestions based on complexity
+      const componentSuggestions = [];
+      if (calculatedComplexity > 4) {
+        componentSuggestions.push('Consider breaking this component into smaller parts');
+      }
+      if (componentName.includes('Container') || componentName.includes('Manager')) {
+        componentSuggestions.push('Use React context or hooks for state management');
+      }
+      if (componentName.includes('List') || componentName.includes('Table')) {
+        componentSuggestions.push('Implement virtualization for large data sets');
+      }
+
+      setSuggestions(componentSuggestions);
+
+      // Get performance analysis from RenderAnalyzer
+      const renderAnalysis = RenderAnalyzer.getInstance().analyzeComponent({
+        componentName,
+        renderTime: 0,
+        renderCount: 0
+      });
+
+      // Combine suggestions
+      setSuggestions([...componentSuggestions, ...renderAnalysis.possibleOptimizations]);
+    } catch (error) {
+      console.error('Error analyzing component:', error);
     }
-    
-    setSuggestions(selectedSuggestions);
   }, [componentName]);
-  
+
+  // Calculate if this is a complex component
+  const isComplexComponent = complexity > 3;
+
   return {
     complexity,
     suggestions,
-    isComplexComponent: complexity > 3
+    isComplexComponent
   };
 }
 

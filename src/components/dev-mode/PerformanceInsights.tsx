@@ -174,9 +174,9 @@ const PerformanceInsights: React.FC = () => {
     );
   }
 
-  // Get queued metrics count
+  // Get queued metrics count (with type safety)
   const queuedMetrics = (performanceMonitor.getMetrics() as any).queuedMetrics || [];
-  const queuedMetricsCount = typeof queuedMetrics.length === 'number' ? queuedMetrics.length : 0;
+  const queuedMetricsCount = Array.isArray(queuedMetrics) ? queuedMetrics.length : 0;
 
   return (
     <Card className="fixed bottom-4 left-4 w-80 h-80 z-50 shadow-xl overflow-hidden opacity-90 hover:opacity-100">

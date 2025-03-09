@@ -1,79 +1,111 @@
-import { RenderAnalyzer } from '@/utils/performance/RenderAnalyzer';
 
-// Add missing types
+import { ComponentExtractor } from "@/utils/codeAnalysis/ComponentExtractor";
+import { RenderAnalyzer } from "@/utils/performance/RenderAnalyzer";
+import { performanceMonitor } from "@/utils/performance/performanceMonitor";
+
 export interface AssistantSuggestion {
   id: string;
   componentName: string;
-  suggestion: string;
-  priority: 'low' | 'medium' | 'high';
-  impact: string;
-  autoFix?: boolean;
-  code?: string;
+  type: 'performance' | 'quality' | 'optimization' | 'accessibility' | 'security';
+  title: string;
+  description: string;
+  context?: string;
+  codeExample?: string;
+  autoFixAvailable: boolean;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status?: 'pending' | 'applied' | 'dismissed';
 }
 
 export interface AssistantIntent {
   id: string;
-  description: string;
-  relatedComponents: string[];
-  status: 'pending' | 'implemented' | 'abandoned';
-  createdAt: Date;
+  type: string;
+  action: string;
+  target: string;
+  status: 'pending' | 'completed' | 'failed';
+  suggestion?: AssistantSuggestion;
 }
 
 export class AICodeAssistant {
+  private static instance: AICodeAssistant;
   private suggestions: AssistantSuggestion[] = [];
   private intents: AssistantIntent[] = [];
-  private context: Record<string, any> = {};
+  private componentExtractor: ComponentExtractor;
 
-  // Implementation of missing methods
-  public getSuggestionsForComponent(componentName: string): AssistantSuggestion[] {
-    return this.suggestions.filter(s => s.componentName === componentName);
+  private constructor() {
+    this.componentExtractor = new ComponentExtractor();
+  }
+
+  public static getInstance(): AICodeAssistant {
+    if (!AICodeAssistant.instance) {
+      AICodeAssistant.instance = new AICodeAssistant();
+    }
+    return AICodeAssistant.instance;
   }
 
   public getSuggestions(): AssistantSuggestion[] {
     return this.suggestions;
   }
 
+  public getSuggestionsForComponent(componentName: string): AssistantSuggestion[] {
+    return this.suggestions.filter(s => s.componentName === componentName);
+  }
+
   public getIntents(): AssistantIntent[] {
     return this.intents;
   }
 
-  public registerIntent(description: string, relatedComponents: string[] = []): string {
-    const id = `intent_${Date.now()}`;
-    this.intents.push({
+  public registerIntent(intent: Omit<AssistantIntent, 'id'>): string {
+    const id = `intent-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    const newIntent: AssistantIntent = {
+      ...intent,
       id,
-      description,
-      relatedComponents,
-      status: 'pending',
-      createdAt: new Date()
-    });
+      status: 'pending'
+    };
+    this.intents.push(newIntent);
     return id;
   }
 
-  public applyAutoFix(suggestionId: string): boolean {
-    const suggestion = this.suggestions.find(s => s.id === suggestionId);
-    if (suggestion && suggestion.autoFix && suggestion.code) {
-      console.log(`Applying auto-fix for suggestion: ${suggestionId}`);
-      // Actual implementation would apply the code changes
-      return true;
+  public updateIntentStatus(intentId: string, status: 'pending' | 'completed' | 'failed'): void {
+    const intentIndex = this.intents.findIndex(i => i.id === intentId);
+    if (intentIndex >= 0) {
+      this.intents[intentIndex].status = status;
     }
-    return false;
   }
 
-  public updateIntentStatus(intentId: string, status: 'implemented' | 'abandoned'): boolean {
-    const intent = this.intents.find(i => i.id === intentId);
-    if (intent) {
-      intent.status = status;
-      return true;
-    }
-    return false;
+  public applyAutoFix(suggestionId: string): Promise<boolean> {
+    // Implement auto-fix logic here
+    return Promise.resolve(true);
   }
 
-  public updateContext(contextUpdate: Record<string, any>): void {
-    this.context = { ...this.context, ...contextUpdate };
+  public updateContext(context: any): void {
+    // Update system context
+    console.log("Context updated:", context);
   }
 
-  // Other implementation details...
+  public analyzeSuggestions(): AssistantSuggestion[] {
+    // Generate suggestions based on component analysis
+    const performanceMetrics = performanceMonitor.getComponentMetrics();
+    
+    // Create performance optimization suggestions
+    Object.entries(performanceMetrics).forEach(([componentName, metrics]) => {
+      if (!metrics || typeof metrics.averageRenderTime !== 'number') return;
+      
+      if (metrics.averageRenderTime > 16) {
+        this.suggestions.push({
+          id: `perf-${componentName}-${Date.now()}`,
+          componentName,
+          type: 'performance',
+          title: `Slow render detected in ${componentName}`,
+          description: `Component ${componentName} is rendering slowly (${metrics.averageRenderTime.toFixed(2)}ms). Consider memoizing or optimizing this component.`,
+          priority: metrics.averageRenderTime > 50 ? 'critical' : 'high',
+          autoFixAvailable: false
+        });
+      }
+    });
+    
+    return this.suggestions;
+  }
 }
 
-// Create and export singleton instance
-export const aiCodeAssistant = new AICodeAssistant();
+// Export singleton instance
+export const aiCodeAssistant = AICodeAssistant.getInstance();

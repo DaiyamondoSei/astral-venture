@@ -4,7 +4,7 @@
  * Provides AI-powered assistance and insights
  */
 
-import { AIResponse, AIQuestion } from './types';
+import { AIResponse, AIQuestion, AIQuestionOptions } from './types';
 import { createFallbackResponse } from './fallback';
 
 const EDGE_FUNCTION_URL = '/api/ask-assistant';
@@ -64,7 +64,8 @@ async function fetchAssistantResponse(question: AIQuestion): Promise<AIResponse>
  */
 export async function processQuestion(
   question: string, 
-  context?: string
+  context?: string,
+  options?: AIQuestionOptions
 ): Promise<AIResponse> {
   try {
     const aiQuestion: AIQuestion = {
@@ -91,20 +92,14 @@ export async function processQuestion(
  */
 export const askAIAssistant = async (
   question: AIQuestion | string,
-  userId?: string
+  options?: AIQuestionOptions
 ): Promise<AIResponse> => {
   try {
-    // Log user context for debugging
-    if (userId) {
-      console.log(`Processing question for user ${userId}`);
-    }
-    
     // Handle case where question is a string
     if (typeof question === 'string') {
       return await fetchAssistantResponse({
         text: question,
-        question,
-        userId
+        question
       });
     }
     

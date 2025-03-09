@@ -70,5 +70,5 @@ export interface TourStep {
   elementId: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
   target?: string;
-  targetSelector?: string; // Make targetSelector optional to match the hook types
+  targetSelector?: string; // Make consistent with achievement hook types
 }

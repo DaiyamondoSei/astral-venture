@@ -106,14 +106,26 @@ export class RenderAnalyzer {
     return Object.values(metrics)
       .filter(metric => {
         if (!metric) return false;
+        
+        // Safe access to properties with type checking
+        const renderCount = typeof metric === 'object' && metric.renderCount ? metric.renderCount : 0;
+        const averageRenderTime = typeof metric === 'object' && metric.averageRenderTime ? metric.averageRenderTime : 0;
+        
         // Components with excessive renders or slow render times
-        return (metric.renderCount > 50 || (metric.averageRenderTime || 0) > 16);
+        return (renderCount > 50 || averageRenderTime > 16);
       })
-      .map(metric => ({
-        componentName: metric.componentName || 'unknown',
-        renderTime: metric.averageRenderTime || 0,
-        renderCount: metric.renderCount || 0
-      }))
+      .map(metric => {
+        // Safe mapping with defaults for missing values
+        const componentName = typeof metric === 'object' && metric.componentName ? metric.componentName : 'unknown';
+        const averageRenderTime = typeof metric === 'object' && metric.averageRenderTime ? metric.averageRenderTime : 0;
+        const renderCount = typeof metric === 'object' && metric.renderCount ? metric.renderCount : 0;
+        
+        return {
+          componentName,
+          renderTime: averageRenderTime,
+          renderCount
+        };
+      })
       .sort((a, b) => b.renderTime - a.renderTime);
   }
 }

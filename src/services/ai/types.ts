@@ -56,3 +56,10 @@ export interface AIServiceConfig {
   personalizedResponses: boolean;
   maxHistoryItems: number;
 }
+
+// Define the interface for the options parameter in the askQuestion method
+export interface AIQuestionOptions {
+  model?: AIModel;
+  temperature?: number;
+  maxTokens?: number;
+}

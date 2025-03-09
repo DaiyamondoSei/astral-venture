@@ -1,6 +1,6 @@
 
 import { useRef, useEffect, useCallback } from 'react';
-import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
+import { RenderAnalyzer } from '@/utils/performance/RenderAnalyzer';
 import { usePerfConfig } from './usePerfConfig';
 
 interface RenderTrackingOptions {
@@ -60,7 +60,14 @@ export function useRenderTracking(
       return;
     }
     
-    renderCostAnalyzer.recordRender(componentName, duration);
+    // Use RenderAnalyzer instead of renderCostAnalyzer
+    const analyzer = RenderAnalyzer.getInstance();
+    analyzer.analyzeComponent({
+      componentName,
+      renderTime: duration,
+      renderCount: renderCountRef.current
+    });
+    
     lastRecordTimeRef.current = now;
     
     // Only log slow renders (over 16ms) for complex components to reduce noise
@@ -75,9 +82,13 @@ export function useRenderTracking(
     
     // Only check for optimizations occasionally and for problematic components
     if (renderCountRef.current % 10 === 0 && (complexity > 1 || duration > 16)) {
-      const analysis = renderCostAnalyzer.getComponentAnalysis(componentName);
+      const analysis = analyzer.analyzeComponent({
+        componentName,
+        renderTime: duration,
+        renderCount: renderCountRef.current
+      });
       
-      if (analysis && analysis.suggestions.some(s => s.priority === 'critical')) {
+      if (analysis && analysis.possibleOptimizations.some(s => s.includes('critical'))) {
         console.warn(`[${componentName}] Critical optimization suggestions:`);
       }
     }

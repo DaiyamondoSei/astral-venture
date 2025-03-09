@@ -1,82 +1,89 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useErrorPrevention } from '@/contexts/ErrorPreventionContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const ValidationDashboard = () => {
-  const {
-    isEnabled,
-    enableErrorPrevention,
-    errorComponents,
-    warnComponents
+const ValidationDashboard: React.FC = () => {
+  const { 
+    isEnabled, 
+    enableErrorPrevention, 
+    errorComponents, 
+    warnComponents,
+    validateAllComponents 
   } = useErrorPrevention();
-
-  // Fix the event handler types 
-  const handleEnableToggle = (event: React.MouseEvent<HTMLButtonElement>) => {
-    enableErrorPrevention(true);
-  };
-
-  const handleDisableToggle = (event: React.MouseEvent<HTMLButtonElement>) => {
-    enableErrorPrevention(false);
-  };
+  
+  const [activeTab, setActiveTab] = useState('errors');
+  
+  useEffect(() => {
+    if (isEnabled) {
+      validateAllComponents();
+    }
+  }, [isEnabled, validateAllComponents]);
 
   return (
-    <div className="p-4 bg-gray-800 rounded-lg">
-      <h2 className="text-lg font-semibold mb-4">Real-time Validation Dashboard</h2>
-      
-      <div className="flex items-center mb-4">
-        <span className="mr-2">Status:</span>
-        <span className={`px-2 py-1 rounded text-xs ${isEnabled ? 'bg-green-500/30' : 'bg-gray-500/30'}`}>
-          {isEnabled ? 'Active' : 'Disabled'}
-        </span>
-        
-        <div className="ml-auto space-x-2">
-          <button
-            onClick={handleEnableToggle}
-            className={`px-3 py-1 rounded text-xs ${isEnabled ? 'bg-green-600' : 'bg-green-600/50'}`}
-          >
-            Enable
-          </button>
-          <button
-            onClick={handleDisableToggle}
-            className={`px-3 py-1 rounded text-xs ${!isEnabled ? 'bg-red-600' : 'bg-red-600/50'}`}
-          >
-            Disable
-          </button>
+    <Card className="bg-background border shadow-md">
+      <CardHeader className="p-4 pb-0">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-xl">Component Validation</CardTitle>
+          <div>
+            <button
+              onClick={() => enableErrorPrevention(!isEnabled)}
+              className={`px-3 py-1 text-xs rounded ${
+                isEnabled ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-700'
+              }`}
+            >
+              {isEnabled ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
         </div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gray-900 p-3 rounded">
-          <h3 className="text-sm font-medium mb-2 text-red-400">Error Components</h3>
-          {errorComponents.length > 0 ? (
-            <ul className="text-xs space-y-1">
-              {errorComponents.map((comp, index) => (
-                <li key={index} className="py-1 px-2 bg-red-900/20 rounded">
-                  {comp}
-                </li>
-              ))}
-            </ul>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="errors" className="text-sm">
+              Errors ({errorComponents.length})
+            </TabsTrigger>
+            <TabsTrigger value="warnings" className="text-sm">
+              Warnings ({warnComponents.length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </CardHeader>
+      <CardContent className="p-4 pt-2">
+        <TabsContent value="errors" className="mt-2">
+          {errorComponents.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">
+              No errors detected
+            </p>
           ) : (
-            <p className="text-xs text-gray-400">No components with errors</p>
-          )}
-        </div>
-        
-        <div className="bg-gray-900 p-3 rounded">
-          <h3 className="text-sm font-medium mb-2 text-yellow-400">Warning Components</h3>
-          {warnComponents.length > 0 ? (
-            <ul className="text-xs space-y-1">
-              {warnComponents.map((comp, index) => (
-                <li key={index} className="py-1 px-2 bg-yellow-900/20 rounded">
-                  {comp}
-                </li>
+            <div className="space-y-2">
+              {errorComponents.map((component, index) => (
+                <div key={index} className="p-2 bg-red-50 border border-red-200 rounded-md">
+                  <h3 className="font-medium text-red-800">{component.name || 'Unknown component'}</h3>
+                  <p className="text-sm text-red-600">{component.message || 'Error in component'}</p>
+                </div>
               ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-gray-400">No components with warnings</p>
+            </div>
           )}
-        </div>
-      </div>
-    </div>
+        </TabsContent>
+
+        <TabsContent value="warnings" className="mt-2">
+          {warnComponents.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">
+              No warnings detected
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {warnComponents.map((component, index) => (
+                <div key={index} className="p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <h3 className="font-medium text-yellow-800">{component.name || 'Unknown component'}</h3>
+                  <p className="text-sm text-yellow-600">{component.message || 'Warning in component'}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </CardContent>
+    </Card>
   );
 };
 

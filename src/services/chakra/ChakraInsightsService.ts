@@ -1,95 +1,168 @@
-import { AIResponse } from '@/services/ai/types';
 
-const aiService = {
-  askQuestion: async () => ({ answer: "Response", type: "text" } as AIResponse),
-  getInsights: async () => [],
-  generateReflection: async () => ({ answer: "Reflection", type: "reflection" }),
-  getPersonalizedRecommendations: async (userId: string, category?: string) => {
-    return [
-      { id: "1", title: "Recommendation 1", content: "Test recommendation content" }
-    ];
-  }
-};
+import { AIInsight, AIModel, AIQuestion } from '@/services/ai/types';
+import { aiService } from '@/services/ai/aiService';
+
+export interface ChakraBalanceData {
+  chakra: string;
+  id: number;
+  value: number;
+  active: boolean;
+  name: string;
+  color: string;
+}
+
+export interface ChakraInsight {
+  chakra: string;
+  message: string;
+  value: number;
+  suggestions: string[];
+}
 
 export class ChakraInsightsService {
-  static async getPersonalizedInsights(
-    userId: string, 
-    activatedChakras?: ChakraActivated, 
-    dominantEmotions: string[] = []
-  ) {
+  // Helper to determine which chakras are activated
+  private determineActivatedChakras(chakraData: ChakraBalanceData[]): number[] {
+    return chakraData
+      .filter(chakra => chakra.active)
+      .map(chakra => chakra.id);
+  }
+
+  // Normalize chakra data for AI processing
+  private normalizeChakraData(chakraData: ChakraBalanceData[]): any {
+    const chakraNames = this.getChakraNames(chakraData);
+    return {
+      activated: this.determineActivatedChakras(chakraData),
+      values: chakraData.map(c => ({ id: c.id, name: c.name, value: c.value }))
+    };
+  }
+
+  // Helper to get chakra names array
+  private getChakraNames(chakraData: ChakraBalanceData[]): string[] {
+    return chakraData.map(c => c.name);
+  }
+
+  // Get personalized recommendations for chakra balancing
+  async getPersonalizedRecommendations(
+    chakraData: ChakraBalanceData[],
+    currentEmotion?: string
+  ): Promise<string[]> {
     try {
-      const normalizedChakras = normalizeChakraData(activatedChakras);
-      const chakraNames = getChakraNames(normalizedChakras);
+      const normalizedChakras = this.normalizeChakraData(chakraData);
+      const activatedChakras = this.determineActivatedChakras(chakraData);
       
-      const recommendations = await aiService.getPersonalizedRecommendations(userId);
-      const practiceRecommendations = recommendations.slice(0, 3);
+      const prompt = `Based on my current chakra readings: ${JSON.stringify(normalizedChakras)}, 
+      ${currentEmotion ? `and my current dominant emotion of ${currentEmotion},` : ''}
+      provide 3 specific, actionable recommendations to help balance my energy centers.`;
       
-      const personalizedInsights: string[] = [];
+      const response = await aiService.askQuestion({
+        question: prompt,
+        text: prompt
+      });
       
-      if (chakraNames.length > 0) {
-        const dominantChakra = chakraNames[0];
-        personalizedInsights.push(
-          `Your ${dominantChakra} chakra is currently the most active, suggesting a focus on ${this.getChakraFocus(dominantChakra)}.`
-        );
-      }
+      // Parse or extract recommendations from the response
+      const recommendations: string[] = 
+        response.suggestedPractices && response.suggestedPractices.length > 0 
+          ? response.suggestedPractices 
+          : this.extractRecommendationsFromText(response.answer);
       
-      if (dominantEmotions.length > 0) {
-        const topEmotion = dominantEmotions[0];
-        personalizedInsights.push(
-          `Your reflections show a strong ${topEmotion.toLowerCase()} energy signature.`
-        );
-      }
-      
-      if (chakraNames.length >= 2) {
-        personalizedInsights.push(
-          `The connection between your ${chakraNames[0]} and ${chakraNames[1]} chakras indicates ${this.getChakraConnectionInsight(chakraNames[0], chakraNames[1])}.`
-        );
-      }
-      
-      return {
-        personalizedInsights,
-        practiceRecommendations
-      };
+      return recommendations;
     } catch (error) {
-      console.error('Error generating chakra insights:', error);
-      return {
-        personalizedInsights: ['Continue your reflection practice to deepen your insights.'],
-        practiceRecommendations: []
-      };
+      console.error('Error getting chakra recommendations:', error);
+      return [
+        'Practice deep breathing exercises focusing on your core energy centers',
+        'Spend time in nature to rebalance your energy flow',
+        'Consider meditation with visualization of balanced chakra colors'
+      ];
     }
   }
   
-  private static getChakraFocus(chakra: string): string {
-    const focuses = {
-      'Root': 'stability and security',
-      'Sacral': 'creativity and emotions',
-      'Solar Plexus': 'personal power and confidence',
-      'Heart': 'love and compassion',
-      'Throat': 'communication and expression',
-      'Third Eye': 'intuition and wisdom',
-      'Crown': 'spiritual connection and higher consciousness'
+  // Extract recommendations from text response
+  private extractRecommendationsFromText(text: string): string[] {
+    // Simple extraction logic - look for numbered items or bullet points
+    const lines = text.split('\n');
+    const recommendations: string[] = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Match numbered items or bullet points
+      if (/^(\d+\.|\*|-)\s+/.test(trimmed)) {
+        const recommendation = trimmed.replace(/^(\d+\.|\*|-)\s+/, '');
+        if (recommendation) {
+          recommendations.push(recommendation);
+        }
+      }
+    }
+    
+    // If no recommendations were found with the pattern, just return the first 3 sentences
+    if (recommendations.length === 0) {
+      const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      return sentences.slice(0, 3).map(s => s.trim());
+    }
+    
+    return recommendations.slice(0, 3); // Limit to 3 recommendations
+  }
+
+  // Get insights for specific chakras
+  async getChakraInsights(chakraData: ChakraBalanceData[]): Promise<ChakraInsight[]> {
+    // Implementation for getting detailed chakra insights
+    return chakraData.filter(c => c.active).map(chakra => ({
+      chakra: chakra.name,
+      message: `Your ${chakra.name} chakra is ${this.getChakraState(chakra.value)}`,
+      value: chakra.value,
+      suggestions: this.getDefaultSuggestionsForChakra(chakra.name)
+    }));
+  }
+  
+  private getChakraState(value: number): string {
+    if (value < 0.3) return "underactive";
+    if (value > 0.7) return "overactive";
+    return "balanced";
+  }
+  
+  private getDefaultSuggestionsForChakra(chakraName: string): string[] {
+    // Default suggestions when AI is not available
+    const defaultSuggestions: Record<string, string[]> = {
+      "Root": [
+        "Practice grounding exercises",
+        "Walk barefoot in nature",
+        "Use red crystals like garnet or ruby"
+      ],
+      "Sacral": [
+        "Dance to express yourself",
+        "Create art or engage in creative activities",
+        "Use orange crystals like carnelian"
+      ],
+      "Solar Plexus": [
+        "Practice yoga focusing on core strength",
+        "Affirm your personal power daily",
+        "Use yellow crystals like citrine"
+      ],
+      "Heart": [
+        "Practice loving-kindness meditation",
+        "Spend time with loved ones",
+        "Use green or pink crystals like rose quartz"
+      ],
+      "Throat": [
+        "Express yourself through writing or speaking",
+        "Sing or hum to vibrate the throat area",
+        "Use blue crystals like aquamarine"
+      ],
+      "Third Eye": [
+        "Practice meditation focusing on the third eye area",
+        "Keep a dream journal",
+        "Use indigo or purple crystals like amethyst"
+      ],
+      "Crown": [
+        "Practice silent meditation",
+        "Spend time in prayer or spiritual connection",
+        "Use violet or white crystals like clear quartz"
+      ]
     };
     
-    return focuses[chakra as keyof typeof focuses] || 'energy balance';
-  }
-  
-  private static getChakraConnectionInsight(chakra1: string, chakra2: string): string {
-    if ((chakra1 === 'Heart' && chakra2 === 'Throat') || 
-        (chakra1 === 'Throat' && chakra2 === 'Heart')) {
-      return 'a deepening connection between love and authentic expression';
-    }
-    
-    if ((chakra1 === 'Third Eye' && chakra2 === 'Crown') || 
-        (chakra1 === 'Crown' && chakra2 === 'Third Eye')) {
-      return 'an awakening of higher spiritual awareness and intuition';
-    }
-    
-    if ((chakra1 === 'Root' && chakra2 === 'Solar Plexus') || 
-        (chakra1 === 'Solar Plexus' && chakra2 === 'Root')) {
-      return 'a grounding of your personal power';
-    }
-    
-    return 'a meaningful pattern in your energy system';
+    return defaultSuggestions[chakraName] || [
+      "Meditate focusing on this chakra",
+      "Research specific activities for this energy center",
+      "Consider energy healing techniques"
+    ];
   }
 }
 

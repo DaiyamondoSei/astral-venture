@@ -69,7 +69,17 @@ export const PerformanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const detectedCategory = getPerformanceCategory();
       setPerformanceCategory(detectedCategory);
     } else {
-      setPerformanceCategory(mode);
+      // Convert string mode to DeviceCapability enum
+      if (mode === 'low') {
+        setPerformanceCategory(DeviceCapability.LOW);
+      } else if (mode === 'medium') {
+        setPerformanceCategory(DeviceCapability.MEDIUM);
+      } else if (mode === 'high') {
+        setPerformanceCategory(DeviceCapability.HIGH);
+      } else {
+        // If it's already a DeviceCapability enum value
+        setPerformanceCategory(mode);
+      }
     }
   };
 
