@@ -1,5 +1,5 @@
-
 import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
+import { detectDeviceCapability } from '@/utils/adaptiveRendering';
 
 // Simplified performance configuration type
 export interface PerfConfig {
@@ -14,7 +14,7 @@ export interface PerfConfigContextType {
   updateConfig: (config: Partial<PerfConfig>) => void;
 }
 
-// Default configuration - simplified
+// Default configuration
 const defaultConfig: PerfConfig = {
   enableVirtualization: true,
   enableLazyLoading: true,
@@ -27,28 +27,42 @@ const PerfConfigContext = createContext<PerfConfigContextType>({
   updateConfig: () => {},
 });
 
-// Simple device capability detection
-const detectDeviceCapability = (): 'low' | 'medium' | 'high' => {
-  if (typeof window === 'undefined') return 'medium';
-  
-  const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
-  const cpuCores = navigator.hardwareConcurrency || 4;
-  
-  if (isMobile || (cpuCores && cpuCores <= 2)) {
-    return 'low';
-  } else if (cpuCores && cpuCores >= 8) {
-    return 'high';
-  } else {
-    return 'medium';
-  }
-};
-
 // Provider component
 export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [config, setConfig] = useState<PerfConfig>({
-    ...defaultConfig,
-    deviceCapability: detectDeviceCapability()
+  const [config, setConfig] = useState<PerfConfig>(() => {
+    // Use stored config if available
+    if (typeof window !== 'undefined') {
+      try {
+        const storedConfig = localStorage.getItem('perfConfig');
+        if (storedConfig) {
+          const parsedConfig = JSON.parse(storedConfig);
+          return {
+            ...defaultConfig,
+            ...parsedConfig
+          };
+        }
+      } catch (error) {
+        console.error('Error reading stored performance config:', error);
+      }
+    }
+    
+    // Otherwise use default with detected device capability
+    return {
+      ...defaultConfig,
+      deviceCapability: detectDeviceCapability()
+    };
   });
+
+  // Save config changes to storage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('perfConfig', JSON.stringify(config));
+      } catch (error) {
+        console.error('Error saving performance config:', error);
+      }
+    }
+  }, [config]);
 
   // Update configuration
   const updateConfig = useCallback((newConfig: Partial<PerfConfig>) => {
@@ -63,6 +77,15 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       {children}
     </PerfConfigContext.Provider>
   );
+};
+
+// Custom hook for using the config
+export const usePerfConfig = (): PerfConfigContextType => {
+  const context = useContext(PerfConfigContext);
+  if (!context) {
+    throw new Error('usePerfConfig must be used within a PerfConfigProvider');
+  }
+  return context;
 };
 
 export default PerfConfigContext;

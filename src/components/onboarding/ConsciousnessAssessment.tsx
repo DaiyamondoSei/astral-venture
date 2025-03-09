@@ -1,202 +1,205 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  CheckCircle,
-  ChevronDown
-} from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { motion } from 'framer-motion';
+import MetatronsCube from '@/components/visual-foundation/MetatronsCube';
 
-type Question = {
-  id: string;
-  text: string;
-  options: {
-    text: string;
-    value: number;
-  }[];
-};
-
-const questions: Question[] = [
+// Define the assessment questions
+const questions = [
   {
     id: 'awareness',
-    text: 'How often do you notice subtle emotional changes in yourself during daily activities?',
+    question: 'How would you rate your self-awareness?',
     options: [
-      { text: 'Rarely or never', value: 1 },
-      { text: 'Sometimes, but not consistently', value: 2 },
-      { text: 'Often, especially during significant events', value: 3 },
-      { text: 'Almost always, I\'m frequently aware of my emotional state', value: 4 },
-      { text: 'Continuously, with deep awareness of subtle shifts', value: 5 }
-    ]
-  },
-  {
-    id: 'presence',
-    text: 'When engaged in routine tasks (like washing dishes), how present are you in the moment?',
-    options: [
-      { text: 'My mind is usually elsewhere', value: 1 },
-      { text: 'I notice when my mind wanders but struggle to stay present', value: 2 },
-      { text: 'I can be present for short periods with effort', value: 3 },
-      { text: 'I'm often present but occasionally drift', value: 4 },
-      { text: 'I can maintain consistent presence and awareness', value: 5 }
-    ]
-  },
-  {
-    id: 'connection',
-    text: 'How would you describe your sense of connection to something greater than yourself?',
-    options: [
-      { text: 'I don\'t feel any particular connection', value: 1 },
-      { text: 'I occasionally sense a connection, especially in nature', value: 2 },
-      { text: 'I often feel connected to something larger', value: 3 },
-      { text: 'I regularly experience a sense of unity with life', value: 4 },
-      { text: 'I consistently experience deep interconnectedness', value: 5 }
-    ]
-  },
-  {
-    id: 'purpose',
-    text: 'How clear is your sense of purpose or meaning in life?',
-    options: [
-      { text: 'Unclear, I'm still searching', value: 1 },
-      { text: 'I have glimpses but no consistent sense of purpose', value: 2 },
-      { text: 'I have some direction but it's still developing', value: 3 },
-      { text: 'I have a strong sense of purpose in most areas', value: 4 },
-      { text: 'My purpose feels clear, aligned and integrated in my life', value: 5 }
+      { value: 1, label: 'Just beginning to explore my inner world' },
+      { value: 2, label: 'Sometimes aware of my thoughts and feelings' },
+      { value: 3, label: 'Regularly practice self-reflection' },
+      { value: 4, label: 'Highly attuned to my inner states' },
+      { value: 5, label: 'Deep awareness of subtle energetic shifts within' }
     ]
   },
   {
     id: 'meditation',
-    text: 'What is your experience with meditation or mindfulness practices?',
+    question: 'What is your experience with meditation?',
     options: [
-      { text: 'No experience or very limited', value: 1 },
-      { text: 'I\'ve tried occasionally but don\'t practice regularly', value: 2 },
-      { text: 'I practice irregularly, a few times per month', value: 3 },
-      { text: 'I have a consistent weekly practice', value: 4 },
-      { text: 'Daily practice is integrated into my life', value: 5 }
+      { value: 1, label: 'Never tried it' },
+      { value: 2, label: 'Occasionally meditate' },
+      { value: 3, label: 'Regular practice of 1-3 times per week' },
+      { value: 4, label: 'Daily practice of 10-20 minutes' },
+      { value: 5, label: 'Deep daily practice of 30+ minutes' }
+    ]
+  },
+  {
+    id: 'energy',
+    question: 'How familiar are you with energy centers (chakras)?',
+    options: [
+      { value: 1, label: 'Not familiar at all' },
+      { value: 2, label: 'Have heard about them' },
+      { value: 3, label: 'Basic understanding of their purpose' },
+      { value: 4, label: 'Regular work with one or more chakras' },
+      { value: 5, label: 'Deep energetic awareness and practice' }
+    ]
+  },
+  {
+    id: 'quantum',
+    question: 'How do you relate to quantum concepts?',
+    options: [
+      { value: 1, label: 'Unfamiliar with quantum principles' },
+      { value: 2, label: 'Basic understanding of scientific concepts' },
+      { value: 3, label: 'See connections between quantum science and consciousness' },
+      { value: 4, label: 'Applying quantum thinking in daily life' },
+      { value: 5, label: 'Living in quantum awareness regularly' }
+    ]
+  },
+  {
+    id: 'synchronicity',
+    question: 'How often do you notice meaningful coincidences or synchronicities?',
+    options: [
+      { value: 1, label: 'Rarely or never' },
+      { value: 2, label: 'Occasionally, but view them as random' },
+      { value: 3, label: 'Notice them regularly' },
+      { value: 4, label: 'Frequently observe patterns of synchronicity' },
+      { value: 5, label: 'Live in a state of flow guided by synchronicities' }
     ]
   }
 ];
 
-interface ConsciousnessAssessmentProps {
-  onComplete: (results: Record<string, number>) => void;
-  onBack: () => void;
-}
+// Define consciousness levels based on score ranges
+const consciousnessLevels = {
+  level1: { min: 5, max: 10, name: 'Awakening Explorer', description: 'Beginning to explore consciousness beyond the material plane' },
+  level2: { min: 11, max: 15, name: 'Pattern Observer', description: 'Recognizing meaningful patterns in life experiences' },
+  level3: { min: 16, max: 20, name: 'Energy Sensitive', description: 'Developing awareness of subtle energies and frequencies' },
+  level4: { min: 21, max: 25, name: 'Quantum Thinker', description: 'Understanding the interconnected nature of reality' }
+};
 
-const ConsciousnessAssessment: React.FC<ConsciousnessAssessmentProps> = ({ onComplete, onBack }) => {
+const ConsciousnessAssessment: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [expandedExplanation, setExpandedExplanation] = useState<number | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const [score, setScore] = useState(0);
+  const [assessmentComplete, setAssessmentComplete] = useState(false);
 
-  const handleAnswer = (questionId: string, value: number) => {
-    setAnswers(prev => ({ ...prev, [questionId]: value }));
-  };
-
-  const goToNextQuestion = () => {
+  const handleAnswer = (value: number) => {
+    const questionId = questions[currentQuestion].id;
+    const newAnswers = { ...answers, [questionId]: value };
+    setAnswers(newAnswers);
+    
     if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
-      setExpandedExplanation(null);
+      setCurrentQuestion(currentQuestion + 1);
     } else {
-      onComplete(answers);
+      // Calculate final score
+      const totalScore = Object.values(newAnswers).reduce((sum, val) => sum + val, 0);
+      setScore(totalScore);
+      
+      // Determine consciousness level
+      let level = '';
+      if (totalScore >= consciousnessLevels.level4.min) {
+        level = consciousnessLevels.level4.name;
+      } else if (totalScore >= consciousnessLevels.level3.min) {
+        level = consciousnessLevels.level3.name;
+      } else if (totalScore >= consciousnessLevels.level2.min) {
+        level = consciousnessLevels.level2.name;
+      } else {
+        level = consciousnessLevels.level1.name;
+      }
+      
+      setResult(level);
+      setAssessmentComplete(true);
+      
+      // Store assessment result
+      localStorage.setItem('initialAssessmentCompleted', 'true');
+      localStorage.setItem('consciousnessLevel', level);
+      localStorage.setItem('consciousnessScore', totalScore.toString());
     }
   };
 
-  const goToPreviousQuestion = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(prev => prev - 1);
-      setExpandedExplanation(null);
-    } else {
-      onBack();
-    }
-  };
-
-  const currentQuestionData = questions[currentQuestion];
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
-  const isQuestionAnswered = currentQuestionData && answers[currentQuestionData.id];
-
-  const toggleExplanation = (index: number) => {
-    setExpandedExplanation(expandedExplanation === index ? null : index);
-  };
+  const progress = ((currentQuestion + (assessmentComplete ? 1 : 0)) / questions.length) * 100;
 
   return (
-    <div className="flex flex-col items-center space-y-6 w-full max-w-2xl mx-auto px-4 py-6">
-      <div className="w-full">
-        <h2 className="text-2xl font-bold text-center text-white mb-2">Consciousness Assessment</h2>
-        <p className="text-center text-white/80 mb-6">
-          This assessment helps us understand your current consciousness level and personalize your journey.
-        </p>
-        
-        <div className="w-full mb-4">
-          <Progress value={progress} className="h-2" />
-          <p className="text-sm text-right mt-1 text-white/70">
-            Question {currentQuestion + 1} of {questions.length}
-          </p>
-        </div>
-        
-        <Card className="bg-black/40 backdrop-blur-lg border-purple-800/30 p-6 w-full">
-          <h3 className="text-xl font-semibold text-white mb-4">
-            {currentQuestionData.text}
-          </h3>
-          
-          <div className="space-y-3 mt-6">
-            {currentQuestionData.options.map((option, index) => (
-              <div key={index} className="space-y-2">
-                <div 
-                  className={`p-3 rounded-lg cursor-pointer transition-all flex justify-between items-center
-                    ${answers[currentQuestionData.id] === option.value 
-                      ? 'bg-purple-800/50 border border-purple-500' 
-                      : 'bg-gray-800/40 border border-gray-700/50 hover:bg-gray-700/50'}`}
-                  onClick={() => handleAnswer(currentQuestionData.id, option.value)}
-                >
-                  <div className="flex items-center">
-                    <div className={`w-5 h-5 rounded-full mr-3 flex items-center justify-center
-                      ${answers[currentQuestionData.id] === option.value 
-                        ? 'bg-purple-500 text-white' 
-                        : 'bg-gray-700'}`}
-                    >
-                      {answers[currentQuestionData.id] === option.value && (
-                        <CheckCircle size={14} />
-                      )}
-                    </div>
-                    <span className="text-white">{option.text}</span>
-                  </div>
-                  
-                  <ChevronDown 
-                    size={18} 
-                    className={`text-gray-400 transition-transform ${expandedExplanation === index ? 'transform rotate-180' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleExplanation(index);
-                    }}
-                  />
-                </div>
-                
-                {expandedExplanation === index && (
-                  <div className="text-sm text-white/70 pl-8 pr-4 py-2 bg-gray-800/30 rounded-lg">
-                    <p>This response indicates a {index === 0 ? 'beginning' : index === 4 ? 'highly developed' : 'developing'} level of consciousness in this area.</p>
-                  </div>
-                )}
+    <div className="min-h-[80vh] flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-2xl">
+        {!assessmentComplete ? (
+          <Card className="bg-black/30 backdrop-blur-md border-violet-500/20 p-6 relative overflow-hidden">
+            <div className="absolute -right-16 -top-16 opacity-10 pointer-events-none">
+              <MetatronsCube size={200} color="rgba(255,255,255,0.2)" />
+            </div>
+            
+            <h2 className="text-2xl font-semibold text-white mb-8 text-center">
+              Consciousness Assessment
+            </h2>
+            
+            <Progress value={progress} className="h-2 mb-8" indicatorClassName="bg-violet-500" />
+            
+            <motion.div
+              key={currentQuestion}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+              className="mb-8"
+            >
+              <h3 className="text-xl text-white mb-6">{questions[currentQuestion].question}</h3>
+              
+              <div className="space-y-3">
+                {questions[currentQuestion].options.map((option, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    className="w-full justify-start text-left p-4 border-violet-500/30 hover:bg-violet-500/20 text-white"
+                    onClick={() => handleAnswer(option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
               </div>
-            ))}
-          </div>
-        </Card>
-        
-        <div className="flex justify-between mt-6">
-          <Button 
-            onClick={goToPreviousQuestion}
-            variant="outline"
-            className="flex items-center gap-1 border-white/20 text-white hover:bg-white/10"
+            </motion.div>
+            
+            <div className="text-sm text-white/60 text-center">
+              Question {currentQuestion + 1} of {questions.length}
+            </div>
+          </Card>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
           >
-            <ChevronLeft size={16} /> Back
-          </Button>
-          
-          <Button 
-            onClick={goToNextQuestion}
-            disabled={!isQuestionAnswered}
-            className={`flex items-center gap-1 ${isQuestionAnswered ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-600/50 cursor-not-allowed'}`}
-          >
-            {currentQuestion < questions.length - 1 ? 'Next' : 'Complete'} <ChevronRight size={16} />
-          </Button>
-        </div>
+            <Card className="bg-black/30 backdrop-blur-md border-violet-500/20 p-8 relative overflow-hidden text-center">
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-5">
+                <MetatronsCube size={400} color="rgba(255,255,255,0.5)" />
+              </div>
+              
+              <h2 className="text-3xl font-semibold text-white mb-4">Assessment Complete</h2>
+              
+              <div className="mb-8 relative">
+                <div className="inline-block relative">
+                  <div className="absolute inset-0 bg-violet-500/20 blur-xl rounded-full" />
+                  <div className="text-5xl font-bold text-white relative">
+                    {score}
+                    <span className="text-lg text-white/60 ml-1">/ 25</span>
+                  </div>
+                </div>
+              </div>
+              
+              <h3 className="text-2xl font-medium text-violet-300 mb-4">
+                Your Consciousness Level:
+              </h3>
+              
+              <div className="text-3xl font-bold text-white mb-8">{result}</div>
+              
+              <p className="text-white/80 mb-8">
+                This assessment provides a starting point for your quantum journey. 
+                As you progress through practices and reflections, you'll expand
+                your consciousness to new dimensions.
+              </p>
+              
+              <Button className="bg-violet-500 hover:bg-violet-600 text-white w-full py-6 text-lg">
+                Begin Your Quantum Journey
+              </Button>
+            </Card>
+          </motion.div>
+        )}
       </div>
     </div>
   );

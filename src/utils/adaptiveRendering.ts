@@ -1,200 +1,183 @@
 
 /**
- * Adaptive Rendering System
+ * Optimized adaptive rendering utilities
  * 
- * This module provides utilities for adapting the rendering behavior
- * based on device performance and user preferences.
+ * This module provides functionality to adjust rendering quality and performance
+ * based on device capabilities and current application state.
  */
 
-import { getPerformanceCategory } from './performanceUtils';
+import { PerfConfig } from '@/contexts/PerfConfigContext';
 
-// Configuration for different performance levels
-const PERFORMANCE_CONFIGS = {
-  high: {
-    enableAnimations: true,
-    enableParticles: true,
-    enableGlow: true,
-    particleCount: 100,
-    animationFrameRate: 60,
-    renderDistance: 'far',
-    effectDetail: 'high',
-  },
-  medium: {
-    enableAnimations: true,
-    enableParticles: true,
-    enableGlow: true,
-    particleCount: 60,
-    animationFrameRate: 45,
-    renderDistance: 'medium',
-    effectDetail: 'medium',
-  },
-  low: {
-    enableAnimations: true,
-    enableParticles: false,
-    enableGlow: false,
-    particleCount: 30,
-    animationFrameRate: 30,
-    renderDistance: 'near',
-    effectDetail: 'low',
-  },
-  minimal: {
-    enableAnimations: false,
-    enableParticles: false,
-    enableGlow: false,
-    particleCount: 0,
-    animationFrameRate: 24,
-    renderDistance: 'near',
-    effectDetail: 'minimal',
-  },
+// Flag to track if adaptive rendering is initialized
+let isInitialized = false;
+
+// Default thresholds for device capability detection
+const cpuThresholds = {
+  low: 2,    // 2 cores or fewer
+  medium: 4, // 3-4 cores
+  high: 8    // 8+ cores
 };
 
-// Global performance level - defaulting to medium
-let performanceLevel = 'medium';
-
-// Feature overrides for specific scenarios
-const featureOverrides: Record<string, boolean> = {};
-
-/**
- * Initialize the adaptive rendering system
- */
-export const initAdaptiveRendering = () => {
-  // Determine initial performance level based on device capabilities
-  performanceLevel = detectDevicePerformance();
-  console.log(`Adaptive rendering initialized with performance level: ${performanceLevel}`);
-  
-  // Add event listener for visibility changes to adapt rendering when tab is inactive
-  document.addEventListener('visibilitychange', adjustForVisibility);
-  
-  // Set up performance monitoring
-  setupPerformanceMonitoring();
+// Memory thresholds in MB (if available)
+const memoryThresholds = {
+  low: 2048,    // 2GB or less
+  medium: 4096, // 4GB
+  high: 8192    // 8GB+
 };
 
 /**
- * Detect device performance level
+ * Device capability detection using available browser APIs
  */
-const detectDevicePerformance = (): string => {
-  // Simple detection based on user agent and device memory
-  const memory = (navigator as any).deviceMemory || 4;
-  const isHighEnd = memory >= 6;
-  const isLowEnd = memory <= 2;
+export function detectDeviceCapability(): 'low' | 'medium' | 'high' {
+  if (typeof window === 'undefined') return 'medium';
   
-  // Check if it's a mobile device
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
-  );
+  // Check for mobile devices first
+  const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
   
-  if (isHighEnd && !isMobile) {
-    return 'high';
-  } else if (isLowEnd || isMobile) {
+  // CPU cores
+  const cpuCores = navigator.hardwareConcurrency || 4;
+  
+  // Memory (if available)
+  let memory: number | undefined;
+  if ('deviceMemory' in navigator) {
+    memory = (navigator as any).deviceMemory * 1024;
+  }
+  
+  // Battery status (if available)
+  let isBatteryLow = false;
+  if ('getBattery' in navigator) {
+    (navigator as any).getBattery().then((battery: any) => {
+      isBatteryLow = battery.level < 0.2 && !battery.charging;
+    }).catch(() => {
+      // Ignore errors with battery API
+    });
+  }
+  
+  // Check performance timing API for navigation timing
+  let navigationTime = 0;
+  if (performance && performance.timing) {
+    navigationTime = 
+      performance.timing.domContentLoadedEventEnd - 
+      performance.timing.navigationStart;
+  }
+  
+  // Determine capability level based on all factors
+  if (
+    isMobile || 
+    (cpuCores <= cpuThresholds.low) || 
+    (memory && memory <= memoryThresholds.low) ||
+    isBatteryLow ||
+    navigationTime > 2000 // Slow initial page load
+  ) {
     return 'low';
+  } else if (
+    (cpuCores >= cpuThresholds.high) && 
+    (memory === undefined || memory >= memoryThresholds.high) &&
+    navigationTime < 1000 // Fast initial page load
+  ) {
+    return 'high';
   } else {
     return 'medium';
   }
-};
+}
 
 /**
- * Adjust rendering when visibility changes
+ * Create initial performance configuration based on device capability
  */
-const adjustForVisibility = () => {
-  if (document.hidden) {
-    // Tab is inactive, reduce rendering quality
-    setFeatureOverride('enableAnimations', false);
-    setFeatureOverride('enableParticles', false);
-  } else {
-    // Tab is active again, restore default settings
-    clearFeatureOverride('enableAnimations');
-    clearFeatureOverride('enableParticles');
-  }
-};
-
-/**
- * Set up ongoing performance monitoring
- */
-const setupPerformanceMonitoring = () => {
-  // Check FPS periodically and adjust settings if needed
-  let lastTime = performance.now();
-  let frames = 0;
+export function createInitialPerfConfig(): PerfConfig {
+  const deviceCapability = detectDeviceCapability();
   
-  const checkPerformance = () => {
-    frames++;
-    const currentTime = performance.now();
+  return {
+    enableVirtualization: true,
+    enableLazyLoading: true,
+    deviceCapability: deviceCapability
+  };
+}
+
+/**
+ * Initialize adaptive rendering system
+ */
+export function initAdaptiveRendering(): void {
+  if (isInitialized) return;
+  
+  // Feature detection and capability-based adjustments
+  const deviceCapability = detectDeviceCapability();
+  
+  // Apply body classes for CSS-based optimizations
+  if (typeof document !== 'undefined') {
+    document.body.classList.add(`device-${deviceCapability}`);
     
-    if (currentTime > lastTime + 1000) {
-      const fps = Math.round((frames * 1000) / (currentTime - lastTime));
-      lastTime = currentTime;
-      frames = 0;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.body.classList.add('reduced-motion');
+    }
+  }
+  
+  // Set up resize observer for adaptive layout changes
+  if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
+    const resizeObserver = new ResizeObserver(throttle(() => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
       
-      // Adjust performance level based on FPS
-      if (fps < 30 && performanceLevel !== 'minimal') {
-        performanceLevel = 'minimal';
-        console.log('Performance dropped, reducing quality to minimal');
-      } else if (fps < 45 && performanceLevel !== 'low' && performanceLevel !== 'minimal') {
-        performanceLevel = 'low';
-        console.log('Performance dropped, reducing quality to low');
-      } else if (fps > 55 && performanceLevel === 'minimal') {
-        performanceLevel = 'low';
-        console.log('Performance improved, increasing quality to low');
-      } else if (fps > 55 && performanceLevel === 'low') {
-        performanceLevel = 'medium';
-        console.log('Performance improved, increasing quality to medium');
-      }
+      // Update layout classes based on viewport dimensions
+      document.body.classList.remove('viewport-xs', 'viewport-sm', 'viewport-md', 'viewport-lg', 'viewport-xl');
+      
+      if (width < 640) document.body.classList.add('viewport-xs');
+      else if (width < 768) document.body.classList.add('viewport-sm');
+      else if (width < 1024) document.body.classList.add('viewport-md');
+      else if (width < 1280) document.body.classList.add('viewport-lg');
+      else document.body.classList.add('viewport-xl');
+      
+      // Add tall/wide viewport indicators
+      document.body.classList.remove('viewport-tall', 'viewport-wide');
+      if (height > width) document.body.classList.add('viewport-tall');
+      else document.body.classList.add('viewport-wide');
+    }, 200));
+    
+    resizeObserver.observe(document.body);
+  }
+  
+  console.log('Adaptive rendering initialized with capability:', deviceCapability);
+  
+  isInitialized = true;
+}
+
+/**
+ * Helper function to throttle function calls
+ */
+function throttle<T extends (...args: any[]) => any>(func: T, limit: number): (...funcArgs: Parameters<T>) => ReturnType<T> | undefined {
+  let inThrottle = false;
+  let lastResult: ReturnType<T> | undefined;
+  
+  return function(this: any, ...args: Parameters<T>): ReturnType<T> | undefined {
+    if (!inThrottle) {
+      lastResult = func.apply(this, args);
+      inThrottle = true;
+      
+      setTimeout(() => {
+        inThrottle = false;
+      }, limit);
     }
     
-    requestAnimationFrame(checkPerformance);
+    return lastResult;
+  };
+}
+
+/**
+ * Adjust element count based on device capability
+ */
+export function adaptElementCount(baseCount: number, deviceCapability: 'low' | 'medium' | 'high'): number {
+  const factors: Record<'low' | 'medium' | 'high', number> = {
+    low: 0.3,
+    medium: 0.7,
+    high: 1.0
   };
   
-  requestAnimationFrame(checkPerformance);
-};
+  return Math.max(3, Math.floor(baseCount * factors[deviceCapability]));
+}
 
-/**
- * Get the current performance level
- */
-export const getPerformanceLevel = (): string => {
-  return performanceLevel;
-};
-
-/**
- * Get a specific setting for the current performance level
- */
-export const getAdaptiveSetting = <T>(settingName: string): T => {
-  const config = PERFORMANCE_CONFIGS[performanceLevel as keyof typeof PERFORMANCE_CONFIGS];
-  
-  // Check if there's an override for this feature
-  if (featureOverrides.hasOwnProperty(settingName)) {
-    return featureOverrides[settingName] as unknown as T;
-  }
-  
-  // Return the setting from the current performance level
-  return config[settingName as keyof typeof config] as unknown as T;
-};
-
-/**
- * Check if a feature is enabled
- */
-export const isFeatureEnabled = (featureName: string): boolean => {
-  return getAdaptiveSetting<boolean>(featureName);
-};
-
-/**
- * Override a specific feature setting
- */
-export const setFeatureOverride = (featureName: string, value: boolean): void => {
-  featureOverrides[featureName] = value;
-};
-
-/**
- * Clear a feature override and return to using the performance level setting
- */
-export const clearFeatureOverride = (featureName: string): void => {
-  delete featureOverrides[featureName];
-};
-
-/**
- * Set performance level manually
- */
-export const setPerformanceLevel = (level: 'high' | 'medium' | 'low' | 'minimal'): void => {
-  if (PERFORMANCE_CONFIGS.hasOwnProperty(level)) {
-    performanceLevel = level;
-    console.log(`Performance level manually set to: ${level}`);
-  }
+export default {
+  init: initAdaptiveRendering,
+  detectDeviceCapability,
+  createInitialPerfConfig,
+  adaptElementCount
 };

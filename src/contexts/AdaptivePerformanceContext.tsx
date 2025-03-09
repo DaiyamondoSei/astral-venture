@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { detectDeviceCapability } from '@/utils/adaptiveRendering';
 
 // Simple enum for device capability
 export enum DeviceCapability {
@@ -41,44 +42,37 @@ interface AdaptivePerformanceProviderProps {
 
 export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderProps> = ({ children }) => {
   // State for manual performance mode
-  const [manualMode, setManualMode] = useState<DeviceCapability | 'auto'>('auto');
-  // Calculated device capability
-  const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(DeviceCapability.MEDIUM);
+  const [manualMode, setManualMode] = useState<DeviceCapability | 'auto'>(() => {
+    // Get saved preference
+    if (typeof localStorage !== 'undefined') {
+      const savedMode = localStorage.getItem('performanceMode') as DeviceCapability | 'auto' | null;
+      return savedMode || 'auto';
+    }
+    return 'auto';
+  });
   
-  // Simple device detection - run only once on mount
+  // Calculated device capability
+  const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(() => {
+    const detectedCapability = detectDeviceCapability();
+    return DeviceCapability[detectedCapability.toUpperCase() as keyof typeof DeviceCapability];
+  });
+  
+  // Device detection - run only when manual mode changes
   useEffect(() => {
     if (manualMode === 'auto') {
-      const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
-      const cpuCores = navigator.hardwareConcurrency || 4;
-      
-      if (isMobile || cpuCores <= 2) {
-        setDeviceCapability(DeviceCapability.LOW);
-      } else if (cpuCores >= 8) {
-        setDeviceCapability(DeviceCapability.HIGH);
-      } else {
-        setDeviceCapability(DeviceCapability.MEDIUM);
-      }
+      const detectedCapability = detectDeviceCapability();
+      setDeviceCapability(DeviceCapability[detectedCapability.toUpperCase() as keyof typeof DeviceCapability]);
     } else {
       setDeviceCapability(manualMode);
     }
   }, [manualMode]);
-  
-  // Load saved preference
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedMode = localStorage.getItem('performanceMode') as DeviceCapability | 'auto' | null;
-      if (savedMode) {
-        setManualMode(savedMode);
-      }
-    }
-  }, []);
   
   // Manual mode setter
   const setManualPerformanceMode = (mode: DeviceCapability | 'auto') => {
     setManualMode(mode);
     
     // Store preference in localStorage for persistence
-    if (typeof window !== 'undefined') {
+    if (typeof localStorage !== 'undefined') {
       localStorage.setItem('performanceMode', mode);
     }
   };

@@ -6,26 +6,19 @@ import './index.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AdaptivePerformanceProvider } from '@/contexts/AdaptivePerformanceContext';
 import { initWebVitals } from '@/utils/webVitalsMonitor';
-import { initAdaptiveRendering } from '@/utils/adaptiveRendering';
-import { initMemoryManagement } from '@/utils/memoryManager';
-import LoadingScreen from '@/components/LoadingScreen';
 import { PerfConfigProvider } from '@/contexts/PerfConfigContext';
-import { performanceMonitor } from '@/utils/performance/performanceMonitor';
+import LoadingScreen from '@/components/LoadingScreen';
+import { markStart, markEnd } from '@/utils/webVitalsMonitor';
+import memoryManager from '@/utils/memoryManager';
 
 // Create a performance-optimized bootstrapping sequence
 const bootstrap = () => {
-  // First, initialize core performance monitoring and adaptive systems
+  markStart('app-bootstrap');
+  
+  // First, initialize core performance monitoring and memory management
   initWebVitals();
-  initAdaptiveRendering();
+  memoryManager.init();
   
-  if (process.env.NODE_ENV === 'development') {
-    // Start performance monitoring in development
-    performanceMonitor.startMonitoring();
-  }
-  
-  // Initialize memory management after initial render
-  setTimeout(initMemoryManagement, 1000);
-
   // Create root element if missing
   const rootElement = document.getElementById('root');
   if (!rootElement) {
@@ -50,34 +43,54 @@ const bootstrap = () => {
         performance.mark('app-initial-render');
       }
       
-      // Set a timeout to prevent the loading screen from flashing if loading is very fast
-      const timer = setTimeout(() => {
-        setLoadingComplete(true);
-        
-        // Measure time to interactivity
+      // Track performance metrics when app becomes interactive
+      const trackInteractive = () => {
         if (typeof performance !== 'undefined') {
           performance.mark('app-interactive');
-          performance.measure('app-time-to-interactive', 'app-initial-render', 'app-interactive');
-          
-          const measure = performance.getEntriesByName('app-time-to-interactive')[0];
-          console.log(`App interactive in ${Math.round(measure.duration)}ms`);
+          try {
+            performance.measure('app-time-to-interactive', 'app-initial-render', 'app-interactive');
+            
+            const measure = performance.getEntriesByName('app-time-to-interactive')[0];
+            console.log(`App interactive in ${Math.round(measure.duration)}ms`);
+          } catch (e) {
+            console.error('Error measuring time to interactive:', e);
+          }
         }
-      }, 1500);
+      };
       
-      return () => clearTimeout(timer);
-    }, []);
+      if (loadingComplete) {
+        // App has become interactive after loading screen
+        trackInteractive();
+      }
+      
+      return () => {
+        // Cleanup any resources if component unmounts
+      };
+    }, [loadingComplete]);
     
-    return loadingComplete ? (
+    // Handle loading complete callback
+    const handleLoadComplete = () => {
+      markStart('app-transition');
+      // Set a short delay to ensure smooth transition
+      setTimeout(() => {
+        setLoadingComplete(true);
+        markEnd('app-transition');
+      }, 100);
+    };
+    
+    return (
       <React.StrictMode>
-        <PerfConfigProvider>
-          <AdaptivePerformanceProvider>
-            <App />
-            <Toaster />
-          </AdaptivePerformanceProvider>
-        </PerfConfigProvider>
+        {loadingComplete ? (
+          <PerfConfigProvider>
+            <AdaptivePerformanceProvider>
+              <App />
+              <Toaster />
+            </AdaptivePerformanceProvider>
+          </PerfConfigProvider>
+        ) : (
+          <LoadingScreen onLoadComplete={handleLoadComplete} />
+        )}
       </React.StrictMode>
-    ) : (
-      <LoadingScreen onLoadComplete={() => setLoadingComplete(true)} />
     );
   };
   
@@ -86,6 +99,8 @@ const bootstrap = () => {
   
   // Mark when app is fully loaded
   window.addEventListener('load', () => {
+    markEnd('app-bootstrap');
+    
     // Use requestIdleCallback for non-critical operations after load
     if ('requestIdleCallback' in window) {
       window.requestIdleCallback(() => {
@@ -95,10 +110,14 @@ const bootstrap = () => {
         // Report initial performance metrics
         if (typeof performance !== 'undefined') {
           performance.mark('app-fully-loaded');
-          performance.measure('app-load-time', 'app-initial-render', 'app-fully-loaded');
-          
-          const measure = performance.getEntriesByName('app-load-time')[0];
-          console.log(`App fully loaded in ${Math.round(measure.duration)}ms`);
+          try {
+            performance.measure('app-load-time', 'app-initial-render', 'app-fully-loaded');
+            
+            const measure = performance.getEntriesByName('app-load-time')[0];
+            console.log(`App fully loaded in ${Math.round(measure.duration)}ms`);
+          } catch (e) {
+            console.error('Error measuring full load time:', e);
+          }
         }
       });
     } else {
