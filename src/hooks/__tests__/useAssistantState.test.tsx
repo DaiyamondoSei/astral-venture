@@ -1,6 +1,6 @@
 
 import { renderHook, act } from '@testing-library/react';
-import { useAssistantState } from '../useCodeAssistant';
+import { useAssistantState } from '@/components/ai-assistant/hooks/useAssistantState';
 
 // Mock state for testing
 const initialState = {

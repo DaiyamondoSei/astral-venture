@@ -1,4 +1,7 @@
 
+import { IAchievementData } from '../../data/types';
+import { StepInteraction } from '../../data/types';
+
 /**
  * Achievement state for managing user progress and earned achievements
  */
@@ -52,13 +55,14 @@ export interface ProgressTrackingResult {
  */
 export interface AchievementTrackerProps {
   userId?: string;
-  completedSteps: Record<string, boolean>;
-  stepInteractions: StepInteraction[];
+  onUnlock?: (achievement: IAchievementData) => void;
+  onProgress?: (achievement: IAchievementData, progress: number) => void;
+  achievementList?: IAchievementData[];
   currentStreak?: number;
   reflectionCount?: number;
   meditationMinutes?: number;
-  totalPoints?: number;
   uniqueChakrasActivated?: number;
+  totalPoints?: number;
   wisdomResourcesExplored?: number;
 }
 
@@ -76,15 +80,6 @@ export interface AchievementTrackerResult {
   getProgressPercentage: () => number;
   achievementHistory: Record<string, any>;
   progressTracking: Record<string, number>;
-}
-
-/**
- * Represents a user interaction with an onboarding step
- */
-export interface StepInteraction {
-  stepId: string;
-  interactionType: string;
-  timestamp: string;
 }
 
 /**

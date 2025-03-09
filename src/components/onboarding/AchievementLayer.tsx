@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useAchievementTracker } from './hooks/achievement';
+import { useAchievementTracker } from './hooks/achievement/useAchievementTracker';
 import { useAchievementNotification } from './hooks/useAchievementNotification';
 import AchievementNotification from './AchievementNotification';
 import AchievementProgressTracker from './AchievementProgressTracker';
-import { StepInteraction } from '@/contexts/onboarding/types';
+import { StepInteraction } from './hooks/achievement/types';
 import { useUserStreak } from '@/hooks/useUserStreak';
 import { getPerformanceCategory } from '@/utils/performanceUtils';
 

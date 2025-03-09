@@ -4,19 +4,7 @@ import { IAchievementData } from '../../data/types';
 import { useAchievementState } from './useAchievementState';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
-
-interface AchievementTrackerProps {
-  userId: string;
-  onUnlock?: (achievement: IAchievementData) => void;
-  onProgress?: (achievement: IAchievementData, progress: number) => void;
-  achievementList?: IAchievementData[];
-  currentStreak?: number;
-  reflectionCount?: number;
-  meditationMinutes?: number;
-  uniqueChakrasActivated?: number;
-  totalPoints?: number;
-  wisdomResourcesExplored?: number;
-}
+import { AchievementTrackerProps } from './types';
 
 export function useAchievementTracker({
   userId,
@@ -39,7 +27,7 @@ export function useAchievementTracker({
   
   // Get achievement state from context
   const { 
-    state: { achievements = [] },
+    state,
     updateAchievement,
     unlockAchievement,
     getAchievementProgress,
@@ -137,7 +125,7 @@ export function useAchievementTracker({
       
       // Process newly unlocked achievements
       if (data?.unlockedAchievements?.length > 0) {
-        const newAchievements = data.unlockedAchievements.map(a => ({
+        const newAchievements = data.unlockedAchievements.map((a: any) => ({
           id: a.id,
           title: a.title,
           description: a.description || '',
@@ -252,6 +240,11 @@ export function useAchievementTracker({
     
     trackActivity(activityType, details);
   }, [userId, trackActivity]);
+
+  // Function to dismiss achievements (for notifications)
+  const dismissAchievement = useCallback((id: string) => {
+    setEarnedAchievements(prev => prev.filter(a => a.id !== id));
+  }, []);
   
   return {
     unlockedAchievements,
@@ -262,6 +255,7 @@ export function useAchievementTracker({
     getProgress: getAchievementProgress,
     logActivity,
     trackActivity,
+    dismissAchievement,
     getProgressPercentage: () => progressPercentage,
     getTotalPoints: () => totalEarnedPoints,
     progressTracking: {

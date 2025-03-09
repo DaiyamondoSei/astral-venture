@@ -1,4 +1,3 @@
-
 import { useEffect, useRef } from 'react';
 import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
 import { DeepPropAnalyzer } from '@/utils/error-prevention/DeepPropAnalyzer';
@@ -13,7 +12,7 @@ import { monitorComponent } from '@/utils/componentDoc';
  */
 export function useErrorPrevention(
   componentName: string,
-  props: Record<string, any>,
+  props: Record<string, any> = {},
   options: {
     trackRenders?: boolean;
     validateProps?: boolean;
@@ -65,11 +64,10 @@ export function useErrorPrevention(
       const propChanges = DeepPropAnalyzer.analyzePropChanges(prevPropsRef.current, props);
       
       // Only log if there are significant changes
-      if (propChanges.length > 0 && propChanges.some(c => c.importance === 'high')) {
+      const significantChanges = propChanges.filter(c => c.type === 'high');
+      if (significantChanges.length > 0) {
         console.debug(`[${componentName}] Significant props changed:`, 
-          propChanges
-            .filter(c => c.importance === 'high')
-            .map(change => DeepPropAnalyzer.formatPropChange(change))
+          significantChanges.map(change => DeepPropAnalyzer.formatPropChange(change))
         );
       }
     }

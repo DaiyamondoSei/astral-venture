@@ -9,6 +9,7 @@ import { Trash, RefreshCw, AlertTriangle, Clock, Zap, Cloud, Database } from 'lu
 import { usePerfConfig } from '@/hooks/usePerfConfig';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
+import { Database } from '@/types/supabase';
 
 // Component for displaying performance insights and metrics
 const PerformanceInsights: React.FC = () => {
@@ -63,7 +64,7 @@ const PerformanceInsights: React.FC = () => {
       setIsLoadingBackend(true);
       
       const { data, error } = await supabase
-        .from('performance_metrics')
+        .from('performance_metrics' as keyof Database['public']['Tables'])
         .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
@@ -114,20 +115,27 @@ const PerformanceInsights: React.FC = () => {
   const flushToBackend = async () => {
     try {
       // This will trigger the internal flush method
-      // @ts-ignore - Accessing private method for dev purposes
-      if (typeof performanceMonitor.flushMetrics === 'function') {
-        // @ts-ignore
-        await performanceMonitor.flushMetrics();
-        
-        toast({
-          title: 'Metrics flushed to backend',
-          description: 'Performance data has been sent to the server',
-          duration: 2000
-        });
-        
-        // Refresh backend metrics after a short delay
-        setTimeout(() => fetchBackendMetrics(), 1000);
-      }
+      // Use a direct call to the performance monitoring API
+      await supabase.functions.invoke('track-performance', {
+        body: {
+          metrics: performanceMonitor.getMetrics().queuedMetrics || [],
+          sessionId: 'manual-flush',
+          deviceInfo: {
+            userAgent: navigator.userAgent,
+            screenWidth: window.innerWidth,
+            screenHeight: window.innerHeight
+          }
+        }
+      });
+      
+      toast({
+        title: 'Metrics flushed to backend',
+        description: 'Performance data has been sent to the server',
+        duration: 2000
+      });
+      
+      // Refresh backend metrics after a short delay
+      setTimeout(() => fetchBackendMetrics(), 1000);
     } catch (error) {
       console.error('Error flushing metrics:', error);
       

@@ -1,220 +1,134 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { IAchievementData } from '../../data/validators';
+import { useState, useCallback, createContext, useContext } from 'react';
+import { IAchievementData } from '../../data/types';
 
+// Achievement state types
 export interface IAchievementState {
   achievements: IAchievementData[];
-  completed: IAchievementData[];
-  inProgress: IAchievementData[];
-  locked: IAchievementData[];
-  visible: IAchievementData[];
-  currentlyDisplayed: IAchievementData | null;
-  isAchievementVisible: boolean;
+  history: Record<string, any>;
+  progressTracking: Record<string, number>;
 }
 
-const initialState: IAchievementState = {
-  achievements: [],
-  completed: [],
-  inProgress: [],
-  locked: [],
-  visible: [],
-  currentlyDisplayed: null,
-  isAchievementVisible: false
+// Achievement actions interface
+export interface IAchievementActions {
+  updateAchievement: (id: string, updates: Partial<IAchievementData>) => void;
+  unlockAchievement: (id: string) => void;
+  getAchievementProgress: (id: string) => number;
+  trackProgress: (category: string, amount: number) => void;
+  resetProgress: (category: string) => void;
+}
+
+// Create context
+const AchievementContext = createContext<{
+  state: IAchievementState;
+  updateAchievement: IAchievementActions['updateAchievement'];
+  unlockAchievement: IAchievementActions['unlockAchievement'];
+  getAchievementProgress: IAchievementActions['getAchievementProgress'];
+  trackProgress: IAchievementActions['trackProgress'];
+  resetProgress: IAchievementActions['resetProgress'];
+} | null>(null);
+
+// Hook for using achievement state
+export const useAchievementState = () => {
+  const context = useContext(AchievementContext);
+  
+  if (!context) {
+    throw new Error('useAchievementState must be used within an AchievementProvider');
+  }
+  
+  return context;
 };
 
-export interface IAchievementActions {
-  completeAchievement: (id: string) => void;
-  showAchievement: (achievement: IAchievementData) => void;
-  hideAchievement: () => void;
-  updateProgress: (id: string, progress: number) => void;
-  unlockAchievement: (id: string) => void;
-  loadAchievements: (achievements: IAchievementData[]) => void;
-  resetState: () => void;
-}
-
-export function useAchievementState(
-  defaultAchievements: IAchievementData[] = []
-): [IAchievementState, IAchievementActions] {
+// Provider component
+export const AchievementProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<IAchievementState>({
-    ...initialState,
-    achievements: defaultAchievements
+    achievements: [],
+    history: {},
+    progressTracking: {}
   });
-
-  // Initialize achievement data
-  useEffect(() => {
-    if (defaultAchievements.length > 0) {
-      loadAchievements(defaultAchievements);
-    }
-  }, [defaultAchievements]);
-
-  // Action to complete an achievement
-  const completeAchievement = useCallback((id: string) => {
-    setState(prev => {
-      const achievement = prev.achievements.find(a => a.id === id);
-      if (!achievement) return prev;
-
-      const updatedAchievement = {
-        ...achievement,
-        completed: true,
-        completedAt: new Date(),
-        progress: 100
-      };
-
-      const updatedAchievements = prev.achievements.map(a =>
-        a.id === id ? updatedAchievement : a
-      );
-
-      // Update the completed and inProgress lists
-      const newCompleted = [...prev.completed, updatedAchievement];
-      const newInProgress = prev.inProgress.filter(a => a.id !== id);
-
-      return {
-        ...prev,
-        achievements: updatedAchievements,
-        completed: newCompleted,
-        inProgress: newInProgress,
-        currentlyDisplayed: updatedAchievement,
-        isAchievementVisible: true
-      };
-    });
-  }, []);
-
-  // Action to show an achievement
-  const showAchievement = useCallback((achievement: IAchievementData) => {
-    setState(prev => ({
-      ...prev,
-      currentlyDisplayed: achievement,
-      isAchievementVisible: true
+  
+  // Update a specific achievement
+  const updateAchievement = useCallback((id: string, updates: Partial<IAchievementData>) => {
+    setState(prevState => ({
+      ...prevState,
+      achievements: prevState.achievements.map(achievement => 
+        achievement.id === id 
+          ? { ...achievement, ...updates } 
+          : achievement
+      )
     }));
   }, []);
-
-  // Action to hide the currently displayed achievement
-  const hideAchievement = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      isAchievementVisible: false
-    }));
-  }, []);
-
-  // Action to update achievement progress
-  const updateProgress = useCallback((id: string, progress: number) => {
-    setState(prev => {
-      const achievement = prev.achievements.find(a => a.id === id);
-      if (!achievement) return prev;
-
-      const shouldComplete = progress >= 100;
-      
-      const updatedAchievement = {
-        ...achievement,
-        progress,
-        completed: shouldComplete,
-        completedAt: shouldComplete ? new Date() : undefined
-      };
-
-      const updatedAchievements = prev.achievements.map(a =>
-        a.id === id ? updatedAchievement : a
-      );
-
-      // Update the lists
-      let newCompleted = [...prev.completed];
-      let newInProgress = [...prev.inProgress];
-
-      if (shouldComplete) {
-        newCompleted = [...newCompleted, updatedAchievement];
-        newInProgress = newInProgress.filter(a => a.id !== id);
-      } else if (!newInProgress.some(a => a.id === id)) {
-        newInProgress = [...newInProgress, updatedAchievement];
-      } else {
-        newInProgress = newInProgress.map(a => 
-          a.id === id ? updatedAchievement : a
-        );
-      }
-
-      return {
-        ...prev,
-        achievements: updatedAchievements,
-        completed: newCompleted,
-        inProgress: newInProgress,
-        currentlyDisplayed: shouldComplete ? updatedAchievement : prev.currentlyDisplayed,
-        isAchievementVisible: shouldComplete ? true : prev.isAchievementVisible
-      };
-    });
-  }, []);
-
-  // Action to unlock an achievement
+  
+  // Mark an achievement as unlocked
   const unlockAchievement = useCallback((id: string) => {
-    setState(prev => {
-      const achievement = prev.achievements.find(a => a.id === id);
-      if (!achievement) return prev;
-
-      const updatedAchievement = {
-        ...achievement,
-        visible: true
-      };
-
-      const updatedAchievements = prev.achievements.map(a =>
-        a.id === id ? updatedAchievement : a
+    setState(prevState => {
+      // Update the achievement
+      const updatedAchievements = prevState.achievements.map(achievement => 
+        achievement.id === id 
+          ? { ...achievement, unlocked: true } 
+          : achievement
       );
-
-      // Update the visible and locked lists
-      const newVisible = [...prev.visible, updatedAchievement];
-      const newLocked = prev.locked.filter(a => a.id !== id);
-
+      
+      // Add to history
+      const updatedHistory = {
+        ...prevState.history,
+        [id]: {
+          unlockedAt: new Date().toISOString(),
+          achievement: updatedAchievements.find(a => a.id === id)
+        }
+      };
+      
       return {
-        ...prev,
+        ...prevState,
         achievements: updatedAchievements,
-        visible: newVisible,
-        locked: newLocked,
+        history: updatedHistory
       };
     });
   }, []);
-
-  // Action to load achievements
-  const loadAchievements = useCallback((achievements: IAchievementData[]) => {
-    const completed: IAchievementData[] = [];
-    const inProgress: IAchievementData[] = [];
-    const locked: IAchievementData[] = [];
-    const visible: IAchievementData[] = [];
-
-    achievements.forEach(achievement => {
-      if (achievement.completed) {
-        completed.push(achievement);
-      } else if (achievement.progress && achievement.progress > 0) {
-        inProgress.push(achievement);
+  
+  // Get progress for a specific achievement
+  const getAchievementProgress = useCallback((id: string) => {
+    const achievement = state.achievements.find(a => a.id === id);
+    return achievement?.progress || 0;
+  }, [state.achievements]);
+  
+  // Track progress for a category
+  const trackProgress = useCallback((category: string, amount: number) => {
+    setState(prevState => ({
+      ...prevState,
+      progressTracking: {
+        ...prevState.progressTracking,
+        [category]: (prevState.progressTracking[category] || 0) + amount
       }
-
-      if (achievement.visible || !achievement.hideUntilUnlocked) {
-        visible.push(achievement);
-      } else {
-        locked.push(achievement);
+    }));
+  }, []);
+  
+  // Reset progress for a category
+  const resetProgress = useCallback((category: string) => {
+    setState(prevState => ({
+      ...prevState,
+      progressTracking: {
+        ...prevState.progressTracking,
+        [category]: 0
       }
-    });
-
-    setState({
-      achievements,
-      completed,
-      inProgress,
-      locked,
-      visible,
-      currentlyDisplayed: null,
-      isAchievementVisible: false
-    });
+    }));
   }, []);
-
-  // Action to reset the state
-  const resetState = useCallback(() => {
-    setState(initialState);
-  }, []);
-
-  const actions: IAchievementActions = {
-    completeAchievement,
-    showAchievement,
-    hideAchievement,
-    updateProgress,
+  
+  // Context value
+  const value = {
+    state,
+    updateAchievement,
     unlockAchievement,
-    loadAchievements,
-    resetState
+    getAchievementProgress,
+    trackProgress,
+    resetProgress
   };
+  
+  return (
+    <AchievementContext.Provider value={value}>
+      {children}
+    </AchievementContext.Provider>
+  );
+};
 
-  return [state, actions];
-}
+export default AchievementProvider;
