@@ -67,7 +67,7 @@ export interface AIQuestionOptions {
 // Define assistant suggestion and intent types for AICodeAssistant
 export interface AssistantSuggestion {
   id: string;
-  type: 'optimization' | 'improvement' | 'warning' | 'error';
+  type: 'optimization' | 'improvement' | 'warning' | 'error' | 'performance' | 'quality' | 'architecture' | 'refactoring';
   component?: string;
   title: string;
   description: string;
@@ -77,7 +77,7 @@ export interface AssistantSuggestion {
   priority: 'low' | 'medium' | 'high';
 }
 
-export type AssistantIntentStatus = 'pending' | 'completed' | 'failed';
+export type AssistantIntentStatus = 'pending' | 'completed' | 'failed' | 'implemented' | 'abandoned';
 
 export interface AssistantIntent {
   id: string;
@@ -87,13 +87,21 @@ export interface AssistantIntent {
   created: Date;
   updated?: Date;
   componentPath?: string;
+  relatedComponents?: string[];
+}
+
+// Add UseAICodeAssistantProps interface
+export interface UseAICodeAssistantProps {
+  initialComponents?: string[];
+  autoAnalyze?: boolean;
+  analysisDepth?: 'shallow' | 'deep';
 }
 
 // Add CodeQualityIssue type for CodeQualityDashboard
 export interface CodeQualityIssue {
   id: string;
   component: string;
-  type: 'security' | 'pattern' | 'complexity' | 'performance';
+  type: 'security' | 'pattern' | 'complexity' | 'performance' | 'render' | 'architecture';
   description: string;
   suggestions: string[];
   priority: 'low' | 'medium' | 'high';

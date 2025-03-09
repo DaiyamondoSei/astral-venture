@@ -32,11 +32,11 @@ export interface FeatureTooltipData {
   position: 'top' | 'right' | 'bottom' | 'left';
   elementId?: string;
   targetElement: string; // Required property
+  targetSelector: string; // Add as required
   condition?: string;
   delay?: number;
   
-  // Additional properties used in the codebase
-  targetSelector?: string;
+  // Additional properties
   requiredStep?: string;
 }
 
@@ -56,11 +56,11 @@ export interface GuidedTourStep {
   title: string;
   description: string;
   elementId: string;
-  targetElement: string; // Required property
+  targetElement: string;
   position: 'top' | 'right' | 'bottom' | 'left';
   content?: string;
   target?: string;
-  targetSelector?: string;
+  targetSelector: string; // Make required
 }
 
 export interface TourStep {
@@ -68,7 +68,7 @@ export interface TourStep {
   title: string;
   content: string;
   elementId: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position: 'top' | 'bottom' | 'left' | 'right';
   target?: string;
-  targetSelector?: string; // Make consistent with achievement hook types
+  targetSelector: string; // Make required
 }

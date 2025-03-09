@@ -1,89 +1,62 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { IAchievementData, AchievementState } from './types';
+import { useState, useCallback, useEffect } from 'react';
+import { IAchievementData } from '../../data/types';
 
 /**
- * Hook to track progress of achievements
+ * Hook for tracking achievement progress across the application
  */
-export function useAchievementProgress(achievementState: AchievementState) {
+export function useAchievementProgress() {
+  // Store achievement progress as achievementId -> progress value
   const [achievementProgress, setAchievementProgress] = useState<Record<string, number>>({});
-  
-  // Initialize achievement progress
+
+  // Initialize achievements from local storage
   useEffect(() => {
-    if (achievementState.achievements) {
-      const initialProgress: Record<string, number> = {};
-      
-      // Initialize progress for each achievement
-      achievementState.achievements.forEach(achievement => {
-        initialProgress[achievement.id] = achievement.progress || 0;
-      });
-      
-      setAchievementProgress(initialProgress);
+    try {
+      const stored = localStorage.getItem('achievementProgress');
+      if (stored) {
+        setAchievementProgress(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading achievement progress:', error);
     }
-  }, [achievementState.achievements]);
-  
-  // Update progress for a specific achievement
+  }, []);
+
+  // Update progress for an achievement
   const updateProgress = useCallback((achievementId: string, progressValue: number) => {
-    if (!achievementId) return;
-    
-    setAchievementProgress(prev => ({
-      ...prev,
-      [achievementId]: Math.min(1, progressValue)
-    }));
-    
-    // If achievement has an updateAchievement method, use it
-    if (achievementState.updateAchievement) {
-      achievementState.updateAchievement(achievementId, { progress: progressValue });
-    }
-  }, [achievementState]);
-  
-  // Calculate progress based on tracking type
-  const calculateProgressForAchievement = useCallback((achievement: IAchievementData) => {
-    if (!achievement) return 0;
-    
-    // For streak-based achievements
-    if (achievement.type === 'streak' && achievement.streakDays && achievementState.progressTracking.streakDays) {
-      const currentStreak = achievementState.progressTracking.streakDays;
-      return Math.min(1, currentStreak / achievement.streakDays);
-    }
-    
-    // For progressive achievements with a tracking type
-    if (achievement.trackingType && achievement.requiredAmount) {
-      const currentValue = achievementState.progressTracking[achievement.trackingType] || 0;
-      return Math.min(1, currentValue / achievement.requiredAmount);
-    }
-    
-    // For step-based achievements
-    if (achievement.requiredSteps && Array.isArray(achievement.requiredSteps) && achievementState.progress) {
-      let completedSteps = 0;
+    setAchievementProgress(prev => {
+      const updated = { ...prev, [achievementId]: progressValue };
       
-      achievement.requiredSteps.forEach(step => {
-        if (achievementState.progress[step]) {
-          completedSteps++;
-        }
-      });
+      // Persist to localStorage
+      try {
+        localStorage.setItem('achievementProgress', JSON.stringify(updated));
+      } catch (error) {
+        console.error('Error saving achievement progress:', error);
+      }
       
-      return Math.min(1, completedSteps / achievement.requiredSteps.length);
+      return updated;
+    });
+  }, []);
+
+  // Calculate progress percentage for an achievement
+  const calculateProgressForAchievement = useCallback((achievement: IAchievementData): number => {
+    if (!achievement || !achievement.id) return 0;
+    
+    // Get current progress value
+    const currentProgress = achievementProgress[achievement.id] || 0;
+    
+    // Calculate as percentage of required amount
+    if (achievement.requiredAmount) {
+      return Math.min(100, (currentProgress / achievement.requiredAmount) * 100);
     }
     
-    // For completed achievements
-    if (achievementState.earnedAchievements.some(a => a.id === achievement.id)) {
-      return 1;
-    }
-    
-    return achievementProgress[achievement.id] || 0;
-  }, [achievementState, achievementProgress]);
-  
-  // Get all achievements with their progress
+    return currentProgress;
+  }, [achievementProgress]);
+
+  // Get all achievements with their current progress
   const getAchievementsWithProgress = useCallback(() => {
-    if (!achievementState.achievements) return [];
-    
-    return achievementState.achievements.map(achievement => ({
-      ...achievement,
-      progress: calculateProgressForAchievement(achievement)
-    }));
-  }, [achievementState.achievements, calculateProgressForAchievement]);
-  
+    return [];
+  }, []);
+
   return {
     achievementProgress,
     updateProgress,

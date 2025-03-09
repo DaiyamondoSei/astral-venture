@@ -1,140 +1,150 @@
 
 /**
- * Service for providing chakra insights and analysis
+ * ChakraInsightsService
+ * Service for generating insights related to chakras and energy centers
  */
+import { AIInsight, AIResponse, AIQuestion, AIQuestionOptions } from '../ai/types';
+import { askAIAssistant } from '../ai/assistant';
 
-import { AIResponse, AIInsight } from '@/services/ai/types';
-import { askAIAssistant } from '@/services/ai/assistant';
-
-// Define chakra types and data
-const chakraNames = ['root', 'sacral', 'solar_plexus', 'heart', 'throat', 'third_eye', 'crown'];
-
-// Mock chakra activation data
-const chakraActivations = {
-  root: 0.6,
-  sacral: 0.45,
-  solar_plexus: 0.8,
-  heart: 0.7,
-  throat: 0.3,
-  third_eye: 0.5,
-  crown: 0.4
+// Define chakra names for easier reference
+const chakraNames = {
+  root: 'Root',
+  sacral: 'Sacral',
+  solarPlexus: 'Solar Plexus',
+  heart: 'Heart',
+  throat: 'Throat',
+  thirdEye: 'Third Eye',
+  crown: 'Crown'
 };
 
-// Normalize chakra data for API
-const normalizeChakraData = (chakras: Record<string, number>) => {
-  return Object.entries(chakras).map(([name, value]) => ({
-    chakra: name,
-    activation: value
-  }));
+// Map normalized chakra data to user-friendly names
+const normalizeChakraData = (chakraData) => {
+  return Object.entries(chakraData).reduce((acc, [key, value]) => {
+    acc[chakraNames[key] || key] = value;
+    return acc;
+  }, {});
 };
 
-/**
- * Get personalized insights based on chakra activations
- */
-export async function getPersonalizedInsights(userId: string, chakras?: Record<string, number>): Promise<AIInsight[]> {
-  try {
-    const userChakras = chakras || chakraActivations;
-    const normalizedChakras = normalizeChakraData(userChakras);
-    
-    // Get most activated chakras
-    const sortedChakras = Object.entries(userChakras)
-      .sort(([_, a], [__, b]) => b - a)
-      .slice(0, 3)
-      .map(([name]) => name);
-    
-    // Generate insights from AI
-    const response = await askAIAssistant({
-      text: `Provide insights for user with most active chakras: ${sortedChakras.join(', ')}`,
-      context: `User chakra data: ${JSON.stringify(normalizedChakras)}`,
-      userId
-    });
-    
-    // Parse insights from response
-    const insights: AIInsight[] = [
-      {
-        id: `insight-${Date.now()}-1`,
-        type: 'energy',
-        title: 'Energy Balance Insight',
-        content: response.answer.substring(0, 150) + '...',
-        createdAt: new Date().toISOString(),
-        tags: sortedChakras
-      },
-      {
-        id: `insight-${Date.now()}-2`,
-        type: 'meditation',
-        title: 'Recommended Meditation Focus',
-        content: response.suggestedPractices?.[0] || 'Focus on balancing your energy centers through mindful meditation',
-        createdAt: new Date().toISOString(),
-        tags: ['meditation', ...sortedChakras]
-      }
-    ];
-    
-    return insights;
-  } catch (error) {
-    console.error('Error getting personalized insights:', error);
-    
-    // Return fallback insights
-    return [{
-      id: `insight-fallback-${Date.now()}`,
-      type: 'energy',
-      title: 'Energy Balance',
-      content: 'Focus on balancing your energy centers through consistent practice',
-      createdAt: new Date().toISOString(),
-      tags: ['balance', 'energy']
-    }];
-  }
-}
-
-/**
- * Get personalized recommendations based on user data
- */
-export async function getPersonalizedRecommendations(userId: string, topics?: string[]): Promise<string[]> {
-  try {
-    // Default topics if none provided
-    const focusTopics = topics || ['meditation', 'reflection', 'energy'];
-    
-    // Generate recommendations from AI
-    const response = await askAIAssistant({
-      text: `Provide personalized recommendations for topics: ${focusTopics.join(', ')}`,
-      userId
-    });
-    
-    // Extract recommendations
-    if (response.suggestedPractices && response.suggestedPractices.length > 0) {
-      return response.suggestedPractices;
-    }
-    
-    // Parse recommendations from text if not explicitly provided
-    const recommendations = response.answer
-      .split('\n')
-      .filter(line => line.trim().length > 0)
-      .slice(0, 3);
-    
-    return recommendations.length > 0 ? recommendations : ['Meditation', 'Breathwork', 'Reflection'];
-  } catch (error) {
-    console.error('Error getting personalized recommendations:', error);
-    
-    // Return fallback recommendations
-    return ['Daily meditation', 'Reflection journaling', 'Energy alignment'];
-  }
-}
-
-/**
- * Export for use in other services
- */
 export const ChakraInsightsService = {
-  askQuestion: askAIAssistant,
-  getInsights: getPersonalizedInsights,
-  generateReflection: async (topic: string) => {
+  /**
+   * Ask a question to the AI assistant
+   */
+  askQuestion: async (question: string | AIQuestion, options?: AIQuestionOptions): Promise<AIResponse> => {
+    return askAIAssistant(question, options);
+  },
+
+  /**
+   * Get insights based on chakra activity
+   */
+  getInsights: async (userId: string, chakras?: Record<string, number>): Promise<AIInsight[]> => {
     try {
-      const response = await askAIAssistant({
-        text: `Generate a reflection prompt about: ${topic}`
-      });
-      return response.answer;
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
+      // Example chakra data if not provided
+      const chakraData = chakras || {
+        root: 0.6,
+        sacral: 0.75,
+        solarPlexus: 0.4,
+        heart: 0.8,
+        throat: 0.5,
+        thirdEye: 0.7,
+        crown: 0.3
+      };
+
+      // Normalize chakra data
+      const normalizedChakras = normalizeChakraData(chakraData);
+
+      // Request insights from AI based on chakra activity
+      const question: AIQuestion = {
+        text: `Generate insights for user based on their chakra activity: ${JSON.stringify(normalizedChakras)}`,
+        userId,
+        context: 'chakra_insights'
+      };
+
+      const aiResponse = await askAIAssistant(question);
+
+      // Generate insights from AI response
+      const insights: AIInsight[] = [
+        {
+          id: 'chakra-insight-1',
+          type: 'meditation',
+          title: 'Chakra Balancing',
+          content: aiResponse.answer,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'chakra-insight-2',
+          type: 'practice',
+          title: 'Recommended Practices',
+          content: aiResponse.suggestedPractices?.join('\n') || 'No practices suggested.',
+          createdAt: new Date().toISOString()
+        }
+      ];
+
+      return insights;
     } catch (error) {
-      console.error('Error generating reflection:', error);
-      return `Reflect on your experience with ${topic}`;
+      console.error('Error getting chakra insights:', error);
+      return [];
     }
   },
-  getPersonalizedRecommendations
+
+  /**
+   * Generate reflection prompts based on chakra activity
+   */
+  generateReflection: async (topic: string): Promise<string> => {
+    try {
+      const question: AIQuestion = {
+        text: `Generate a reflection prompt about ${topic} for spiritual growth.`,
+        context: 'reflection_generation'
+      };
+
+      const aiResponse = await askAIAssistant(question);
+      return aiResponse.answer;
+    } catch (error) {
+      console.error('Error generating reflection:', error);
+      return 'What insights have you gained about yourself today?';
+    }
+  },
+
+  /**
+   * Get personalized recommendations based on user data
+   */
+  getPersonalizedRecommendations: async (userId: string, topics?: string[]): Promise<string[]> => {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
+      const topicsText = topics && topics.length > 0 
+        ? `focusing on the following topics: ${topics.join(', ')}`
+        : 'based on their overall spiritual journey';
+
+      const question: AIQuestion = {
+        text: `Generate personalized practice recommendations for user ${topicsText}.`,
+        userId,
+        context: 'personalized_recommendations'
+      };
+
+      const aiResponse = await askAIAssistant(question);
+      return aiResponse.suggestedPractices || [];
+    } catch (error) {
+      console.error('Error getting personalized recommendations:', error);
+      return [
+        'Practice mindful breathing for 5 minutes',
+        'Journal about your emotions',
+        'Connect with nature'
+      ];
+    }
+  },
+
+  /**
+   * Get personalized insights (alias for backwards compatibility)
+   */
+  getPersonalizedInsights: async (userId: string, chakras?: Record<string, number>): Promise<AIInsight[]> => {
+    return ChakraInsightsService.getInsights(userId, chakras);
+  }
 };
+
+export default ChakraInsightsService;

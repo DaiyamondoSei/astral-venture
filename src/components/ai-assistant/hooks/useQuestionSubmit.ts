@@ -61,8 +61,8 @@ export const useQuestionSubmit = ({
         stream: navigator.onLine // Only enable streaming if online
       };
       
-      // Create empty options object
-      const options: AIQuestionOptions = {};
+      // Create options object
+      const options: AIQuestionOptions = {}; 
       
       // Call the API
       const aiResponse = await askAIAssistant(questionData, options);

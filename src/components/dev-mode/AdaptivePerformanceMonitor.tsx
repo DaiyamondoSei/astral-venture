@@ -1,7 +1,30 @@
+/**
+ * AdaptivePerformanceMonitor
+ * A component that monitors and controls performance based on device capabilities
+ */
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { 
+  DeviceCapability, 
+  PerformanceMode, 
+  getPerformanceCategory,
+  throttleForPerformance 
+} from '@/utils/performanceUtils';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Activity, ChevronDown, ChevronUp } from 'lucide-react';
-import { useAdaptivePerformance } from '@/contexts/AdaptivePerformanceContext';
+// Helper function to convert string values to PerformanceMode safely
+const toPerformanceMode = (value: string): PerformanceMode => {
+  switch (value) {
+    case 'low': return DeviceCapability.LOW;
+    case 'medium': return DeviceCapability.MEDIUM;
+    case 'high': return DeviceCapability.HIGH;
+    case 'auto': return 'auto';
+    default: return DeviceCapability.MEDIUM;
+  }
+};
 
 /**
  * Enhanced Performance Monitor component that displays web vitals
@@ -21,7 +44,7 @@ const AdaptivePerformanceMonitor = () => {
     features,
     webVitals,
     setManualPerformanceMode 
-  } = useAdaptivePerformance();
+  } = usePerfConfig();
 
   // Performance monitoring
   useEffect(() => {

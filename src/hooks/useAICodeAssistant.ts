@@ -1,125 +1,133 @@
 
-import { useState, useCallback } from 'react';
-import { AICodeAssistant } from '@/utils/ai/AICodeAssistant';
-import { AssistantSuggestion, AssistantIntent } from '@/services/ai/types';
-
-interface UseAICodeAssistantProps {
-  componentId?: string;
-}
-
-interface AICodeAssistantState {
-  suggestions: AssistantSuggestion[];
-  intents: AssistantIntent[];
-  selectedSuggestion: AssistantSuggestion | null;
-  isAnalyzing: boolean;
-  isFixing: boolean;
-}
-
 /**
- * Hook for AI code assistant functionality
+ * Hook for using AI code assistant capabilities
  */
-export function useAICodeAssistant({ componentId }: UseAICodeAssistantProps = {}) {
-  const [state, setState] = useState<AICodeAssistantState>({
-    suggestions: [],
-    intents: [],
-    selectedSuggestion: null,
-    isAnalyzing: false,
-    isFixing: false
-  });
+import { useState, useCallback, useEffect } from 'react';
+import { AICodeAssistant } from '@/utils/ai/AICodeAssistant';
+import { AssistantSuggestion, AssistantIntent, UseAICodeAssistantProps } from '@/services/ai/types';
+
+export function useAICodeAssistant(props?: UseAICodeAssistantProps) {
+  const [suggestions, setSuggestions] = useState<AssistantSuggestion[]>([]);
+  const [intents, setIntents] = useState<AssistantIntent[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   
-  // Create a singleton instance of AICodeAssistant
+  // Initialize the AI code assistant
   const assistant = new AICodeAssistant();
   
-  // Analyze current component
+  // Analyze a single component
   const analyzeComponent = useCallback(async (componentId: string) => {
-    setState(prev => ({ ...prev, isAnalyzing: true }));
-    
     try {
-      // Get suggestions for the component
-      const suggestions = await assistant.getSuggestions(componentId);
+      setIsAnalyzing(true);
+      setLoading(true);
+      setSelectedComponent(componentId);
       
-      setState(prev => ({
-        ...prev,
-        suggestions,
-        isAnalyzing: false
-      }));
+      // Perform the analysis
+      await assistant.analyzeComponent(componentId);
+      
+      // Update suggestions
+      const newSuggestions = assistant.getSuggestions();
+      setSuggestions(newSuggestions);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error analyzing component:', error);
-      setState(prev => ({ ...prev, isAnalyzing: false }));
+    } finally {
+      setIsAnalyzing(false);
+      setLoading(false);
     }
   }, [assistant]);
   
-  // Get suggestions for multiple components
+  // Analyze multiple components
   const analyzeComponents = useCallback(async (componentIds: string[]) => {
-    setState(prev => ({ ...prev, isAnalyzing: true }));
-    
     try {
-      // Get all intents
-      const intents = await assistant.getIntents();
+      setIsAnalyzing(true);
+      setLoading(true);
       
-      setState(prev => ({
-        ...prev,
-        intents,
-        isAnalyzing: false
-      }));
+      // Analyze each component
+      await Promise.all(componentIds.map(id => assistant.analyzeComponent(id)));
+      
+      // Update suggestions
+      const newSuggestions = assistant.getSuggestions();
+      setSuggestions(newSuggestions);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error analyzing components:', error);
-      setState(prev => ({ ...prev, isAnalyzing: false }));
+    } finally {
+      setIsAnalyzing(false);
+      setLoading(false);
     }
   }, [assistant]);
   
-  // Register a new intent
+  // Refresh suggestions
+  const refreshSuggestions = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Get updated suggestions
+      const newSuggestions = assistant.getSuggestions();
+      setSuggestions(newSuggestions);
+      
+      // Get updated intents
+      const newIntents = assistant.getIntents();
+      setIntents(newIntents);
+      
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Error refreshing suggestions:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [assistant]);
+  
+  // Register an intent
   const registerIntent = useCallback(async (intent: Omit<AssistantIntent, 'id' | 'created' | 'status'>) => {
     try {
-      await assistant.registerIntent(intent);
+      const newIntent = await assistant.registerIntent(intent);
       
-      // Refresh intents
-      const intents = await assistant.getIntents();
-      setState(prev => ({ ...prev, intents }));
+      // Update intents
+      const updatedIntents = assistant.getIntents();
+      setIntents(updatedIntents);
       
-      return true;
+      return newIntent;
     } catch (error) {
       console.error('Error registering intent:', error);
-      return false;
+      return null;
     }
   }, [assistant]);
   
-  // Select a suggestion
-  const selectSuggestion = useCallback((suggestion: AssistantSuggestion) => {
-    setState(prev => ({ ...prev, selectedSuggestion: suggestion }));
-  }, []);
-  
-  // Clear selected suggestion
-  const clearSelectedSuggestion = useCallback(() => {
-    setState(prev => ({ ...prev, selectedSuggestion: null }));
-  }, []);
-  
   // Apply auto-fix for a suggestion
-  const applyAutoFix = useCallback(async (suggestion: AssistantSuggestion) => {
-    if (!suggestion) return false;
-    
-    setState(prev => ({ ...prev, isFixing: true }));
-    
+  const applyAutoFix = useCallback(async (suggestionId: string): Promise<boolean> => {
     try {
-      const result = await assistant.applyAutoFix(suggestion.id);
+      setIsFixing(true);
       
-      setState(prev => ({ ...prev, isFixing: false }));
+      // Apply the auto-fix
+      const result = await assistant.applyAutoFix(suggestionId);
+      
+      // Refresh suggestions
+      const newSuggestions = assistant.getSuggestions();
+      setSuggestions(newSuggestions);
+      
       return result;
     } catch (error) {
       console.error('Error applying auto-fix:', error);
-      setState(prev => ({ ...prev, isFixing: false }));
       return false;
+    } finally {
+      setIsFixing(false);
     }
   }, [assistant]);
   
   // Mark an intent as implemented
-  const markIntentAsImplemented = useCallback(async (intentId: string) => {
+  const markIntentImplemented = useCallback(async (intentId: string): Promise<boolean> => {
     try {
+      // Mark the intent as implemented
       await assistant.updateIntentStatus(intentId, 'completed');
       
-      // Refresh intents
-      const intents = await assistant.getIntents();
-      setState(prev => ({ ...prev, intents }));
+      // Update intents
+      const updatedIntents = assistant.getIntents();
+      setIntents(updatedIntents);
       
       return true;
     } catch (error) {
@@ -129,13 +137,14 @@ export function useAICodeAssistant({ componentId }: UseAICodeAssistantProps = {}
   }, [assistant]);
   
   // Mark an intent as abandoned
-  const markIntentAsAbandoned = useCallback(async (intentId: string) => {
+  const markIntentAbandoned = useCallback(async (intentId: string): Promise<boolean> => {
     try {
+      // Mark the intent as abandoned
       await assistant.updateIntentStatus(intentId, 'failed');
       
-      // Refresh intents
-      const intents = await assistant.getIntents();
-      setState(prev => ({ ...prev, intents }));
+      // Update intents
+      const updatedIntents = assistant.getIntents();
+      setIntents(updatedIntents);
       
       return true;
     } catch (error) {
@@ -144,23 +153,44 @@ export function useAICodeAssistant({ componentId }: UseAICodeAssistantProps = {}
     }
   }, [assistant]);
   
-  // Initial analysis if component ID is provided
-  useState(() => {
-    if (componentId) {
-      analyzeComponent(componentId);
+  // Get suggestions for a specific component
+  const getSuggestionsForComponent = useCallback((componentId: string): AssistantSuggestion[] => {
+    return suggestions.filter(suggestion => suggestion.component === componentId);
+  }, [suggestions]);
+  
+  // Update the context with new information
+  const updateContext = useCallback((contextData: any) => {
+    assistant.updateContext(contextData);
+  }, [assistant]);
+  
+  // Initialize components if auto-analyze is enabled
+  useEffect(() => {
+    if (props?.autoAnalyze && props.initialComponents && props.initialComponents.length > 0) {
+      analyzeComponents(props.initialComponents);
     }
-  });
+    
+    // Initial fetch of suggestions and intents
+    refreshSuggestions();
+  }, [props?.autoAnalyze, props?.initialComponents, analyzeComponents, refreshSuggestions]);
   
   return {
-    ...state,
+    suggestions,
+    intents,
+    isAnalyzing,
+    isFixing,
+    selectedComponent,
+    loading,
+    lastUpdated,
     analyzeComponent,
     analyzeComponents,
+    refreshSuggestions,
     registerIntent,
-    selectSuggestion,
-    clearSelectedSuggestion,
     applyAutoFix,
-    markIntentAsImplemented,
-    markIntentAsAbandoned,
-    updateContext: (context: string) => assistant.updateContext?.(context)
+    markIntentImplemented,
+    markIntentAbandoned,
+    getSuggestionsForComponent,
+    updateContext
   };
 }
+
+export default useAICodeAssistant;

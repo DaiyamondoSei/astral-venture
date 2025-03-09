@@ -67,7 +67,7 @@ export function monitorPerformance(): void {
  */
 export function throttleForPerformance<T extends (...args: any[]) => any>(
   fn: T, 
-  deviceCapability: DeviceCapability | PerformanceMode, 
+  deviceCapability: PerformanceMode, 
   options: { low?: number; medium?: number; high?: number } = {}
 ): (...args: Parameters<T>) => ReturnType<T> | undefined {
   const { low = 500, medium = 250, high = 100 } = options;
@@ -77,9 +77,11 @@ export function throttleForPerformance<T extends (...args: any[]) => any>(
   let throttleTime: number;
   
   // Set throttle time based on device capability
-  const capability = typeof deviceCapability === 'string' ? deviceCapability : DeviceCapability.MEDIUM;
+  const capabilityValue = typeof deviceCapability === 'string' 
+    ? (deviceCapability as string)
+    : (deviceCapability as DeviceCapability);
   
-  switch (capability) {
+  switch (capabilityValue) {
     case DeviceCapability.LOW:
     case 'low':
       throttleTime = low;

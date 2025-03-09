@@ -3,7 +3,7 @@ import React from 'react';
 import { useFeatureDiscovery } from './hooks/useFeatureDiscovery';
 import FeatureTooltip from './FeatureTooltip';
 import GuidedTour from './GuidedTour';
-import { TourStep } from './hooks/achievement/types';
+import { TourStep } from './data/types';
 
 interface FeatureDiscoveryLayerProps {
   hasCompletedOnboarding: boolean;
@@ -30,14 +30,15 @@ const FeatureDiscoveryLayer: React.FC<FeatureDiscoveryLayerProps> = ({
         content: step.description, // Map description to content for the TourStep format
         elementId: step.elementId,
         position: step.position,
-        target: step.target // Map to expected prop name
+        target: step.target || step.targetElement, // Map to expected prop name
+        targetSelector: step.targetSelector || `#${step.elementId}` // Ensure targetSelector is provided
       }));
       
       return (
         <GuidedTour 
           tourId={tourData.id}
           title={tourData.title}
-          description={tourData.description}
+          description={tourData.description || ''}
           steps={mappedSteps}
           onComplete={() => dismissTour(tourData.id)}
         />

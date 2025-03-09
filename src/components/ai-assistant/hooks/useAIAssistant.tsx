@@ -3,6 +3,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantState } from './useAssistantState';
 import { useQuestionSubmit } from './useQuestionSubmit';
+import { AIQuestionOptions } from '@/services/ai/types';
 
 interface UseAIAssistantProps {
   reflectionContext?: string;
