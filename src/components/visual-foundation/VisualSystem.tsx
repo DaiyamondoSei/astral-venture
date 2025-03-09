@@ -1,7 +1,7 @@
 
 import React from 'react';
 import CosmicBackground from './CosmicBackground';
-import MetatronsCube from './MetatronsCube';
+import MetatronsCube from './metatrons-cube';
 import GlassmorphicContainer from './GlassmorphicContainer';
 import { useQuantumTheme } from './QuantumThemeProvider';
 

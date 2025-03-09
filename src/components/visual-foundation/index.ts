@@ -1,6 +1,6 @@
 
 export { default as CosmicBackground } from './CosmicBackground';
-export { default as MetatronsCube } from './MetatronsCube';
+export { default as MetatronsCube } from './metatrons-cube';
 export { default as GlassmorphicContainer } from './GlassmorphicContainer';
 export { default as QuantumThemeProvider, useQuantumTheme } from './QuantumThemeProvider';
 export { default as VisualSystem } from './VisualSystem';
@@ -18,3 +18,4 @@ export type {
   QuantumContrast,
   QuantumAnimationLevel
 } from './QuantumThemeProvider';
+
