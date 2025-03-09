@@ -1,6 +1,7 @@
 
 import { api } from '@/utils/apiClient';
 import { EnergyReflection, EmotionalJourney } from './types';
+import { AIQuestion } from '@/services/ai/types';
 
 /**
  * Fetch emotional journey data for a user
@@ -22,6 +23,29 @@ export const fetchEmotionalJourney = async (userId: string): Promise<EmotionalJo
     };
   } catch (error) {
     console.error('Error fetching emotional journey:', error);
+    return null;
+  }
+};
+
+/**
+ * Analyze reflection data for emotional insights
+ */
+export const analyzeReflectionContent = async (
+  reflectionContent: string,
+  userId?: string
+): Promise<string | null> => {
+  try {
+    // Create a properly formatted question object
+    const aiQuestion: AIQuestion = {
+      text: "Analyze the emotional content of this reflection",
+      context: reflectionContent,
+      userId
+    };
+    
+    const response = await api.getAiResponse(aiQuestion);
+    return response.answer;
+  } catch (error) {
+    console.error('Error analyzing reflection content:', error);
     return null;
   }
 };

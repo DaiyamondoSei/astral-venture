@@ -6,9 +6,10 @@
 import { PerformanceMonitor } from './PerformanceMonitor';
 
 // Create and export a singleton instance for consistent monitoring
-export const performanceMonitor = new PerformanceMonitor();
+const performanceMonitor = new PerformanceMonitor();
 
 // Add additional methods to the singleton instance for better reporting
+// @ts-ignore - Extending the instance with custom methods
 performanceMonitor.reportSlowRender = function(componentName: string, duration: number) {
   if (!componentName || typeof duration !== 'number') return;
   
@@ -27,10 +28,8 @@ performanceMonitor.reportSlowRender = function(componentName: string, duration: 
     duration,
     timestamp: Date.now()
   });
-  
-  // Could be extended to send to analytics or monitoring service
-  // if that functionality is needed in the future
 };
 
 // Export the extended singleton
+export { performanceMonitor };
 export default performanceMonitor;

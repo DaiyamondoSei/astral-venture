@@ -4,9 +4,17 @@ import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 import { RenderAnalyzer, RenderAnalysis } from '@/utils/performance/RenderAnalyzer';
 import { RenderFrequency, DeviceCapability } from '@/utils/performanceUtils';
 
+interface ComponentMetric {
+  componentName: string;
+  renderCount: number;
+  averageRenderTime: number;
+  renderTimes?: number[];
+  lastRenderTime?: number;
+}
+
 // Component to display insights about component rendering
 const RenderInsights = () => {
-  const [componentMetrics, setComponentMetrics] = useState<Record<string, any>>({});
+  const [componentMetrics, setComponentMetrics] = useState<Record<string, ComponentMetric>>({});
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'renderCount' | 'renderTime'>('renderTime');
   const [showProblematicOnly, setShowProblematicOnly] = useState(false);
@@ -25,13 +33,13 @@ const RenderInsights = () => {
   
   // Fetch component metrics from performance monitor
   const fetchMetrics = () => {
-    const metrics = performanceMonitor.getComponentMetrics();
-    setComponentMetrics(metrics);
+    const metrics = performanceMonitor.getComponentMetrics() as Record<string, ComponentMetric>;
+    setComponentMetrics(metrics || {});
     
     // Analyze components for performance issues
     const results: Record<string, RenderAnalysis> = {};
     
-    for (const [name, metric] of Object.entries(metrics)) {
+    for (const [name, metric] of Object.entries(metrics || {})) {
       // Convert to format expected by RenderAnalyzer
       const analysis = RenderAnalyzer.getInstance().analyzeComponent({
         componentName: name,
@@ -46,7 +54,7 @@ const RenderInsights = () => {
   };
   
   // Get sorted list of components
-  const getSortedComponents = (): [string, any][] => {
+  const getSortedComponents = (): [string, ComponentMetric][] => {
     if (!componentMetrics) return [];
     
     let entries = Object.entries(componentMetrics);

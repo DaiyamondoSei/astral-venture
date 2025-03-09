@@ -43,3 +43,5 @@ export function useAssistantState() {
     reset
   };
 }
+
+export default useAssistantState;

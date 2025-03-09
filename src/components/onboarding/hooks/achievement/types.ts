@@ -40,6 +40,13 @@ export interface AchievementState {
   // Add missing properties needed by useAchievementProgress
   achievements?: IAchievementData[];
   updateAchievement?: (id: string, data: Partial<IAchievementData>) => void;
+  
+  // Additional properties to align with hook implementations
+  displayAchievement?: (achievement: IAchievementData) => void;
+  dismissAchievement?: () => void;
+  visibleAchievements?: IAchievementData[];
+  selectedAchievement?: IAchievementData;
+  showDetails?: boolean;
 }
 
 export interface IAchievementData {
@@ -112,7 +119,7 @@ export interface FeatureTooltipData {
   condition?: string;
   delay?: number;
   elementId?: string;
-  targetSelector: string; // Make required to match data/types.ts
+  targetSelector: string;
   requiredStep?: string;
 }
 
@@ -127,7 +134,7 @@ export interface GuidedTourStep {
   elementId: string;
   target?: string;
   content: string;
-  targetSelector: string; // Make required to match TourStep
+  targetSelector: string;
 }
 
 export interface TourStep {
@@ -150,4 +157,22 @@ export interface GuidedTourData {
   priority?: number;
   condition?: string;
   requiredStep?: string;
+}
+
+// Feature discovery hook return type
+export interface FeatureDiscoveryResult {
+  visibleTooltips: FeatureTooltipData[];
+  activeTooltip: FeatureTooltipData | null;
+  discoveredFeatures: string[];
+  markDiscovered: (tooltipId: string) => void;
+  showTooltip: (tooltipId: string) => void;
+  hideTooltip: () => void;
+  
+  // Additional properties needed by components
+  activeTooltips?: FeatureTooltipData[];
+  activeTour?: GuidedTourData | null;
+  guidedTours?: GuidedTourData[];
+  dismissTooltip?: () => void;
+  dismissTour?: () => void;
+  startTour?: (tourId: string) => void;
 }

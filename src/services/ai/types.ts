@@ -10,7 +10,7 @@ export interface AIQuestionOptions {
   temperature?: number;
   maxTokens?: number;
   model?: AIModel;
-  cacheKey?: string; // Added to support backend caching
+  cacheKey?: string;
 }
 
 export interface AIQuestion {
@@ -19,7 +19,7 @@ export interface AIQuestion {
   context?: string;
   reflectionIds?: string[];
   stream?: boolean;
-  userId?: string; // Added to support user-specific contexts
+  userId?: string;
 }
 
 export interface AIResponseMeta {
@@ -45,7 +45,7 @@ export interface AIInsight {
   confidence: number;
   relevance: number;
   source?: string;
-  title?: string; // Added to support existing code
+  title?: string;
 }
 
 export interface AssistantSuggestion {
@@ -94,8 +94,8 @@ export interface AICodeAssistantContext {
   currentComponent: string;
   error: string;
   isFixing: boolean;
-  loading?: boolean;
-  applyAutoFix?: (suggestionId: string) => Promise<boolean>;
+  loading: boolean;
+  applyAutoFix: (suggestionId: string) => Promise<boolean>;
   lastUpdated?: Date;
   runAnalysis: (component?: string) => Promise<void>;
   dismissSuggestion: (suggestionId: string) => void;

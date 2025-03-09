@@ -74,3 +74,5 @@ export function handleError(error: any): Response {
     { originalError: errorMessage, timestamp: new Date().toISOString() }
   );
 }
+
+export default handleError;
