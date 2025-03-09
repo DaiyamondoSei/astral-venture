@@ -1,128 +1,91 @@
 
 import { GuidedTourData } from './types';
 
+// Export an array as the default export
 export const guidedTours: GuidedTourData[] = [
   {
-    id: 'welcome-tour',
-    title: 'Welcome to the Sacred Geometry Explorer',
-    description: 'Let us guide you through the main features of this application',
-    condition: 'firstVisit',
+    id: 'dashboard-intro',
+    title: 'Welcome to Your Dashboard',
+    description: 'Let\'s explore the key features of your personal dashboard',
     steps: [
       {
-        id: 'step-1',
-        title: 'Welcome to Sacred Geometry',
-        description: 'This application helps you explore the sacred connections between geometry, energy, and consciousness.',
-        elementId: 'welcome-header',
+        id: 'dashboard-welcome',
+        title: 'Your Personal Dashboard',
+        description: 'This is your central hub for tracking progress and accessing features',
+        elementId: 'dashboard-main',
         position: 'bottom',
-        targetElement: '#welcome-header',
-        targetSelector: '#welcome-header',
-        content: 'Begin your journey by exploring the sacred geometry concepts.',
-        target: '#welcome-header'
+        targetElement: 'dashboard-container',
+        content: 'Welcome to your personal growth dashboard',
+        target: 'dashboard-container',
+        targetSelector: '#dashboard-container'
       },
       {
-        id: 'step-2',
-        title: 'Energy Visualizations',
-        description: 'Visualize your energy field and see how it responds to your interactions.',
-        elementId: 'energy-visualization',
+        id: 'dashboard-stats',
+        title: 'Your Stats',
+        description: 'View your activity stats and progress metrics here',
+        elementId: 'stats-panel',
         position: 'bottom',
-        targetElement: '#energy-visualization',
-        targetSelector: '#energy-visualization',
-        content: 'Click on different parts of the visualization to see how energy flows.',
-        target: '#energy-visualization'
+        targetElement: 'stats-container',
+        content: 'Track your meditation and reflection progress',
+        target: 'stats-container',
+        targetSelector: '#stats-container'
       },
       {
-        id: 'step-3',
-        title: 'Sacred Nodes',
-        description: 'Explore various sacred geometry nodes and their connections to your energy.',
-        elementId: 'sacred-nodes',
+        id: 'dashboard-challenges',
+        title: 'Daily Challenges',
+        description: 'Check your daily challenges and growth activities',
+        elementId: 'challenges-panel',
         position: 'left',
-        targetElement: '#sacred-nodes',
-        targetSelector: '#sacred-nodes',
-        content: 'Click on nodes to learn about their meanings and energy signatures.',
-        target: '#sacred-nodes'
+        targetElement: 'challenges-container',
+        content: 'Complete daily challenges to boost your progress',
+        target: 'challenges-container',
+        targetSelector: '#challenges-container'
       }
-    ]
+    ],
+    requiredStep: 'login'
   },
   {
-    id: 'reflection-tour',
-    title: 'Reflection and Insight Features',
-    description: 'Discover how to use the reflection tools for deeper self-awareness',
-    condition: 'completedMeditation',
+    id: 'meditation-intro',
+    title: 'Meditation Features',
+    description: 'Explore the meditation tools and features',
     steps: [
       {
-        id: 'step-1',
-        title: 'Reflection Journal',
-        description: 'Record your insights and experiences in your personal journal.',
-        elementId: 'reflection-journal',
+        id: 'meditation-welcome',
+        title: 'Meditation Center',
+        description: 'This is your space for mindfulness and meditation practices',
+        elementId: 'meditation-main',
         position: 'right',
-        targetElement: '#reflection-journal',
-        targetSelector: '#reflection-journal',
-        content: 'Click here to open your reflection journal and start documenting your journey.',
-        target: '#reflection-journal'
+        targetElement: 'meditation-container',
+        content: 'Welcome to your meditation center',
+        target: 'meditation-container',
+        targetSelector: '#meditation-container'
       },
       {
-        id: 'step-2',
-        title: 'Energy Insights',
-        description: 'View personalized insights about your energy patterns.',
-        elementId: 'energy-insights',
+        id: 'meditation-timer',
+        title: 'Meditation Timer',
+        description: 'Use this timer to track your meditation sessions',
+        elementId: 'timer-panel',
         position: 'bottom',
-        targetElement: '#energy-insights',
-        targetSelector: '#energy-insights',
-        content: 'Explore your energy insights to understand patterns in your consciousness.',
-        target: '#energy-insights'
+        targetElement: 'timer-container',
+        content: 'Set and track your meditation time',
+        target: 'timer-container',
+        targetSelector: '#timer-container'
       },
       {
-        id: 'step-3',
-        title: 'Chakra Analyzer',
-        description: 'See which of your chakras are most active based on your reflections.',
-        elementId: 'chakra-analyzer',
-        position: 'left',
-        targetElement: '#chakra-analyzer',
-        targetSelector: '#chakra-analyzer',
-        content: 'The chakra analyzer helps you understand which energy centers are most active.',
-        target: '#chakra-analyzer'
-      }
-    ]
-  },
-  {
-    id: 'ai-features-tour',
-    title: 'AI Assistant Features',
-    description: 'Learn how the AI assistant can help you on your spiritual journey',
-    condition: 'completedReflection',
-    steps: [
-      {
-        id: 'step-1',
-        title: 'AI Wisdom Guide',
-        description: 'Ask questions and receive guidance from the AI wisdom assistant.',
-        elementId: 'ai-wisdom-button',
-        position: 'right',
-        targetElement: '#ai-wisdom-button',
-        targetSelector: '#ai-wisdom-button',
-        content: 'Click this button to start a conversation with the AI wisdom guide.',
-        target: '#ai-wisdom-button'
-      },
-      {
-        id: 'step-2',
-        title: 'Personalized Practices',
-        description: 'Receive personalized practice recommendations based on your energy.',
-        elementId: 'personalized-practices',
-        position: 'bottom',
-        targetElement: '#personalized-practices',
-        targetSelector: '#personalized-practices',
-        content: 'View practices that are specifically recommended for your energy signature.',
-        target: '#personalized-practices'
-      },
-      {
-        id: 'step-3',
-        title: 'Meditation Assistant',
-        description: 'Get AI-guided meditation sessions tailored to your needs.',
-        elementId: 'meditation-assistant',
+        id: 'meditation-history',
+        title: 'Meditation History',
+        description: 'View your past meditation sessions and progress',
+        elementId: 'history-panel',
         position: 'top',
-        targetElement: '#meditation-assistant',
-        targetSelector: '#meditation-assistant',
-        content: 'Start an AI-guided meditation session that adapts to your energy state.',
-        target: '#meditation-assistant'
+        targetElement: 'history-container',
+        content: 'Review your meditation journey',
+        target: 'history-container',
+        targetSelector: '#history-container'
       }
-    ]
+    ],
+    requiredStep: 'dashboard-intro'
   }
 ];
+
+// Add default export
+export default guidedTours;

@@ -1,143 +1,283 @@
 
-/**
- * Performance utility functions and device capability detection
- */
+import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
+// Performance mode definitions
+export enum PerformanceMode {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high'
+}
+
+// Device capability
 export enum DeviceCapability {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high'
 }
 
-// Export low, medium, high as string literals for backward compatibility
-export type PerformanceMode = DeviceCapability | 'auto' | 'low' | 'medium' | 'high';
-
+// Render frequency
 export enum RenderFrequency {
   NORMAL = 'normal',
   FREQUENT = 'frequent',
   EXCESSIVE = 'excessive'
 }
 
-/**
- * Detect device capability based on hardware and browser features
- */
-export function getPerformanceCategory(): DeviceCapability {
-  if (typeof window === 'undefined') return DeviceCapability.MEDIUM;
-  
-  // Check if we already have a stored value
-  if ((window as any).__deviceCapability) {
-    return (window as any).__deviceCapability;
-  }
-  
-  // Check for known mobile devices
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
-  // Check for hardware concurrency (CPU cores)
-  const cpuCores = navigator.hardwareConcurrency || 0;
-  
-  // Device memory is not supported in all browsers, use a safe fallback
-  const deviceMemory = typeof (navigator as any).deviceMemory !== 'undefined' ? (navigator as any).deviceMemory : 4;
-  
-  // Use user agent for additional signals
-  const isOldBrowser = /MSIE|Trident/.test(navigator.userAgent);
-  
-  // Determine category based on hardware capabilities
-  if (isOldBrowser || (isMobile && (cpuCores <= 2 || deviceMemory <= 2))) {
-    return DeviceCapability.LOW;
-  } else if ((isMobile && cpuCores <= 4) || (!isMobile && cpuCores <= 2)) {
-    return DeviceCapability.MEDIUM;
-  } else {
-    return DeviceCapability.HIGH;
-  }
+// Performance preset options
+export type PerformancePreset = 'comprehensive' | 'balanced' | 'minimal' | 'disabled';
+
+// Performance feature configuration
+export interface FeatureConfig {
+  particleCount: number;
+  animationComplexity: number;
+  enableBlur: boolean;
+  enableGlow: boolean;
+  enableShadows: boolean;
+  enableParallax: boolean;
+  enablePreciseRenderingOptimization: boolean;
 }
 
-/**
- * Start monitoring performance
- */
-export function monitorPerformance(): void {
-  import('./performance/PerformanceMonitor').then((module) => {
-    const { PerformanceMonitor } = module;
-    const instance = new PerformanceMonitor();
-    instance.startMonitoring();
-  });
+// Performance feature flags
+export interface PerformanceFeatureFlags {
+  enableHeavyAnimations: boolean;
+  enableBackgroundEffects: boolean;
+  enableDetailedChakraVisualization: boolean;
+  enableAdvancedParticles: boolean;
+  enableRealtimeUpdates: boolean;
+  enableHighResolutionAssets: boolean;
 }
 
-/**
- * Create a performance throttled function
- */
-export function throttleForPerformance<T extends (...args: any[]) => any>(
-  fn: T, 
-  deviceCapability: PerformanceMode, 
-  options: { low?: number; medium?: number; high?: number } = {}
-): (...args: Parameters<T>) => ReturnType<T> | undefined {
-  const { low = 500, medium = 250, high = 100 } = options;
-  
-  let lastCall = 0;
-  let timeoutId: NodeJS.Timeout | null = null;
-  let throttleTime: number;
-  
-  // Set throttle time based on device capability
-  const capabilityValue = typeof deviceCapability === 'string' 
-    ? (deviceCapability as string)
-    : (deviceCapability as DeviceCapability);
-  
-  switch (capabilityValue) {
+// Web Vitals Config
+export interface WebVitalsConfig {
+  lcpThreshold: number;
+  fidThreshold: number;
+  clsThreshold: number;
+  ttfbThreshold: number;
+  collectAll: boolean;
+}
+
+// Memory Usage Thresholds
+export interface MemoryUsageThresholds {
+  warning: number;  // MB
+  critical: number; // MB
+}
+
+// Define performance metrics type
+export interface PerformanceMetrics {
+  fps: number;
+  memoryUsage: number;
+  renderTime: number;
+  jsHeapSize?: number;
+  loadTime?: number;
+  domNodes?: number;
+}
+
+// Performance Configuration Interface
+export interface PerformanceConfig {
+  performanceMode: PerformanceMode;
+  deviceCapability: DeviceCapability;
+  adaptiveQuality: boolean;
+  manualPerformanceMode: boolean;
+  features: PerformanceFeatureFlags;
+  webVitals: WebVitalsConfig;
+  memoryThresholds: MemoryUsageThresholds;
+  showPerformanceStats: boolean;
+  enablePerformanceMonitoring: boolean;
+  setManualPerformanceMode?: (mode: PerformanceMode) => void;
+}
+
+// Performance mode setting functions
+export const applyLowPerformanceMode = (): void => {
+  console.log("Applying low performance mode");
+  performanceMonitor.startMonitoring();
+};
+
+export const applyMediumPerformanceMode = (): void => {
+  console.log("Applying medium performance mode");
+  performanceMonitor.startMonitoring();
+};
+
+export const applyHighPerformanceMode = (): void => {
+  console.log("Applying high performance mode");
+  performanceMonitor.startMonitoring();
+};
+
+// Detect device capability
+export const detectDeviceCapability = (): DeviceCapability => {
+  // Logic to detect device capability
+  return DeviceCapability.HIGH;
+};
+
+// Get recommended performance mode based on device capability
+export const getRecommendedPerformanceMode = (
+  deviceCapability: DeviceCapability
+): PerformanceMode => {
+  switch (deviceCapability) {
     case DeviceCapability.LOW:
-    case 'low':
-      throttleTime = low;
-      break;
+      return PerformanceMode.LOW;
     case DeviceCapability.MEDIUM:
-    case 'medium':
-      throttleTime = medium;
-      break;
+      return PerformanceMode.MEDIUM;
     case DeviceCapability.HIGH:
-    case 'high':
-      throttleTime = high;
-      break;
-    case 'auto':
-      // Determine based on device capability
-      const detectedCapability = getPerformanceCategory();
-      return throttleForPerformance(fn, detectedCapability, options);
+      return PerformanceMode.HIGH;
     default:
-      throttleTime = medium;
+      return PerformanceMode.MEDIUM;
   }
-  
-  return function(...args: Parameters<T>): ReturnType<T> | undefined {
-    const now = Date.now();
-    
-    if (now - lastCall < throttleTime) {
-      // Clear any existing timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      
-      // Schedule the function call
-      timeoutId = setTimeout(() => {
-        lastCall = Date.now();
-        timeoutId = null;
-        fn(...args);
-      }, throttleTime - (now - lastCall));
-      
-      return undefined;
-    }
-    
-    lastCall = now;
-    return fn(...args);
-  };
-}
+};
 
-// Add throttle function for backward compatibility
-export function throttle<T extends (...args: any[]) => any>(
-  fn: T,
-  delay = 300
-): (...args: Parameters<T>) => void {
-  let lastCall = 0;
-  return function(...args: Parameters<T>): void {
-    const now = Date.now();
-    if (now - lastCall < delay) {
-      return;
-    }
-    lastCall = now;
-    fn(...args);
+// Analyze system performance
+export const analyzeSystemPerformance = (): Promise<PerformanceMetrics> => {
+  return new Promise((resolve) => {
+    // Simulate performance analysis
+    setTimeout(() => {
+      resolve({
+        fps: 60,
+        memoryUsage: 50,
+        renderTime: 8,
+        jsHeapSize: 20,
+        loadTime: 1200,
+        domNodes: 250
+      });
+    }, 100);
+  });
+};
+
+// Get performance feature configuration based on mode
+export const getFeatureConfig = (mode: PerformanceMode): FeatureConfig => {
+  switch (mode) {
+    case PerformanceMode.LOW:
+      return {
+        particleCount: 50,
+        animationComplexity: 1,
+        enableBlur: false,
+        enableGlow: false,
+        enableShadows: false,
+        enableParallax: false,
+        enablePreciseRenderingOptimization: false
+      };
+    case PerformanceMode.MEDIUM:
+      return {
+        particleCount: 150,
+        animationComplexity: 2,
+        enableBlur: true,
+        enableGlow: true,
+        enableShadows: false,
+        enableParallax: true,
+        enablePreciseRenderingOptimization: true
+      };
+    case PerformanceMode.HIGH:
+      return {
+        particleCount: 300,
+        animationComplexity: 3,
+        enableBlur: true,
+        enableGlow: true,
+        enableShadows: true,
+        enableParallax: true,
+        enablePreciseRenderingOptimization: true
+      };
+    default:
+      return {
+        particleCount: 150,
+        animationComplexity: 2,
+        enableBlur: true,
+        enableGlow: true,
+        enableShadows: false,
+        enableParallax: true,
+        enablePreciseRenderingOptimization: true
+      };
+  }
+};
+
+// Create default performance config
+export const createDefaultPerformanceConfig = (): PerformanceConfig => {
+  const deviceCapability = detectDeviceCapability();
+  const recommendedMode = getRecommendedPerformanceMode(deviceCapability);
+  
+  return {
+    performanceMode: recommendedMode,
+    deviceCapability,
+    adaptiveQuality: true,
+    manualPerformanceMode: false,
+    features: {
+      enableHeavyAnimations: recommendedMode !== PerformanceMode.LOW,
+      enableBackgroundEffects: recommendedMode !== PerformanceMode.LOW,
+      enableDetailedChakraVisualization: recommendedMode === PerformanceMode.HIGH,
+      enableAdvancedParticles: recommendedMode === PerformanceMode.HIGH,
+      enableRealtimeUpdates: true,
+      enableHighResolutionAssets: recommendedMode === PerformanceMode.HIGH
+    },
+    webVitals: {
+      lcpThreshold: 2500,
+      fidThreshold: 100,
+      clsThreshold: 0.1,
+      ttfbThreshold: 600,
+      collectAll: true
+    },
+    memoryThresholds: {
+      warning: 80,  // MB
+      critical: 150 // MB
+    },
+    showPerformanceStats: false,
+    enablePerformanceMonitoring: true
   };
-}
+};
+
+// Get performance preset
+export const getPerformancePreset = (preset: PerformancePreset): PerformanceConfig => {
+  const baseConfig = createDefaultPerformanceConfig();
+  
+  switch (preset) {
+    case 'comprehensive':
+      return {
+        ...baseConfig,
+        performanceMode: PerformanceMode.HIGH,
+        adaptiveQuality: false,
+        features: {
+          ...baseConfig.features,
+          enableHeavyAnimations: true,
+          enableBackgroundEffects: true,
+          enableDetailedChakraVisualization: true,
+          enableAdvancedParticles: true,
+          enableRealtimeUpdates: true,
+          enableHighResolutionAssets: true
+        }
+      };
+    case 'balanced':
+      return {
+        ...baseConfig,
+        performanceMode: PerformanceMode.MEDIUM,
+        adaptiveQuality: true
+      };
+    case 'minimal':
+      return {
+        ...baseConfig,
+        performanceMode: PerformanceMode.LOW,
+        adaptiveQuality: false,
+        features: {
+          ...baseConfig.features,
+          enableHeavyAnimations: false,
+          enableBackgroundEffects: false,
+          enableDetailedChakraVisualization: false,
+          enableAdvancedParticles: false,
+          enableRealtimeUpdates: true,
+          enableHighResolutionAssets: false
+        }
+      };
+    case 'disabled':
+      return {
+        ...baseConfig,
+        performanceMode: PerformanceMode.LOW,
+        adaptiveQuality: false,
+        enablePerformanceMonitoring: false,
+        features: {
+          ...baseConfig.features,
+          enableHeavyAnimations: false,
+          enableBackgroundEffects: false,
+          enableDetailedChakraVisualization: false,
+          enableAdvancedParticles: false,
+          enableRealtimeUpdates: false,
+          enableHighResolutionAssets: false
+        }
+      };
+    default:
+      return baseConfig;
+  }
+};

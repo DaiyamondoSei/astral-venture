@@ -1,55 +1,101 @@
 
-import { AssistantSuggestion, AssistantIntent, AssistantIntentStatus } from '@/services/ai/types';
+// Importing from the newly created interface file
+import type { AssistantSuggestion, AssistantIntent, AssistantIntentStatus } from '@/services/ai/types';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-import { RenderAnalyzer } from '@/utils/performance/RenderAnalyzer';
 
-/**
- * AI-powered code analysis and assistance
- */
+export { AssistantSuggestion, AssistantIntent, AssistantIntentStatus };
+
 export class AICodeAssistant {
-  private suggestions: Record<string, AssistantSuggestion[]> = {};
+  private suggestions: AssistantSuggestion[] = [];
   private intents: AssistantIntent[] = [];
-  private context: string = '';
+  private analyzedComponents: Set<string> = new Set();
+  private isFixing: boolean = false;
 
   constructor() {
-    // Initialize with empty suggestions
-    this.suggestions = {};
-    this.intents = [];
+    // Initialize the code assistant
+    console.log('AI Code Assistant initialized');
   }
 
-  /**
-   * Get suggestions for a specific component
-   */
-  public async getSuggestions(componentId: string): Promise<AssistantSuggestion[]> {
-    // Return cached suggestions if available
-    if (this.suggestions[componentId]) {
-      return this.suggestions[componentId];
-    }
-
-    try {
-      // Generate new suggestions based on component analysis
-      const suggestions = await this.analyzeSingleComponent(componentId);
+  // Analyze a specific component and provide suggestions
+  public async analyzeComponent(componentId: string): Promise<AssistantSuggestion[]> {
+    console.log(`Analyzing component: ${componentId}`);
+    
+    // Mark this component as analyzed
+    this.analyzedComponents.add(componentId);
+    
+    // For now, we'll generate mock suggestions based on performance metrics
+    const metrics = performanceMonitor.getComponentMetrics(componentId);
+    const suggestions: AssistantSuggestion[] = [];
+    
+    // Generate suggestions based on performance metrics if available
+    if (metrics && typeof metrics === 'object') {
+      const averageRenderTime = typeof metrics.averageRenderTime === 'number' ? metrics.averageRenderTime : 0;
       
-      // Cache suggestions
-      this.suggestions[componentId] = suggestions;
-      
-      return suggestions;
-    } catch (error) {
-      console.error('Error getting suggestions:', error);
-      return [];
+      if (averageRenderTime > 50) {
+        suggestions.push({
+          id: `perf-${componentId}-${Date.now()}`,
+          type: 'performance',
+          component: componentId,
+          title: 'High render time detected',
+          description: `Component ${componentId} has an average render time of ${averageRenderTime.toFixed(2)}ms, which may cause performance issues.`,
+          priority: 'high',
+          autoFixAvailable: true
+        });
+      } else if (averageRenderTime > 16) {
+        suggestions.push({
+          id: `perf-${componentId}-${Date.now()}`,
+          type: 'performance',
+          component: componentId,
+          title: 'Render optimization opportunity',
+          description: `Component ${componentId} could benefit from render optimization. Current average: ${averageRenderTime.toFixed(2)}ms.`,
+          priority: 'medium',
+          autoFixAvailable: false
+        });
+      }
     }
+    
+    // Add some generic suggestions for every component
+    suggestions.push({
+      id: `quality-${componentId}-${Date.now()}`,
+      type: 'quality',
+      component: componentId,
+      title: 'Consider adding error boundaries',
+      description: 'Wrapping this component with an error boundary would improve resilience.',
+      priority: 'low',
+      autoFixAvailable: false
+    });
+    
+    // Store the suggestions
+    this.suggestions = [...this.suggestions, ...suggestions];
+    
+    return suggestions;
   }
-
-  /**
-   * Get all registered intents
-   */
-  public async getIntents(): Promise<AssistantIntent[]> {
-    return this.intents;
+  
+  // Analyze multiple components
+  public async analyzeComponents(componentIds: string[]): Promise<AssistantSuggestion[]> {
+    console.log(`Analyzing ${componentIds.length} components`);
+    
+    const allSuggestions: AssistantSuggestion[] = [];
+    
+    for (const componentId of componentIds) {
+      const suggestions = await this.analyzeComponent(componentId);
+      allSuggestions.push(...suggestions);
+    }
+    
+    return allSuggestions;
   }
-
-  /**
-   * Register a new intent
-   */
+  
+  // Get all current suggestions
+  public getSuggestions(): AssistantSuggestion[] {
+    return this.suggestions;
+  }
+  
+  // Get suggestions for a specific component
+  public getSuggestionsForComponent(componentId: string): AssistantSuggestion[] {
+    return this.suggestions.filter(s => s.component === componentId);
+  }
+  
+  // Register a new intent
   public async registerIntent(intent: Omit<AssistantIntent, 'id' | 'created' | 'status'>): Promise<AssistantIntent> {
     const newIntent: AssistantIntent = {
       ...intent,
@@ -58,126 +104,79 @@ export class AICodeAssistant {
       status: 'pending'
     };
     
-    this.intents.push(newIntent);
+    this.intents = [...this.intents, newIntent];
+    
     return newIntent;
   }
-
-  /**
-   * Apply an auto-fix for a suggestion
-   */
-  public async applyAutoFix(suggestionId: string): Promise<boolean> {
-    // Find the suggestion across all components
-    let targetSuggestion: AssistantSuggestion | null = null;
-    
-    Object.values(this.suggestions).forEach(componentSuggestions => {
-      const found = componentSuggestions.find(s => s.id === suggestionId);
-      if (found) {
-        targetSuggestion = found;
-      }
-    });
-    
-    if (!targetSuggestion || !targetSuggestion.autoFixAvailable) {
-      return false;
-    }
-    
-    try {
-      // Apply the auto-fix (mock implementation for now)
-      console.log(`Applying auto-fix for suggestion: ${suggestionId}`);
-      
-      // Return success
-      return true;
-    } catch (error) {
-      console.error('Error applying auto-fix:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Update the status of an intent
-   */
-  public async updateIntentStatus(intentId: string, status: AssistantIntentStatus): Promise<boolean> {
+  
+  // Update an intent's status
+  public async updateIntentStatus(intentId: string, status: AssistantIntentStatus): Promise<AssistantIntent | undefined> {
     const intentIndex = this.intents.findIndex(i => i.id === intentId);
     
     if (intentIndex === -1) {
-      return false;
+      return undefined;
     }
     
-    this.intents[intentIndex] = {
+    const updatedIntent = {
       ...this.intents[intentIndex],
       status,
       updated: new Date()
     };
     
-    return true;
-  }
-
-  /**
-   * Update context information for more accurate suggestions
-   */
-  public updateContext(context: string): void {
-    this.context = context;
-  }
-
-  /**
-   * Analyze a single component for improvement suggestions
-   */
-  private async analyzeSingleComponent(componentId: string): Promise<AssistantSuggestion[]> {
-    const suggestions: AssistantSuggestion[] = [];
+    this.intents = [
+      ...this.intents.slice(0, intentIndex),
+      updatedIntent,
+      ...this.intents.slice(intentIndex + 1)
+    ];
     
-    // Get performance metrics
-    const metrics = performanceMonitor.getComponentMetrics();
-    const componentMetrics = metrics[componentId];
+    return updatedIntent;
+  }
+  
+  // Get all intents
+  public getIntents(): AssistantIntent[] {
+    return this.intents;
+  }
+  
+  // Apply a fix for a suggestion
+  public async applyFix(suggestionId: string): Promise<boolean> {
+    const suggestion = this.suggestions.find(s => s.id === suggestionId);
     
-    // Check for render performance issues
-    if (componentMetrics && typeof componentMetrics === 'object') {
-      const averageRenderTime = 'averageRenderTime' in componentMetrics ? 
-        (componentMetrics as any).averageRenderTime : 0;
-      
-      if (averageRenderTime > 16) {
-        suggestions.push({
-          id: `perf-${componentId}-${Date.now()}`,
-          type: 'warning',
-          component: componentId,
-          title: 'Slow render performance',
-          description: `Component ${componentId} is rendering slowly (${averageRenderTime.toFixed(2)}ms)`,
-          priority: 'high',
-          autoFixAvailable: false
-        });
-      }
-      
-      // Check for excessive re-renders
-      const renderCount = 'renderCount' in componentMetrics ? 
-        (componentMetrics as any).renderCount : 0;
-      
-      if (renderCount > 50) {
-        suggestions.push({
-          id: `renders-${componentId}-${Date.now()}`,
-          type: 'warning',
-          component: componentId,
-          title: 'Excessive re-renders',
-          description: `Component ${componentId} is re-rendering excessively (${renderCount} times)`,
-          context: 'Consider using React.memo or optimizing dependency arrays',
-          codeExample: `
-const ${componentId} = React.memo(({ prop1, prop2 }) => {
-  // Component implementation
-});`,
-          priority: 'medium',
-          autoFixAvailable: true
-        });
-      }
+    if (!suggestion || !suggestion.autoFixAvailable) {
+      return false;
     }
     
-    // Check for general React best practices
-    suggestions.push({
-      id: `practice-${componentId}-${Date.now()}`,
-      type: 'improvement',
-      component: componentId,
-      title: 'Use functional components with hooks',
-      description: 'Modern React best practices favor functional components with hooks',
-      priority: 'low',
-      autoFixAvailable: false
-    });
+    // Set fixing flag
+    this.isFixing = true;
     
-    return suggestions;
+    // Simulate applying a fix
+    console.log(`Applying fix for suggestion: ${suggestionId}`);
+    
+    // Wait for a short time to simulate work
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Reset fixing flag
+    this.isFixing = false;
+    
+    // Remove the fixed suggestion
+    this.suggestions = this.suggestions.filter(s => s.id !== suggestionId);
+    
+    return true;
+  }
+  
+  // Check if currently applying a fix
+  public getIsFixing(): boolean {
+    return this.isFixing;
+  }
+  
+  // Reset the code assistant
+  public reset(): void {
+    this.suggestions = [];
+    this.intents = [];
+    this.analyzedComponents.clear();
+    this.isFixing = false;
   }
 }
+
+// Export a singleton instance
+export const aiCodeAssistant = new AICodeAssistant();
+export default aiCodeAssistant;

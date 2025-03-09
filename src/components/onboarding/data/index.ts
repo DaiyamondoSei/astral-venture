@@ -1,15 +1,15 @@
 
-import { FeatureTooltipData, GuidedTourData } from '../hooks/achievement/types';
-import tooltips from './tooltips';
-import tours from './tours';
-import achievements from './achievements';
+import { achievements } from './achievements';
+import { tooltips } from './tooltips';
+import { guidedTours } from './tours';
 
-// Export all data with correctly typed exports
-export const featureTooltips: FeatureTooltipData[] = tooltips;
-export const guidedTours: GuidedTourData[] = tours;
-export const onboardingAchievements = achievements;
-export const progressiveAchievements = achievements;
-export const milestoneAchievements = achievements;
+export { achievements, tooltips, guidedTours };
 
-// For backward compatibility
-export const achievementsList = achievements;
+// Export as namespace for backwards compatibility
+export const onboardingData = {
+  achievements,
+  tooltips,
+  guidedTours
+};
+
+export default onboardingData;

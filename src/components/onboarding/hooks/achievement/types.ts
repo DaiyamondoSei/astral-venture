@@ -112,7 +112,7 @@ export interface FeatureTooltipData {
   condition?: string;
   delay?: number;
   elementId?: string;
-  targetSelector?: string;
+  targetSelector: string; // Make required to match data/types.ts
   requiredStep?: string;
 }
 
@@ -135,7 +135,7 @@ export interface TourStep {
   title: string;
   content: string;
   elementId: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position: 'top' | 'bottom' | 'left' | 'right';
   target?: string;
   targetSelector: string;
 }

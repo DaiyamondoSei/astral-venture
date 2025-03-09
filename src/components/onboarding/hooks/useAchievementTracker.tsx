@@ -1,58 +1,102 @@
 
-import { useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAchievementProgress } from './achievement/useAchievementProgress';
-import { useAchievementState } from './achievement/useAchievementState';
+import { useAchievementDisplay } from './achievement/useAchievementDisplay';
+import { IAchievementData, AchievementTrackerProps, AchievementTrackerResult } from './achievement/types';
 
-// Props for the hook
-interface AchievementTrackerProps {
-  onboardingInteractions?: number;
-  reflections?: number;
-  completedPractices?: number;
-}
-
-// Types for the achievement tracker
-type AchievementTrackerResult = ReturnType<typeof useAchievementProgress>;
-
-/**
- * Hook to track user progress and award achievements automatically
- */
 export const useAchievementTracker = (props: AchievementTrackerProps): AchievementTrackerResult => {
-  const { onboardingInteractions = 0, reflections = 0, completedPractices = 0 } = props;
-  const { achievements } = useAchievementState();
-  const tracker = useAchievementProgress();
+  const {
+    onUnlock,
+    achievementList = [],
+    completedSteps = {},
+    stepInteractions = [],
+    userId = '',
+    currentStreak = 0,
+    reflectionCount = 0,
+    meditationMinutes = 0,
+    wisdomResourcesCount = 0,
+    totalPoints = 0
+  } = props;
+
+  // Get achievement progress tracking functionality
+  const achievementProgress = useAchievementProgress();
   
-  // Track onboarding interactions
+  // Get achievement display functionality
+  const {
+    currentAchievement,
+    earnedAchievements,
+    dismissAchievement,
+    displayAchievement
+  } = useAchievementDisplay();
+
+  const [achievementHistory, setAchievementHistory] = useState<Record<string, any>>({});
+  const [progressTracking, setProgressTracking] = useState<Record<string, number>>({});
+
+  // Function to track progress for specific types
+  const trackProgress = useCallback((type: string, amount: number) => {
+    achievementProgress.updateProgress(type, amount);
+    
+    setProgressTracking(prev => ({
+      ...prev,
+      [type]: (prev[type] || 0) + amount
+    }));
+  }, [achievementProgress]);
+
+  // Check completed steps for unlocking achievements
   useEffect(() => {
-    if (onboardingInteractions > 0) {
-      // Find onboarding interaction achievements
-      const interactionAchievement = achievements.find(a => a.id === 'onboarding-interaction');
-      if (interactionAchievement) {
-        tracker.trackProgress('onboarding-interaction', 1);
+    Object.entries(completedSteps).forEach(([step, completed]) => {
+      if (completed) {
+        trackProgress(`step_${step}`, 1);
       }
-    }
-  }, [onboardingInteractions, achievements]);
-  
-  // Track reflections
+    });
+  }, [completedSteps, trackProgress]);
+
+  // Check step interactions for unlocking achievements
   useEffect(() => {
-    if (reflections > 0) {
-      // Find reflection achievements
-      const reflectionAchievement = achievements.find(a => a.id === 'reflection-milestone');
-      if (reflectionAchievement) {
-        tracker.trackProgress('reflection-milestone', 1);
+    stepInteractions.forEach(interaction => {
+      if (interaction && interaction.type) {
+        trackProgress(`interaction_${interaction.type}`, 1);
       }
-    }
-  }, [reflections, achievements]);
-  
-  // Track completed practices
+    });
+  }, [stepInteractions, trackProgress]);
+
+  // Check streak for unlocking achievements
   useEffect(() => {
-    if (completedPractices > 0) {
-      // Find practice achievements
-      const practiceAchievement = achievements.find(a => a.id === 'practice-completion');
-      if (practiceAchievement) {
-        tracker.trackProgress('practice-completion', 1);
-      }
+    if (currentStreak > 0) {
+      trackProgress('streak_days', currentStreak);
     }
-  }, [completedPractices, achievements]);
-  
-  return tracker;
+  }, [currentStreak, trackProgress]);
+
+  // Function to get achievement progress
+  const getAchievementProgress = useCallback((achievementId: string): number => {
+    const achievement = achievementList.find(a => a.id === achievementId);
+    if (!achievement) return 0;
+    
+    return achievementProgress.calculateProgressForAchievement(achievement);
+  }, [achievementList, achievementProgress]);
+
+  // Function to get total achievement points
+  const getTotalPoints = useCallback((): number => {
+    return earnedAchievements.reduce((total, achievement) => total + (achievement.points || 0), 0);
+  }, [earnedAchievements]);
+
+  // Function to get overall progress percentage
+  const getProgressPercentage = useCallback((): number => {
+    if (achievementList.length === 0) return 0;
+    return (earnedAchievements.length / achievementList.length) * 100;
+  }, [achievementList, earnedAchievements]);
+
+  return {
+    earnedAchievements,
+    currentAchievement,
+    dismissAchievement,
+    getAchievementProgress,
+    getTotalPoints,
+    getProgressPercentage,
+    achievementHistory,
+    progressTracking,
+    trackProgress
+  };
 };
+
+export default useAchievementTracker;

@@ -52,7 +52,10 @@ const FeatureDiscoveryLayer: React.FC<FeatureDiscoveryLayerProps> = ({
       {activeTooltips.map(tooltip => (
         <FeatureTooltip
           key={tooltip.id}
-          tooltipData={tooltip}
+          tooltipData={{
+            ...tooltip,
+            targetSelector: tooltip.targetSelector || `#${tooltip.elementId || tooltip.targetElement}`
+          }}
           onDismiss={() => dismissTooltip(tooltip.id)}
         />
       ))}

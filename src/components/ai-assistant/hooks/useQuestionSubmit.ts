@@ -75,8 +75,8 @@ export const useQuestionSubmit = ({
         // Set model info if available
         if (aiResponse.meta) {
           state.setModelInfo({
-            model: aiResponse.meta.model,
-            tokens: aiResponse.meta.tokenUsage
+            model: aiResponse.meta.model || "unknown",
+            tokens: aiResponse.meta.tokenUsage || 0
           });
         }
       }
