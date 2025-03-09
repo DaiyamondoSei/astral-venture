@@ -3,6 +3,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { PerfConfigProvider } from './contexts/PerfConfigContext';
 import { PerformanceProvider } from './contexts/PerformanceContext';
+import { ConsciousnessProvider } from './contexts/ConsciousnessContext';
 import LoadingScreen from './components/LoadingScreen';
 import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
 
@@ -22,24 +23,26 @@ function App() {
   return (
     <PerfConfigProvider>
       <PerformanceProvider>
-        <Router>
-          <Suspense fallback={<LoadingScreen />}>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/dream-capture" element={<DreamCapturePage />} />
-              <Route path="/entry-animation" element={<EntryAnimation />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/meditation" element={<MeditationPage />} />
-              <Route path="/reflection" element={<ReflectionPage />} />
-              <Route path="/chakra" element={<ChakraPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-          {/* Performance Monitor (only visible in development) */}
-          <PerformanceMonitor />
-        </Router>
+        <ConsciousnessProvider>
+          <Router>
+            <Suspense fallback={<LoadingScreen />}>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/dream-capture" element={<DreamCapturePage />} />
+                <Route path="/entry-animation" element={<EntryAnimation />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/meditation" element={<MeditationPage />} />
+                <Route path="/reflection" element={<ReflectionPage />} />
+                <Route path="/chakra" element={<ChakraPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+            {/* Performance Monitor (only visible in development) */}
+            <PerformanceMonitor />
+          </Router>
+        </ConsciousnessProvider>
       </PerformanceProvider>
     </PerfConfigProvider>
   );
