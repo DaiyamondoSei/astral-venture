@@ -1,10 +1,6 @@
 
-/**
- * Core Consciousness Data Types
- * These types define the structure for consciousness metrics, dream storage, and chakra activation.
- */
+// Core consciousness data types
 
-// Consciousness Levels and States
 export type ConsciousnessLevel = 
   | 'awakening'
   | 'aware'
@@ -14,15 +10,6 @@ export type ConsciousnessLevel =
   | 'cosmically_aware'
   | 'unified';
 
-export type ConsciousnessState = 
-  | 'active'
-  | 'reflective'
-  | 'meditative'
-  | 'dreaming'
-  | 'lucid'
-  | 'expanded';
-
-// Chakra System
 export type ChakraType = 
   | 'root'
   | 'sacral'
@@ -32,78 +19,102 @@ export type ChakraType =
   | 'third'
   | 'crown';
 
+export interface ConsciousnessMetrics {
+  userId: string;
+  level: ConsciousnessLevel;
+  awarenessScore: number;
+  expansionRate: number;
+  insightDepth: number;
+  reflectionQuality: number;
+  meditationConsistency: number;
+  energyClarity: number;
+  chakraBalance: number;
+  lastAssessment: string;
+  history: ConsciousnessHistoryEntry[];
+}
+
+export interface ConsciousnessHistoryEntry {
+  date: string;
+  awarenessScore: number;
+  level: ConsciousnessLevel;
+}
+
 export interface ChakraStatus {
   type: ChakraType;
-  activation: number; // 0-100 percentage
-  balance: number; // -100 to 100 (underactive to overactive)
+  activation: number;
+  balance: number;
   blockages: string[];
   dominantEmotions: string[];
 }
 
 export interface ChakraSystem {
   chakras: Record<ChakraType, ChakraStatus>;
-  overallBalance: number; // 0-100 percentage
+  overallBalance: number;
   dominantChakra: ChakraType | null;
   lastUpdated: string;
 }
 
-// Dream Storage
+export interface DreamConsciousness {
+  depth: number;
+  insights: string[];
+  archetypes: string[];
+}
+
+export interface DreamAnalysis {
+  theme: string;
+  interpretation: string;
+  guidance: string;
+}
+
 export interface DreamRecord {
   id: string;
   userId: string;
   date: string;
   content: string;
-  lucidity: number; // 0-100 percentage
+  lucidity: number;
   emotionalTone: string[];
   symbols: string[];
   chakrasActivated: ChakraType[];
-  consciousness: {
-    depth: number; // 0-100 percentage
-    insights: string[];
-    archetypes: string[];
-  };
-  analysis: {
-    theme: string;
-    interpretation: string;
-    guidance: string;
-  };
+  consciousness?: DreamConsciousness;
+  analysis?: DreamAnalysis;
   tags: string[];
 }
 
-// Consciousness Metrics
-export interface ConsciousnessMetrics {
-  userId: string;
-  level: ConsciousnessLevel;
-  awarenessScore: number; // 0-100 percentage
-  expansionRate: number; // Growth rate over time
-  insightDepth: number; // 0-100 percentage
-  reflectionQuality: number; // 0-100 percentage
-  meditationConsistency: number; // 0-100 percentage
-  energyClarity: number; // 0-100 percentage
-  chakraBalance: number; // 0-100 percentage
-  lastAssessment: string;
-  history: {
-    date: string;
-    level: ConsciousnessLevel;
-    awarenessScore: number;
-  }[];
+export interface ConsciousnessInsight {
+  id: string;
+  text: string;
+  source: 'meditation' | 'dream' | 'reflection' | 'chakra' | 'system';
+  relevance: number;
+  dateGenerated: string;
 }
 
-// User Progress
+export interface ConsciousnessRecommendation {
+  id: string;
+  type: 'practice' | 'reflection' | 'meditation' | 'chakra';
+  title: string;
+  description: string;
+  priorityLevel: number;
+}
+
 export interface ConsciousnessProgress {
   userId: string;
   currentLevel: ConsciousnessLevel;
-  currentState: ConsciousnessState;
+  currentState: 'inactive' | 'active' | 'balanced' | 'expanding' | 'evolving';
   energyPoints: number;
   meditationMinutes: number;
   reflectionCount: number;
   dreamRecallPercentage: number;
-  chakraSystem: ChakraSystem;
+  chakraSystem: {
+    chakras: Record<string, any>;
+    overallBalance: number;
+    dominantChakra: ChakraType | null;
+    lastUpdated: string;
+  };
   nextMilestone: {
     description: string;
     pointsNeeded: number;
     estimatedCompletion: string;
   };
-  insights: string[];
-  recommendations: string[];
+  insights: ConsciousnessInsight[];
+  recommendations: ConsciousnessRecommendation[];
 }

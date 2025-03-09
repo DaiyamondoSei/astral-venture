@@ -1,37 +1,44 @@
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
-export const useLogout = (userId?: string) => {
+export function useLogout() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleLogout = async () => {
-    if (!userId) return;
-    
-    setIsLoggingOut(true);
+  const logout = async () => {
     try {
-      await supabase.auth.signOut();
+      setIsLoggingOut(true);
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Clear any user-specific data from localStorage
+      localStorage.removeItem('hasVisitedQuanex');
+      
+      // Redirect to login page
+      navigate('/login');
+      
       toast({
-        title: "Signed out",
-        description: "You've been successfully signed out.",
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
       });
-      localStorage.removeItem(`entry-animation-shown-${userId}`);
-    } catch (error: any) {
-      console.error('Error signing out:', error);
+    } catch (error) {
+      console.error('Logout error:', error);
       toast({
-        title: "Sign out failed",
-        description: error.message,
-        variant: "destructive"
+        title: "Logout Failed",
+        description: "There was a problem logging you out. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsLoggingOut(false);
     }
   };
 
-  return {
-    handleLogout,
-    isLoggingOut
-  };
-};
+  return { logout, isLoggingOut };
+}

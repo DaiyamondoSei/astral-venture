@@ -1,27 +1,42 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
 import { useConsciousness } from '@/contexts/ConsciousnessContext';
-import { toast } from '@/components/ui/use-toast';
+import { useUser } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { dreamService } from '@/services/consciousness/dreamService';
+import type { DreamRecord, ChakraType } from '@/types/consciousness';
 
-/**
- * Dream Capture Form component
- */
-export const DreamCaptureForm: React.FC = () => {
-  const [dreamContent, setDreamContent] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export function DreamCaptureForm() {
+  const navigate = useNavigate();
+  const user = useUser();
   const { saveDream } = useConsciousness();
+  const { toast } = useToast();
   
+  const [dreamContent, setDreamContent] = useState('');
+  const [lucidity, setLucidity] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to save your dream record.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (!dreamContent.trim()) {
       toast({
-        title: 'Dream content required',
-        description: 'Please enter your dream to continue.',
-        variant: 'destructive'
+        title: "Empty Dream Content",
+        description: "Please describe your dream before submitting.",
+        variant: "destructive"
       });
       return;
     }
@@ -29,56 +44,103 @@ export const DreamCaptureForm: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      const savedDream = await saveDream(dreamContent);
+      // Analyze dream content
+      const analysis = dreamService.analyzeDreamContent(dreamContent);
       
-      if (savedDream) {
+      // Prepare dream record
+      const dreamRecord: Omit<DreamRecord, 'id'> = {
+        userId: user.id,
+        date: new Date().toISOString(),
+        content: dreamContent,
+        lucidity,
+        emotionalTone: analysis.emotionalTone,
+        symbols: analysis.symbols,
+        chakrasActivated: analysis.chakrasActivated as ChakraType[],
+        consciousness: {
+          depth: Math.min(10, Math.max(1, lucidity * 2)),
+          insights: [],
+          archetypes: []
+        },
+        analysis: {
+          theme: analysis.theme,
+          interpretation: `Your dream appears to reflect ${analysis.theme.toLowerCase()} themes.`,
+          guidance: `Consider reflecting on ${analysis.theme.toLowerCase()} aspects of your life.`
+        },
+        tags: analysis.emotionalTone
+      };
+      
+      // Save the dream
+      const result = await saveDream(dreamRecord);
+      
+      if (result) {
         toast({
-          title: 'Dream captured',
-          description: 'Your dream has been saved and analyzed.',
+          title: "Dream Captured",
+          description: "Your dream has been recorded successfully.",
         });
-        setDreamContent('');
-      } else {
-        toast({
-          title: 'Error saving dream',
-          description: 'Please try again later.',
-          variant: 'destructive'
-        });
+        
+        // Store completion in localStorage
+        localStorage.setItem('dreamCaptureCompleted', 'true');
+        
+        // Navigate to entry animation or dashboard
+        navigate('/entry-animation');
       }
     } catch (error) {
+      console.error('Error saving dream:', error);
       toast({
-        title: 'Error saving dream',
-        description: 'Please try again later.',
-        variant: 'destructive'
+        title: "Error Saving Dream",
+        description: "There was a problem saving your dream. Please try again.",
+        variant: "destructive"
       });
-      console.error('Dream capture error:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit}>
-        <h2 className="text-xl font-semibold mb-4">Capture Your Dream</h2>
-        <p className="text-muted-foreground mb-4">
-          Record your dream to receive insights about your subconscious and chakra activations.
-        </p>
-        
-        <Textarea 
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <label htmlFor="dreamContent" className="block text-sm font-medium">
+          Describe your dream in detail:
+        </label>
+        <Textarea
+          id="dreamContent"
           value={dreamContent}
           onChange={(e) => setDreamContent(e.target.value)}
-          placeholder="Describe your dream in detail..."
-          className="min-h-[150px] mb-4"
-        />
-        
-        <Button 
-          type="submit" 
+          placeholder="I found myself walking through a forest where the trees were glowing with blue light..."
+          rows={8}
           className="w-full"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Analyzing Dream...' : 'Save & Analyze Dream'}
-        </Button>
-      </form>
-    </Card>
+          required
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <label htmlFor="lucidity" className="block text-sm font-medium">
+          Lucidity Level: {lucidity}
+        </label>
+        <p className="text-xs text-gray-500">
+          How aware were you that you were dreaming? (0 = not at all, 5 = completely lucid)
+        </p>
+        <Slider
+          id="lucidity"
+          min={0}
+          max={5}
+          step={1}
+          value={[lucidity]}
+          onValueChange={(value) => setLucidity(value[0])}
+        />
+        <div className="flex justify-between text-xs">
+          <span>Not Lucid</span>
+          <span>Fully Lucid</span>
+        </div>
+      </div>
+      
+      <Button 
+        type="submit" 
+        className="w-full"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'Capturing Dream...' : 'Capture Dream'}
+      </Button>
+    </form>
   );
-};
+}

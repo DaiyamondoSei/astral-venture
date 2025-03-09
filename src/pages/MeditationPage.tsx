@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MeditationTimer } from '@/components/meditation/MeditationTimer';
+import MeditationTimer from '@/components/meditation/MeditationTimer';
 
 const MeditationPage = () => {
   return (

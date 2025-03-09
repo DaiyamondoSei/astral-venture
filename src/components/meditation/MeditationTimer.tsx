@@ -1,217 +1,144 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Card } from '@/components/ui/card';
 import { Play, Pause, RotateCcw, Check } from 'lucide-react';
-import HumanSilhouette from '@/components/entry-animation/cosmic/silhouette/HumanSilhouette';
+import { useToast } from '@/hooks/use-toast';
 
-interface MeditationTimerProps {
-  defaultDuration?: number; // in minutes
-  onComplete?: (duration: number) => void;
-  showChakras?: boolean;
-  activatedChakras?: number[];
-}
+const DEFAULT_DURATION = 5; // 5 minutes
+const DEFAULT_INTERVAL = 60; // 60 seconds
 
-const MeditationTimer: React.FC<MeditationTimerProps> = ({
-  defaultDuration = 5,
-  onComplete,
-  showChakras = true,
-  activatedChakras = []
-}) => {
-  const [duration, setDuration] = useState(defaultDuration);
-  const [timeLeft, setTimeLeft] = useState(duration * 60);
+const MeditationTimer = () => {
+  const [duration, setDuration] = useState(DEFAULT_DURATION);
+  const [timeRemaining, setTimeRemaining] = useState(duration * 60);
   const [isActive, setIsActive] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [progress, setProgress] = useState(0);
-  
-  // Format time as MM:SS
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-  
-  // Calculate chakra intensity based on progress
-  const getChakraIntensity = useCallback((chakraIndex: number) => {
-    const baseIntensity = 0.3;
-    const progressEffect = progress * 0.7;
-    
-    // If this chakra is activated, give it more intensity
-    const isActivated = activatedChakras.includes(chakraIndex);
-    const activationBonus = isActivated ? 0.3 : 0;
-    
-    // Make some chakras more prominent during specific progress points
-    let phaseBonus = 0;
-    
-    if (progress < 0.3) {
-      // Root and sacral more active in early meditation
-      if (chakraIndex === 0 || chakraIndex === 1) {
-        phaseBonus = 0.2;
-      }
-    } else if (progress < 0.6) {
-      // Solar plexus and heart more active in mid meditation
-      if (chakraIndex === 2 || chakraIndex === 3) {
-        phaseBonus = 0.2;
-      }
-    } else {
-      // Throat, third eye, and crown more active in later meditation
-      if (chakraIndex === 4 || chakraIndex === 5 || chakraIndex === 6) {
-        phaseBonus = 0.2;
-      }
-    }
-    
-    return Math.min(baseIntensity + progressEffect + activationBonus + phaseBonus, 1);
-  }, [progress, activatedChakras]);
-  
-  // Timer logic
+  const [isComplete, setIsComplete] = useState(false);
+  const { toast } = useToast();
+
+  // Effect for countdown
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
-    if (isActive && timeLeft > 0) {
+    if (isActive && timeRemaining > 0) {
       interval = setInterval(() => {
-        setTimeLeft(prevTime => {
-          const newTime = prevTime - 1;
-          const newProgress = 1 - (newTime / (duration * 60));
-          setProgress(newProgress);
-          return newTime;
-        });
+        setTimeRemaining((prevTime) => prevTime - 1);
       }, 1000);
-    } else if (isActive && timeLeft === 0) {
+    } else if (isActive && timeRemaining === 0) {
       setIsActive(false);
-      setIsCompleted(true);
-      if (onComplete) {
-        onComplete(duration);
-      }
-    } else if (interval) {
-      clearInterval(interval);
+      setIsComplete(true);
+      
+      // Play completion sound
+      const audio = new Audio('/meditation-complete.mp3');
+      audio.play().catch(err => console.log('Audio play failed:', err));
+      
+      // Show completion notification
+      toast({
+        title: "Meditation Complete",
+        description: `You've completed a ${duration} minute meditation session.`,
+      });
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, timeLeft, duration, onComplete]);
-  
-  // Reset timer
+  }, [isActive, timeRemaining, duration, toast]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const startTimer = () => {
+    setIsActive(true);
+    setIsComplete(false);
+  };
+
+  const pauseTimer = () => {
+    setIsActive(false);
+  };
+
   const resetTimer = () => {
     setIsActive(false);
-    setTimeLeft(duration * 60);
-    setProgress(0);
-    setIsCompleted(false);
+    setIsComplete(false);
+    setTimeRemaining(duration * 60);
   };
-  
-  // Handle duration change
+
   const handleDurationChange = (value: number[]) => {
     const newDuration = value[0];
     setDuration(newDuration);
-    setTimeLeft(newDuration * 60);
-    setProgress(0);
+    setTimeRemaining(newDuration * 60);
+    setIsActive(false);
+    setIsComplete(false);
   };
-  
+
   return (
-    <div className="relative w-full max-w-md mx-auto rounded-xl bg-black/30 backdrop-blur-sm border border-white/10 p-6 shadow-lg">
-      {/* Human silhouette visualization */}
-      <div className="mb-8 w-full max-w-[200px] mx-auto">
-        <HumanSilhouette 
-          showChakras={showChakras}
-          showDetails={progress > 0.3}
-          showIllumination={progress > 0.5}
-          showFractal={progress > 0.7}
-          showTranscendence={progress > 0.9}
-          showInfinity={isCompleted}
-          baseProgressPercentage={progress * 100}
-          getChakraIntensity={getChakraIntensity}
-          activatedChakras={activatedChakras}
-        />
-      </div>
-      
-      {/* Timer display */}
-      <div className="text-center mb-8">
-        <motion.div 
-          className="text-4xl font-mono font-light text-white"
-          animate={isActive ? { scale: [1, 1.03, 1] } : {}}
-          transition={{ duration: 2, repeat: isActive ? Infinity : 0, repeatType: "reverse" }}
-        >
-          {formatTime(timeLeft)}
-        </motion.div>
+    <Card className="p-6 max-w-md mx-auto bg-white/10 backdrop-blur-md border-0">
+      <div className="text-center space-y-6">
+        <h2 className="text-2xl font-semibold">Meditation Timer</h2>
         
-        <div className="mt-2 text-white/60 text-sm">
-          {isActive ? "Meditating..." : isCompleted ? "Meditation Complete" : "Set your meditation time"}
+        <div className="text-6xl font-mono">
+          {formatTime(timeRemaining)}
         </div>
-      </div>
-      
-      {/* Progress bar */}
-      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-6">
-        <motion.div 
-          className="h-full bg-gradient-to-r from-quantum-400 to-quantum-600"
-          initial={{ width: '0%' }}
-          animate={{ width: `${progress * 100}%` }}
-          transition={{ duration: 0.5 }}
-        />
-      </div>
-      
-      {/* Duration slider (only shown when timer is not active) */}
-      {!isActive && !isCompleted && (
-        <div className="mb-8">
-          <div className="flex justify-between text-white/60 text-xs mb-2">
-            <span>1 min</span>
-            <span>{duration} min</span>
-            <span>20 min</span>
+        
+        {!isActive && !isComplete && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm">
+                Duration: {duration} minutes
+              </label>
+              <Slider
+                min={1}
+                max={60}
+                step={1}
+                value={[duration]}
+                onValueChange={handleDurationChange}
+                disabled={isActive}
+              />
+              <div className="flex justify-between text-xs">
+                <span>1 min</span>
+                <span>60 min</span>
+              </div>
+            </div>
           </div>
-          <Slider
-            value={[duration]}
-            min={1}
-            max={20}
-            step={1}
-            onValueChange={handleDurationChange}
-            className="my-4"
-          />
-        </div>
-      )}
-      
-      {/* Control buttons */}
-      <div className="flex justify-center space-x-4">
-        {isCompleted ? (
-          <Button
-            className="bg-green-600 hover:bg-green-500 text-white"
-            onClick={resetTimer}
-          >
-            <Check className="mr-2 w-4 h-4" />
-            Complete
-          </Button>
-        ) : (
-          <>
-            <Button
-              variant="outline"
-              className="border-white/20 text-white"
-              onClick={resetTimer}
-              disabled={!isActive && timeLeft === duration * 60}
-            >
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-            
-            <Button
-              className={isActive 
-                ? "bg-quantum-600 hover:bg-quantum-500 text-white" 
-                : "bg-quantum-500 hover:bg-quantum-400 text-white"}
-              onClick={() => setIsActive(!isActive)}
-            >
-              {isActive ? (
-                <>
-                  <Pause className="mr-2 w-4 h-4" />
-                  Pause
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 w-4 h-4" />
-                  {timeLeft < duration * 60 ? "Resume" : "Begin"}
-                </>
-              )}
-            </Button>
-          </>
         )}
+        
+        <div className="flex justify-center space-x-4">
+          {!isActive && !isComplete && (
+            <Button onClick={startTimer} size="lg" className="px-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500">
+              <Play className="mr-2 h-5 w-5" />
+              Begin
+            </Button>
+          )}
+          
+          {isActive && (
+            <Button onClick={pauseTimer} variant="outline" size="lg" className="px-8 rounded-full">
+              <Pause className="mr-2 h-5 w-5" />
+              Pause
+            </Button>
+          )}
+          
+          {(isActive || timeRemaining < duration * 60) && (
+            <Button onClick={resetTimer} variant="outline" size="lg" className="px-8 rounded-full">
+              <RotateCcw className="mr-2 h-5 w-5" />
+              Reset
+            </Button>
+          )}
+          
+          {isComplete && (
+            <Button 
+              onClick={resetTimer} 
+              size="lg" 
+              className="px-8 rounded-full bg-gradient-to-r from-green-500 to-teal-500"
+            >
+              <Check className="mr-2 h-5 w-5" />
+              Complete
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
+    </Card>
   );
 };
 

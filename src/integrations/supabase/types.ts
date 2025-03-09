@@ -9,6 +9,39 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      chakra_systems: {
+        Row: {
+          chakras: Json
+          created_at: string | null
+          dominant_chakra: string | null
+          id: string
+          last_updated: string | null
+          overall_balance: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chakras: Json
+          created_at?: string | null
+          dominant_chakra?: string | null
+          id?: string
+          last_updated?: string | null
+          overall_balance?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chakras?: Json
+          created_at?: string | null
+          dominant_chakra?: string | null
+          id?: string
+          last_updated?: string | null
+          overall_balance?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       challenges: {
         Row: {
           category: string
@@ -39,6 +72,57 @@ export type Database = {
           id?: string
           level?: number
           title?: string
+        }
+        Relationships: []
+      }
+      consciousness_metrics: {
+        Row: {
+          awareness_score: number
+          chakra_balance: number
+          created_at: string | null
+          energy_clarity: number
+          expansion_rate: number
+          history: Json | null
+          id: string
+          insight_depth: number
+          last_assessment: string | null
+          level: string
+          meditation_consistency: number
+          reflection_quality: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          awareness_score?: number
+          chakra_balance?: number
+          created_at?: string | null
+          energy_clarity?: number
+          expansion_rate?: number
+          history?: Json | null
+          id?: string
+          insight_depth?: number
+          last_assessment?: string | null
+          level?: string
+          meditation_consistency?: number
+          reflection_quality?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          awareness_score?: number
+          chakra_balance?: number
+          created_at?: string | null
+          energy_clarity?: number
+          expansion_rate?: number
+          history?: Json | null
+          id?: string
+          insight_depth?: number
+          last_assessment?: string | null
+          level?: string
+          meditation_consistency?: number
+          reflection_quality?: number
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -78,6 +162,66 @@ export type Database = {
           title?: string
           type?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      dreams: {
+        Row: {
+          analysis_guidance: string | null
+          analysis_interpretation: string | null
+          analysis_theme: string | null
+          chakras_activated: string[] | null
+          consciousness_archetypes: string[] | null
+          consciousness_depth: number | null
+          consciousness_insights: string[] | null
+          content: string
+          created_at: string | null
+          date: string | null
+          emotional_tone: string[] | null
+          id: string
+          lucidity: number | null
+          symbols: string[] | null
+          tags: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_guidance?: string | null
+          analysis_interpretation?: string | null
+          analysis_theme?: string | null
+          chakras_activated?: string[] | null
+          consciousness_archetypes?: string[] | null
+          consciousness_depth?: number | null
+          consciousness_insights?: string[] | null
+          content: string
+          created_at?: string | null
+          date?: string | null
+          emotional_tone?: string[] | null
+          id?: string
+          lucidity?: number | null
+          symbols?: string[] | null
+          tags?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_guidance?: string | null
+          analysis_interpretation?: string | null
+          analysis_theme?: string | null
+          chakras_activated?: string[] | null
+          consciousness_archetypes?: string[] | null
+          consciousness_depth?: number | null
+          consciousness_insights?: string[] | null
+          content?: string
+          created_at?: string | null
+          date?: string | null
+          emotional_tone?: string[] | null
+          id?: string
+          lucidity?: number | null
+          symbols?: string[] | null
+          tags?: string[] | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

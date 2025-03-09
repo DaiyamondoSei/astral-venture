@@ -1,155 +1,91 @@
 
-// Update the import to use the correct type and function
-import { ChakraActivated, normalizeChakraData, isChakraActivated } from '@/utils/emotion/chakraTypes';
 import React, { useState, useEffect } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Button } from '@/components/ui/button';
-import { Calendar } from "@/components/ui/calendar"
-import { CalendarIcon } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { format } from 'date-fns';
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import ReflectionHistoryInsights from '@/components/reflection/ReflectionHistoryInsights';
+import { Card } from '@/components/ui/card';
+import { useConsciousness } from '@/contexts/ConsciousnessContext';
+import { useUser } from '@/hooks/useAuth';
 
-interface Reflection {
-  id: string;
-  content: string;
-  created_at: string;
-  dominant_emotion: string;
-  chakras_activated: ChakraActivated;
-  emotional_depth: number;
-}
+const ReflectionHistory = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const { dreams } = useConsciousness();
+  const user = useUser();
 
-interface ReflectionHistoryProps {
-  reflections?: Reflection[];
-  onOpenAiAssistant?: (reflectionId?: string, reflectionContent?: string) => void;
-}
+  useEffect(() => {
+    // Simulate loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
 
-interface ReflectionItemProps {
-  reflection: Reflection;
-  onViewInsights: (reflection: Reflection) => void;
-}
+    return () => clearTimeout(timer);
+  }, []);
 
-const ReflectionItem: React.FC<ReflectionItemProps> = ({ reflection, onViewInsights }) => {
-  return (
-    <div className="glass-card p-4">
-      <p className="text-sm text-gray-500">{reflection.created_at}</p>
-      <p className="text-md">{reflection.content.substring(0, 100)}...</p>
-      <Button variant="secondary" size="sm" onClick={() => onViewInsights(reflection)}>
-        View Insights
-      </Button>
-    </div>
-  );
-};
-
-// Fix the type in the component to ensure reflection.id is a string
-const ReflectionHistory: React.FC<ReflectionHistoryProps> = ({ 
-  reflections = [],
-  onOpenAiAssistant 
-}) => {
-  const [filter, setFilter] = useState('');
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [selectedReflection, setSelectedReflection] = useState<Reflection | null>(null);
-  const [showInsights, setShowInsights] = useState(false);
-
-  const filteredReflections = reflections.filter(reflection => {
-    const searchTerm = filter.toLowerCase();
-    const contentMatch = reflection.content.toLowerCase().includes(searchTerm);
-    const emotionMatch = reflection.dominant_emotion.toLowerCase().includes(searchTerm);
-    
-    let dateMatch = true;
-    if (date) {
-      const reflectionDate = new Date(reflection.created_at);
-      dateMatch = (
-        reflectionDate.getFullYear() === date.getFullYear() &&
-        reflectionDate.getMonth() === date.getMonth() &&
-        reflectionDate.getDate() === date.getDate()
-      );
-    }
-    
-    return (contentMatch || emotionMatch) && dateMatch;
-  });
-
-  const handleViewInsights = (reflection: Reflection) => {
-    setSelectedReflection(reflection);
-    setShowInsights(true);
-  };
-
-  const handleCloseInsights = () => {
-    setShowInsights(false);
-    setSelectedReflection(null);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-4">
-        <Input
-          type="text"
-          placeholder="Filter reflections..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant={"outline"}
-              className={cn(
-                "w-[280px] justify-start text-left font-normal",
-                !date && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date ? format(date, "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              disabled={(date) =>
-                date > new Date() || date < new Date("2023-01-01")
-              }
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
-      
-      <div className="space-y-3">
-        {filteredReflections.map((reflection) => (
-          <ReflectionItem 
-            key={String(reflection.id)} // Ensure ID is converted to string
-            reflection={{
-              id: String(reflection.id), // Convert ID to string to fix type issues
-              content: reflection.content,
-              created_at: reflection.created_at,
-              dominant_emotion: reflection.dominant_emotion,
-              chakras_activated: reflection.chakras_activated,
-              emotional_depth: reflection.emotional_depth
-            }}
-            onViewInsights={() => handleViewInsights(reflection)}
-          />
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(3)].map((_, index) => (
+          <Card key={index} className="p-6 animate-pulse">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
+            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2"></div>
+            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-4/5"></div>
+          </Card>
         ))}
       </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Card className="p-6 text-center">
+        <h3 className="text-xl font-semibold mb-2">Sign in to View Reflections</h3>
+        <p className="text-gray-500 dark:text-gray-400">
+          You need to be signed in to access your reflection history.
+        </p>
+      </Card>
+    );
+  }
+
+  if (dreams.length === 0) {
+    return (
+      <Card className="p-6 text-center">
+        <h3 className="text-xl font-semibold mb-2">No Reflections Yet</h3>
+        <p className="text-gray-500 dark:text-gray-400">
+          You haven't recorded any dreams or reflections yet. Start by capturing a dream.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold">Your Reflection Journey</h2>
+      </div>
       
-      {showInsights && selectedReflection && (
-        <ReflectionHistoryInsights 
-          reflection={selectedReflection}
-          onClose={handleCloseInsights}
-          onOpenAiAssistant={onOpenAiAssistant}
-        />
-      )}
+      <div className="space-y-4">
+        {dreams.map((dream) => (
+          <Card key={dream.id} className="p-6 hover:shadow-md transition-shadow">
+            <div className="flex justify-between mb-2">
+              <h3 className="text-lg font-medium">{dream.analysis?.theme || 'Dream Reflection'}</h3>
+              <span className="text-sm text-gray-500">
+                {new Date(dream.date).toLocaleDateString()}
+              </span>
+            </div>
+            <p className="text-gray-600 dark:text-gray-300 line-clamp-3 mb-2">
+              {dream.content}
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {dream.emotionalTone.map((emotion, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 rounded-full text-xs"
+                >
+                  {emotion}
+                </span>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };

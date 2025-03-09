@@ -10,7 +10,7 @@ import PerformanceMonitor from './components/dev-mode/PerformanceMonitor';
 // Lazy load pages to reduce initial bundle size
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const DreamCapturePage = lazy(() => import('./pages/DreamCapture'));
-const EntryAnimation = lazy(() => import('./components/EntryAnimationView'));
+const EntryAnimationPage = lazy(() => import('./pages/EntryAnimation'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const MeditationPage = lazy(() => import('./pages/MeditationPage'));
 const ReflectionPage = lazy(() => import('./pages/ReflectionPage'));
@@ -29,7 +29,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/dream-capture" element={<DreamCapturePage />} />
-                <Route path="/entry-animation" element={<EntryAnimation />} />
+                <Route path="/entry-animation" element={<EntryAnimationPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/meditation" element={<MeditationPage />} />
                 <Route path="/reflection" element={<ReflectionPage />} />
