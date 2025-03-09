@@ -1,42 +1,17 @@
 
+import { extractListItems } from "./listPatternMatcher.ts";
+import { identifyInsightsByKeywords } from "./keywordPatternMatcher.ts";
+
 /**
- * Extract list items from text
+ * Extract list items from text - legacy function for backward compatibility
  */
 export function extractListItems(text: string): { type: string; content: string }[] {
-  const insights = [];
-  const listItemRegex = /(?:^|\n)(?:\d+\.\s|\*\s|-\s)(.+)(?:\n|$)/g;
-  
-  let match;
-  while ((match = listItemRegex.exec(text)) !== null) {
-    insights.push({
-      type: "point",
-      content: match[1].trim()
-    });
-  }
-  
-  return insights;
+  return extractListItems(text);
 }
 
 /**
- * Identify paragraphs containing insight keywords
+ * Identify paragraphs containing insight keywords - legacy function for backward compatibility
  */
 export function identifyInsightParagraphs(text: string): { type: string; content: string }[] {
-  const insights = [];
-  const paragraphs = text.split(/\n\n+/);
-  const insightKeywords = [
-    "important", "key", "significant", "essential", "critical",
-    "remember", "note", "consider", "insight", "reflection"
-  ];
-  
-  paragraphs.forEach(paragraph => {
-    const lowerPara = paragraph.toLowerCase();
-    if (insightKeywords.some(keyword => lowerPara.includes(keyword))) {
-      insights.push({
-        type: "paragraph",
-        content: paragraph.trim()
-      });
-    }
-  });
-  
-  return insights;
+  return identifyInsightsByKeywords(text);
 }

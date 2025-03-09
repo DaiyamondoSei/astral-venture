@@ -1,41 +1,31 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-interface ContextData {
-  userProfile?: {
-    userLevel: number;
-    energyPoints: number;
-    [key: string]: any;
-  };
-  reflection?: {
-    content: string;
-    dominantEmotion?: string;
-    emotionalDepth?: number;
-    chakrasActivated?: string[];
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
+import { ContextData } from "../types.ts";
 
 /**
- * Fetch context data for the AI request
+ * Fetch context data for an AI query
  */
-export async function fetchContextData(supabase: any, userId?: string, reflectionId?: string): Promise<ContextData> {
+export async function fetchContextData(
+  supabaseAdmin: any, 
+  userId?: string, 
+  reflectionId?: string
+): Promise<ContextData> {
   const contextData: ContextData = {};
   
-  // Get user profile data if userId is provided
+  // Fetch user profile if userId is provided
   if (userId) {
     try {
-      const { data: userProfile } = await supabase
+      const { data: userProfile } = await supabaseAdmin
         .from("user_profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
       
       if (userProfile) {
         contextData.userProfile = {
-          userLevel: userProfile.astral_level,
-          energyPoints: userProfile.energy_points
+          userLevel: userProfile.astral_level || 1,
+          energyPoints: userProfile.energy_points || 0,
+          username: userProfile.username
         };
       }
     } catch (error) {
@@ -43,14 +33,14 @@ export async function fetchContextData(supabase: any, userId?: string, reflectio
     }
   }
   
-  // Get reflection data if reflectionId is provided
+  // Fetch reflection data if reflectionId is provided
   if (reflectionId) {
     try {
-      const { data: reflection } = await supabase
+      const { data: reflection } = await supabaseAdmin
         .from("energy_reflections")
         .select("*")
         .eq("id", reflectionId)
-        .single();
+        .maybeSingle();
       
       if (reflection) {
         contextData.reflection = {
@@ -69,18 +59,36 @@ export async function fetchContextData(supabase: any, userId?: string, reflectio
 }
 
 /**
- * Build a rich context string for the AI request
+ * Build rich context for the AI request
  */
-export function buildRichContext(baseContext: string = "", contextData: ContextData): string {
-  const contextParts = [baseContext];
+export function buildRichContext(basicContext: string = "", contextData: ContextData = {}): string {
+  const contextParts: string[] = [];
   
+  // Add basic context if provided
+  if (basicContext) {
+    contextParts.push(basicContext);
+  }
+  
+  // Add user profile information if available
   if (contextData.userProfile) {
-    contextParts.push(`User Information: ${JSON.stringify(contextData.userProfile)}`);
+    contextParts.push(
+      "User Information:\n" +
+      `- Level: ${contextData.userProfile.userLevel}\n` +
+      `- Energy Points: ${contextData.userProfile.energyPoints}`
+    );
   }
   
+  // Add reflection information if available
   if (contextData.reflection) {
-    contextParts.push(`Reflection Information: ${JSON.stringify(contextData.reflection)}`);
+    contextParts.push(
+      "Reflection Information:\n" +
+      `- Content: ${contextData.reflection.content}\n` +
+      (contextData.reflection.dominantEmotion ? `- Dominant Emotion: ${contextData.reflection.dominantEmotion}\n` : "") +
+      (contextData.reflection.emotionalDepth ? `- Emotional Depth: ${contextData.reflection.emotionalDepth}\n` : "") +
+      (contextData.reflection.chakrasActivated ? `- Chakras Activated: ${JSON.stringify(contextData.reflection.chakrasActivated)}` : "")
+    );
   }
   
-  return contextParts.filter(Boolean).join("\n\n");
+  // Join all context parts with double line breaks
+  return contextParts.join("\n\n");
 }

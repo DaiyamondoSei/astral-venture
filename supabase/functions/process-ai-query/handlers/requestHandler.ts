@@ -27,20 +27,23 @@ export async function processAIQuery(user: any, req: Request): Promise<Response>
       options = {} 
     } = requestData;
     
-    // Set defaults
+    // Set defaults with more options for flexibility
     const model = options.model || "gpt-4o-mini";
     const temperature = options.temperature || 0.7;
     const maxTokens = options.maxTokens || 1000;
     const useCache = options.useCache !== false;
     const stream = options.stream || false;
     const cacheKey = options.cacheKey || createCacheKey(query, context, model);
+    const cacheTtl = options.cacheTtl || 30 * 60 * 1000; // 30 minutes default TTL
     
     // Check cache first if caching is enabled
     if (useCache) {
       const cachedResponse = await getCachedResponse(cacheKey, stream);
       if (cachedResponse) {
+        console.log(`Cache hit for key: ${cacheKey}`);
         return cachedResponse;
       }
+      console.log(`Cache miss for key: ${cacheKey}`);
     }
     
     // Get OpenAI API key
@@ -85,26 +88,21 @@ export async function processAIQuery(user: any, req: Request): Promise<Response>
       
       // Cache the streaming response if caching is enabled
       if (useCache) {
-        await cacheResponse(cacheKey, streamResponse.clone(), true);
+        await cacheResponse(cacheKey, streamResponse.clone(), true, cacheTtl);
       }
       
       return streamResponse;
     }
     
     // For non-streaming responses, process and format the data
-    if (!openAIResponse.ok) {
-      const errorData = await openAIResponse.json();
-      throw new Error(errorData.error?.message || "Error from OpenAI API");
-    }
-    
     const responseData = await openAIResponse.json();
     const answer = responseData.choices[0]?.message?.content || "";
     
-    // Extract insights using a basic heuristic
-    const insights = extractInsights(answer);
-    
     // Calculate processing time
     const processingTime = performance.now() - startTime;
+    
+    // Extract insights using improved extractInsights function
+    const insights = extractInsights(answer);
     
     // Prepare the final response
     const result: AIQueryResponse = {
@@ -125,16 +123,24 @@ export async function processAIQuery(user: any, req: Request): Promise<Response>
     
     // Cache the response if caching is enabled
     if (useCache) {
-      await cacheResponse(cacheKey, response.clone(), false);
+      await cacheResponse(cacheKey, response.clone(), false, cacheTtl);
     }
     
     // Track usage for billing/quotas if needed
     if (userId) {
+      // Use EdgeRuntime.waitUntil to handle this as a background task
       EdgeRuntime.waitUntil(
         trackUsage(supabaseAdmin, userId, {
           model,
           tokensUsed: responseData.usage?.total_tokens || 0,
-          queryType: reflectionId ? "reflection_analysis" : "general_query"
+          queryType: reflectionId ? "reflection_analysis" : "general_query",
+          processingTime,
+          answerLength: answer.length,
+          insightsCount: insights.length,
+          metadata: {
+            queryLength: query.length,
+            hasReflection: Boolean(reflectionId)
+          }
         })
       );
     }

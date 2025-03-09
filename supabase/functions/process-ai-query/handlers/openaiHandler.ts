@@ -1,6 +1,6 @@
 
 /**
- * Call the OpenAI API
+ * Call the OpenAI API with improved error handling and logging
  */
 export async function callOpenAI(query: string, context: string, options: {
   model: string;
@@ -31,19 +31,40 @@ export async function callOpenAI(query: string, context: string, options: {
     content: query
   });
   
-  // Make request to OpenAI
-  return fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${options.apiKey}`
-    },
-    body: JSON.stringify({
-      model: options.model,
-      messages,
-      temperature: options.temperature,
-      max_tokens: options.maxTokens,
-      stream: options.stream
-    })
-  });
+  // Log the request model and settings (not the content for privacy)
+  console.log(`OpenAI request: model=${options.model}, temperature=${options.temperature}, stream=${options.stream}`);
+  
+  try {
+    // Make request to OpenAI
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${options.apiKey}`
+      },
+      body: JSON.stringify({
+        model: options.model,
+        messages,
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
+        stream: options.stream
+      })
+    });
+    
+    // Log response status
+    console.log(`OpenAI response status: ${response.status}`);
+    
+    // Handle non-2xx responses
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: { message: "Unknown error" } }));
+      console.error("OpenAI API error:", errorData);
+      throw new Error(`OpenAI API error: ${errorData.error?.message || "Unknown error"}`);
+    }
+    
+    return response;
+  } catch (error) {
+    // Log and rethrow any errors
+    console.error("Error calling OpenAI:", error);
+    throw error;
+  }
 }
