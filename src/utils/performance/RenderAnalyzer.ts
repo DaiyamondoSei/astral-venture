@@ -69,7 +69,7 @@ export class RenderAnalyzer {
     const optimizations: string[] = [];
     
     if (renderTime > this.renderThresholds.critical) {
-      optimizations.push('Critical: This component's render time is very high. Consider breaking it into smaller components.');
+      optimizations.push("Critical: This component's render time is very high. Consider breaking it into smaller components.");
     }
     
     if (renderFrequency === RenderFrequency.EXCESSIVE) {
