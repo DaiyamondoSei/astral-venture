@@ -8,6 +8,7 @@ export interface AchievementTrackerProps {
   stepInteractions?: any[];
   userId?: string;
   currentStreak?: number;
+  reflectionCount?: number; // Add missing property
 }
 
 export interface AchievementTrackerResult {
@@ -37,7 +38,7 @@ export interface IAchievementData {
   id: string;
   title: string;
   description: string;
-  icon?: string;
+  icon?: string; // Make icon optional
   type: 'discovery' | 'completion' | 'interaction' | 'streak' | 'progressive' | 'milestone';
   category?: string;
   points: number;
@@ -64,13 +65,26 @@ export interface ProgressTrackingResult {
   progress: Record<string, number>;
   didUnlockAchievement: boolean;
   unlockedAchievements: IAchievementData[];
+  updated?: boolean;
+  
+  // Add missing methods for compatibility with tests
+  trackProgress: (type: string, amount: number) => void;
+  resetProgress: (type: string) => void;
+  logActivity: (activityType: string, details?: Record<string, any>) => void;
+  getProgressValue: (type: string) => number;
+  trackMultipleProgress: (progressUpdates: Record<string, number>) => void;
 }
 
 export enum AchievementEventType {
   STEP_COMPLETED = 'step_completed',
   INTERACTION = 'interaction',
   STREAK_UPDATED = 'streak_updated',
-  PROGRESS_TRACKED = 'progress_tracked'
+  PROGRESS_TRACKED = 'progress_tracked',
+  // Add missing event types
+  REFLECTION_COMPLETED = 'reflection_completed',
+  MEDITATION_COMPLETED = 'meditation_completed',
+  CHAKRA_ACTIVATED = 'chakra_activated',
+  WISDOM_EXPLORED = 'wisdom_explored'
 }
 
 export interface FeatureTooltipData {

@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { AchievementProvider } from '@/components/onboarding/hooks/achievement/useAchievementState';
 import { toast } from '@/components/ui/use-toast';
 
 /**
@@ -9,9 +8,8 @@ import { toast } from '@/components/ui/use-toast';
 export const AchievementContext: React.FC<{children: React.ReactNode}> = ({ children }) => {
   return (
     <ErrorBoundary>
-      <AchievementProvider>
-        {children}
-      </AchievementProvider>
+      {/* Implement children directly since AchievementProvider doesn't exist */}
+      {children}
     </ErrorBoundary>
   );
 };

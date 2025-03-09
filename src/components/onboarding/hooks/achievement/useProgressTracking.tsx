@@ -147,8 +147,10 @@ export function useProgressTracking(
     getProgressValue,
     trackMultipleProgress,
     // Add required properties to match ProgressTrackingResult
-    updated: false,
+    earnedPoints: 0,
+    didUnlockAchievement: false,
     unlockedAchievements: emptyAchievements,
-    progress: state.progressTracking || {}
+    progress: state.progressTracking || {},
+    updated: false
   };
 }

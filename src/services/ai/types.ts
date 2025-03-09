@@ -3,12 +3,16 @@
 
 export interface AIQuestion {
   text: string;
+  question?: string; // Added for backward compatibility
   context?: string;
   userId?: string;
+  stream?: boolean;
+  reflectionIds?: string[]; // Added to support reflection context
 }
 
 export interface AIResponse {
   answer: string;
+  text?: string; // Added for backward compatibility
   type: 'text' | 'meditation' | 'reflection' | 'wisdom' | 'error';
   suggestedPractices?: string[];
   sources?: string[];

@@ -33,7 +33,7 @@ export function getPerformanceCategory(): DeviceCapability {
   const cpuCores = navigator.hardwareConcurrency || 0;
   
   // Device memory is not supported in all browsers
-  const memory = navigator.deviceMemory !== undefined ? navigator.deviceMemory : 4;
+  const memory = (navigator as any).deviceMemory !== undefined ? (navigator as any).deviceMemory : 4;
   
   // Use user agent for additional signals
   const isOldBrowser = /MSIE|Trident/.test(navigator.userAgent);
@@ -107,5 +107,21 @@ export function throttleForPerformance<T extends (...args: any[]) => any>(
     
     lastCall = now;
     return fn(...args);
+  };
+}
+
+// Add throttle function for backward compatibility
+export function throttle<T extends (...args: any[]) => any>(
+  fn: T,
+  delay = 300
+): (...args: Parameters<T>) => void {
+  let lastCall = 0;
+  return function(...args: Parameters<T>): void {
+    const now = Date.now();
+    if (now - lastCall < delay) {
+      return;
+    }
+    lastCall = now;
+    fn(...args);
   };
 }

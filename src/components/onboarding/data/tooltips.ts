@@ -12,6 +12,7 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'This dashboard is your gateway to spiritual growth and self-discovery.',
     position: 'bottom',
     elementId: 'dashboard-main',
+    targetElement: 'dashboard-main', // Added missing property
     condition: 'isFirstLogin',
     delay: 1000
   },
@@ -21,6 +22,7 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Track your progress with energy points. Earn them through activities and reflections.',
     position: 'bottom',
     elementId: 'energy-display',
+    targetElement: 'energy-display', // Added missing property
     condition: 'hasCompletedWelcome', 
     delay: 2000
   },
@@ -30,7 +32,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Activate and balance your chakras to enhance your spiritual journey.',
     position: 'left',
     elementId: 'chakra-display',
-    condition: 'hasViewedEnergyTooltip',
+    targetElement: 'chakra-display', // Added missing property
+    condition: 'hasViewedChakraTooltip',
     delay: 2000
   },
   {
@@ -39,6 +42,7 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Take time each day to reflect on your thoughts and feelings.',
     position: 'right',
     elementId: 'reflection-card',
+    targetElement: 'reflection-card', // Added missing property
     condition: 'hasViewedChakraTooltip',
     delay: 2000
   },
@@ -48,6 +52,7 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Explore the patterns that connect all things in the universe.',
     position: 'top',
     elementId: 'sacred-geometry-icon',
+    targetElement: 'sacred-geometry-icon', // Added missing property
     condition: 'hasCompletedOnboarding',
     delay: 2000
   },
@@ -57,6 +62,7 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Discover guided meditations to calm your mind and elevate your consciousness.',
     position: 'left',
     elementId: 'meditation-card',
+    targetElement: 'meditation-card', // Added missing property
     condition: 'hasCompletedOnboarding',
     delay: 2000
   },
@@ -66,6 +72,7 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Track your progress and unlock special achievements as you grow.',
     position: 'bottom',
     elementId: 'achievements-button',
+    targetElement: 'achievements-button', // Added missing property
     condition: 'hasUsedAppForOneDay',
     delay: 2000
   }

@@ -31,9 +31,9 @@ export interface FeatureTooltipData {
   description: string;
   position: 'top' | 'right' | 'bottom' | 'left';
   elementId?: string;
+  targetElement: string; // Required property
   condition?: string;
   delay?: number;
-  targetElement?: string;
   
   // Additional properties used in the codebase
   targetSelector?: string;
@@ -56,6 +56,7 @@ export interface GuidedTourStep {
   title: string;
   description: string;
   elementId: string;
+  targetElement: string; // Required property
   position: 'top' | 'right' | 'bottom' | 'left';
   content?: string;
   target?: string;
@@ -68,4 +69,5 @@ export interface TourStep {
   elementId: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
   target?: string;
+  targetSelector?: string; // Added missing property
 }

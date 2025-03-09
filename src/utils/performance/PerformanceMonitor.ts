@@ -1,3 +1,4 @@
+
 // Performance Monitor Implementation
 import { DeviceCapability } from '../performanceUtils';
 
@@ -5,6 +6,7 @@ interface PerformanceMetrics {
   componentMetrics: Record<string, ComponentMetric>;
   renderTimeSeries: Record<string, number[]>;
   queuedMetrics: any[];
+  totalRenderTime?: number; // Added missing property
 }
 
 interface ComponentMetric {
@@ -21,7 +23,8 @@ export class PerformanceMonitorImpl {
   private metrics: PerformanceMetrics = {
     componentMetrics: {},
     renderTimeSeries: {},
-    queuedMetrics: []
+    queuedMetrics: [],
+    totalRenderTime: 0
   };
   private isMonitoring = false;
   private subscribers: ((metrics: Record<string, any>) => void)[] = [];
@@ -73,6 +76,13 @@ export class PerformanceMonitorImpl {
     const totalRenderTime = componentMetric.renderTimes.reduce((sum, time) => sum + time, 0);
     componentMetric.averageRenderTime = totalRenderTime / componentMetric.renderTimes.length;
     
+    // Update total render time
+    if (this.metrics.totalRenderTime !== undefined) {
+      this.metrics.totalRenderTime += renderTime;
+    } else {
+      this.metrics.totalRenderTime = renderTime;
+    }
+    
     // Track slow renders (over 16ms for 60fps target)
     if (renderTime > 16) {
       componentMetric.slowRenders++;
@@ -94,6 +104,22 @@ export class PerformanceMonitorImpl {
     this.notifySubscribers();
   }
 
+  // Alias for recordRender to support old code
+  recordRenderBatch(componentName: string, renderTime: number): void {
+    this.recordRender(componentName, renderTime);
+  }
+  
+  // Add missing recordUnmount method
+  recordUnmount(componentName: string): void {
+    console.log(`[Performance] Component unmounted: ${componentName}`);
+  }
+  
+  // Add reportRender method for backward compatibility
+  reportRender(componentName: string): void {
+    // Just log the render, don't do timing
+    console.log(`[Performance] Component rendered: ${componentName}`);
+  }
+
   getComponentMetrics(): Record<string, ComponentMetric> {
     return this.metrics.componentMetrics;
   }
@@ -113,7 +139,8 @@ export class PerformanceMonitorImpl {
     this.metrics = {
       componentMetrics: {},
       renderTimeSeries: {},
-      queuedMetrics: []
+      queuedMetrics: [],
+      totalRenderTime: 0
     };
     console.log('[Performance] Metrics cleared');
     this.notifySubscribers();
