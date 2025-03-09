@@ -10,6 +10,15 @@ let memoryManagementEnabled = false;
 // Store references that need cleanup to prevent memory leaks
 const cleanupCallbacks = new Map<string, () => void>();
 
+// Track resource usage to optimize AI processing
+const resourceUsage = {
+  aiRequestsProcessed: 0,
+  memoryPressureDetected: false,
+  lastMemoryCheck: 0,
+  memoryCheckInterval: 30000, // Check every 30 seconds
+  memoryThreshold: 0.7 // 70% memory usage threshold
+};
+
 // Initialize memory management
 export function initMemoryManagement(): void {
   if (typeof window === 'undefined') return;
@@ -40,18 +49,36 @@ export function initMemoryManagement(): void {
   
   // Monitor for memory warnings in supported browsers
   if ('performance' in window && 'memory' in (performance as any)) {
-    setInterval(() => {
-      const memory = (performance as any).memory;
-      const usedHeapPercentage = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
-      
-      if (usedHeapPercentage > 0.7) {
-        console.warn(`Memory usage high (${Math.round(usedHeapPercentage * 100)}%)`);
-        cleanupUnusedResources(true); // Aggressive cleanup when memory is high
-      }
-    }, 30000); // Check every 30 seconds
+    setInterval(checkMemoryUsage, resourceUsage.memoryCheckInterval);
   }
   
   console.log('Memory management initialized');
+}
+
+// Check current memory usage
+function checkMemoryUsage(): void {
+  if (!('performance' in window && 'memory' in (performance as any))) return;
+  
+  const now = Date.now();
+  resourceUsage.lastMemoryCheck = now;
+  
+  const memory = (performance as any).memory;
+  const usedHeapPercentage = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
+  
+  // Update memory pressure flag
+  const previousState = resourceUsage.memoryPressureDetected;
+  resourceUsage.memoryPressureDetected = usedHeapPercentage > resourceUsage.memoryThreshold;
+  
+  // Log if state changed
+  if (previousState !== resourceUsage.memoryPressureDetected) {
+    console.log(`Memory pressure changed: ${usedHeapPercentage.toFixed(2)}% used, pressure: ${resourceUsage.memoryPressureDetected}`);
+  }
+  
+  // Cleanup if memory pressure is high
+  if (resourceUsage.memoryPressureDetected) {
+    console.warn(`Memory usage high (${Math.round(usedHeapPercentage * 100)}%)`);
+    cleanupUnusedResources(true); // Aggressive cleanup when memory is high
+  }
 }
 
 // Handle visibility changes to free resources when tab is hidden
@@ -71,13 +98,36 @@ export function unregisterCleanupCallback(id: string): void {
   cleanupCallbacks.delete(id);
 }
 
+// Track AI request to manage memory usage
+export function trackAIRequest(): void {
+  resourceUsage.aiRequestsProcessed++;
+  
+  // Check memory more frequently during heavy AI usage
+  if (resourceUsage.aiRequestsProcessed % 5 === 0) {
+    const now = Date.now();
+    if (now - resourceUsage.lastMemoryCheck > 5000) { // At least 5 seconds since last check
+      checkMemoryUsage();
+    }
+  }
+  
+  // Reset counter occasionally to prevent overflow
+  if (resourceUsage.aiRequestsProcessed > 1000) {
+    resourceUsage.aiRequestsProcessed = 1;
+  }
+}
+
+// Get current memory pressure state
+export function isMemoryPressureHigh(): boolean {
+  return resourceUsage.memoryPressureDetected;
+}
+
 // Cleanup unused resources based on current state
 export function cleanupUnusedResources(aggressive: boolean): void {
   if (!memoryManagementEnabled) return;
   
   // Run garbage collection if supported in current environment (Dev tools)
-  if (aggressive && window.gc) {
-    window.gc();
+  if (aggressive && (window as any).gc) {
+    (window as any).gc();
   }
   
   if (aggressive) {
@@ -98,6 +148,16 @@ export function cleanupUnusedResources(aggressive: boolean): void {
   
   // Clear object URL references
   cleanupObjectURLs();
+  
+  // Clear AI processing caches if memory pressure is high
+  if (aggressive && resourceUsage.memoryPressureDetected) {
+    // This will be handled by the specific services
+    // that implement their own cache clearing logic
+    const event = new CustomEvent('memory-pressure', { 
+      detail: { level: 'high' } 
+    });
+    window.dispatchEvent(event);
+  }
   
   console.log(`Memory cleanup completed (${aggressive ? 'aggressive' : 'partial'})`);
 }
@@ -169,6 +229,11 @@ export function optimizedImageLoad(
     high: 100
   };
   
+  // Track memory pressure to adjust image quality
+  if (resourceUsage.memoryPressureDetected && quality !== 'low') {
+    quality = 'low';
+  }
+  
   const separator = imageUrl.includes('?') ? '&' : '?';
   img.src = `${imageUrl}${separator}q=${qualityMap[quality]}`;
   
@@ -177,4 +242,18 @@ export function optimizedImageLoad(
   }
   
   return img;
+}
+
+// Optimize memory for AI processing
+export function optimizeForAIProcessing(enable: boolean): void {
+  if (enable) {
+    // When AI processing is active, be more aggressive with memory
+    resourceUsage.memoryThreshold = 0.6; // Lower threshold during AI operations
+    
+    // Run a partial cleanup to free resources for AI processing
+    cleanupUnusedResources(false);
+  } else {
+    // Reset to normal threshold
+    resourceUsage.memoryThreshold = 0.7;
+  }
 }

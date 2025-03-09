@@ -19,12 +19,25 @@ interface UseQuestionSubmitProps {
   isMounted: React.MutableRefObject<boolean>;
 }
 
+// Cache for storing AI responses to prevent duplicate requests
+const responseCache = new Map<string, {
+  response: AIResponse,
+  timestamp: number,
+  expiresAt: number
+}>();
+
+// Default cache TTL (10 minutes)
+const DEFAULT_CACHE_TTL = 10 * 60 * 1000;
+
 // Queue for tracking pending requests to prevent duplicates
 const pendingRequests = new Set<string>();
 
+// Maximum size for the response cache to prevent memory issues
+const MAX_CACHE_SIZE = 100;
+
 /**
  * Hook for submitting questions to the AI assistant
- * Optimized for performance and UX
+ * Optimized for performance and UX with backend processing
  */
 export const useQuestionSubmit = ({
   state,
@@ -33,6 +46,71 @@ export const useQuestionSubmit = ({
   userId,
   isMounted
 }: UseQuestionSubmitProps) => {
+  
+  // Cleanup expired cache entries
+  const cleanupCache = useCallback(() => {
+    const now = Date.now();
+    let deletionCount = 0;
+    
+    // Delete expired entries
+    for (const [key, entry] of responseCache.entries()) {
+      if (now > entry.expiresAt) {
+        responseCache.delete(key);
+        deletionCount++;
+      }
+    }
+    
+    // If cache is still too large, remove oldest entries
+    if (responseCache.size > MAX_CACHE_SIZE) {
+      const entries = Array.from(responseCache.entries())
+        .sort((a, b) => a[1].timestamp - b[1].timestamp);
+      
+      const entriesToDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+      entriesToDelete.forEach(([key]) => {
+        responseCache.delete(key);
+        deletionCount++;
+      });
+    }
+    
+    if (deletionCount > 0) {
+      console.log(`Cleaned up ${deletionCount} cache entries, ${responseCache.size} remaining`);
+    }
+  }, []);
+  
+  // Generate cache key from question and context
+  const getCacheKey = useCallback((question: string, reflectionId?: string): string => {
+    return `${userId}:${question}:${reflectionId || ''}`;
+  }, [userId]);
+  
+  // Check if response is cached
+  const getFromCache = useCallback((cacheKey: string): AIResponse | null => {
+    const cached = responseCache.get(cacheKey);
+    if (!cached) return null;
+    
+    // Check if cache is still valid
+    if (Date.now() > cached.expiresAt) {
+      responseCache.delete(cacheKey);
+      return null;
+    }
+    
+    console.log("Cache hit:", cacheKey);
+    return cached.response;
+  }, []);
+  
+  // Add response to cache
+  const addToCache = useCallback((cacheKey: string, response: AIResponse, ttl: number = DEFAULT_CACHE_TTL) => {
+    // Clean up expired entries first
+    cleanupCache();
+    
+    // Add new entry
+    responseCache.set(cacheKey, {
+      response,
+      timestamp: Date.now(),
+      expiresAt: Date.now() + ttl
+    });
+    
+    console.log(`Added to cache with TTL of ${ttl}ms, cache size: ${responseCache.size}`);
+  }, [cleanupCache]);
   
   // Memoized submit function to prevent recreating on every render
   const submitQuestion = useCallback(async (question: string) => {
@@ -44,11 +122,29 @@ export const useQuestionSubmit = ({
     
     // Generate a request ID to prevent duplicate submissions
     const requestId = `${userId}:${question}:${Date.now()}`;
+    const cacheKey = getCacheKey(question, selectedReflectionId);
     
     // Check if this exact request is already pending
     if (pendingRequests.has(requestId)) {
       console.log('Duplicate request prevented');
       return null;
+    }
+    
+    // Check if we have a cached response
+    const cachedResponse = getFromCache(cacheKey);
+    if (cachedResponse && isMounted.current) {
+      console.log('Using cached response');
+      state.setResponse(cachedResponse);
+      
+      // Still update model info from cache
+      if (cachedResponse.meta) {
+        state.setModelInfo({
+          model: cachedResponse.meta.model || "unknown",
+          tokens: cachedResponse.meta.tokenUsage || 0
+        });
+      }
+      
+      return cachedResponse;
     }
     
     pendingRequests.add(requestId);
@@ -90,14 +186,18 @@ export const useQuestionSubmit = ({
       
       // Create options object with timeout
       const options: AIQuestionOptions = {
-        maxTokens: 1200 // Limit token usage for better performance
+        maxTokens: 1200, // Limit token usage for better performance
+        cacheKey: cacheKey // Pass cache key for backend caching
       }; 
       
-      // Call the API
+      // Call the API with exponential backoff retry mechanism
       const aiResponse = await askAIAssistant(questionData, options);
       
       const responseTime = performance.now() - startTime;
       console.log(`AI response received in ${responseTime.toFixed(2)}ms`);
+      
+      // Cache the response for future use
+      addToCache(cacheKey, aiResponse);
       
       // Only update state if component is still mounted
       if (isMounted.current) {
@@ -126,7 +226,24 @@ export const useQuestionSubmit = ({
       }
       pendingRequests.delete(requestId);
     }
-  }, [state, reflectionContext, selectedReflectionId, userId, isMounted]);
+  }, [
+    userId, 
+    selectedReflectionId, 
+    reflectionContext, 
+    isMounted, 
+    state, 
+    getCacheKey, 
+    getFromCache, 
+    addToCache
+  ]);
 
-  return { submitQuestion };
+  // Expose the submit function and cache utilities
+  return { 
+    submitQuestion,
+    clearCache: useCallback(() => {
+      responseCache.clear();
+      console.log("AI response cache cleared");
+    }, []),
+    getCacheSize: useCallback(() => responseCache.size, [])
+  };
 };

@@ -9,6 +9,7 @@ interface PerformanceTrackingOptions {
   enabled?: boolean;
   throttleInterval?: number;
   batchUpdates?: boolean;
+  maxBatchSize?: number;
 }
 
 /**
@@ -31,7 +32,8 @@ export function usePerformanceTracking(
     reportToAnalytics = false,
     enabled = true,
     throttleInterval = 0,
-    batchUpdates = true
+    batchUpdates = true,
+    maxBatchSize = 20
   } = options;
   
   // Skip if not enabled
@@ -42,10 +44,26 @@ export function usePerformanceTracking(
   const lastRecordTimeRef = useRef<number>(0);
   const recordedThisRenderRef = useRef(false);
   const batchQueueRef = useRef<{time: number, duration: number}[]>([]);
+  const batchTimeoutRef = useRef<number | null>(null);
   
   // Start render timing when component renders
   renderStartTimeRef.current = performance.now();
   recordedThisRenderRef.current = false;
+  
+  // Process the batch queue
+  const processBatch = useCallback(() => {
+    if (batchQueueRef.current.length === 0) return;
+    
+    // Use the optimized batch recording method
+    performanceMonitor.recordRenderBatch(componentName, [...batchQueueRef.current]);
+    batchQueueRef.current = [];
+    
+    // Clear timeout reference
+    if (batchTimeoutRef.current !== null) {
+      window.clearTimeout(batchTimeoutRef.current);
+      batchTimeoutRef.current = null;
+    }
+  }, [componentName]);
   
   // Memoize the record function to prevent recreating it on every render
   const recordRender = useCallback((duration: number) => {
@@ -60,11 +78,13 @@ export function usePerformanceTracking(
       // Add to batch queue
       batchQueueRef.current.push({ time: now, duration });
       
-      // Process batch if getting large or it's been a while
-      if (batchQueueRef.current.length > 10 || (batchQueueRef.current.length > 0 && now - batchQueueRef.current[0].time > 2000)) {
-        // Use the optimized batch recording method
-        performanceMonitor.recordRenderBatch(componentName, [...batchQueueRef.current]);
-        batchQueueRef.current = [];
+      // Process batch if getting too large
+      if (batchQueueRef.current.length >= maxBatchSize) {
+        processBatch();
+      } 
+      // Schedule processing if not already scheduled
+      else if (batchTimeoutRef.current === null) {
+        batchTimeoutRef.current = window.setTimeout(processBatch, 2000);
       }
     } else {
       // Record immediately if not batching
@@ -81,9 +101,21 @@ export function usePerformanceTracking(
     // Report to analytics if enabled, only for very slow renders
     if (reportToAnalytics && duration > logSlowRenderThreshold * 2) {
       // This would be implemented with a real analytics service
-      console.info(`[Performance Analytics] Slow render: ${componentName} (${duration.toFixed(2)}ms)`);
+      // Using backend performance tracking endpoint instead
+      if (navigator.onLine && Math.random() < 0.1) { // Sample 10% of events to reduce traffic
+        performanceMonitor.reportSlowRender(componentName, duration);
+      }
     }
-  }, [componentName, logSlowRenders, logSlowRenderThreshold, reportToAnalytics, throttleInterval, batchUpdates]);
+  }, [
+    componentName, 
+    logSlowRenders, 
+    logSlowRenderThreshold, 
+    reportToAnalytics, 
+    throttleInterval, 
+    batchUpdates,
+    maxBatchSize,
+    processBatch
+  ]);
   
   // Track render completion and log metrics with throttling
   useEffect(() => {
@@ -102,17 +134,22 @@ export function usePerformanceTracking(
     return () => {
       // Process any remaining batched data on unmount
       if (batchUpdates && batchQueueRef.current.length > 0) {
-        performanceMonitor.recordRenderBatch(componentName, [...batchQueueRef.current]);
-        batchQueueRef.current = [];
+        processBatch();
       }
       
       // Record component unmount if needed
       performanceMonitor.recordUnmount(componentName);
+      
+      // Clear any pending timeouts
+      if (batchTimeoutRef.current !== null) {
+        window.clearTimeout(batchTimeoutRef.current);
+      }
     };
-  }, [componentName, recordRender, batchUpdates]);
+  }, [componentName, recordRender, batchUpdates, processBatch]);
   
   return {
     getLastRenderTime: () => lastRenderTimeRef.current,
-    getComponentMetrics: () => performanceMonitor.getComponentMetrics(componentName)
+    getComponentMetrics: () => performanceMonitor.getComponentMetrics(componentName),
+    flushMetrics: processBatch
   };
 }

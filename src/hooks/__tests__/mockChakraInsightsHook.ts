@@ -1,8 +1,12 @@
 
 import { AIInsight } from '@/services/ai/types';
 
-// Options object type for compatibility with component expectations
-type MockOptions = Record<string, any>;
+// Define the options type for the mock to match the real hook's expectations
+export interface ChakraInsightsOptions {
+  focusChakras?: number[];
+  includeRecommendations?: boolean;
+  maxItems?: number;
+}
 
 // This mock adapter translates between the old and new API formats
 export const mockChakraInsights = {
@@ -15,7 +19,7 @@ export const mockChakraInsights = {
   }),
   
   // New version of getPersonalizedInsights that returns properly typed data
-  getInsights: jest.fn((userId: string, chakras?: Record<string, boolean>, options?: MockOptions) => {
+  getInsights: jest.fn((userId: string, chakras?: Record<string, boolean>, options?: ChakraInsightsOptions) => {
     return Promise.resolve({
       insights: [
         { id: '1', content: 'Insight 1', type: 'meditation', title: 'Insight One', createdAt: new Date().toISOString() },
