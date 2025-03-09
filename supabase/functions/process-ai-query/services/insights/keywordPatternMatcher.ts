@@ -1,24 +1,32 @@
 
 /**
- * Identify paragraphs containing insight keywords
+ * Extract insights from paragraphs containing specific keywords
  */
-export function identifyInsightsByKeywords(text: string, keywords: string[] = []): { type: string; content: string }[] {
-  const insights = [];
+export function identifyInsightsByKeywords(text: string): { type: string; content: string }[] {
+  const insights: { type: string; content: string }[] = [];
+  
+  // Split text into paragraphs
   const paragraphs = text.split(/\n\n+/);
   
-  // Use default keywords if none provided
-  const insightKeywords = keywords.length > 0 ? keywords : [
+  // Keywords that often indicate insights
+  const insightKeywords = [
     "important", "key", "significant", "essential", "critical",
-    "remember", "note", "consider", "insight", "reflection"
+    "remember", "note", "consider", "insight", "reflection",
+    "takeaway", "lesson", "understand", "realize", "practice"
   ];
   
+  // Check each paragraph for insight keywords
   paragraphs.forEach(paragraph => {
     const lowerPara = paragraph.toLowerCase();
+    
+    // If the paragraph contains any insight keywords, add it as an insight
     if (insightKeywords.some(keyword => lowerPara.includes(keyword))) {
-      insights.push({
-        type: "paragraph",
-        content: paragraph.trim()
-      });
+      if (!insights.some(i => i.content === paragraph.trim())) {
+        insights.push({
+          type: "paragraph",
+          content: paragraph.trim()
+        });
+      }
     }
   });
   

@@ -94,7 +94,8 @@ export async function getCachedResponse(
 export async function cacheResponse(
   cacheKey: string, 
   response: Response, 
-  isStreaming: boolean
+  isStreaming: boolean,
+  ttl?: number
 ): Promise<void> {
   try {
     // Clone the response before reading it
@@ -128,7 +129,7 @@ export async function cacheResponse(
       }
       
       // Add to memory cache
-      storeInMemoryCache(cacheKey, allChunks, true);
+      storeInMemoryCache(cacheKey, allChunks, true, ttl);
       
       // Save to persistent cache asynchronously
       const decoder = new TextDecoder();
@@ -146,7 +147,7 @@ export async function cacheResponse(
     
     // Add to memory cache
     const encoder = new TextEncoder();
-    storeInMemoryCache(cacheKey, encoder.encode(responseData), false);
+    storeInMemoryCache(cacheKey, encoder.encode(responseData), false, ttl);
     
     // Save to persistent cache asynchronously
     EdgeRuntime.waitUntil(
