@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from "@/lib/utils";
 import { motion } from 'framer-motion';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { getPerformanceCategory, DeviceCapability } from '@/utils/performanceUtils';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -40,7 +40,7 @@ export function GlassCard({
   blurStrength = 'medium'
 }: GlassCardProps) {
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const isLowPerformance = getPerformanceCategory() === 'low';
+  const isLowPerformance = getPerformanceCategory() === DeviceCapability.LOW;
   
   // Adjust effects for mobile and low-performance devices
   const shouldReduceMotion = isMobile || isLowPerformance;

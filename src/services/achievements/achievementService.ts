@@ -1,91 +1,114 @@
 
+/**
+ * Achievement service for tracking user achievements
+ */
+
 import { supabase } from '@/lib/supabaseClient';
-import { AchievementEventType, AchievementType } from '@/components/onboarding/hooks/achievement/types';
+import { IAchievementData } from '@/components/onboarding/hooks/achievement/types';
 
 /**
- * Track an achievement event
- * 
- * @param userId The user ID
- * @param eventType The type of achievement event
- * @param data Additional data for the event
+ * Achievement Service class
+ * Manages user achievements and progress tracking
  */
-export async function trackAchievementEvent(
-  userId: string,
-  eventType: AchievementEventType,
-  data?: Record<string, any>
-) {
-  try {
-    if (!userId) {
-      console.error('Cannot track achievement event: No user ID provided');
-      return;
+class AchievementService {
+  /**
+   * Get achievements for a specific user
+   * 
+   * @param userId User ID
+   * @returns Array of achievements
+   */
+  async getUserAchievements(userId: string): Promise<IAchievementData[]> {
+    try {
+      // For now, return a mock empty array 
+      // This will be implemented later with actual database queries
+      console.log(`Getting achievements for user ${userId}`);
+      return [];
+    } catch (error) {
+      console.error('Error getting user achievements:', error);
+      return [];
     }
-    
-    console.log(`Tracking achievement event: ${eventType}`, data);
-    
-    // Record the event in the database
-    const { error } = await supabase
-      .from('user_activities')
-      .insert({
-        user_id: userId,
-        activity_type: eventType,
-        metadata: data || {},
-      });
+  }
+
+  /**
+   * Save a new achievement for a user
+   * 
+   * @param userId User ID
+   * @param achievement Achievement data
+   * @returns Success status
+   */
+  async saveAchievement(userId: string, achievement: IAchievementData): Promise<boolean> {
+    try {
+      // Log the achievement for now
+      console.log(`Saving achievement for user ${userId}:`, achievement);
       
-    if (error) {
-      console.error('Error tracking achievement event:', error);
+      // Mock successful save
+      return true;
+    } catch (error) {
+      console.error('Error saving achievement:', error);
+      return false;
     }
-    
-    return { success: !error };
-  } catch (err) {
-    console.error('Failed to track achievement event:', err);
-    return { success: false, error: err };
+  }
+
+  /**
+   * Track user progress for a specific achievement type
+   * 
+   * @param userId User ID
+   * @param progressType Type of progress to track
+   * @param value Progress value
+   * @returns Updated progress value
+   */
+  async trackProgress(userId: string, progressType: string, value: number): Promise<number> {
+    try {
+      console.log(`Tracking progress for user ${userId}: ${progressType} = ${value}`);
+      // Mock return - would normally update a database
+      return value;
+    } catch (error) {
+      console.error('Error tracking progress:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get progress tracking data for a user
+   * 
+   * @param userId User ID
+   * @returns Progress tracking data
+   */
+  async getProgressTracking(userId: string): Promise<Record<string, number>> {
+    try {
+      // Mock progress data
+      return {
+        reflections: 0,
+        meditation_minutes: 0,
+        chakras_activated: 0,
+        wisdom_resources_explored: 0,
+        streakDays: 0,
+        total_energy_points: 0
+      };
+    } catch (error) {
+      console.error('Error getting progress tracking:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Get all available achievements
+   * 
+   * @returns Array of all available achievements
+   */
+  async getAllAchievements(): Promise<IAchievementData[]> {
+    try {
+      // For now, return a mock empty array
+      return [];
+    } catch (error) {
+      console.error('Error getting all achievements:', error);
+      return [];
+    }
   }
 }
 
-/**
- * Unlock an achievement for a user
- * 
- * @param userId The user ID
- * @param achievementId The achievement ID
- * @param data Additional data for the achievement
- */
-export async function unlockAchievement(
-  userId: string,
-  achievementId: string,
-  data?: Record<string, any>
-) {
-  try {
-    if (!userId || !achievementId) {
-      console.error('Cannot unlock achievement: Missing user ID or achievement ID');
-      return { success: false };
-    }
-    
-    console.log(`Unlocking achievement ${achievementId} for user ${userId}`);
-    
-    // Record the achievement in the database
-    const { error } = await supabase
-      .from('user_achievements')
-      .insert({
-        user_id: userId,
-        achievement_id: achievementId,
-        unlocked_at: new Date().toISOString(),
-        metadata: data || {},
-      });
-      
-    if (error) {
-      // Check if it's a duplicate - achievement already unlocked
-      if (error.code === '23505') { // Unique violation
-        console.log(`Achievement ${achievementId} already unlocked for user ${userId}`);
-        return { success: true, alreadyUnlocked: true };
-      }
-      
-      console.error('Error unlocking achievement:', error);
-      return { success: false, error };
-    }
-    
-    return { success: true };
-  } catch (err) {
-    console.error('Failed to unlock achievement:', err);
-    return { success: false, error: err };
-  }
-}
+// Create and export singleton instance
+export const achievementService = new AchievementService();
+
+// For default export
+export default achievementService;

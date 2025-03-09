@@ -1,6 +1,6 @@
 
 import { useCallback } from 'react';
-import { AchievementState, ProgressTrackingResult, AchievementEventType } from './types';
+import { AchievementState, ProgressTrackingResult, AchievementEventType, IAchievementData } from './types';
 
 /**
  * Hook for tracking user progress in various achievement categories
@@ -137,11 +137,18 @@ export function useProgressTracking(
     console.log('Multiple progress updates:', changedValues);
   }, [state.progressTracking, setProgressTracking]);
 
+  // Create empty achievement array for type safety
+  const emptyAchievements: IAchievementData[] = [];
+
   return {
     trackProgress,
     resetProgress,
     logActivity,
     getProgressValue,
-    trackMultipleProgress
+    trackMultipleProgress,
+    // Add required properties to match ProgressTrackingResult
+    updated: false,
+    unlockedAchievements: emptyAchievements,
+    progress: state.progressTracking || {}
   };
 }

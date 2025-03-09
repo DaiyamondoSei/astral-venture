@@ -1,280 +1,249 @@
 /**
- * PerformanceMonitor class
- * Tracks component render times, frequency, and other performance metrics
+ * PerformanceMonitor class for tracking component rendering and application performance
+ * This file uses PascalCase to match class name conventions
  */
 
-import { createSafeFunction } from '@/utils/errorHandling';
+import { throttle } from '../performanceUtils';
 
-// Metric types for component performance
+// Define types for metrics
 export interface ComponentMetric {
   componentName: string;
   renderCount: number;
-  averageRenderTime: number;
-  maxRenderTime: number;
-  lastRenderTime: number;
   totalRenderTime: number;
-  renderTimestamps: number[];
-  recentRenderDurations: number[];
-  slowRenders: number;
-}
-
-// Subscriber type for the pub/sub pattern
-type Subscriber = (metrics: ComponentMetric[]) => void;
-
-// RenderAnalysis for component optimization suggestions
-export interface RenderAnalysis {
-  componentName: string;
-  renderCount: number;
-  renderFrequency: 'low' | 'medium' | 'high';
   averageRenderTime: number;
-  maxRenderTime: number;
-  possibleOptimizations: string[];
-  isProblematic: boolean;
+  lastRenderTime: number;
+  renderTimes: number[];
+  lastRenderInfo?: Record<string, any>;
+  renderTimeline: {
+    timestamp: number;
+    renderTime: number;
+    info?: Record<string, any>;
+  }[];
 }
 
-class PerformanceMonitor {
-  private metrics: Map<string, ComponentMetric> = new Map();
-  private subscribers: Subscriber[] = [];
-  private sessionId: string;
-  private throttleInterval: number = 500; // ms
-  private lastBatchTime: number = 0;
-  private batchedReports: { component: string, duration: number }[] = [];
+export interface PerformanceMetrics {
+  components: Record<string, ComponentMetric>;
+  queuedMetrics: any[];
+  lastFPSCheck: number;
+  averageFPS: number;
+  deviceInfo: {
+    category: string;
+    userAgent: string;
+    memory?: number;
+    screen?: { width: number, height: number };
+  };
+}
+
+// Define the class with Singleton pattern
+export class PerformanceMonitor {
+  private static instance: PerformanceMonitor;
+  private metrics: PerformanceMetrics;
+  private isMonitoring: boolean = false;
+  private subscribers: ((metrics: PerformanceMetrics) => void)[] = [];
   
-  constructor() {
-    this.sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    
-    // Debug logging
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PerformanceMonitor] Initialized with session ID:', this.sessionId);
-    }
+  private constructor() {
+    this.metrics = {
+      components: {},
+      queuedMetrics: [],
+      lastFPSCheck: 0,
+      averageFPS: 60,
+      deviceInfo: {
+        category: 'medium',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        memory: typeof navigator !== 'undefined' && 'deviceMemory' in navigator ? 
+          (navigator as any).deviceMemory : undefined,
+        screen: typeof window !== 'undefined' ? {
+          width: window.innerWidth,
+          height: window.innerHeight
+        } : undefined
+      }
+    };
   }
   
-  /**
-   * Report a component render with timing information
-   */
-  reportRender = createSafeFunction((componentName: string, renderDuration: number) => {
-    // Skip reporting if component name is not provided
-    if (!componentName) return;
-    
-    const now = Date.now();
-    let metric = this.metrics.get(componentName);
-    
-    if (!metric) {
-      metric = {
+  // Get singleton instance
+  public static getInstance(): PerformanceMonitor {
+    if (!PerformanceMonitor.instance) {
+      PerformanceMonitor.instance = new PerformanceMonitor();
+    }
+    return PerformanceMonitor.instance;
+  }
+  
+  // Report component render
+  public reportRender(
+    componentName: string,
+    renderTime: number,
+    renderInfo: Record<string, any> = {}
+  ): void {
+    if (!this.metrics.components[componentName]) {
+      this.metrics.components[componentName] = {
         componentName,
         renderCount: 0,
-        averageRenderTime: 0,
-        maxRenderTime: 0,
-        lastRenderTime: now,
         totalRenderTime: 0,
-        renderTimestamps: [],
-        recentRenderDurations: [],
-        slowRenders: 0,
+        averageRenderTime: 0,
+        lastRenderTime: 0,
+        renderTimes: [],
+        renderTimeline: []
       };
-      this.metrics.set(componentName, metric);
     }
+    
+    const metric = this.metrics.components[componentName];
     
     // Update metrics
     metric.renderCount += 1;
-    metric.lastRenderTime = now;
-    metric.totalRenderTime += renderDuration;
-    metric.recentRenderDurations.push(renderDuration);
-    metric.renderTimestamps.push(now);
+    metric.totalRenderTime += renderTime;
+    metric.lastRenderTime = renderTime;
+    metric.lastRenderInfo = renderInfo;
+    metric.renderTimes.push(renderTime);
     
-    // Keep only recent render durations (last 10)
-    if (metric.recentRenderDurations.length > 10) {
-      metric.recentRenderDurations.shift();
+    // Keep renderTimes array at a reasonable size
+    if (metric.renderTimes.length > 50) {
+      metric.renderTimes.shift();
     }
     
-    // Keep only recent timestamps (last 50)
-    if (metric.renderTimestamps.length > 50) {
-      metric.renderTimestamps.shift();
-    }
-    
-    // Update average render time
+    // Calculate average render time
     metric.averageRenderTime = metric.totalRenderTime / metric.renderCount;
     
-    // Update max render time if this render was slower
-    if (renderDuration > metric.maxRenderTime) {
-      metric.maxRenderTime = renderDuration;
+    // Add to timeline
+    metric.renderTimeline.push({
+      timestamp: Date.now(),
+      renderTime,
+      info: renderInfo
+    });
+    
+    // Keep timeline at a reasonable size
+    if (metric.renderTimeline.length > 20) {
+      metric.renderTimeline.shift();
     }
     
-    // Track slow renders (more than 16ms = below 60fps)
-    if (renderDuration > 16) {
-      metric.slowRenders += 1;
+    // Add to queue for potential server logging
+    this.metrics.queuedMetrics.push({
+      component: componentName,
+      renderTime,
+      timestamp: Date.now()
+    });
+    
+    // Keep queue at a reasonable size
+    if (this.metrics.queuedMetrics.length > 100) {
+      this.metrics.queuedMetrics.shift();
     }
     
-    // Notify subscribers of updated metrics
+    // Notify subscribers of changes
     this.notifySubscribers();
-  }, 'PerformanceMonitor.reportRender');
+  }
   
-  /**
-   * Record batch of renders for efficiency
-   */
-  recordRenderBatch = (renders: { component: string, duration: number }[]) => {
-    const now = Date.now();
+  // For backward compatibility
+  public recordRender = this.reportRender;
+  
+  // Start monitoring
+  public startMonitoring(): void {
+    if (this.isMonitoring) return;
     
-    // Add to batch
-    this.batchedReports.push(...renders);
+    this.isMonitoring = true;
     
-    // Process batch if throttle time has passed
-    if (now - this.lastBatchTime > this.throttleInterval) {
-      this.processBatch();
-      this.lastBatchTime = now;
+    // Monitor FPS if in browser environment
+    if (typeof window !== 'undefined') {
+      let lastTime = performance.now();
+      let frames = 0;
+      
+      const checkFPS = () => {
+        frames++;
+        const now = performance.now();
+        const elapsed = now - lastTime;
+        
+        if (elapsed >= 1000) {
+          this.metrics.averageFPS = Math.round((frames * 1000) / elapsed);
+          lastTime = now;
+          frames = 0;
+          this.metrics.lastFPSCheck = Date.now();
+          
+          // Notify subscribers of FPS update
+          this.notifySubscribers();
+        }
+        
+        if (this.isMonitoring) {
+          requestAnimationFrame(checkFPS);
+        }
+      };
+      
+      requestAnimationFrame(checkFPS);
     }
-  };
-  
-  /**
-   * Process batched render reports
-   */
-  processBatch = () => {
-    // Skip if no batched reports
-    if (this.batchedReports.length === 0) return;
     
-    // Process each report
-    for (const report of this.batchedReports) {
-      this.reportRender(report.component, report.duration);
+    console.log('Performance monitoring started');
+  }
+  
+  // Stop monitoring
+  public stopMonitoring(): void {
+    this.isMonitoring = false;
+    console.log('Performance monitoring stopped');
+  }
+  
+  // Clear metrics
+  public clearMetrics(componentName?: string): void {
+    if (componentName) {
+      delete this.metrics.components[componentName];
+    } else {
+      this.metrics.components = {};
     }
     
-    // Clear batch
-    this.batchedReports = [];
-  };
+    this.notifySubscribers();
+  }
   
-  /**
-   * Record component unmount
-   */
-  recordUnmount = (componentName: string) => {
-    // Implement if needed
-  };
+  // Get all component metrics
+  public getAllMetrics(): Record<string, ComponentMetric> {
+    return this.metrics.components;
+  }
   
-  /**
-   * Subscribe to metric updates
-   */
-  subscribe = (callback: Subscriber) => {
+  // Get metrics for a specific component
+  public getComponentMetrics(componentName: string): ComponentMetric | null {
+    return this.metrics.components[componentName] || null;
+  }
+  
+  // Get render count for a component
+  public getRenderCount(componentName: string): number {
+    return this.metrics.components[componentName]?.renderCount || 0;
+  }
+  
+  // Get average render time for a component
+  public getAverageRenderTime(componentName: string): number {
+    return this.metrics.components[componentName]?.averageRenderTime || 0;
+  }
+  
+  // Get all metrics data
+  public getMetrics(): PerformanceMetrics {
+    return this.metrics;
+  }
+  
+  // Subscribe to metrics updates
+  public subscribe(callback: (metrics: PerformanceMetrics) => void): () => void {
     this.subscribers.push(callback);
     
     // Return unsubscribe function
     return () => {
-      this.subscribers = this.subscribers.filter(sub => sub !== callback);
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
     };
-  };
+  }
   
-  /**
-   * Notify subscribers of metric updates
-   */
-  private notifySubscribers = () => {
-    const metrics = Array.from(this.metrics.values());
+  // Notify all subscribers of metrics updates
+  private notifySubscribers(): void {
     for (const subscriber of this.subscribers) {
-      try {
-        subscriber(metrics);
-      } catch (error) {
-        console.error('[PerformanceMonitor] Error in subscriber:', error);
-      }
+      subscriber(this.metrics);
     }
-  };
+  }
   
-  /**
-   * Get metrics for all components
-   */
-  getAllMetrics = () => {
-    return Array.from(this.metrics.values());
-  };
-  
-  /**
-   * Get metrics for a specific component
-   */
-  getMetrics = (componentName: string) => {
-    return this.metrics.get(componentName);
-  };
-  
-  /**
-   * Get component metrics as an object 
-   */
-  getComponentMetrics = (componentName: string) => {
-    const metric = this.metrics.get(componentName);
-    return metric ? { ...metric } : null;
-  };
-  
-  /**
-   * Clear all metrics
-   */
-  clearMetrics = () => {
-    this.metrics.clear();
-    this.notifySubscribers();
-  };
-  
-  /**
-   * Analyze renders for optimization opportunities
-   */
-  analyzeRenders = (): RenderAnalysis[] => {
-    return Array.from(this.metrics.values()).map(metric => {
-      const renderFrequency = this.calculateRenderFrequency(metric);
-      const possibleOptimizations = this.suggestOptimizations(metric, renderFrequency);
-      
-      return {
-        componentName: metric.componentName,
-        renderCount: metric.renderCount,
-        renderFrequency,
-        averageRenderTime: metric.averageRenderTime,
-        maxRenderTime: metric.maxRenderTime,
-        possibleOptimizations,
-        isProblematic: possibleOptimizations.length > 0
-      };
-    });
-  };
-  
-  /**
-   * Calculate render frequency category based on metrics
-   */
-  private calculateRenderFrequency = (metric: ComponentMetric): 'low' | 'medium' | 'high' => {
-    // Skip if not enough data
-    if (metric.renderTimestamps.length < 2) return 'low';
-    
-    // Calculate average time between renders
-    const timestamps = [...metric.renderTimestamps].sort((a, b) => a - b);
-    let totalDelta = 0;
-    
-    for (let i = 1; i < timestamps.length; i++) {
-      totalDelta += timestamps[i] - timestamps[i - 1];
-    }
-    
-    const avgTimeBetweenRenders = totalDelta / (timestamps.length - 1);
-    
-    // Categorize frequency
-    if (avgTimeBetweenRenders < 100) return 'high';
-    if (avgTimeBetweenRenders < 500) return 'medium';
-    return 'low';
-  };
-  
-  /**
-   * Suggest optimizations based on render metrics
-   */
-  private suggestOptimizations = (
-    metric: ComponentMetric, 
-    frequency: 'low' | 'medium' | 'high'
-  ): string[] => {
-    const suggestions: string[] = [];
-    
-    // Suggest memoization for frequently rendering components
-    if (frequency === 'high' && metric.renderCount > 10) {
-      suggestions.push('Consider using React.memo or useMemo to prevent unnecessary rerenders');
-    }
-    
-    // Suggest optimization for slow renders
-    if (metric.averageRenderTime > 16 && metric.renderCount > 5) {
-      suggestions.push('Component has slow render times (>16ms), consider optimizing rendering logic');
-    }
-    
-    // Suggest useCallback for components with high render counts
-    if (metric.renderCount > 20) {
-      suggestions.push('Consider using useCallback for event handlers to prevent recreation on each render');
-    }
-    
-    return suggestions;
-  };
+  // Find components that might need optimization
+  public getComponentsNeedingOptimization(): string[] {
+    return Object.values(this.metrics.components)
+      .filter(metric => 
+        metric.averageRenderTime > 20 || 
+        metric.renderCount > 30 ||
+        metric.renderTimes.some(time => time > 50)
+      )
+      .map(metric => metric.componentName);
+  }
 }
 
 // Export singleton instance
-export const performanceMonitor = new PerformanceMonitor();
+export const performanceMonitor = PerformanceMonitor.getInstance();
 
+// Default export
 export default performanceMonitor;

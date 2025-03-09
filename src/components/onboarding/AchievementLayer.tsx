@@ -6,7 +6,7 @@ import AchievementNotification from './AchievementNotification';
 import AchievementProgressTracker from './AchievementProgressTracker';
 import { StepInteraction } from '@/types/achievement';
 import { useUserStreak } from '@/hooks/useUserStreak';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { getPerformanceCategory, DeviceCapability } from '@/utils/performanceUtils';
 
 interface AchievementLayerProps {
   userId: string;
@@ -29,13 +29,20 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
 }) => {
   const [lastShowTime, setLastShowTime] = useState<number>(0);
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
-  const devicePerformance = useMemo(() => getPerformanceCategory(), []);
+  const devicePerformance = useMemo(() => getPerformanceCategory() as DeviceCapability, []);
   
   // Get user streak data from hook
   const { userStreak, activatedChakras } = useUserStreak(userId);
   
   // Memoize achievement tracker inputs to prevent unnecessary recalculations
   const trackerProps = useMemo(() => ({
+    achievementList: [],  // This will be filled from inside the hook
+    onUnlock: undefined,  // Will be handled internally
+    onProgress: undefined // Will be handled internally
+  }), []);
+  
+  // Extra data passed to internal tracker component
+  const extraTrackerData = {
     userId, 
     completedSteps, 
     stepInteractions,
@@ -45,17 +52,7 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
     totalPoints,
     uniqueChakrasActivated: activatedChakras.length,
     wisdomResourcesExplored: wisdomResourcesCount
-  }), [
-    userId, 
-    completedSteps, 
-    stepInteractions, 
-    userStreak.current, 
-    reflectionCount, 
-    meditationMinutes, 
-    totalPoints, 
-    activatedChakras.length, 
-    wisdomResourcesCount
-  ]);
+  };
   
   // Get achievement data and operations using the hook structure
   const { 
@@ -64,7 +61,7 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
     getTotalPoints,
     getProgressPercentage,
     progressTracking
-  } = useAchievementTracker(trackerProps);
+  } = useAchievementTracker(trackerProps, extraTrackerData);
 
   // Handle achievement notifications and progress tracker visibility
   const {
@@ -80,9 +77,9 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
     const timeSinceLastShow = now - lastShowTime;
     
     // Don't show too frequently (throttle based on device performance)
-    const minTimeBetweenShows = devicePerformance === 'low' 
+    const minTimeBetweenShows = devicePerformance === DeviceCapability.LOW 
       ? 120000  // 2 minutes for low-end devices
-      : devicePerformance === 'medium'
+      : devicePerformance === DeviceCapability.MEDIUM
         ? 90000  // 1.5 minutes for medium devices
         : 60000; // 1 minute for high-end devices
         
@@ -94,7 +91,7 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
     if (!hasInitialized && userId) {
       if (shouldShowProgressTracker()) {
         // Adjust display time based on device performance
-        const displayTime = devicePerformance === 'low' ? 3000 : 5000;
+        const displayTime = devicePerformance === DeviceCapability.LOW ? 3000 : 5000;
         const cleanup = showProgress(displayTime);
         setLastShowTime(Date.now());
         setHasInitialized(true);
@@ -117,7 +114,7 @@ const AchievementLayer: React.FC<AchievementLayerProps> = ({
           
         if (hasSignificantChange) {
           // Adjust display time based on device performance
-          const displayTime = devicePerformance === 'low' ? 3000 : 5000;
+          const displayTime = devicePerformance === DeviceCapability.LOW ? 3000 : 5000;
           const cleanup = showProgress(displayTime);
           setLastShowTime(Date.now());
           return cleanup;

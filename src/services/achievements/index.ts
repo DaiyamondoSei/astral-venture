@@ -1,13 +1,5 @@
 
-export * from './achievementService';
-export * from './achievementAnalytics';
+import achievementService from './achievementService';
 
-import { achievementService } from './achievementService';
-import { achievementAnalytics } from './achievementAnalytics';
-
-const achievementServices = {
-  service: achievementService,
-  analytics: achievementAnalytics
-};
-
-export default achievementServices;
+export { achievementService };
+export default achievementService;

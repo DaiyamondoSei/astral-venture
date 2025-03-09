@@ -3,7 +3,7 @@ import React, { ReactNode, useEffect, useState } from 'react';
 import { motion, MotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { getPerformanceCategory, DeviceCapability } from '@/utils/performanceUtils';
 
 interface GlassmorphicContainerProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onDrag'> {
   children: ReactNode;
@@ -34,12 +34,12 @@ export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
   ...props
 }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const deviceCapability = getPerformanceCategory();
+  const deviceCapability = getPerformanceCategory() as DeviceCapability;
   const [performanceAdjusted, setPerformanceAdjusted] = useState(false);
   
   // Reduce effects on low-end devices for better performance
   useEffect(() => {
-    if (deviceCapability === 'low') {
+    if (deviceCapability === DeviceCapability.LOW) {
       setPerformanceAdjusted(true);
     }
   }, [deviceCapability]);

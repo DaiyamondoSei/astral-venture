@@ -1,163 +1,194 @@
 
 /**
- * Performance Utilities
- * 
- * This module provides utility functions for performance optimization 
- * and monitoring across the application.
+ * Performance utilities for optimizing application performance
  */
 
-// Throttle function to limit how often a function can be called
-export const throttle = <T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): ((...args: Parameters<T>) => ReturnType<T> | undefined) => {
-  let lastCall = 0;
-  return (...args: Parameters<T>): ReturnType<T> | undefined => {
-    const now = Date.now();
-    if (now - lastCall >= limit) {
-      lastCall = now;
-      return func(...args);
-    }
-    return undefined;
-  };
-};
-
-// Debounce function to delay function execution until after a period of inactivity
-export const debounce = <T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): ((...args: Parameters<T>) => void) => {
-  let timeout: NodeJS.Timeout | null = null;
-  
-  return (...args: Parameters<T>): void => {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-    
-    timeout = setTimeout(() => {
-      func(...args);
-    }, wait);
-  };
-};
-
-// Performance categories for component classification
-export enum PerformanceCategory {
-  CRITICAL = 'critical',
-  HIGH = 'high',
-  MEDIUM = 'medium',
+// Device capability categories
+export enum DeviceCapability {
   LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high'
 }
 
-// Get performance category based on component name or metrics
-export const getPerformanceCategory = (
-  componentName: string,
-  renderTime?: number
-): PerformanceCategory => {
-  // Critical components that affect user interaction
-  const criticalComponents = [
-    'button',
-    'input',
-    'form',
-    'navbar',
-    'sidebar',
-    'menu',
-    'dialog',
-  ];
+/**
+ * Determines the performance category of the current device
+ * Based on device memory, processor cores, and user agent
+ * 
+ * @param userAgent Optional user agent string (defaults to navigator.userAgent)
+ * @param memory Optional memory amount in GB (defaults to navigator.deviceMemory if available)
+ * @returns Performance category (low, medium, high)
+ */
+export function getPerformanceCategory(
+  userAgent?: string, 
+  memory?: number
+): DeviceCapability {
+  // Use provided values or get from browser
+  const ua = userAgent || (typeof navigator !== 'undefined' ? navigator.userAgent : '');
+  const mem = memory || (typeof navigator !== 'undefined' && 'deviceMemory' in navigator ? 
+    (navigator as any).deviceMemory : undefined);
   
-  // High priority visual components
-  const highPriorityComponents = [
-    'card',
-    'header',
-    'footer',
-    'chart',
-    'astral',
-    'chakra',
-    'energy',
-  ];
+  // Low-end device indicators
+  const isLowEndDevice = 
+    /android 4\./i.test(ua) || 
+    /Mobile/i.test(ua) && mem && mem <= 2 ||
+    /iPhone|iPad/i.test(ua) && !/iPhone 1[3-9]|iPad Pro/i.test(ua);
   
-  // Check if component name includes any critical terms
-  if (criticalComponents.some(term => 
-    componentName.toLowerCase().includes(term))) {
-    return PerformanceCategory.CRITICAL;
+  // High-end device indicators
+  const isHighEndDevice = 
+    (/desktop|macintosh/i.test(ua) && (!mem || mem >= 8)) ||
+    /iPhone 1[3-9]|iPad Pro/i.test(ua) ||
+    /high-end/i.test(ua);
+  
+  // Determine category based on indicators
+  if (isLowEndDevice) {
+    return DeviceCapability.LOW;
+  } else if (isHighEndDevice) {
+    return DeviceCapability.HIGH;
+  } else {
+    return DeviceCapability.MEDIUM;
   }
+}
+
+/**
+ * Utility to throttle function calls for performance
+ * 
+ * @param func The function to throttle
+ * @param limit Time limit in milliseconds
+ * @returns Throttled function
+ */
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => ReturnType<T> | undefined {
+  let lastCall = 0;
+  let lastResult: ReturnType<T>;
   
-  // Check if component name includes any high priority terms
-  if (highPriorityComponents.some(term => 
-    componentName.toLowerCase().includes(term))) {
-    return PerformanceCategory.HIGH;
-  }
+  return function(...args: Parameters<T>): ReturnType<T> | undefined {
+    const now = Date.now();
+    
+    if (now - lastCall >= limit) {
+      lastCall = now;
+      lastResult = func(...args);
+      return lastResult;
+    }
+    
+    return undefined;
+  };
+}
+
+/**
+ * Batches multiple calls into a single execution
+ * Useful for reducing the number of renders or API calls
+ * 
+ * @param callback Function to execute with batched calls
+ * @param delay Delay in milliseconds
+ * @returns Function that can be called multiple times but will only execute once per delay period
+ */
+export function batch<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number = 100
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const batch: Parameters<T>[0][] = [];
   
-  // If render time is provided, categorize based on that
-  if (renderTime !== undefined) {
-    if (renderTime > 50) {
-      return PerformanceCategory.HIGH;
-    } else if (renderTime > 20) {
-      return PerformanceCategory.MEDIUM;
+  return function(...args: Parameters<T>): void {
+    batch.push(args[0]);
+    
+    if (timeoutId === null) {
+      timeoutId = setTimeout(() => {
+        callback(batch);
+        batch.length = 0;
+        timeoutId = null;
+      }, delay);
+    }
+  };
+}
+
+/**
+ * Monitors application performance and logs significant issues
+ * Simple utility for runtime performance optimization
+ */
+export function monitorPerformance(): void {
+  if (typeof window === 'undefined') return;
+  
+  // Monitor long tasks using PerformanceObserver
+  if ('PerformanceObserver' in window) {
+    try {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.duration > 50) {
+            console.warn(`Long task detected: ${entry.duration.toFixed(2)}ms`);
+          }
+        }
+      });
+      
+      observer.observe({ entryTypes: ['longtask'] });
+    } catch (e) {
+      console.error('PerformanceObserver error:', e);
     }
   }
   
-  // Default to low priority
-  return PerformanceCategory.LOW;
-};
+  // Monitor frame rate
+  let lastTime = performance.now();
+  let frames = 0;
+  let fps = 0;
+  
+  function checkFrameRate() {
+    frames++;
+    const now = performance.now();
+    const elapsed = now - lastTime;
+    
+    if (elapsed >= 1000) {
+      fps = Math.round((frames * 1000) / elapsed);
+      
+      if (fps < 30) {
+        console.warn(`Low frame rate detected: ${fps} FPS`);
+      }
+      
+      frames = 0;
+      lastTime = now;
+    }
+    
+    requestAnimationFrame(checkFrameRate);
+  }
+  
+  requestAnimationFrame(checkFrameRate);
+}
 
-// Calculate performance score from 0-100 based on metrics
-export const calculatePerformanceScore = (
+/**
+ * Calculate a complexity score for a component based on various factors
+ * @param renderTime Average render time in milliseconds
+ * @param deps Number of dependencies
+ * @param childCount Number of child components
+ * @param stateCount Number of state variables
+ * @returns Complexity score from 0-100
+ */
+export function calculateComplexityScore(
   renderTime: number,
-  renderCount: number,
-  componentDepth: number = 1
-): number => {
-  // Base score: 100 is perfect
-  let score = 100;
+  deps: number = 0,
+  childCount: number = 0,
+  stateCount: number = 0
+): number {
+  // Normalize values
+  const normalizedRenderTime = Math.min(renderTime / 20, 1);
+  const normalizedDeps = Math.min(deps / 15, 1);
+  const normalizedChildCount = Math.min(childCount / 10, 1);
+  const normalizedStateCount = Math.min(stateCount / 8, 1);
   
-  // Deduct points for render time
-  // 0-10ms: no deduction 
-  // 10-20ms: -5 points
-  // 20-50ms: -10 points
-  // 50-100ms: -20 points
-  // >100ms: -30 points
-  if (renderTime > 100) {
-    score -= 30;
-  } else if (renderTime > 50) {
-    score -= 20;
-  } else if (renderTime > 20) {
-    score -= 10;
-  } else if (renderTime > 10) {
-    score -= 5;
-  }
+  // Weight factors
+  const weights = {
+    renderTime: 0.4,
+    deps: 0.3,
+    childCount: 0.2,
+    stateCount: 0.1
+  };
   
-  // Deduct points for render count (per session)
-  // 1-5: no deduction
-  // 6-10: -5 points
-  // 11-20: -10 points
-  // >20: -15 points
-  if (renderCount > 20) {
-    score -= 15;
-  } else if (renderCount > 10) {
-    score -= 10;
-  } else if (renderCount > 5) {
-    score -= 5;
-  }
+  // Calculate score
+  const score = 
+    (normalizedRenderTime * weights.renderTime) +
+    (normalizedDeps * weights.deps) +
+    (normalizedChildCount * weights.childCount) +
+    (normalizedStateCount * weights.stateCount);
   
-  // Deduct points for component depth
-  // 1-3: no deduction
-  // 4-6: -5 points
-  // >6: -10 points
-  if (componentDepth > 6) {
-    score -= 10;
-  } else if (componentDepth > 3) {
-    score -= 5;
-  }
-  
-  // Ensure score is within 0-100 range
-  return Math.max(0, Math.min(100, score));
-};
-
-// Determine if a component needs optimization based on metrics
-export const needsOptimization = (
-  renderTime: number,
-  renderCount: number,
-  componentDepth: number = 1
-): boolean => {
-  const score = calculatePerformanceScore(renderTime, renderCount, componentDepth);
-  return score < 70; // Any score below 70 suggests optimization is needed
-};
+  return Math.round(score * 100);
+}

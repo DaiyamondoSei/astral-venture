@@ -1,58 +1,69 @@
 
 /**
- * AI Fallback Responses
- * Provides offline fallback responses when the AI service is unavailable
+ * Fallback responses for when the AI service is unavailable
  */
 
 import { AIResponse } from './types';
 
-// Generic responses for when the AI service is unavailable
-const GENERIC_RESPONSES = [
-  "I understand what you're asking, but I need to be online to provide a detailed answer. Please check your connection and try again.",
-  "That's an interesting question. When I'm back online, I can provide a more personalized response.",
-  "I'd like to help with that. Could you try again when we have an internet connection?",
-  "I need to connect to my knowledge base to answer that properly. Please check your connection and try again.",
+// Fallback response templates
+export const FALLBACK_RESPONSES = [
+  {
+    text: "I'm sorry, but I'm currently unable to connect to my knowledge base. This could be due to network issues. Please try again later or check your internet connection.",
+    suggestedPractices: [
+      "Take a deep breath and practice a moment of mindfulness",
+      "Try a short meditation exercise while waiting",
+      "Reflect on your energy balance during this pause"
+    ]
+  },
+  {
+    text: "It seems I'm having trouble accessing my full capabilities at the moment. This is often due to connectivity issues. Please try your question again in a few moments.",
+    suggestedPractices: [
+      "Practice patience as a mindfulness exercise",
+      "Use this moment to check in with your energy centers",
+      "Consider journaling your question for later reflection"
+    ]
+  },
+  {
+    text: "I'm currently experiencing a disconnection from my knowledge source. This is temporary and should resolve shortly. In the meantime, perhaps try a simple mindfulness exercise.",
+    suggestedPractices: [
+      "Focus on your breathing for a few moments",
+      "Practice a quick body scan meditation",
+      "Set an intention for when our connection resumes"
+    ]
+  }
 ];
 
-// Common questions and canned responses for offline use
-const COMMON_QUESTIONS: Record<string, string> = {
-  "what is meditation": "Meditation is a practice of focused attention that helps calm the mind and relax the body. Regular meditation has been shown to reduce stress and anxiety.",
-  "how do chakras work": "Chakras are energy centers in your body according to several spiritual traditions. They're thought to affect physical and mental well-being when balanced.",
-  "what are energy points": "Energy points in our system represent your progress and growth. You earn them by completing reflections, meditations, and other activities.",
-  "how do i improve my streak": "To improve your streak, log in daily and complete at least one activity such as a reflection or meditation. Consistency is key!",
-};
-
 /**
- * Creates a fallback response when the AI service is unavailable
+ * Create a fallback response when the AI service is unavailable
+ * 
+ * @param question The user's original question
+ * @returns A formatted fallback response
  */
 export function createFallbackResponse(question: string): AIResponse {
-  // Check for common questions
-  const lowerQuestion = question.toLowerCase();
-  let answer = '';
+  // Select a random fallback response
+  const randomIndex = Math.floor(Math.random() * FALLBACK_RESPONSES.length);
+  const fallback = FALLBACK_RESPONSES[randomIndex];
   
-  // Look for keyword matches in the question
-  for (const [key, response] of Object.entries(COMMON_QUESTIONS)) {
-    if (lowerQuestion.includes(key)) {
-      answer = response;
-      break;
-    }
-  }
-  
-  // Use a generic response if no match found
-  if (!answer) {
-    const randomIndex = Math.floor(Math.random() * GENERIC_RESPONSES.length);
-    answer = GENERIC_RESPONSES[randomIndex];
-  }
-  
-  // Return in the expected format
   return {
-    answer,
+    answer: fallback.text,
     type: 'text',
-    suggestedPractices: [],
+    suggestedPractices: fallback.suggestedPractices,
     meta: {
       model: 'fallback',
       tokenUsage: 0,
       processingTime: 0
     }
   };
+}
+
+/**
+ * Find a contextually appropriate fallback response
+ * 
+ * @param question The user's question
+ * @returns The most contextually relevant fallback response
+ */
+export function findFallbackResponse(question: string): AIResponse {
+  // For now, just use the basic createFallbackResponse
+  // This could be enhanced to provide more contextual responses
+  return createFallbackResponse(question);
 }

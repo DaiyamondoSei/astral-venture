@@ -1,12 +1,20 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { useProgressTracking } from '../../achievement/useProgressTracking';
+import { AchievementState } from '../../achievement/types';
 
 describe('useProgressTracking Hook', () => {
   // Define mock state and setter for testing
   const mockSetProgressTracking = jest.fn();
-  const mockState = {
+  
+  // Create a valid mock state that matches the AchievementState interface
+  const mockState: AchievementState = {
     earnedAchievements: [],
+    unlockedAchievements: [],
+    progress: {},
+    recentAchievements: [],
+    hasNewAchievements: false,
+    totalPoints: 0,
     achievementHistory: {},
     currentAchievement: null,
     progressTracking: {
