@@ -1,11 +1,5 @@
 
 project_id = "wkmyvthtyjcdzhzvfyji"
 
-[track-performance]
-verify_jwt = true
-
-[track-achievement]
-verify_jwt = true
-
-[sync-user-data]
-verify_jwt = true
+[global.env]
+API_URL = "https://wkmyvthtyjcdzhzvfyji.functions.supabase.co"

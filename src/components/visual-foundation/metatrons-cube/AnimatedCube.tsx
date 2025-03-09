@@ -5,6 +5,10 @@ import MetatronsCube from './MetatronsCube';
 import { MetatronsCubeProps } from './types';
 import { usePerfConfig } from '@/hooks/usePerfConfig';
 
+/**
+ * AnimatedCube wraps MetatronsCube with animation effects 
+ * that are conditionally applied based on device capability
+ */
 const AnimatedCube: React.FC<MetatronsCubeProps> = (props) => {
   const { config } = usePerfConfig();
   const [isAnimating, setIsAnimating] = useState(false);

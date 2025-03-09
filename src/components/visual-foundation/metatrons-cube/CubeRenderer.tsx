@@ -3,7 +3,12 @@ import React, { useMemo } from 'react';
 import { MetatronsCubeProps, MetatronsNode } from './types';
 import CubeLines from './CubeLines';
 import CubeNode from './CubeNode';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
 
+/**
+ * CubeRenderer handles the SVG rendering of nodes and connections
+ * with performance optimizations
+ */
 const CubeRenderer: React.FC<MetatronsCubeProps> = ({
   nodes,
   connections,
@@ -14,6 +19,8 @@ const CubeRenderer: React.FC<MetatronsCubeProps> = ({
   withAnimation = false,
   intensity = 5
 }) => {
+  const { config } = usePerfConfig();
+  
   // Convert nodes array to a lookup object for faster access
   const nodesLookup = useMemo(() => {
     return nodes.reduce((acc, node) => {
@@ -30,6 +37,15 @@ const CubeRenderer: React.FC<MetatronsCubeProps> = ({
     }, {} as Record<string, { x: number; y: number }>);
   }, [nodes]);
 
+  // Reduce visual complexity for low-end devices
+  const displayedConnections = useMemo(() => {
+    if (config.deviceCapability === 'low') {
+      // For low-performance devices, only show a subset of connections
+      return connections.filter((_, index) => index % 2 === 0);
+    }
+    return connections;
+  }, [connections, config.deviceCapability]);
+
   return (
     <svg 
       xmlns="http://www.w3.org/2000/svg" 
@@ -38,11 +54,11 @@ const CubeRenderer: React.FC<MetatronsCubeProps> = ({
     >
       {/* Draw connection lines */}
       <CubeLines
-        connections={connections}
+        connections={displayedConnections}
         nodes={nodePositions}
         activeNodeId={activeNodeId}
         variant={variant}
-        withAnimation={withAnimation}
+        withAnimation={withAnimation && config.deviceCapability !== 'low'}
         intensity={intensity}
       />
       
@@ -55,7 +71,7 @@ const CubeRenderer: React.FC<MetatronsCubeProps> = ({
           onClick={() => onNodeClick?.(node.id)}
           variant={variant}
           size={size}
-          withAnimation={withAnimation}
+          withAnimation={withAnimation && config.deviceCapability !== 'low'}
           intensity={intensity}
         />
       ))}
