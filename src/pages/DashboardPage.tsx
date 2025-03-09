@@ -14,7 +14,9 @@ const DashboardPage = () => {
       astralLevel={1} 
       onLogout={logout}
     >
-      {/* Dashboard content will be rendered by DashboardLayout */}
+      <div className="dashboard-content">
+        {/* Dashboard content will be rendered by DashboardLayout */}
+      </div>
     </DashboardLayout>
   );
 };

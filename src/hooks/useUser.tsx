@@ -1,9 +1,8 @@
 
-import { useContext } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
-// Context to store and provide user data
 export function useUser(): User | null {
   // Get session data
   const [user, setUser] = useState<User | null>(null);

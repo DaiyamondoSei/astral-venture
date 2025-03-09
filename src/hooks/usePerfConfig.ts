@@ -1,14 +1,14 @@
 
 import { useContext } from 'react';
-import { PerfConfigContext, PerfConfig } from '@/contexts/PerfConfigContext';
+import PerfConfigContext, { PerfConfig } from '@/contexts/PerfConfigContext';
 
-/**
- * Hook to access and update performance configuration settings
- */
-export const usePerfConfig = (): PerfConfig & { 
-  updateConfig: (updates: Partial<PerfConfig>) => void;
-  applyPreset: (preset: 'comprehensive' | 'balanced' | 'minimal' | 'disabled') => void;
-} => {
-  const { config, updateConfig, applyPreset } = useContext(PerfConfigContext);
-  return { ...config, updateConfig, applyPreset };
+// Custom hook to use the performance configuration
+export const usePerfConfig = () => {
+  const context = useContext(PerfConfigContext);
+  if (!context) {
+    throw new Error('usePerfConfig must be used within a PerfConfigProvider');
+  }
+  return context;
 };
+
+export default usePerfConfig;
