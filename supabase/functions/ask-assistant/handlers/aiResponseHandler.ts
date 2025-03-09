@@ -1,7 +1,6 @@
 
 import { createSuccessResponse } from "../../shared/responseUtils.ts";
-import { extractKeyInsights } from "../services/insightExtractor.ts";
-import { extractSuggestedPractices } from "../services/insightExtractor.ts";
+import { extractKeyInsights, extractSuggestedPractices } from "../services/insightExtractor.ts";
 import { AIModel } from "../services/openai/index.ts";
 
 export async function processAIResponse(

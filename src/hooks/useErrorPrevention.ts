@@ -66,12 +66,7 @@ export function useErrorPrevention(
         lastRenderTimeRef.current = now;
       }
     }
-    
-    // Clean up on unmount
-    return () => {
-      // No cleanup needed for this hook
-    };
-  });
+  }, [componentName, errorPrevention, props, throttleInterval, trackPropChanges, trackRenders, validateProps]);
 }
 
 export default useErrorPrevention;

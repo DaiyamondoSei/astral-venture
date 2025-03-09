@@ -88,8 +88,10 @@ export function useCodeEnhancement(
     // Only pass in the props we need to track
     const propsToTrack = { complexity };
     
-    useErrorPrevention(componentName, propsToTrack);
+    useErrorPrevention(componentName, propsToTrack, {
+      trackRenders: trackRenders,
+      validateProps: validateProps,
+      trackPropChanges: trackPropChanges
+    });
   }
-  
-  // Skip lifecycle logging to reduce console noise
 }

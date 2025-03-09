@@ -1,109 +1,95 @@
 
 /**
- * AI service types
- * Improved type definitions for better type safety
+ * AIQuestion interface for structured AI requests
  */
-
-export type AIModel = 'gpt-4o-mini' | 'gpt-4o' | 'gpt-3.5-turbo' | string;
-
-export interface AIQuestionOptions {
-  temperature?: number;
-  maxTokens?: number;
-  model?: AIModel;
-  cacheKey?: string;
-}
-
 export interface AIQuestion {
   text: string;
-  question?: string;
   context?: string;
   reflectionIds?: string[];
-  stream?: boolean;
   userId?: string;
 }
 
-export interface AIResponseMeta {
-  model?: string;
-  tokenUsage?: number;
-  processingTime?: number;
-  source?: string;
+/**
+ * AIQuestionOptions interface for configuring AI requests
+ */
+export interface AIQuestionOptions {
+  cacheResults?: boolean;
+  stream?: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  maxTokens?: number;
 }
 
+/**
+ * AIResponse interface for structured AI responses
+ */
 export interface AIResponse {
   answer: string;
-  type: 'text' | 'error' | 'stream';
-  suggestedPractices: string[];
-  sources?: {url: string; title: string}[];
-  meta?: AIResponseMeta;
+  insights?: string[];
+  suggestedPractices?: string[];
+  relatedInsights?: string[];
+  reflectionId?: string;
+  type?: 'text' | 'error' | 'stream';
+  processingTime?: number;
+  tokenUsage?: number;
+  model?: string;
 }
 
-// AI Insights related types
+/**
+ * AIInsight interface for structured insights
+ */
 export interface AIInsight {
   id: string;
+  type: 'chakra' | 'emotion' | 'practice' | 'wisdom';
   text: string;
-  type: 'chakra' | 'emotion' | 'practice' | 'wisdom' | 'general' | 'reflection' | 'meditation';
   confidence: number;
   relevance: number;
-  source?: string;
-  title?: string;
+  title: string;
 }
 
+/**
+ * AssistantSuggestion interface for code-related suggestions
+ */
 export interface AssistantSuggestion {
   id: string;
+  type: 'performance' | 'quality' | 'security' | 'accessibility';
+  component: string;
   title: string;
   description: string;
-  type: 'optimization' | 'improvement' | 'warning' | 'error' | 'performance' | 'quality';
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  component?: string;
-  created: Date;
+  priority: 'high' | 'medium' | 'low';
+  autoFixAvailable: boolean;
+  created: string;
   status: 'pending' | 'applied' | 'dismissed';
-  autoFixAvailable?: boolean;
-  codeExample?: string;
-  context?: string;
 }
 
+/**
+ * AssistantIntent interface for code assistant intents
+ */
 export interface AssistantIntent {
   id: string;
-  type: string;
+  type: 'fix' | 'optimize' | 'refactor';
   description: string;
-  confidence: number;
-  created: Date;
-  status?: 'active' | 'completed' | 'dismissed' | 'pending' | 'implemented';
-  relatedComponents?: string[];
+  componentId: string;
+  status: 'pending' | 'completed' | 'failed';
+  created: string;
 }
 
+/**
+ * Types for AI Code Assistant
+ */
 export interface UseAICodeAssistantProps {
-  component?: string;
-  file?: string;
-  autoAnalyze?: boolean;
-  initialComponents?: string[];
-  analysisDepth?: 'shallow' | 'medium' | 'deep';
+  component: string;
+  options?: {
+    autoAnalyze?: boolean;
+    analysisDepth?: 'simple' | 'detailed';
+  };
 }
 
-export interface AICodeAssistantOptions {
-  autoFix?: boolean;
-  includePerformance?: boolean;
-  includePatterns?: boolean;
-  includeSecurity?: boolean;
-}
-
-export interface AICodeAssistantContext {
-  suggestions: AssistantSuggestion[];
-  intents: AssistantIntent[];
-  isAnalyzing: boolean;
-  currentComponent: string;
-  error: string;
-  isFixing: boolean;
-  loading: boolean;
-  applyAutoFix: (suggestionId: string) => Promise<boolean>;
-  lastUpdated?: Date;
-  runAnalysis: (component?: string) => Promise<void>;
-  dismissSuggestion: (suggestionId: string) => void;
-  applyFix: (suggestionId: string) => Promise<boolean>;
-}
-
+/**
+ * ChakraInsightsOptions interface for chakra-specific insights
+ */
 export interface ChakraInsightsOptions {
-  includeChakraDetails?: boolean;
-  includeEmotionalAnalysis?: boolean;
   includeRecommendations?: boolean;
+  detailLevel?: 'basic' | 'detailed';
+  timeframe?: 'recent' | 'all';
 }
+

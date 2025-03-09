@@ -3,7 +3,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantState } from './useAssistantState';
 import { useQuestionSubmit } from './useQuestionSubmit';
-import { AIQuestionOptions, AIQuestion } from '@/services/ai/types';
+import { AIQuestion } from '@/services/ai/types';
 
 interface UseAIAssistantProps {
   reflectionContext?: string;
@@ -56,7 +56,6 @@ export const useAIAssistant = ({
       // Create a properly formatted question object
       const aiQuestion: AIQuestion = {
         text: state.question,
-        question: state.question, // For backward compatibility
         context: reflectionContext,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         userId: user.id
