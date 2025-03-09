@@ -12,7 +12,7 @@ const EDGE_FUNCTION_URL = '/api/ask-assistant';
 /**
  * Fetch a response from the AI assistant
  */
-async function fetchAssistantResponse(question: AIQuestion): Promise<AIResponse> {
+async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestionOptions): Promise<AIResponse> {
   try {
     // Check if online before attempting fetch
     if (!navigator.onLine) {
@@ -25,7 +25,10 @@ async function fetchAssistantResponse(question: AIQuestion): Promise<AIResponse>
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(question),
+      body: JSON.stringify({
+        ...question,
+        options
+      }),
     });
     
     if (!response.ok) {
@@ -75,7 +78,7 @@ export async function processQuestion(
       stream: false
     };
     
-    return await fetchAssistantResponse(aiQuestion);
+    return await fetchAssistantResponse(aiQuestion, options);
   } catch (error) {
     console.error('Error processing question:', error);
     return {
@@ -100,7 +103,7 @@ export const askAIAssistant = async (
       return await fetchAssistantResponse({
         text: question,
         question
-      });
+      }, options);
     }
     
     // Make sure text field is always present for backward compatibility
@@ -110,7 +113,7 @@ export const askAIAssistant = async (
       question: question.question || question.text
     };
     
-    return await fetchAssistantResponse(enhancedQuestion);
+    return await fetchAssistantResponse(enhancedQuestion, options);
   } catch (error) {
     console.error('Error in askAIAssistant:', error);
     return createFallbackResponse(

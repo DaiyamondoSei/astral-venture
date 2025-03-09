@@ -1,7 +1,7 @@
 
 import { useCallback } from 'react';
 import { processQuestion, askAIAssistant } from '@/services/ai/assistant';
-import { AIQuestion, AIResponse } from '@/services/ai/types';
+import { AIQuestion, AIResponse, AIQuestionOptions } from '@/services/ai/types';
 
 interface AssistantState {
   setLoading: (loading: boolean) => void;
@@ -54,14 +54,18 @@ export const useQuestionSubmit = ({
       
       // Prepare question data
       const questionData: AIQuestion = {
+        text: question,
         question,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         context: reflectionContext || '',
         stream: navigator.onLine // Only enable streaming if online
       };
       
+      // Create empty options object
+      const options: AIQuestionOptions = {};
+      
       // Call the API
-      const aiResponse = await askAIAssistant(questionData, userId);
+      const aiResponse = await askAIAssistant(questionData, options);
       
       // Only update state if component is still mounted
       if (isMounted.current) {

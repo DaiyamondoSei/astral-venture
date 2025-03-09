@@ -56,7 +56,8 @@ export function getPerformanceCategory(): DeviceCapability {
  */
 export function monitorPerformance(): void {
   import('./performance/PerformanceMonitor').then((module) => {
-    const instance = module.performanceMonitor || new module.PerformanceMonitor();
+    const { PerformanceMonitor } = module;
+    const instance = new PerformanceMonitor();
     instance.startMonitoring();
   });
 }

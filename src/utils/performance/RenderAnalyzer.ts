@@ -108,17 +108,17 @@ export class RenderAnalyzer {
         if (!metric) return false;
         
         // Safe access to properties with type checking
-        const renderCount = typeof metric === 'object' && metric.renderCount ? metric.renderCount : 0;
-        const averageRenderTime = typeof metric === 'object' && metric.averageRenderTime ? metric.averageRenderTime : 0;
+        const renderCount = typeof metric === 'object' && 'renderCount' in metric ? (metric as any).renderCount : 0;
+        const averageRenderTime = typeof metric === 'object' && 'averageRenderTime' in metric ? (metric as any).averageRenderTime : 0;
         
         // Components with excessive renders or slow render times
         return (renderCount > 50 || averageRenderTime > 16);
       })
       .map(metric => {
         // Safe mapping with defaults for missing values
-        const componentName = typeof metric === 'object' && metric.componentName ? metric.componentName : 'unknown';
-        const averageRenderTime = typeof metric === 'object' && metric.averageRenderTime ? metric.averageRenderTime : 0;
-        const renderCount = typeof metric === 'object' && metric.renderCount ? metric.renderCount : 0;
+        const componentName = typeof metric === 'object' && 'componentName' in metric ? (metric as any).componentName : 'unknown';
+        const averageRenderTime = typeof metric === 'object' && 'averageRenderTime' in metric ? (metric as any).averageRenderTime : 0;
+        const renderCount = typeof metric === 'object' && 'renderCount' in metric ? (metric as any).renderCount : 0;
         
         return {
           componentName,

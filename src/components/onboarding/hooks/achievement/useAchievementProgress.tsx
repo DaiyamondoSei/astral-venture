@@ -1,98 +1,93 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { useOnboarding } from '@/contexts/OnboardingContext';
-import { useAchievementState } from './useAchievementState';
-import { IAchievementData } from '@/components/onboarding/hooks/achievement/types';
+import { IAchievementData, AchievementState } from './types';
 
-interface ProgressTrackerResult {
-  trackProgress: (achievementId: string, value?: number) => void;
-  getCurrentProgress: (achievementId: string) => number;
-  isAchievementComplete: (achievementId: string) => boolean;
-  getProgressPercentage: (achievementId: string) => number;
-}
-
-export const useAchievementProgress = (): ProgressTrackerResult => {
-  const { trackStepInteraction } = useOnboarding();
-  const { achievements, updateAchievement } = useAchievementState();
+/**
+ * Hook to track progress of achievements
+ */
+export function useAchievementProgress(achievementState: AchievementState) {
+  const [achievementProgress, setAchievementProgress] = useState<Record<string, number>>({});
   
-  // Track progress for an achievement
-  const trackProgress = useCallback((achievementId: string, value = 1) => {
-    const achievement = achievements.find(a => a.id === achievementId);
-    
-    if (!achievement) {
-      console.warn(`Achievement with ID ${achievementId} not found`);
-      return;
-    }
-    
-    // Clone achievement to modify it
-    const updatedAchievement = { ...achievement };
-    
-    // Safely handle progress property
-    const currentProgress = typeof updatedAchievement.progress === 'number' 
-      ? updatedAchievement.progress 
-      : 0;
-    
-    // Update progress
-    updatedAchievement.progress = currentProgress + value;
-    
-    // Check if achievement is completed
-    const requiredAmount = updatedAchievement.requiredAmount || 1;
-    const isComplete = (updatedAchievement.progress >= requiredAmount);
-    
-    // If newly completed, set awarded flag
-    if (isComplete && !updatedAchievement.awarded) {
-      updatedAchievement.awarded = true;
+  // Initialize achievement progress
+  useEffect(() => {
+    if (achievementState.achievements) {
+      const initialProgress: Record<string, number> = {};
       
-      // Log interaction for tracking
-      trackStepInteraction(achievementId, 'achievement_completed');
+      // Initialize progress for each achievement
+      achievementState.achievements.forEach(achievement => {
+        initialProgress[achievement.id] = achievement.progress || 0;
+      });
+      
+      setAchievementProgress(initialProgress);
+    }
+  }, [achievementState.achievements]);
+  
+  // Update progress for a specific achievement
+  const updateProgress = useCallback((achievementId: string, progressValue: number) => {
+    if (!achievementId) return;
+    
+    setAchievementProgress(prev => ({
+      ...prev,
+      [achievementId]: Math.min(1, progressValue)
+    }));
+    
+    // If achievement has an updateAchievement method, use it
+    if (achievementState.updateAchievement) {
+      achievementState.updateAchievement(achievementId, { progress: progressValue });
+    }
+  }, [achievementState]);
+  
+  // Calculate progress based on tracking type
+  const calculateProgressForAchievement = useCallback((achievement: IAchievementData) => {
+    if (!achievement) return 0;
+    
+    // For streak-based achievements
+    if (achievement.type === 'streak' && achievement.streakDays && achievementState.progressTracking.streakDays) {
+      const currentStreak = achievementState.progressTracking.streakDays;
+      return Math.min(1, currentStreak / achievement.streakDays);
     }
     
-    // Save updated achievement
-    updateAchievement(updatedAchievement);
+    // For progressive achievements with a tracking type
+    if (achievement.trackingType && achievement.requiredAmount) {
+      const currentValue = achievementState.progressTracking[achievement.trackingType] || 0;
+      return Math.min(1, currentValue / achievement.requiredAmount);
+    }
     
-    return updatedAchievement;
-  }, [achievements, updateAchievement, trackStepInteraction]);
+    // For step-based achievements
+    if (achievement.requiredSteps && Array.isArray(achievement.requiredSteps) && achievementState.progress) {
+      let completedSteps = 0;
+      
+      achievement.requiredSteps.forEach(step => {
+        if (achievementState.progress[step]) {
+          completedSteps++;
+        }
+      });
+      
+      return Math.min(1, completedSteps / achievement.requiredSteps.length);
+    }
+    
+    // For completed achievements
+    if (achievementState.earnedAchievements.some(a => a.id === achievement.id)) {
+      return 1;
+    }
+    
+    return achievementProgress[achievement.id] || 0;
+  }, [achievementState, achievementProgress]);
   
-  // Get current progress
-  const getCurrentProgress = useCallback((achievementId: string): number => {
-    const achievement = achievements.find(a => a.id === achievementId);
-    if (!achievement) return 0;
+  // Get all achievements with their progress
+  const getAchievementsWithProgress = useCallback(() => {
+    if (!achievementState.achievements) return [];
     
-    return typeof achievement.progress === 'number' ? achievement.progress : 0;
-  }, [achievements]);
-  
-  // Check if achievement is complete
-  const isAchievementComplete = useCallback((achievementId: string): boolean => {
-    const achievement = achievements.find(a => a.id === achievementId);
-    if (!achievement) return false;
-    
-    // If awarded flag is set, achievement is complete
-    if (achievement.awarded) return true;
-    
-    // Check progress against required amount
-    const progress = typeof achievement.progress === 'number' ? achievement.progress : 0;
-    const requiredAmount = achievement.requiredAmount || 1;
-    
-    return progress >= requiredAmount;
-  }, [achievements]);
-  
-  // Calculate progress percentage
-  const getProgressPercentage = useCallback((achievementId: string): number => {
-    const achievement = achievements.find(a => a.id === achievementId);
-    if (!achievement) return 0;
-    
-    const progress = typeof achievement.progress === 'number' ? achievement.progress : 0;
-    const requiredAmount = achievement.requiredAmount || 1;
-    
-    // Ensure percentage is between 0 and 100
-    const percentage = Math.min(100, Math.max(0, (progress / requiredAmount) * 100));
-    return Math.round(percentage);
-  }, [achievements]);
+    return achievementState.achievements.map(achievement => ({
+      ...achievement,
+      progress: calculateProgressForAchievement(achievement)
+    }));
+  }, [achievementState.achievements, calculateProgressForAchievement]);
   
   return {
-    trackProgress,
-    getCurrentProgress,
-    isAchievementComplete,
-    getProgressPercentage
+    achievementProgress,
+    updateProgress,
+    calculateProgressForAchievement,
+    getAchievementsWithProgress
   };
-};
+}

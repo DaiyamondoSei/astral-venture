@@ -63,3 +63,46 @@ export interface AIQuestionOptions {
   temperature?: number;
   maxTokens?: number;
 }
+
+// Define assistant suggestion and intent types for AICodeAssistant
+export interface AssistantSuggestion {
+  id: string;
+  type: 'optimization' | 'improvement' | 'warning' | 'error';
+  component?: string;
+  title: string;
+  description: string;
+  context?: string;
+  codeExample?: string;
+  autoFixAvailable?: boolean;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export type AssistantIntentStatus = 'pending' | 'completed' | 'failed';
+
+export interface AssistantIntent {
+  id: string;
+  type: string;
+  description: string;
+  status: AssistantIntentStatus;
+  created: Date;
+  updated?: Date;
+  componentPath?: string;
+}
+
+// Add CodeQualityIssue type for CodeQualityDashboard
+export interface CodeQualityIssue {
+  id: string;
+  component: string;
+  type: 'security' | 'pattern' | 'complexity' | 'performance';
+  description: string;
+  suggestions: string[];
+  priority: 'low' | 'medium' | 'high';
+  location?: string;
+}
+
+export interface CodeQualityStats {
+  componentsAnalyzed: number;
+  issuesByType: Record<string, number>;
+  highPriorityIssues: number;
+  lastUpdated: Date;
+}

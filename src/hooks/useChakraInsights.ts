@@ -1,69 +1,77 @@
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { ChakraActivated } from '@/utils/emotion/chakraTypes';
+import { useState, useEffect, useCallback } from 'react';
 import { ChakraInsightsService } from '@/services/chakra/ChakraInsightsService';
+import { AIInsight } from '@/services/ai/types';
 
-interface UseChakraInsightsResult {
-  personalizedInsights: string[];
-  practiceRecommendations: string[];
-  loading: boolean;
+interface ChakraInsightsOptions {
+  userId?: string;
+  chakras?: Record<string, number>;
+  initialInsights?: AIInsight[];
 }
 
-/**
- * Hook to get personalized chakra insights and practice recommendations
- * based on activated chakras and dominant emotions
- */
-export function useChakraInsights(
-  activatedChakras?: ChakraActivated, 
-  dominantEmotions: string[] = []
-): UseChakraInsightsResult {
-  const [personalizedInsights, setPersonalizedInsights] = useState<string[]>([]);
-  const [practiceRecommendations, setPracticeRecommendations] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
-  
+export function useChakraInsights({ userId, chakras, initialInsights }: ChakraInsightsOptions = {}) {
+  const [insights, setInsights] = useState<AIInsight[]>(initialInsights || []);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
+
+  // Fetch insights on mount or when dependencies change
   useEffect(() => {
-    let isMounted = true;
+    if (userId) {
+      fetchInsights();
+    }
+  }, [userId, chakras]);
+
+  // Fetch chakra-based insights
+  const fetchInsights = useCallback(async () => {
+    if (!userId) return;
     
-    const fetchPersonalizedContent = async () => {
-      if (!user) return;
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const fetchedInsights = await ChakraInsightsService.getInsights(userId, chakras);
+      setInsights(fetchedInsights);
       
-      setLoading(true);
-      try {
-        const { personalizedInsights, practiceRecommendations } = 
-          await ChakraInsightsService.getPersonalizedInsights(
-            user.id,
-            activatedChakras,
-            dominantEmotions
-          );
-        
-        if (isMounted) {
-          setPersonalizedInsights(personalizedInsights);
-          setPracticeRecommendations(practiceRecommendations);
-        }
-      } catch (error) {
-        console.error('Error fetching personalized content:', error);
-        if (isMounted) {
-          setPersonalizedInsights(['Continue your reflection practice to deepen your insights.']);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-    
-    fetchPersonalizedContent();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [user, activatedChakras, dominantEmotions]);
+      // Also fetch recommendations
+      const fetchedRecommendations = await ChakraInsightsService.getPersonalizedRecommendations(userId);
+      setRecommendations(fetchedRecommendations);
+    } catch (err) {
+      console.error('Error fetching chakra insights:', err);
+      setError('Failed to load chakra insights');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, chakras]);
+
+  // Get insight by type
+  const getInsightByType = useCallback((type: string): AIInsight | null => {
+    return insights.find(insight => insight.type === type) || null;
+  }, [insights]);
+
+  // Get all insights
+  const getAllInsights = useCallback((): AIInsight[] => {
+    return insights;
+  }, [insights]);
+
+  // Get recommendations
+  const getRecommendations = useCallback((): string[] => {
+    return recommendations;
+  }, [recommendations]);
+
+  // Refresh insights
+  const refreshInsights = useCallback(async () => {
+    await fetchInsights();
+  }, [fetchInsights]);
 
   return {
-    personalizedInsights,
-    practiceRecommendations,
-    loading
+    insights,
+    loading,
+    error,
+    recommendations,
+    getInsightByType,
+    getAllInsights,
+    getRecommendations,
+    refreshInsights
   };
 }

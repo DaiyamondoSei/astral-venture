@@ -23,6 +23,7 @@ export interface AchievementTrackerResult {
   getProgressPercentage: () => number;
   achievementHistory: Record<string, any>;
   progressTracking: Record<string, number>;
+  trackProgress?: (type: string, amount: number) => void;
 }
 
 export interface AchievementState {
@@ -35,6 +36,10 @@ export interface AchievementState {
   recentAchievements: IAchievementData[];
   hasNewAchievements: boolean;
   totalPoints: number;
+  
+  // Add missing properties needed by useAchievementProgress
+  achievements?: IAchievementData[];
+  updateAchievement?: (id: string, data: Partial<IAchievementData>) => void;
 }
 
 export interface IAchievementData {
@@ -122,7 +127,7 @@ export interface GuidedTourStep {
   elementId: string;
   target?: string;
   content: string;
-  targetSelector?: string;
+  targetSelector: string; // Make required to match TourStep
 }
 
 export interface TourStep {
@@ -132,7 +137,7 @@ export interface TourStep {
   elementId: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
   target?: string;
-  targetSelector?: string;
+  targetSelector: string;
 }
 
 export interface GuidedTourData {
