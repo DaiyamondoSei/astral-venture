@@ -1,239 +1,242 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Types for chakra visualization
 export type ChakraName = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
-
-export interface ChakraData {
-  name: ChakraName;
-  color: string;
-  description: string;
-  element: string;
-  position: string;
-  mantra: string;
-  activated: boolean;
-  progress: number;
-  practices: ChakraPractice[];
-}
 
 export interface ChakraPractice {
   id: string;
-  name: string;
-  type: 'meditation' | 'reflection' | 'exercise';
+  title: string;
   description: string;
   duration: number;
   difficulty: number;
-  effects: string[];
-  chakras: ChakraName[];
   energyPoints: number;
-  title: string;
+  chakraId: ChakraName;
+}
+
+export interface ChakraData {
+  id: ChakraName;
+  name: string;
+  position: number;
+  color: string;
+  description: string;
+  activationLevel: number;
+  associatedEmotions: string[];
+  balancingPractices: ChakraPractice[];
 }
 
 export interface ChakraVisualizationData {
-  chakras: Record<ChakraName, ChakraData>;
-  recommendedPractices: ChakraPractice[];
-  userChakraSystem: {
-    activatedChakras: ChakraName[];
-    overallBalance: number;
-  };
+  chakras: ChakraData[];
+  overallBalance: number;
 }
 
-const CHAKRA_COLORS = {
-  root: '#FF5757',
-  sacral: '#FF9E43',
-  solar: '#FFDE59',
-  heart: '#7ED957',
-  throat: '#5CC9F5',
-  'third-eye': '#A85CFF',
-  crown: '#C588FF'
-};
-
-const DEFAULT_CHAKRA_DATA: Record<ChakraName, Omit<ChakraData, 'activated' | 'progress' | 'practices'>> = {
-  root: {
-    name: 'root',
-    color: CHAKRA_COLORS.root,
-    description: 'Foundation, stability, security, and basic needs',
-    element: 'Earth',
-    position: 'Base of spine',
-    mantra: 'I am safe and secure'
-  },
-  sacral: {
-    name: 'sacral',
-    color: CHAKRA_COLORS.sacral,
-    description: 'Creativity, pleasure, emotions, and relationships',
-    element: 'Water',
-    position: 'Lower abdomen',
-    mantra: 'I feel and experience life fully'
-  },
-  solar: {
-    name: 'solar',
-    color: CHAKRA_COLORS.solar,
-    description: 'Personal power, confidence, and self-esteem',
-    element: 'Fire',
-    position: 'Upper abdomen',
-    mantra: 'I am powerful and confident'
-  },
-  heart: {
-    name: 'heart',
-    color: CHAKRA_COLORS.heart,
-    description: 'Love, compassion, and harmony',
-    element: 'Air',
-    position: 'Center of chest',
-    mantra: 'I give and receive love freely'
-  },
-  throat: {
-    name: 'throat',
-    color: CHAKRA_COLORS.throat,
-    description: 'Communication, expression, and truth',
-    element: 'Ether',
-    position: 'Throat',
-    mantra: 'I express my truth with clarity'
-  },
-  'third-eye': {
-    name: 'third-eye',
-    color: CHAKRA_COLORS['third-eye'],
-    description: 'Intuition, perception, and insight',
-    element: 'Light',
-    position: 'Between eyebrows',
-    mantra: 'I see beyond illusion'
-  },
-  crown: {
-    name: 'crown',
-    color: CHAKRA_COLORS.crown,
-    description: 'Spiritual connection, consciousness, and enlightenment',
-    element: 'Thought',
-    position: 'Top of head',
-    mantra: 'I am connected to all that is'
-  }
-};
-
 /**
- * Get chakra visualization data for the current user
+ * Get chakra visualization data for a user
  */
-export async function getChakraVisualizationData(userId?: string): Promise<ChakraVisualizationData> {
+export async function getChakraVisualizationData(options: { userLevel: number }): Promise<ChakraVisualizationData> {
+  const { userLevel = 1 } = options;
+  
   try {
-    // If no user ID, return default data
-    if (!userId) {
-      return getDefaultVisualizationData();
-    }
-
-    // Fetch user's activated chakras
-    const { data: chakraSystem, error: chakraError } = await supabase
+    // In a production app, we would fetch this from the database
+    // Here we're generating mock data based on user level
+    
+    // Check if we have data in the database
+    const { data: chakraSystemData, error } = await supabase
       .from('chakra_systems')
       .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (chakraError) {
-      console.error('Error fetching chakra data:', chakraError);
-      return getDefaultVisualizationData();
+      .maybeSingle();
+    
+    if (chakraSystemData && !error) {
+      // Convert stored data to our format
+      return parseChakraSystemData(chakraSystemData);
     }
-
-    // Fetch available practices for chakras
-    const { data: practices, error: practicesError } = await supabase
-      .from('practices')
-      .select('*')
-      .in('type', ['meditation', 'reflection', 'exercise']);
-
-    if (practicesError) {
-      console.error('Error fetching practices:', practicesError);
-    }
-
-    // Create the full chakra data
-    const activatedChakras: ChakraName[] = chakraSystem?.activated_chakras || [];
-    const chakras: Record<ChakraName, ChakraData> = {};
-
-    // Build chakra data for each chakra
-    Object.keys(DEFAULT_CHAKRA_DATA).forEach((chakraName) => {
-      const name = chakraName as ChakraName;
-      const isActivated = activatedChakras.includes(name);
-      
-      // Find practices for this chakra
-      const chakraPractices = (practices || [])
-        .filter(p => (p.chakra_association || []).includes(name))
-        .map(p => ({
-          id: p.id,
-          name: p.title,
-          title: p.title,
-          type: p.type,
-          description: p.description,
-          duration: p.duration,
-          difficulty: p.difficulty || 1,
-          effects: p.effects || [],
-          chakras: p.chakra_association || [],
-          energyPoints: p.energy_points || 5
-        }));
-
-      chakras[name] = {
-        ...DEFAULT_CHAKRA_DATA[name],
-        activated: isActivated,
-        progress: chakraSystem?.[`${name}_progress`] || 0,
-        practices: chakraPractices
-      };
-    });
-
-    // Determine recommended practices
-    const recommendedPractices = Object.values(chakras)
-      .flatMap(chakra => chakra.practices)
-      .filter((practice, index, self) => 
-        index === self.findIndex(p => p.id === practice.id)
-      )
-      .sort((a, b) => {
-        // Prioritize practices for activated chakras
-        const aActivated = a.chakras.some(c => activatedChakras.includes(c));
-        const bActivated = b.chakras.some(c => activatedChakras.includes(c));
-        if (aActivated && !bActivated) return -1;
-        if (!aActivated && bActivated) return 1;
-        return 0;
-      })
-      .slice(0, 5);
-
-    return {
-      chakras,
-      recommendedPractices,
-      userChakraSystem: {
-        activatedChakras,
-        overallBalance: calculateOverallBalance(chakras)
-      }
-    };
+    
+    // If no data, generate mock data
+    return generateMockChakraData(userLevel);
   } catch (error) {
-    console.error('Error in getChakraVisualizationData:', error);
-    return getDefaultVisualizationData();
+    console.error('Error fetching chakra visualization data:', error);
+    return generateMockChakraData(userLevel);
   }
 }
 
 /**
- * Calculate overall chakra balance
+ * Parse chakra system data from the database
  */
-function calculateOverallBalance(chakras: Record<ChakraName, ChakraData>): number {
-  const activatedChakras = Object.values(chakras).filter(c => c.activated);
-  if (activatedChakras.length === 0) return 0;
-  
-  const totalProgress = activatedChakras.reduce((sum, chakra) => sum + chakra.progress, 0);
-  return totalProgress / activatedChakras.length;
+function parseChakraSystemData(data: any): ChakraVisualizationData {
+  try {
+    // In a real implementation, this would map database fields to our model
+    return data.chakra_data as ChakraVisualizationData;
+  } catch (e) {
+    console.error('Error parsing chakra data:', e);
+    return generateMockChakraData(1);
+  }
 }
 
 /**
- * Get default visualization data
+ * Generate mock chakra data for testing
  */
-function getDefaultVisualizationData(): ChakraVisualizationData {
-  const chakras: Record<ChakraName, ChakraData> = {};
+function generateMockChakraData(userLevel: number): ChakraVisualizationData {
+  // Base activation level is influenced by user level
+  const baseActivation = Math.min(35 + (userLevel * 8), 90);
   
-  Object.keys(DEFAULT_CHAKRA_DATA).forEach((chakraName) => {
-    const name = chakraName as ChakraName;
-    chakras[name] = {
-      ...DEFAULT_CHAKRA_DATA[name],
-      activated: false,
-      progress: 0,
-      practices: []
-    };
-  });
+  // Random variance to make it more realistic
+  const getActivation = () => {
+    const base = baseActivation + (Math.random() * 20 - 10);
+    return Math.min(Math.max(base, 20), 95); // Keep between 20-95%
+  };
   
   return {
-    chakras,
-    recommendedPractices: [],
-    userChakraSystem: {
-      activatedChakras: [],
-      overallBalance: 0
-    }
+    chakras: [
+      {
+        id: 'root',
+        name: 'Root Chakra',
+        position: 85, // Position in % from top
+        color: '#FF0000',
+        description: 'Foundation, stability, and security',
+        activationLevel: getActivation(),
+        associatedEmotions: ['Security', 'Stability', 'Survival', 'Grounding'],
+        balancingPractices: [
+          {
+            id: 'root-meditation',
+            title: 'Root Grounding Meditation',
+            description: 'A meditation to strengthen your connection to earth and physical body',
+            duration: 10,
+            difficulty: 1,
+            energyPoints: 15,
+            chakraId: 'root'
+          },
+          {
+            id: 'root-breathing',
+            title: 'Root Breathing Technique',
+            description: 'Breathing exercise to establish safety and stability',
+            duration: 5,
+            difficulty: 1,
+            energyPoints: 10,
+            chakraId: 'root'
+          }
+        ]
+      },
+      {
+        id: 'sacral',
+        name: 'Sacral Chakra',
+        position: 75,
+        color: '#FF7F00',
+        description: 'Creativity, emotion, and pleasure',
+        activationLevel: getActivation(),
+        associatedEmotions: ['Passion', 'Joy', 'Creativity', 'Sensuality'],
+        balancingPractices: [
+          {
+            id: 'sacral-creative',
+            title: 'Creative Expression',
+            description: 'Exercise to unlock creative energy and emotional flow',
+            duration: 15,
+            difficulty: 2,
+            energyPoints: 20,
+            chakraId: 'sacral'
+          }
+        ]
+      },
+      {
+        id: 'solar',
+        name: 'Solar Plexus Chakra',
+        position: 65,
+        color: '#FFFF00',
+        description: 'Personal power, confidence, and self-esteem',
+        activationLevel: getActivation(),
+        associatedEmotions: ['Confidence', 'Willpower', 'Self-esteem', 'Purpose'],
+        balancingPractices: [
+          {
+            id: 'solar-power',
+            title: 'Power Activation',
+            description: 'Practice to strengthen your inner power and confidence',
+            duration: 8,
+            difficulty: 2,
+            energyPoints: 18,
+            chakraId: 'solar'
+          }
+        ]
+      },
+      {
+        id: 'heart',
+        name: 'Heart Chakra',
+        position: 55,
+        color: '#00FF00',
+        description: 'Love, compassion, and connection',
+        activationLevel: getActivation(),
+        associatedEmotions: ['Love', 'Compassion', 'Forgiveness', 'Empathy'],
+        balancingPractices: [
+          {
+            id: 'heart-opening',
+            title: 'Heart Opening Meditation',
+            description: 'Meditation to open the heart center and develop compassion',
+            duration: 12,
+            difficulty: 3,
+            energyPoints: 25,
+            chakraId: 'heart'
+          }
+        ]
+      },
+      {
+        id: 'throat',
+        name: 'Throat Chakra',
+        position: 45,
+        color: '#0000FF',
+        description: 'Communication, expression, and truth',
+        activationLevel: getActivation(),
+        associatedEmotions: ['Expression', 'Truth', 'Communication', 'Authenticity'],
+        balancingPractices: [
+          {
+            id: 'throat-expression',
+            title: 'Authentic Expression',
+            description: 'Practice to develop clear and authentic communication',
+            duration: 7,
+            difficulty: 2,
+            energyPoints: 15,
+            chakraId: 'throat'
+          }
+        ]
+      },
+      {
+        id: 'third-eye',
+        name: 'Third Eye Chakra',
+        position: 35,
+        color: '#4B0082',
+        description: 'Intuition, insight, and vision',
+        activationLevel: getActivation(),
+        associatedEmotions: ['Intuition', 'Clarity', 'Insight', 'Perception'],
+        balancingPractices: [
+          {
+            id: 'third-eye-vision',
+            title: 'Third Eye Activation',
+            description: 'Practice to develop intuition and inner vision',
+            duration: 15,
+            difficulty: 4,
+            energyPoints: 30,
+            chakraId: 'third-eye'
+          }
+        ]
+      },
+      {
+        id: 'crown',
+        name: 'Crown Chakra',
+        position: 25,
+        color: '#8F00FF',
+        description: 'Consciousness, spirituality, and enlightenment',
+        activationLevel: getActivation(),
+        associatedEmotions: ['Awareness', 'Unity', 'Transcendence', 'Bliss'],
+        balancingPractices: [
+          {
+            id: 'crown-meditation',
+            title: 'Higher Consciousness Meditation',
+            description: 'Advanced meditation to connect with higher consciousness',
+            duration: 20,
+            difficulty: 5,
+            energyPoints: 40,
+            chakraId: 'crown'
+          }
+        ]
+      }
+    ],
+    overallBalance: Math.min(Math.max(30 + (userLevel * 5), 30), 90)
   };
 }

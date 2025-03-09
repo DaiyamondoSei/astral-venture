@@ -1,49 +1,72 @@
 
-export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'quantum';
+/**
+ * Types for Metatron's Cube components
+ */
+
+// Supported sizes for the cube
 export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+// Supported theme variants
+export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'quantum';
+
+// Glow intensity options
 export type GlowIntensity = 'low' | 'medium' | 'high';
 
+// A node in the cube
 export interface MetatronsNode {
   id: string;
   x: number;
   y: number;
-  [key: string]: any;
+  size?: number;
+  active?: boolean;
+  pulsing?: boolean;
+  label?: string;
+  tooltip?: string;
 }
 
-export interface MetatronsConnection {
-  id: string;
-  from: string;
-  to: string;
-  [key: string]: any;
+// A connection between nodes
+export interface CubeConnection {
+  source: string;
+  target: string;
+  active?: boolean;
+  pulsing?: boolean;
+  color?: string;
 }
 
+// Props for the MetatronsCube component
 export interface MetatronsCubeProps {
   className?: string;
   size?: CubeSize;
   variant?: CubeTheme;
   nodes: MetatronsNode[];
-  connections: MetatronsConnection[];
+  connections: CubeConnection[];
   activeNodeId?: string;
   onNodeClick?: (nodeId: string) => void;
   withAnimation?: boolean;
   intensity?: number;
 }
 
-// Add CubeNode and CubeLine types for cubeUtils.ts
-export interface CubeNode {
-  id: string;
-  x: number;
-  y: number;
-  radius?: number;
-  status?: string;
-  isActive?: boolean;
-  label?: string;
+// Props for CubeRenderer component
+export interface CubeRendererProps extends MetatronsCubeProps {}
+
+// Props for CubeLines component
+export interface CubeLinesProps {
+  connections: CubeConnection[];
+  nodes: Record<string, { x: number; y: number }>;
+  primaryColor: string;
+  secondaryColor: string;
+  activeNodeId?: string;
+  glowIntensity: GlowIntensity;
+  isSimplified: boolean;
 }
 
-export interface CubeLine {
-  id: string;
-  from: string;
-  to: string;
-  status?: string;
+// Props for CubeNode component
+export interface CubeNodeProps {
+  node: MetatronsNode;
+  primaryColor: string;
+  secondaryColor: string;
   isActive?: boolean;
+  onClick: (nodeId: string) => void;
+  glowIntensity: GlowIntensity;
+  isSimplified: boolean;
 }

@@ -1,51 +1,31 @@
 
-/**
- * Simple in-memory cache for responses
- * In a production environment, this would be replaced with a proper cache service
- */
+// Simple in-memory cache with TTL
+const responseCache = new Map<string, {
+  response: Response,
+  timestamp: number,
+  expiresAt: number,
+  isStreamingResponse: boolean
+}>();
 
-// In-memory cache (not persistent across function invocations)
-const cache = new Map<string, { data: any; timestamp: number; isStream: boolean }>();
+// Cache management constants
+const DEFAULT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const MAX_CACHE_SIZE = 100;
 
 /**
- * Get cached response if available and not expired
+ * Get a cached response if available
  */
 export async function getCachedResponse(
-  key: string,
-  isStreamRequest: boolean
+  cacheKey: string, 
+  isStreamingRequest: boolean
 ): Promise<Response | null> {
-  if (!cache.has(key)) {
-    return null;
-  }
-
-  const cachedItem = cache.get(key);
+  const cached = responseCache.get(cacheKey);
   
-  // Check if cache is expired
-  if (isCacheExpired(cachedItem?.timestamp || 0, cachedItem?.isStream || false)) {
-    cache.delete(key);
-    return null;
+  // Only use cache if it matches the request type (streaming vs non-streaming)
+  if (cached && cached.isStreamingResponse === isStreamingRequest && Date.now() <= cached.expiresAt) {
+    console.log("Cache hit:", cacheKey, isStreamingRequest ? "(streaming)" : "(non-streaming)");
+    return cached.response.clone(); // Return a clone of the cached response
   }
-
-  // Return cached response
-  if (isStreamRequest && cachedItem?.isStream) {
-    // For streaming responses, need to recreate a new stream
-    return new Response(cachedItem.data, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      }
-    });
-  } else if (!isStreamRequest && !cachedItem?.isStream) {
-    // For regular responses
-    return new Response(JSON.stringify(cachedItem.data), {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-  }
-
-  // If request type doesn't match cache type, return null
+  
   return null;
 }
 
@@ -53,100 +33,60 @@ export async function getCachedResponse(
  * Cache a response for future use
  */
 export async function cacheResponse(
-  key: string,
-  response: Response,
-  isStream: boolean,
-  ttl: number = 30 * 60 * 1000 // Default 30 min TTL
+  cacheKey: string, 
+  response: Response, 
+  isStreamingResponse: boolean,
+  ttl = DEFAULT_CACHE_TTL
 ): Promise<void> {
-  try {
-    if (isStream) {
-      // For streaming responses, we need to clone and process the stream
-      const clonedResponse = response.clone();
-      const reader = clonedResponse.body?.getReader();
-      
-      if (!reader) return;
-      
-      let chunks: Uint8Array[] = [];
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      
-      // Combine all chunks
-      const combinedChunks = concatenateUint8Arrays(chunks);
-      
-      // Store in cache
-      cache.set(key, {
-        data: combinedChunks,
-        timestamp: Date.now(),
-        isStream: true
-      });
-    } else {
-      // For regular JSON responses
-      const clonedResponse = response.clone();
-      const data = await clonedResponse.json();
-      
-      cache.set(key, {
-        data,
-        timestamp: Date.now(),
-        isStream: false
-      });
-    }
-  } catch (error) {
-    console.error("Error caching response:", error);
-  }
+  // Clean up cache first
+  await cleanupCache();
+  
+  responseCache.set(cacheKey, {
+    response: response.clone(),
+    timestamp: Date.now(),
+    expiresAt: Date.now() + ttl,
+    isStreamingResponse
+  });
+  
+  console.log(`Added ${isStreamingResponse ? "streaming" : "non-streaming"} response to cache with key: ${cacheKey}`);
 }
 
 /**
- * Helper to concatenate Uint8Arrays
+ * Clean up expired cache entries and maintain cache size limits
  */
-function concatenateUint8Arrays(arrays: Uint8Array[]): Uint8Array {
-  // Calculate total length
-  const totalLength = arrays.reduce((acc, array) => acc + array.length, 0);
-  
-  // Create a new array with the total length
-  const result = new Uint8Array(totalLength);
-  
-  // Copy each array into the result
-  let offset = 0;
-  for (const array of arrays) {
-    result.set(array, offset);
-    offset += array.length;
-  }
-  
-  return result;
-}
-
-/**
- * Check if a cache item has expired
- */
-function isCacheExpired(timestamp: number, isStream: boolean): boolean {
+export async function cleanupCache(forceCleanAll = false): Promise<number> {
   const now = Date.now();
-  // Streaming responses expire sooner (10 minutes)
-  const ttl = isStream ? 10 * 60 * 1000 : 30 * 60 * 1000;
-  return now - timestamp > ttl;
-}
-
-/**
- * Clear entire cache or remove expired items
- */
-export async function cleanupCache(clearAll: boolean = false): Promise<number> {
-  if (clearAll) {
-    const count = cache.size;
-    cache.clear();
-    return count;
+  let deletionCount = 0;
+  
+  if (forceCleanAll) {
+    const size = responseCache.size;
+    responseCache.clear();
+    return size;
   }
   
-  // Remove only expired items
-  let removedCount = 0;
-  for (const [key, item] of cache.entries()) {
-    if (isCacheExpired(item.timestamp, item.isStream)) {
-      cache.delete(key);
-      removedCount++;
+  // Delete expired entries
+  for (const [key, entry] of responseCache.entries()) {
+    if (now > entry.expiresAt) {
+      responseCache.delete(key);
+      deletionCount++;
     }
   }
   
-  return removedCount;
+  // If cache is still too large, remove oldest entries
+  if (responseCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(responseCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    
+    const entriesToDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+    entriesToDelete.forEach(([key]) => {
+      responseCache.delete(key);
+      deletionCount++;
+    });
+  }
+  
+  if (deletionCount > 0) {
+    console.log(`Cleaned up ${deletionCount} cache entries, ${responseCache.size} remaining`);
+  }
+  
+  return deletionCount;
 }

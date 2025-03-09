@@ -1,18 +1,11 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MetatronsNode, GlowIntensity } from './MetatronsCube';
+import { CubeNodeProps } from './types';
 
-interface CubeNodeProps {
-  node: MetatronsNode;
-  primaryColor: string;
-  secondaryColor: string;
-  isActive?: boolean;
-  onClick: (nodeId: string) => void;
-  glowIntensity: GlowIntensity;
-  isSimplified: boolean;
-}
-
+/**
+ * CubeNode renders a single node in the cube
+ */
 const CubeNode: React.FC<CubeNodeProps> = ({
   node,
   primaryColor,
@@ -37,12 +30,7 @@ const CubeNode: React.FC<CubeNodeProps> = ({
   
   // Position styles
   const positionStyles = {
-    left: `${node.x}px`,
-    top: `${node.y}px`,
-    width: `${nodeSize}px`,
-    height: `${nodeSize}px`,
-    marginLeft: `-${nodeSize / 2}px`,
-    marginTop: `-${nodeSize / 2}px`,
+    transform: `translate(${node.x}px, ${node.y}px)`,
   };
   
   // Animation variants
@@ -65,39 +53,39 @@ const CubeNode: React.FC<CubeNodeProps> = ({
   };
   
   return (
-    <>
-      <motion.div
-        className="absolute rounded-full cursor-pointer z-10"
-        style={positionStyles}
-        onClick={handleNodeClick}
-        variants={variants}
-        animate={node.pulsing ? 'active' : 'inactive'}
-        whileHover={{ scale: 1.2 }}
-        title={node.tooltip}
-      >
-        <motion.div
-          className="absolute inset-0 rounded-full"
+    <motion.g
+      style={positionStyles}
+      variants={variants}
+      animate={node.pulsing ? 'active' : 'inactive'}
+      whileHover={{ scale: 1.2 }}
+      onClick={handleNodeClick}
+      title={node.tooltip}
+      className="cursor-pointer"
+    >
+      <circle
+        cx="0"
+        cy="0"
+        r={nodeSize / 2}
+        fill={isActive ? secondaryColor : primaryColor}
+        style={{
+          filter: isSimplified ? undefined : `drop-shadow(0 0 ${getFilterDeviation()}px ${isActive ? secondaryColor : primaryColor})`
+        }}
+      />
+      
+      {node.label && (
+        <text
+          x="0"
+          y={nodeSize + 8}
+          textAnchor="middle"
+          className="fill-white text-xs font-medium pointer-events-none"
           style={{
-            backgroundColor: isActive ? secondaryColor : primaryColor,
-            boxShadow: isSimplified ? 'none' : `0 0 ${getFilterDeviation()}px ${isActive ? secondaryColor : primaryColor}`
+            textShadow: '0 0 4px rgba(0,0,0,0.8)'
           }}
-        />
-        
-        {node.label && (
-          <div 
-            className="absolute whitespace-nowrap text-xs font-medium text-white"
-            style={{
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%) translateY(8px)',
-              textShadow: '0 0 4px rgba(0,0,0,0.8)'
-            }}
-          >
-            {node.label}
-          </div>
-        )}
-      </motion.div>
-    </>
+        >
+          {node.label}
+        </text>
+      )}
+    </motion.g>
   );
 };
 

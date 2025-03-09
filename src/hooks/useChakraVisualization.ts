@@ -1,90 +1,68 @@
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   getChakraVisualizationData, 
-  ChakraVisualizationData,
-  ChakraName,
-  ChakraPractice
+  ChakraVisualizationData, 
+  ChakraName, 
+  ChakraPractice 
 } from '@/services/chakra/chakraVisualizationService';
 
-interface UseChakraVisualizationOptions {
+interface UseChakraVisualizationProps {
   userLevel?: number;
-}
-
-interface UseChakraVisualizationResult {
-  chakraData: ChakraVisualizationData | null;
-  isLoading: boolean;
-  error: string | null;
-  selectedChakra: ChakraName | null;
-  selectedPractice: ChakraPractice | null;
-  selectChakra: (chakraId: ChakraName) => void;
-  selectPractice: (practice: ChakraPractice) => void;
-  refreshChakraData: () => Promise<void>;
 }
 
 /**
  * Hook for managing chakra visualization data and interactions
  */
-export function useChakraVisualization(
-  options: UseChakraVisualizationOptions = {}
-): UseChakraVisualizationResult {
-  const { user } = useAuth();
-  const userLevel = options.userLevel || 1;
-  
+export function useChakraVisualization({ userLevel = 1 }: UseChakraVisualizationProps) {
   const [chakraData, setChakraData] = useState<ChakraVisualizationData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedChakra, setSelectedChakra] = useState<ChakraName | null>(null);
   const [selectedPractice, setSelectedPractice] = useState<ChakraPractice | null>(null);
-  
-  // Fetch chakra data
-  const fetchChakraData = async () => {
-    setIsLoading(true);
-    setError(null);
-    
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load chakra data
+  const loadChakraData = useCallback(async () => {
     try {
-      const data = await getChakraVisualizationData(user?.id, userLevel);
+      setIsLoading(true);
+      setError(null);
+      
+      const data = await getChakraVisualizationData({ userLevel });
       setChakraData(data);
       
-      // Select dominant chakra if available, otherwise root chakra
-      if (data.userChakraSystem?.dominantChakra) {
-        setSelectedChakra(data.userChakraSystem.dominantChakra);
-      } else if (!selectedChakra) {
-        setSelectedChakra('root');
+      // If no chakra is selected, select the first one
+      if (!selectedChakra && data.chakras.length > 0) {
+        setSelectedChakra(data.chakras[0].id);
       }
-      
-      // Reset selected practice
-      setSelectedPractice(null);
-    } catch (err: any) {
-      console.error('Error fetching chakra data:', err);
-      setError(err.message || 'Error fetching chakra data');
+    } catch (err) {
+      console.error('Error loading chakra data:', err);
+      setError('Failed to load chakra visualization data. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  // Initial data fetch
+  }, [userLevel, selectedChakra]);
+
+  // Initial data loading
   useEffect(() => {
-    fetchChakraData();
-  }, [user?.id, userLevel]);
-  
-  // Select a chakra
-  const selectChakra = (chakraId: ChakraName) => {
+    loadChakraData();
+  }, [loadChakraData]);
+
+  // Handle chakra selection
+  const selectChakra = useCallback((chakraId: ChakraName) => {
     setSelectedChakra(chakraId);
     setSelectedPractice(null);
-  };
-  
-  // Select a practice
-  const selectPractice = (practice: ChakraPractice) => {
+  }, []);
+
+  // Handle practice selection
+  const selectPractice = useCallback((practice: ChakraPractice) => {
     setSelectedPractice(practice);
-  };
-  
+  }, []);
+
   // Refresh chakra data
-  const refreshChakraData = async () => {
-    await fetchChakraData();
-  };
-  
+  const refreshChakraData = useCallback(() => {
+    loadChakraData();
+  }, [loadChakraData]);
+
   return {
     chakraData,
     isLoading,
@@ -96,3 +74,5 @@ export function useChakraVisualization(
     refreshChakraData
   };
 }
+
+export default useChakraVisualization;

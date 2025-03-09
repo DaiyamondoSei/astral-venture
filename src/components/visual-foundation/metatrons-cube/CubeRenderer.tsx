@@ -1,42 +1,67 @@
 
 import React, { useMemo } from 'react';
-import { MetatronsCubeProps, MetatronsNode } from './types';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
+import { CubeRendererProps, MetatronsNode, GlowIntensity } from './types';
 import CubeLines from './CubeLines';
 import CubeNode from './CubeNode';
-import { usePerfConfig } from '@/hooks/usePerfConfig';
 
 /**
  * CubeRenderer handles the SVG rendering of nodes and connections
  * with performance optimizations
  */
-const CubeRenderer: React.FC<MetatronsCubeProps> = ({
+const CubeRenderer: React.FC<CubeRendererProps> = ({
   nodes,
   connections,
   activeNodeId,
   onNodeClick,
   variant = 'default',
-  size = 'md',
   withAnimation = false,
   intensity = 5
 }) => {
   const { config } = usePerfConfig();
   
-  // Convert nodes array to a lookup object for faster access
-  const nodesLookup = useMemo(() => {
-    return nodes.reduce((acc, node) => {
-      acc[node.id] = node;
-      return acc;
-    }, {} as Record<string, MetatronsNode>);
-  }, [nodes]);
+  // Theme colors
+  const themeColors = {
+    default: {
+      primary: 'rgba(147, 51, 234, 0.7)',
+      secondary: 'rgba(59, 130, 246, 0.7)',
+    },
+    cosmic: {
+      primary: 'rgba(236, 72, 153, 0.7)',
+      secondary: 'rgba(124, 58, 237, 0.7)',
+    },
+    ethereal: {
+      primary: 'rgba(14, 165, 233, 0.7)',
+      secondary: 'rgba(139, 92, 246, 0.7)',
+    },
+    quantum: {
+      primary: 'rgba(234, 179, 8, 0.7)',
+      secondary: 'rgba(168, 85, 247, 0.7)',
+    }
+  };
   
-  // Create a mapping of node id to position for the CubeLines component
+  // Calculate theme-related styles
+  const theme = themeColors[variant];
+  const adjustedIntensity = config.deviceCapability === 'low' ? intensity * 0.7 : intensity;
+  
+  const primaryColor = useMemo(() => {
+    const opacity = Math.min(0.85, 0.7 * adjustedIntensity);
+    return theme.primary.replace(/[^,]+(?=\))/, String(opacity));
+  }, [theme.primary, adjustedIntensity]);
+  
+  const secondaryColor = useMemo(() => {
+    const opacity = Math.min(0.85, 0.7 * adjustedIntensity);
+    return theme.secondary.replace(/[^,]+(?=\))/, String(opacity));
+  }, [theme.secondary, adjustedIntensity]);
+  
+  // Convert nodes array to a lookup object for faster access
   const nodePositions = useMemo(() => {
     return nodes.reduce((acc, node) => {
       acc[node.id] = { x: node.x, y: node.y };
       return acc;
     }, {} as Record<string, { x: number; y: number }>);
   }, [nodes]);
-
+  
   // Reduce visual complexity for low-end devices
   const displayedConnections = useMemo(() => {
     if (config.deviceCapability === 'low') {
@@ -45,6 +70,9 @@ const CubeRenderer: React.FC<MetatronsCubeProps> = ({
     }
     return connections;
   }, [connections, config.deviceCapability]);
+  
+  const glowIntensity: GlowIntensity = config.deviceCapability === 'low' ? 'low' : 'medium';
+  const isSimplified = config.deviceCapability === 'low';
 
   return (
     <svg 
@@ -56,10 +84,11 @@ const CubeRenderer: React.FC<MetatronsCubeProps> = ({
       <CubeLines
         connections={displayedConnections}
         nodes={nodePositions}
+        primaryColor={primaryColor}
+        secondaryColor={secondaryColor}
         activeNodeId={activeNodeId}
-        variant={variant}
-        withAnimation={withAnimation && config.deviceCapability !== 'low'}
-        intensity={intensity}
+        glowIntensity={glowIntensity}
+        isSimplified={isSimplified}
       />
       
       {/* Draw nodes */}
@@ -67,12 +96,12 @@ const CubeRenderer: React.FC<MetatronsCubeProps> = ({
         <CubeNode
           key={node.id}
           node={node}
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
           isActive={activeNodeId === node.id}
-          onClick={() => onNodeClick?.(node.id)}
-          variant={variant}
-          size={size}
-          withAnimation={withAnimation && config.deviceCapability !== 'low'}
-          intensity={intensity}
+          onClick={onNodeClick ? onNodeClick : () => {}}
+          glowIntensity={glowIntensity}
+          isSimplified={isSimplified}
         />
       ))}
     </svg>

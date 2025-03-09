@@ -1,77 +1,47 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChakraInsightsService } from '@/services/chakra/ChakraInsightsService';
-import { AIInsight } from '@/services/ai/types';
+import { chakraInsightsService, ChakraInsight, ChakraInsightsOptions } from '@/services/chakra/ChakraInsightsService';
 
-interface ChakraInsightsOptions {
-  userId?: string;
-  chakras?: Record<string, number>;
-  initialInsights?: AIInsight[];
-}
-
-export function useChakraInsights({ userId, chakras, initialInsights }: ChakraInsightsOptions = {}) {
-  const [insights, setInsights] = useState<AIInsight[]>(initialInsights || []);
-  const [loading, setLoading] = useState<boolean>(false);
+/**
+ * Hook for fetching and managing chakra insights
+ */
+export function useChakraInsights(options: ChakraInsightsOptions = {}) {
+  const [insights, setInsights] = useState<ChakraInsight[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [recommendations, setRecommendations] = useState<string[]>([]);
 
-  // Fetch insights on mount or when dependencies change
-  useEffect(() => {
-    if (userId) {
-      fetchInsights();
-    }
-  }, [userId, chakras]);
-
-  // Fetch chakra-based insights
-  const fetchInsights = useCallback(async () => {
-    if (!userId) return;
-    
-    setLoading(true);
-    setError(null);
-    
+  // Load insights data
+  const loadInsights = useCallback(async () => {
     try {
-      const fetchedInsights = await ChakraInsightsService.getInsights(userId, chakras);
-      setInsights(fetchedInsights);
+      setIsLoading(true);
+      setError(null);
       
-      // Also fetch recommendations
-      const fetchedRecommendations = await ChakraInsightsService.getPersonalizedRecommendations(userId);
-      setRecommendations(fetchedRecommendations);
+      const data = await chakraInsightsService.getChakraInsights(options);
+      setInsights(data);
     } catch (err) {
-      console.error('Error fetching chakra insights:', err);
-      setError('Failed to load chakra insights');
+      console.error('Error loading chakra insights:', err);
+      setError('Failed to load chakra insights. Please try again.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, [userId, chakras]);
+  }, [options]);
 
-  // Get insight by type
-  const getInsightByType = useCallback((type: string): AIInsight | null => {
-    return insights.find(insight => insight.type === type) || null;
-  }, [insights]);
+  // Initial data loading
+  useEffect(() => {
+    loadInsights();
+  }, [loadInsights]);
 
-  // Get all insights
-  const getAllInsights = useCallback((): AIInsight[] => {
-    return insights;
-  }, [insights]);
-
-  // Get recommendations
-  const getRecommendations = useCallback((): string[] => {
-    return recommendations;
-  }, [recommendations]);
-
-  // Refresh insights
-  const refreshInsights = useCallback(async () => {
-    await fetchInsights();
-  }, [fetchInsights]);
+  // Refresh insights data
+  const refreshInsights = useCallback(() => {
+    loadInsights();
+  }, [loadInsights]);
 
   return {
     insights,
-    loading,
+    isLoading,
     error,
-    recommendations,
-    getInsightByType,
-    getAllInsights,
-    getRecommendations,
     refreshInsights
   };
 }
+
+export default useChakraInsights;
