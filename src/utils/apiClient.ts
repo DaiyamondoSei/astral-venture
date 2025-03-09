@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
 import { withRetry, RetryOptions } from './apiClient/retryStrategy';
+import { AIQuestion, AIQuestionOptions, AIResponse } from '@/services/ai/types';
 
 // Define standardized API response types
 type ApiResponse<T> = {
@@ -159,11 +160,22 @@ export async function callEdgeFunction<T, U = unknown>(
 // Type-safe wrapper functions for specific API endpoints with improved error handling
 export const api = {
   // AI Assistant
-  getAiResponse: (message: string, reflectionId?: string, reflectionContent?: string) => 
+  getAiResponse: (message: string, reflectionId?: string, reflectionContent?: string, options?: AIQuestionOptions) => 
     callEdgeFunction<{response: string; insights: any[]}>('ask-assistant', {
       message,
       reflectionId,
-      reflectionContent
+      reflectionContent,
+      options
+    }),
+    
+  // AI Assistant extended
+  askAIAssistant: (question: AIQuestion, options?: AIQuestionOptions) => 
+    callEdgeFunction<AIResponse>('ask-assistant', {
+      ...question,
+      cacheKey: options?.cacheKey
+    }, {
+      maxRetries: 2,
+      initialDelay: 1000
     }),
     
   // Insights Generator

@@ -1,116 +1,87 @@
 
-// AI Service Types
+/**
+ * AI service types
+ * Improved type definitions for better type safety
+ */
+
+export type AIModel = 'gpt-4o-mini' | 'gpt-4o' | 'gpt-3.5-turbo' | string;
+
+export interface AIQuestionOptions {
+  temperature?: number;
+  maxTokens?: number;
+  model?: AIModel;
+  cacheKey?: string; // Added to support backend caching
+}
 
 export interface AIQuestion {
-  text?: string;
-  question?: string; // Added for backward compatibility
+  text: string;
+  question?: string;
   context?: string;
-  userId?: string;
+  reflectionIds?: string[];
   stream?: boolean;
-  reflectionIds?: string[]; // Added to support reflection context
+}
+
+export interface AIResponseMeta {
+  model?: string;
+  tokenUsage?: number;
+  processingTime?: number;
+  source?: string;
 }
 
 export interface AIResponse {
   answer: string;
-  text?: string; // Added for backward compatibility
-  type: 'text' | 'meditation' | 'reflection' | 'wisdom' | 'error';
-  suggestedPractices?: string[];
-  sources?: string[];
-  meta?: {
-    model?: string;
-    tokenUsage?: number;
-    processingTime?: number;
-  };
+  type: 'text' | 'error' | 'stream';
+  suggestedPractices: string[];
+  sources?: {url: string; title: string}[];
+  meta?: AIResponseMeta;
 }
 
-export interface AIInsight {
-  id: string;
-  type: 'meditation' | 'reflection' | 'practice' | 'wisdom' | 'energy';
-  title: string;
-  content: string;
-  createdAt: string;
-  relevanceScore?: number;
-  tags?: string[];
-}
-
-export interface AIQueryParams {
-  text?: string;
-  userId?: string;
-  context?: string;
-  maxTokens?: number;
-  temperature?: number;
-  includeHistory?: boolean;
-}
-
-export enum AIModel {
-  DEFAULT = 'gpt-3.5-turbo',
-  ADVANCED = 'gpt-4',
-  ADVANCED_16K = 'gpt-4-32k',
-  EMBEDDING = 'text-embedding-ada-002'
-}
-
-export interface AIServiceConfig {
-  defaultModel: AIModel;
-  fallbackToLocalModels: boolean;
-  streamingEnabled: boolean;
-  personalizedResponses: boolean;
-  maxHistoryItems: number;
-}
-
-// Define the interface for the options parameter in the askQuestion method
-export interface AIQuestionOptions {
-  model?: AIModel;
-  temperature?: number;
-  maxTokens?: number;
-}
-
-// Define assistant suggestion and intent types for AICodeAssistant
 export interface AssistantSuggestion {
   id: string;
-  type: 'optimization' | 'improvement' | 'warning' | 'error' | 'performance' | 'quality' | 'architecture' | 'refactoring';
-  component?: string;
   title: string;
   description: string;
-  context?: string;
-  codeExample?: string;
-  autoFixAvailable?: boolean;
-  priority: 'low' | 'medium' | 'high';
+  type: 'optimization' | 'improvement' | 'warning' | 'error';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  component?: string;
+  created: Date;
+  status: 'pending' | 'applied' | 'dismissed';
 }
-
-export type AssistantIntentStatus = 'pending' | 'completed' | 'failed' | 'implemented' | 'abandoned';
 
 export interface AssistantIntent {
   id: string;
   type: string;
   description: string;
-  status: AssistantIntentStatus;
+  confidence: number;
   created: Date;
-  updated?: Date;
-  componentPath?: string;
-  relatedComponents?: string[];
 }
 
-// Add UseAICodeAssistantProps interface
 export interface UseAICodeAssistantProps {
-  initialComponents?: string[];
+  component?: string;
+  file?: string;
   autoAnalyze?: boolean;
-  analysisDepth?: 'shallow' | 'deep';
 }
 
-// Add CodeQualityIssue type for CodeQualityDashboard
-export interface CodeQualityIssue {
-  id: string;
-  component: string;
-  type: 'security' | 'pattern' | 'complexity' | 'performance' | 'render' | 'architecture';
-  description: string;
-  suggestions: string[];
-  priority: 'low' | 'medium' | 'high';
-  location?: string;
+export interface AICodeAssistantOptions {
+  autoFix?: boolean;
+  includePerformance?: boolean;
+  includePatterns?: boolean;
+  includeSecurity?: boolean;
 }
 
-export interface CodeQualityStats {
-  componentsAnalyzed: number;
-  issuesByType: Record<string, number>;
-  highPriorityIssues: number;
-  lastUpdated: Date;
+export interface AICodeAssistantContext {
+  suggestions: AssistantSuggestion[];
+  intents: AssistantIntent[];
+  isAnalyzing: boolean;
+  currentComponent: string;
+  error: string;
+  isFixing: boolean;
+  runAnalysis: (component?: string) => Promise<void>;
+  dismissSuggestion: (suggestionId: string) => void;
+  applyFix: (suggestionId: string) => Promise<boolean>;
+}
+
+export interface ChakraInsightsOptions {
+  includeChakraDetails?: boolean;
+  includeEmotionalAnalysis?: boolean;
+  includeRecommendations?: boolean;
 }

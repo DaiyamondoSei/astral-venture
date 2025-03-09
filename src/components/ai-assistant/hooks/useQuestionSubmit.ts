@@ -114,6 +114,21 @@ export const useQuestionSubmit = ({
     console.log(`Added to cache with TTL of ${ttl}ms, cache size: ${responseCache.size}`);
   }, [cleanupCache]);
   
+  // Check for network conditions to determine if streaming should be used
+  const shouldUseStreaming = useCallback((): boolean => {
+    if (!navigator.onLine) return false;
+    
+    // Check connection type if available
+    if (navigator.connection) {
+      const conn = navigator.connection as any;
+      const effectiveType = conn.effectiveType;
+      return !['slow-2g', '2g'].includes(effectiveType);
+    }
+    
+    // Default to true if connection info not available
+    return true;
+  }, []);
+  
   // Memoized submit function to prevent recreating on every render
   const submitQuestion = useCallback(async (question: string) => {
     // Validate inputs
@@ -133,10 +148,10 @@ export const useQuestionSubmit = ({
     }
     
     // Determine if we should use streaming based on network conditions
-    const shouldUseStreaming = navigator.onLine && navigator.connection?.effectiveType !== 'slow-2g';
+    const useStreaming = shouldUseStreaming();
     
     // Check if we have a cached response
-    const cachedResponse = getFromCache(cacheKey, shouldUseStreaming);
+    const cachedResponse = getFromCache(cacheKey, useStreaming);
     if (cachedResponse && isMounted.current) {
       console.log('Using cached response');
       state.setResponse(cachedResponse);
@@ -170,7 +185,7 @@ export const useQuestionSubmit = ({
         selectedReflectionId,
         userId,
         isOnline: navigator.onLine,
-        useStreaming: shouldUseStreaming
+        useStreaming
       });
       
       // Check online status before proceeding
@@ -187,13 +202,13 @@ export const useQuestionSubmit = ({
         question,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         context: reflectionContext || '',
-        stream: shouldUseStreaming // Only enable streaming if online and connection is good
+        stream: useStreaming // Only enable streaming if online and connection is good
       };
       
-      // Create options object with timeout
+      // Create options object with timeout and cacheKey
       const options: AIQuestionOptions = {
         maxTokens: 1200, // Limit token usage for better performance
-        cacheKey: cacheKey // Pass cache key for backend caching
+        cacheKey // Pass cache key for backend caching
       }; 
       
       // Call the API with exponential backoff retry mechanism
@@ -203,7 +218,7 @@ export const useQuestionSubmit = ({
       console.log(`AI response received in ${responseTime.toFixed(2)}ms`);
       
       // Cache the response for future use
-      addToCache(cacheKey, aiResponse, shouldUseStreaming);
+      addToCache(cacheKey, aiResponse, useStreaming);
       
       // Only update state if component is still mounted
       if (isMounted.current) {
@@ -240,7 +255,8 @@ export const useQuestionSubmit = ({
     state, 
     getCacheKey, 
     getFromCache, 
-    addToCache
+    addToCache,
+    shouldUseStreaming
   ]);
 
   // Expose the submit function and cache utilities

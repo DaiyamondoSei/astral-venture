@@ -8,7 +8,7 @@ import { handleStreamingRequest } from "./streamingHandler.ts";
 import { processAIResponse } from "./aiResponseHandler.ts";
 import { handleError } from "./errorHandler.ts";
 
-// Simple in-memory cache with TTL
+// Simple in-memory cache with TTL and better type safety
 const responseCache = new Map<string, {
   response: Response,
   timestamp: number,
@@ -16,11 +16,13 @@ const responseCache = new Map<string, {
   isStreamingResponse: boolean
 }>();
 
-// Cache management
+// Cache management constants
 const DEFAULT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 const MAX_CACHE_SIZE = 100;
 
-// Clean up expired cache entries
+/**
+ * Clean up expired cache entries and maintain cache size limits
+ */
 function cleanupCache() {
   const now = Date.now();
   let deletionCount = 0;
@@ -50,7 +52,10 @@ function cleanupCache() {
   }
 }
 
-// Main request handler (runs after authentication)
+/**
+ * Main request handler for AI assistant requests
+ * Optimized for better error handling and caching
+ */
 export async function handleAIRequest(user: any, req: Request): Promise<Response> {
   try {
     // Parse request body
@@ -76,11 +81,12 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
       );
     }
     
-    // Check if we have a cached response - Only use for non-streaming requests
-    if (cacheKey && !stream) {
+    // Check if we have a cached response
+    if (cacheKey) {
       const cached = responseCache.get(cacheKey);
-      if (cached && !cached.isStreamingResponse && Date.now() <= cached.expiresAt) {
-        console.log("Cache hit:", cacheKey);
+      // Only use cache if it matches the request type (streaming vs non-streaming)
+      if (cached && cached.isStreamingResponse === stream && Date.now() <= cached.expiresAt) {
+        console.log("Cache hit:", cacheKey, stream ? "(streaming)" : "(non-streaming)");
         return cached.response.clone(); // Return a clone of the cached response
       }
     }
@@ -116,7 +122,24 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
     
     // Check if this is a streaming request
     if (stream) {
-      return handleStreamingRequest(prompt, systemPrompt, model);
+      const streamingResponse = await handleStreamingRequest(prompt, systemPrompt, model);
+      
+      // Cache the streaming response if we have a cache key
+      if (cacheKey) {
+        // Clean up cache first
+        cleanupCache();
+        
+        responseCache.set(cacheKey, {
+          response: streamingResponse.clone(), // Store a clone of the response
+          timestamp: Date.now(),
+          expiresAt: Date.now() + DEFAULT_CACHE_TTL,
+          isStreamingResponse: true
+        });
+        
+        console.log(`Added streaming response to cache with key: ${cacheKey}`);
+      }
+      
+      return streamingResponse;
     }
     
     // Generate response from AI for non-streaming requests
@@ -135,7 +158,7 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
       metrics.totalTokens
     );
     
-    // Cache the response if we have a cache key (only for non-streaming responses)
+    // Cache the response if we have a cache key
     if (cacheKey) {
       // Clean up cache first
       cleanupCache();
@@ -147,7 +170,7 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
         isStreamingResponse: false
       });
       
-      console.log(`Added to cache with key: ${cacheKey}, cache size: ${responseCache.size}`);
+      console.log(`Added non-streaming response to cache with key: ${cacheKey}`);
     }
     
     return response;
@@ -156,18 +179,25 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
   }
 }
 
-// Route handler for clearing cache (admin only)
+/**
+ * Route handler for clearing cache (admin only)
+ * Improved security and validation
+ */
 export async function handleClearCache(user: any, req: Request): Promise<Response> {
   try {
-    // Check if user is admin (simple example)
-    const { authorization = "" } = Object.fromEntries(req.headers.entries());
-    const isAdmin = authorization.includes("admin"); // Real implementation would be more secure
+    // Extract auth header correctly
+    const authHeader = req.headers.get("authorization") || "";
+    
+    // Check if user is admin with better validation
+    const isAdmin = user && 
+                   (user.app_metadata?.role === "admin" || 
+                    authHeader.includes("admin-key")); // Real implementation would be more secure
     
     if (!isAdmin) {
       return createErrorResponse(
         ErrorCode.UNAUTHORIZED,
         "Admin privileges required",
-        {}
+        { userId: user?.id }
       );
     }
     
@@ -176,7 +206,7 @@ export async function handleClearCache(user: any, req: Request): Promise<Respons
     responseCache.clear();
     
     return createSuccessResponse(
-      { cleared: oldSize },
+      { cleared: oldSize, timestamp: new Date().toISOString() },
       { operation: "cache_clear" }
     );
   } catch (error) {

@@ -7,6 +7,7 @@
 
 import { AIResponse, AIQuestion, AIQuestionOptions } from './types';
 import { createFallbackResponse } from './fallback';
+import { api } from '@/utils/apiClient';
 
 const EDGE_FUNCTION_URL = '/api/ask-assistant';
 
@@ -14,6 +15,8 @@ const EDGE_FUNCTION_URL = '/api/ask-assistant';
 const responseCache = new Map<string, {
   response: AIResponse;
   timestamp: number;
+  expiresAt: number;
+  isStreamingResponse: boolean;
 }>();
 
 // Cache TTL in milliseconds (5 minutes)
@@ -41,12 +44,17 @@ async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestion
       return createFallbackResponse(question.question || question.text || '');
     }
     
+    // Determine if this is a streaming request
+    const isStreamingRequest = question.stream === true;
+    
     // Check cache for matching question to avoid redundant API calls
     const cacheKey = generateCacheKey(question);
     const cached = responseCache.get(cacheKey);
     const now = Date.now();
     
-    if (cached && (now - cached.timestamp < CACHE_TTL)) {
+    if (cached && 
+        (now < cached.expiresAt) && 
+        (cached.isStreamingResponse === isStreamingRequest)) {
       console.log('Using cached AI response');
       return cached.response;
     }
@@ -56,54 +64,69 @@ async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestion
       questionText: question.text || question.question,
       hasReflectionIds: question.reflectionIds && question.reflectionIds.length > 0,
       hasContext: !!question.context,
-      streamEnabled: question.stream
+      streamEnabled: question.stream,
+      cacheKey: options?.cacheKey || cacheKey
     });
     
     // Performance measurement
     const startTime = performance.now();
     
-    const response = await fetch(EDGE_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...question,
-        options
-      }),
-    });
+    // Use the API client to fetch response from edge function
+    let response: AIResponse;
+    
+    if (api.askAIAssistant) {
+      // Use API client if available
+      response = await api.askAIAssistant(question, {
+        ...options,
+        cacheKey: options?.cacheKey || cacheKey
+      });
+    } else {
+      // Use fetch as fallback (shouldn't normally be needed)
+      const fetchResponse = await fetch(EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...question,
+          options
+        }),
+      });
+      
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        console.error('AI Assistant error:', errorText);
+        throw new Error(`AI request failed: ${fetchResponse.status} ${fetchResponse.statusText}`);
+      }
+      
+      const data = await fetchResponse.json();
+      
+      // Format the response to match AIResponse interface
+      response = {
+        answer: data.answer || data.text || '',
+        suggestedPractices: data.suggestedPractices || [],
+        sources: data.sources || [],
+        type: isStreamingRequest ? 'stream' : 'text',
+        meta: {
+          model: data.meta?.model || "unknown",
+          tokenUsage: data.meta?.tokenUsage || 0,
+          processingTime: data.meta?.processingTime || (performance.now() - startTime),
+        }
+      };
+    }
     
     const requestTime = performance.now() - startTime;
     console.log(`AI request time: ${requestTime.toFixed(2)}ms`);
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI Assistant error:', errorText);
-      throw new Error(`AI request failed: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    // Format the response to match AIResponse interface
-    const formattedResponse: AIResponse = {
-      answer: data.answer || data.text || '',
-      suggestedPractices: data.suggestedPractices || [],
-      sources: data.sources || [],
-      type: 'text',
-      meta: {
-        model: data.meta?.model || "unknown",
-        tokenUsage: data.meta?.tokenUsage || 0,
-        processingTime: data.meta?.processingTime || requestTime,
-      }
-    };
-    
     // Cache the response
     responseCache.set(cacheKey, {
-      response: formattedResponse,
-      timestamp: now
+      response,
+      timestamp: now,
+      expiresAt: now + CACHE_TTL,
+      isStreamingResponse: isStreamingRequest
     });
     
-    return formattedResponse;
+    return response;
   } catch (error) {
     console.error('Error fetching AI response:', error);
     
@@ -172,8 +195,8 @@ export const askAIAssistant = async (
     // Make sure text field is always present for backward compatibility
     const enhancedQuestion: AIQuestion = {
       ...question,
-      text: question.text || question.question,
-      question: question.question || question.text
+      text: question.text || question.question || '',
+      question: question.question || question.text || ''
     };
     
     return await fetchAssistantResponse(enhancedQuestion, options);
@@ -191,7 +214,7 @@ setInterval(() => {
   let clearedEntries = 0;
   
   responseCache.forEach((value, key) => {
-    if (now - value.timestamp > CACHE_TTL) {
+    if (now > value.expiresAt) {
       responseCache.delete(key);
       clearedEntries++;
     }

@@ -7,6 +7,10 @@ interface ExtendedError extends Error {
   details?: unknown;
 }
 
+/**
+ * Standardized error handler for AI assistant requests
+ * Categorizes errors and returns appropriate responses
+ */
 export function handleError(error: unknown): Response {
   console.error("Error in ask-assistant function:", error);
   
@@ -14,29 +18,41 @@ export function handleError(error: unknown): Response {
   
   // Determine error type with more precision
   const isQuotaError = err.message && (
-    err.message.includes("quota") || 
-    err.message.includes("rate limit") ||
-    err.message.includes("capacity") ||
-    (err.code === "429")
+    err.message.toLowerCase().includes("quota") || 
+    err.message.toLowerCase().includes("rate limit") ||
+    err.message.toLowerCase().includes("capacity") ||
+    err.message.toLowerCase().includes("limit exceeded") ||
+    (err.code === "429") ||
+    (err.status === 429)
   );
   
   const isNetworkError = err.message && (
-    err.message.includes("network") ||
-    err.message.includes("connection") ||
-    err.message.includes("timeout") ||
-    err.message.includes("ETIMEDOUT") ||
-    err.message.includes("ECONNREFUSED")
+    err.message.toLowerCase().includes("network") ||
+    err.message.toLowerCase().includes("connection") ||
+    err.message.toLowerCase().includes("timeout") ||
+    err.message.toLowerCase().includes("etimedout") ||
+    err.message.toLowerCase().includes("econnrefused") ||
+    err.message.toLowerCase().includes("fetch failed")
   );
   
   const isAuthError = err.message && (
-    err.message.includes("authentication") ||
-    err.message.includes("unauthorized") ||
-    err.message.includes("not allowed") ||
-    err.message.includes("permission") ||
+    err.message.toLowerCase().includes("authentication") ||
+    err.message.toLowerCase().includes("unauthorized") ||
+    err.message.toLowerCase().includes("not allowed") ||
+    err.message.toLowerCase().includes("permission") ||
+    err.message.toLowerCase().includes("forbidden") ||
     (err.code === "401" || err.status === 401 || err.code === "403" || err.status === 403)
   );
   
-  // Determine the appropriate error code
+  const isServiceError = err.message && (
+    err.message.toLowerCase().includes("service") ||
+    err.message.toLowerCase().includes("unavailable") ||
+    err.message.toLowerCase().includes("503") ||
+    err.message.toLowerCase().includes("502") ||
+    (err.status === 503 || err.status === 502)
+  );
+  
+  // Determine the appropriate error code with improved categorization
   let errorCode: ErrorCode;
   let errorMessage: string;
   
@@ -49,11 +65,15 @@ export function handleError(error: unknown): Response {
   } else if (isAuthError) {
     errorCode = ErrorCode.UNAUTHORIZED;
     errorMessage = "Authentication failed or unauthorized access";
+  } else if (isServiceError) {
+    errorCode = ErrorCode.SERVICE_UNAVAILABLE;
+    errorMessage = "AI service is currently unavailable, please try again later";
   } else {
     errorCode = ErrorCode.INTERNAL_ERROR;
     errorMessage = "Failed to process request";
   }
   
+  // Include detailed error information for debugging
   return createErrorResponse(
     errorCode,
     errorMessage,
@@ -61,7 +81,11 @@ export function handleError(error: unknown): Response {
       errorMessage: err.message,
       errorCode: err.code,
       errorStatus: err.status,
-      errorDetails: err.details 
+      errorDetails: err.details,
+      errorType: isQuotaError ? "quota" : 
+                 isNetworkError ? "network" : 
+                 isAuthError ? "auth" : 
+                 isServiceError ? "service" : "unknown"
     }
   );
 }
