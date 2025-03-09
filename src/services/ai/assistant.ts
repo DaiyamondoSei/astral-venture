@@ -2,6 +2,7 @@
 /**
  * AI Assistant Service
  * Provides AI-powered assistance and insights
+ * Optimized for performance and error handling
  */
 
 import { AIResponse, AIQuestion, AIQuestionOptions } from './types';
@@ -9,8 +10,28 @@ import { createFallbackResponse } from './fallback';
 
 const EDGE_FUNCTION_URL = '/api/ask-assistant';
 
+// Cache for AI responses to minimize redundant requests
+const responseCache = new Map<string, {
+  response: AIResponse;
+  timestamp: number;
+}>();
+
+// Cache TTL in milliseconds (5 minutes)
+const CACHE_TTL = 5 * 60 * 1000;
+
 /**
- * Fetch a response from the AI assistant
+ * Generate a cache key from a question
+ */
+function generateCacheKey(question: AIQuestion): string {
+  return JSON.stringify({
+    text: question.text || question.question,
+    reflectionIds: question.reflectionIds,
+    context: question.context
+  });
+}
+
+/**
+ * Fetch a response from the AI assistant with caching and performance optimizations
  */
 async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestionOptions): Promise<AIResponse> {
   try {
@@ -19,6 +40,27 @@ async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestion
       console.warn('Offline: Using fallback AI response');
       return createFallbackResponse(question.question || question.text || '');
     }
+    
+    // Check cache for matching question to avoid redundant API calls
+    const cacheKey = generateCacheKey(question);
+    const cached = responseCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cached && (now - cached.timestamp < CACHE_TTL)) {
+      console.log('Using cached AI response');
+      return cached.response;
+    }
+    
+    // Log request information for debugging
+    console.log("Fetching AI assistant response:", {
+      questionText: question.text || question.question,
+      hasReflectionIds: question.reflectionIds && question.reflectionIds.length > 0,
+      hasContext: !!question.context,
+      streamEnabled: question.stream
+    });
+    
+    // Performance measurement
+    const startTime = performance.now();
     
     const response = await fetch(EDGE_FUNCTION_URL, {
       method: 'POST',
@@ -30,6 +72,9 @@ async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestion
         options
       }),
     });
+    
+    const requestTime = performance.now() - startTime;
+    console.log(`AI request time: ${requestTime.toFixed(2)}ms`);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -46,11 +91,17 @@ async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestion
       sources: data.sources || [],
       type: 'text',
       meta: {
-        model: data.meta?.model || 'unknown',
+        model: data.meta?.model || "unknown",
         tokenUsage: data.meta?.tokenUsage || 0,
-        processingTime: data.meta?.processingTime || 0,
+        processingTime: data.meta?.processingTime || requestTime,
       }
     };
+    
+    // Cache the response
+    responseCache.set(cacheKey, {
+      response: formattedResponse,
+      timestamp: now
+    });
     
     return formattedResponse;
   } catch (error) {
@@ -64,6 +115,7 @@ async function fetchAssistantResponse(question: AIQuestion, options?: AIQuestion
 /**
  * Process the user's question and return an AI response
  * This is the main entry point for the AI assistant
+ * Optimized with input validation and error handling
  */
 export async function processQuestion(
   question: string, 
@@ -71,6 +123,16 @@ export async function processQuestion(
   options?: AIQuestionOptions
 ): Promise<AIResponse> {
   try {
+    // Validate input
+    if (!question || typeof question !== 'string' || question.trim() === '') {
+      console.error('Invalid question input:', question);
+      return {
+        answer: "Please provide a valid question.",
+        type: 'error',
+        suggestedPractices: []
+      };
+    }
+    
     const aiQuestion: AIQuestion = {
       text: question,
       question,
@@ -92,6 +154,7 @@ export async function processQuestion(
 /**
  * Ask the AI assistant a question
  * This function is a compatibility layer for the old askAIAssistant function
+ * Optimized for better type handling and error recovery
  */
 export const askAIAssistant = async (
   question: AIQuestion | string,
@@ -121,3 +184,20 @@ export const askAIAssistant = async (
     );
   }
 };
+
+// Clear cache periodically to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  let clearedEntries = 0;
+  
+  responseCache.forEach((value, key) => {
+    if (now - value.timestamp > CACHE_TTL) {
+      responseCache.delete(key);
+      clearedEntries++;
+    }
+  });
+  
+  if (clearedEntries > 0) {
+    console.log(`Cleared ${clearedEntries} expired AI response cache entries`);
+  }
+}, 10 * 60 * 1000); // Run every 10 minutes

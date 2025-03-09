@@ -6,6 +6,7 @@ import type { FeatureTooltipData } from './achievement/types';
 
 /**
  * Hook for handling feature discovery tooltips
+ * Optimized for performance with local storage caching
  */
 export const useFeatureDiscovery = () => {
   const { user } = useAuth();
@@ -30,6 +31,12 @@ export const useFeatureDiscovery = () => {
   // Determine which tooltips should be shown based on conditions
   useEffect(() => {
     if (!user) return;
+    
+    // Skip processing if no tooltips available
+    if (!featureTooltips || featureTooltips.length === 0) {
+      console.warn('No feature tooltips available');
+      return;
+    }
     
     // Filter tooltips based on discovery conditions and already seen
     const eligible = featureTooltips.filter(tooltip => {

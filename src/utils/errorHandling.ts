@@ -23,8 +23,21 @@ export interface ErrorHandlingOptions {
   reportToAnalytics?: boolean;
 }
 
+// Error deduplication cache
+const recentErrors = new Map<string, {
+  count: number;
+  timestamp: number;
+}>();
+
+// Error sampling rate to reduce noise (0.0-1.0)
+const ERROR_SAMPLING_RATE = 0.8;
+
+// Deduplication window (in ms)
+const ERROR_DEDUP_WINDOW = 5000;
+
 /**
  * Enhanced utility function to handle errors consistently across the application
+ * Optimized for performance with deduplication and sampling
  * 
  * @param error The error to handle
  * @param options Configuration options for handling the error
@@ -53,6 +66,34 @@ export function handleError(
     errorMessage = error;
   }
   
+  // Create error key for deduplication
+  const errorKey = `${context}:${errorMessage}`;
+  const now = Date.now();
+  
+  // Check for recent identical errors to avoid flooding
+  const existingError = recentErrors.get(errorKey);
+  if (existingError && (now - existingError.timestamp < ERROR_DEDUP_WINDOW)) {
+    // Update count of duplicate errors
+    existingError.count += 1;
+    existingError.timestamp = now;
+    
+    // Skip further processing for duplicates
+    console.log(`Duplicate error suppressed (${existingError.count} occurrences): ${errorKey}`);
+    return;
+  }
+  
+  // Apply random sampling to reduce volume of non-critical errors
+  if (severity !== ErrorSeverity.CRITICAL && Math.random() > ERROR_SAMPLING_RATE) {
+    console.log(`Error sampled out: ${errorKey}`);
+    return;
+  }
+  
+  // Add to recent errors list
+  recentErrors.set(errorKey, {
+    count: 1,
+    timestamp: now
+  });
+  
   // Log error with context and severity
   const logMethod = severity === ErrorSeverity.CRITICAL || severity === ErrorSeverity.ERROR
     ? console.error
@@ -62,7 +103,7 @@ export function handleError(
   
   logMethod(`[${severity.toUpperCase()}] Error in ${context}:`, error);
   
-  // Report to analytics if enabled
+  // Report to analytics if enabled and not sampled out
   if (reportToAnalytics) {
     // This could be integrated with an actual analytics service
     console.info(`[Analytics] Reporting error: ${errorMessage} in ${context}`);
@@ -110,11 +151,14 @@ export function createSafeAsyncFunction<T extends any[], R>(
     } = opts;
     
     let retryCount = 0;
+    let lastError: any = null;
     
     while (true) {
       try {
         return await fn(...args);
       } catch (error) {
+        lastError = error;
+        
         // If we've exhausted retries or no retry function is provided
         if (retryCount >= maxRetries || !retry) {
           handleError(error, {
@@ -127,7 +171,12 @@ export function createSafeAsyncFunction<T extends any[], R>(
         // Increment retry counter
         retryCount++;
         
-        console.log(`Retrying ${context} (attempt ${retryCount}/${maxRetries})...`);
+        // Exponential backoff
+        const backoffTime = Math.min(1000 * Math.pow(2, retryCount - 1), 8000);
+        console.log(`Retrying ${context} in ${backoffTime}ms (attempt ${retryCount}/${maxRetries})...`);
+        
+        // Wait for backoff period
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
         
         // Execute retry function
         try {
@@ -169,6 +218,23 @@ export function createSafeFunction<T extends any[], R>(
     }
   };
 }
+
+// Periodically clean up the error deduplication cache to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  recentErrors.forEach((value, key) => {
+    if (now - value.timestamp > ERROR_DEDUP_WINDOW) {
+      recentErrors.delete(key);
+      cleanedCount++;
+    }
+  });
+  
+  if (cleanedCount > 0) {
+    console.log(`Cleaned up ${cleanedCount} old error entries`);
+  }
+}, 60000); // Run every minute
 
 // Add captureException function for use in other files
 export function captureException(error: unknown, context: string): void {

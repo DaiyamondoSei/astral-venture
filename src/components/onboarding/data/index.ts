@@ -17,4 +17,5 @@ export const onboardingData = {
   guidedTours
 };
 
+// Export default for convenience
 export default onboardingData;
