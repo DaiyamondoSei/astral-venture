@@ -1,4 +1,3 @@
-
 /**
  * Performance Monitor Utility
  * 
@@ -50,6 +49,9 @@ interface ExtendedPerformance extends Performance {
 class PerformanceMonitor {
   private metrics: Record<string, Partial<PerformanceMetrics>> = {};
   private listeners: Array<(metrics: Record<string, Partial<PerformanceMetrics>>) => void> = [];
+  private pendingUpdates: boolean = false;
+  private lastNotifyTime: number = 0;
+  private notifyThrottle: number = 100; // ms
   
   constructor() {
     // Initialize memory tracking if available
@@ -60,6 +62,91 @@ class PerformanceMonitor {
    * Record a component render
    */
   public recordRender(componentName: string, duration: number): void {
+    this.updateMetrics(componentName, duration);
+  }
+  
+  /**
+   * Record a batch of component renders efficiently
+   */
+  public recordRenderBatch(componentName: string, renders: Array<{time: number, duration: number}>): void {
+    if (!renders.length) return;
+    
+    // Get or create metrics for this component
+    if (!this.metrics[componentName]) {
+      this.metrics[componentName] = {
+        componentName,
+        renderTimes: [],
+        events: [],
+        averageRenderTime: 0,
+        insights: [],
+        componentStats: {},
+        renderTimeline: []
+      };
+    }
+    
+    const metrics = this.metrics[componentName];
+    const renderTimes = metrics.renderTimes || [];
+    const events = metrics.events || [];
+    const renderTimeline = metrics.renderTimeline || [];
+    
+    // Process all renders efficiently in a single batch
+    let totalDuration = 0;
+    
+    renders.forEach(render => {
+      // Add render time
+      renderTimes.push(render.duration);
+      totalDuration += render.duration;
+      
+      // Only keep last 100 render times
+      if (renderTimes.length > 100) {
+        renderTimes.shift();
+      }
+      
+      // Add event (but limit to avoid memory issues)
+      if (events.length < 50) {
+        events.push({
+          time: render.time,
+          type: 'render',
+          data: { duration: render.duration }
+        });
+      }
+      
+      // Add to timeline (limit to avoid memory issues)
+      if (renderTimeline.length < 50) {
+        renderTimeline.push({
+          component: componentName,
+          startTime: render.time - render.duration,
+          endTime: render.time,
+          duration: render.duration
+        });
+      }
+    });
+    
+    // Only keep last 50 timeline entries
+    if (renderTimeline.length > 50) {
+      renderTimeline.splice(0, renderTimeline.length - 50);
+    }
+    
+    // Update average once for the batch
+    const averageRenderTime = renderTimes.reduce((sum, time) => sum + time, 0) / renderTimes.length;
+    
+    // Update metrics in one go
+    this.metrics[componentName] = {
+      ...metrics,
+      renderTimes,
+      lastRenderTime: renders[renders.length - 1].duration,
+      averageRenderTime,
+      events,
+      renderTimeline,
+      lastUpdated: Date.now()
+    };
+    
+    // Throttled notification of listeners
+    this.throttledNotify();
+  }
+  
+  // Private method to handle metric updates
+  private updateMetrics(componentName: string, duration: number): void {
     if (!this.metrics[componentName]) {
       this.metrics[componentName] = {
         componentName,
@@ -119,8 +206,33 @@ class PerformanceMonitor {
       lastUpdated: Date.now()
     };
     
-    // Notify listeners
-    this.notifyListeners();
+    // Throttled notification of listeners
+    this.throttledNotify();
+  }
+  
+  /**
+   * Throttle UI updates to reduce performance impact
+   */
+  private throttledNotify(): void {
+    const now = Date.now();
+    
+    // If we already have a pending update, don't schedule another one
+    if (this.pendingUpdates) return;
+    
+    // If we recently notified, schedule a delayed update
+    if (now - this.lastNotifyTime < this.notifyThrottle) {
+      this.pendingUpdates = true;
+      
+      setTimeout(() => {
+        this.notifyListeners();
+        this.pendingUpdates = false;
+        this.lastNotifyTime = Date.now();
+      }, this.notifyThrottle);
+    } else {
+      // Otherwise update immediately
+      this.notifyListeners();
+      this.lastNotifyTime = now;
+    }
   }
   
   /**
@@ -164,22 +276,32 @@ class PerformanceMonitor {
       return;
     }
     
-    // Update every 2 seconds
+    // Update every 5 seconds instead of 2 for less overhead
     setInterval(() => {
       const memory = extendedPerformance.memory;
       
       if (!memory) return;
       
-      for (const componentName in this.metrics) {
+      // Only update components that were actually rendered recently
+      const now = Date.now();
+      const recentComponents = Object.keys(this.metrics).filter(
+        comp => this.metrics[comp].lastUpdated && 
+               (now - (this.metrics[comp].lastUpdated || 0)) < 30000 // 30 seconds
+      );
+      
+      recentComponents.forEach(componentName => {
         this.metrics[componentName].memoryUsage = {
           jsHeapSizeLimit: memory.jsHeapSizeLimit,
           totalJSHeapSize: memory.totalJSHeapSize,
           usedJSHeapSize: memory.usedJSHeapSize
         };
-      }
+      });
       
-      this.notifyListeners();
-    }, 2000);
+      // Only notify if we have recent components
+      if (recentComponents.length) {
+        this.throttledNotify();
+      }
+    }, 5000); // Less frequent updates
   }
   
   /**
@@ -217,15 +339,50 @@ class PerformanceMonitor {
     }
     
     const insights = this.metrics[componentName].insights || [];
-    insights.push(insight);
     
-    // Only keep last 10 insights
-    if (insights.length > 10) {
-      insights.shift();
+    // Don't add duplicate insights
+    if (!insights.includes(insight)) {
+      insights.push(insight);
+      
+      // Only keep last 10 insights
+      if (insights.length > 10) {
+        insights.shift();
+      }
+      
+      this.metrics[componentName].insights = insights;
+      this.throttledNotify();
     }
+  }
+  
+  /**
+   * Get total render time across all tracked components
+   */
+  public get totalRenderTime(): number {
+    return Object.values(this.metrics).reduce((sum, metric) => {
+      const renderCount = metric.renderTimes?.length || 0;
+      const avgTime = metric.averageRenderTime || 0;
+      return sum + (renderCount * avgTime);
+    }, 0);
+  }
+  
+  /**
+   * Get metrics formatted for visualization tools
+   */
+  public getMetrics() {
+    const componentsCount = Object.keys(this.metrics).length;
+    const totalRenderCount = Object.values(this.metrics).reduce(
+      (sum, metric) => sum + (metric.renderTimes?.length || 0), 0
+    );
     
-    this.metrics[componentName].insights = insights;
-    this.notifyListeners();
+    return {
+      componentsCount,
+      totalRenderCount,
+      totalRenderTime: this.totalRenderTime,
+      lastUpdated: Math.max(...Object.values(this.metrics)
+        .map(m => m.lastUpdated || 0)
+        .filter(Boolean)
+      )
+    };
   }
 }
 

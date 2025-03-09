@@ -2,6 +2,7 @@
 import React, { Suspense, lazy } from 'react';
 import { cn } from "@/lib/utils";
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
+import PerfConfigDashboard from './dev-mode/PerfConfigDashboard';
 
 // Simple fallback background that doesn't block rendering
 const SimpleFallbackBackground = () => (
@@ -64,6 +65,9 @@ const Layout = ({
           {children}
         </div>
       </main>
+      
+      {/* Performance configuration dashboard - only in development */}
+      {process.env.NODE_ENV === 'development' && <PerfConfigDashboard />}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
+import { usePerfConfig } from './usePerfConfig';
 
 interface RenderTrackingOptions {
   complexity?: number;
@@ -8,13 +9,15 @@ interface RenderTrackingOptions {
   hooks?: string[];
   childComponents?: string[];
   enabled?: boolean;
+  throttleInterval?: number;
 }
 
 /**
  * Hook to track component renders and provide optimization suggestions
+ * with improved efficiency through throttling and sampling
  * 
  * @param componentName Name of the component to track
- * @param options Additional component metadata
+ * @param options Additional component metadata and tracking options
  */
 export function useRenderTracking(
   componentName: string,
@@ -28,22 +31,59 @@ export function useRenderTracking(
     dependencies = [],
     hooks = [],
     childComponents = [],
-    enabled = true
+    enabled = true,
+    throttleInterval = 0
   } = options;
   
+  // Get additional config
+  const config = usePerfConfig();
+  
   // Skip if tracking is disabled
-  if (!enabled) return;
+  if (!enabled || !config.enableRenderTracking) return;
   
   const renderCountRef = useRef(0);
   const renderStartTimeRef = useRef(0);
   const lastRenderTimeRef = useRef(0);
+  const lastRecordTimeRef = useRef(0);
   const recordedThisRenderRef = useRef(false);
   
   // Track render start time
   renderStartTimeRef.current = performance.now();
   recordedThisRenderRef.current = false;
   
-  // Track render completion
+  // Create throttled recording function
+  const recordRender = useCallback((duration: number) => {
+    const now = performance.now();
+    
+    // Skip if within throttle interval
+    if (throttleInterval > 0 && now - lastRecordTimeRef.current < throttleInterval) {
+      return;
+    }
+    
+    renderCostAnalyzer.recordRender(componentName, duration);
+    lastRecordTimeRef.current = now;
+    
+    // Only log slow renders (over 16ms) for complex components to reduce noise
+    if (duration > 16 && (complexity > 1 || childComponents.length > 2)) {
+      console.warn(`[${componentName}] Slow render detected: ${duration.toFixed(2)}ms`);
+      
+      // Only provide detailed info for very slow renders
+      if (duration > 50) {
+        console.info(`Component info:`, { complexity, dependencies, hooks, childComponents });
+      }
+    }
+    
+    // Only check for optimizations occasionally and for problematic components
+    if (renderCountRef.current % 10 === 0 && (complexity > 1 || duration > 16)) {
+      const analysis = renderCostAnalyzer.getComponentAnalysis(componentName);
+      
+      if (analysis && analysis.suggestions.some(s => s.priority === 'critical')) {
+        console.warn(`[${componentName}] Critical optimization suggestions:`);
+      }
+    }
+  }, [componentName, complexity, childComponents, dependencies, hooks, throttleInterval]);
+  
+  // Track render completion with throttling
   useEffect(() => {
     // Skip if already recorded this render cycle
     if (recordedThisRenderRef.current) return;
@@ -53,23 +93,7 @@ export function useRenderTracking(
     renderCountRef.current++;
     lastRenderTimeRef.current = renderDuration;
     
-    // Record render in analyzer
-    renderCostAnalyzer.recordRender(componentName, renderDuration);
-    
-    // Log slow renders (over 16ms) but only if it's not a common component
-    if (renderDuration > 16) {
-      console.warn(`[${componentName}] Slow render detected: ${renderDuration.toFixed(2)}ms`);
-      console.info(`Component info:`, options);
-    }
-    
-    // Only check for optimizations every 5 renders to reduce overhead
-    if (renderCountRef.current % 5 === 0) {
-      const analysis = renderCostAnalyzer.getComponentAnalysis(componentName);
-      
-      if (analysis && analysis.suggestions.some(s => s.priority === 'critical')) {
-        console.warn(`[${componentName}] Critical optimization suggestions:`);
-      }
-    }
+    recordRender(renderDuration);
   });
   
   return;

@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
 interface PerformanceTrackingOptions {
@@ -7,10 +7,13 @@ interface PerformanceTrackingOptions {
   logSlowRenderThreshold?: number;
   reportToAnalytics?: boolean;
   enabled?: boolean;
+  throttleInterval?: number;
+  batchUpdates?: boolean;
 }
 
 /**
- * Hook for tracking component rendering performance
+ * Hook for tracking component rendering performance with optimizations
+ * for reduced overhead
  * 
  * @param componentName Name of the component to track
  * @param options Configuration options
@@ -26,7 +29,9 @@ export function usePerformanceTracking(
     logSlowRenders = true,
     logSlowRenderThreshold = 16, // 1 frame at 60fps
     reportToAnalytics = false,
-    enabled = true
+    enabled = true,
+    throttleInterval = 0,
+    batchUpdates = true
   } = options;
   
   // Skip if not enabled
@@ -34,11 +39,51 @@ export function usePerformanceTracking(
   
   const renderStartTimeRef = useRef<number>(0);
   const lastRenderTimeRef = useRef<number>(0);
+  const lastRecordTimeRef = useRef<number>(0);
   const recordedThisRenderRef = useRef(false);
+  const batchQueueRef = useRef<{time: number, duration: number}[]>([]);
   
   // Start render timing when component renders
   renderStartTimeRef.current = performance.now();
   recordedThisRenderRef.current = false;
+  
+  // Create throttled recording function
+  const recordRender = useCallback((duration: number) => {
+    const now = performance.now();
+    
+    // Skip if within throttle interval
+    if (throttleInterval > 0 && now - lastRecordTimeRef.current < throttleInterval) {
+      return;
+    }
+    
+    if (batchUpdates) {
+      // Add to batch queue
+      batchQueueRef.current.push({ time: now, duration });
+      
+      // Process batch if getting large or it's been a while
+      if (batchQueueRef.current.length > 10 || (batchQueueRef.current.length > 0 && now - batchQueueRef.current[0].time > 2000)) {
+        // Record batch all at once for better performance
+        performanceMonitor.recordRenderBatch(componentName, batchQueueRef.current);
+        batchQueueRef.current = [];
+      }
+    } else {
+      // Record immediately if not batching
+      performanceMonitor.recordRender(componentName, duration);
+    }
+    
+    lastRecordTimeRef.current = now;
+    
+    // Log slow renders if enabled, only if significantly slow
+    if (logSlowRenders && duration > logSlowRenderThreshold * 1.5) {
+      console.warn(`[${componentName}] Slow render detected: ${duration.toFixed(2)}ms`);
+    }
+    
+    // Report to analytics if enabled, only for very slow renders
+    if (reportToAnalytics && duration > logSlowRenderThreshold * 2) {
+      // This would be implemented with a real analytics service
+      console.info(`[Performance Analytics] Slow render: ${componentName} (${duration.toFixed(2)}ms)`);
+    }
+  }, [componentName, logSlowRenders, logSlowRenderThreshold, reportToAnalytics, throttleInterval, batchUpdates]);
   
   // Track render completion and log metrics with throttling
   useEffect(() => {
@@ -51,24 +96,16 @@ export function usePerformanceTracking(
     
     lastRenderTimeRef.current = renderDuration;
     
-    // Record component render in performance monitor
-    performanceMonitor.recordRender(componentName, renderDuration);
-    
-    // Log slow renders if enabled
-    if (logSlowRenders && renderDuration > logSlowRenderThreshold) {
-      console.warn(`[${componentName}] Slow render detected: ${renderDuration.toFixed(2)}ms`);
-    }
-    
-    // Report to analytics if enabled
-    if (reportToAnalytics) {
-      // This would be implemented with a real analytics service
-      // For now, just log to console
-      if (renderDuration > logSlowRenderThreshold) {
-        console.info(`[Performance Analytics] Slow render: ${componentName} (${renderDuration.toFixed(2)}ms)`);
-      }
-    }
+    // Record this render (throttled/batched)
+    recordRender(renderDuration);
     
     return () => {
+      // Process any remaining batched data on unmount
+      if (batchUpdates && batchQueueRef.current.length > 0) {
+        performanceMonitor.recordRenderBatch(componentName, batchQueueRef.current);
+        batchQueueRef.current = [];
+      }
+      
       // Record component unmount if needed
       performanceMonitor.recordUnmount(componentName);
     };
