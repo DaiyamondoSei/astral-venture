@@ -1,48 +1,71 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useErrorPrevention } from '@/contexts/ErrorPreventionContext';
 
+interface ValidationOptions {
+  validateOnMount?: boolean;
+  validateOnChange?: boolean;
+  validateOnUnmount?: boolean;
+  warnOnly?: boolean;
+}
+
 /**
- * Hook for providing real-time validation of components
+ * Hook for real-time component validation
+ * 
+ * @param componentName Name of the component to validate
+ * @param props Component props to validate
+ * @param options Validation options
  */
-export function useRealTimeValidation(componentName: string, props: Record<string, any> = {}) {
+export function useRealTimeValidation(
+  componentName: string,
+  props: Record<string, any> = {},
+  options: ValidationOptions = {}
+): void {
+  // Skip in production for performance
+  if (process.env.NODE_ENV !== 'development') return;
+  
+  const {
+    validateOnMount = true,
+    validateOnChange = true,
+    validateOnUnmount = false,
+    warnOnly = false
+  } = options;
+  
+  // Get error prevention context
   const errorPrevention = useErrorPrevention();
-  const [isValid, setIsValid] = useState(true);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const timeoutRef = useRef<number | null>(null);
   
-  // Skip if not enabled or in production
-  if (!errorPrevention.isEnabled || process.env.NODE_ENV !== 'development') {
-    return { isValid: true, errors: [], validateNow: () => {} };
-  }
+  // Track initial render and mounting
+  const isMountedRef = useRef(false);
+  const prevPropsRef = useRef<Record<string, any>>({});
   
-  // Clean up timeout on unmount
+  // Validate on mount
   useEffect(() => {
+    if (validateOnMount) {
+      // Validate this component
+      errorPrevention.validateComponent(componentName, props);
+      isMountedRef.current = true;
+    }
+    
+    // Validate on unmount
     return () => {
-      if (timeoutRef.current !== null) {
-        window.clearTimeout(timeoutRef.current);
+      if (validateOnUnmount && isMountedRef.current) {
+        // Here we would normally validate the unmount if needed
+        // But we'll just log it for now
+        console.debug(`Component ${componentName} unmounted`);
       }
     };
   }, []);
   
-  // Function to run validation immediately
-  const validateNow = () => {
-    try {
-      const result = errorPrevention.validateAllComponents();
-      setIsValid(result.valid);
-      setValidationErrors(result.errors);
-      return result;
-    } catch (error) {
-      console.error(`Validation error in ${componentName}:`, error);
-      setIsValid(false);
-      setValidationErrors([`Error during validation: ${error}`]);
-      return { valid: false, errors: [`Error during validation: ${error}`] };
+  // Validate on prop changes
+  useEffect(() => {
+    if (validateOnChange && isMountedRef.current) {
+      // Track prop changes
+      errorPrevention.trackPropChanges(componentName, prevPropsRef.current, props);
     }
-  };
-  
-  return { 
-    isValid, 
-    errors: validationErrors, 
-    validateNow 
-  };
+    
+    // Update previous props for next change
+    prevPropsRef.current = { ...props };
+  });
 }
+
+export default useRealTimeValidation;

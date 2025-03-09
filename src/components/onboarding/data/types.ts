@@ -60,6 +60,7 @@ export interface GuidedTourStep {
   position: 'top' | 'right' | 'bottom' | 'left';
   content?: string;
   target?: string;
+  targetSelector?: string;
 }
 
 export interface TourStep {

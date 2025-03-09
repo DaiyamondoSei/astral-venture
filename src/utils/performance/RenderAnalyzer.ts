@@ -1,5 +1,5 @@
 
-import { performanceMonitor } from './PerformanceMonitor';
+import { performanceMonitor } from './performanceMonitor';
 
 export enum RenderFrequency {
   NORMAL = 'normal',
@@ -46,7 +46,8 @@ export class RenderAnalyzer {
     const { componentName, renderTime, renderCount } = component;
     
     // Get full metrics from performance monitor if available
-    const metricData = performanceMonitor.getComponentMetrics()[componentName];
+    const metrics = performanceMonitor.getComponentMetrics();
+    const metricData = metrics[componentName];
     const lastRenderTime = renderTime;
     const averageRenderTime = metricData?.averageRenderTime || renderTime;
     
@@ -110,3 +111,6 @@ export class RenderAnalyzer {
       .sort((a, b) => b.renderTime - a.renderTime);
   }
 }
+
+// Export the singleton instance
+export const renderAnalyzer = RenderAnalyzer.getInstance();

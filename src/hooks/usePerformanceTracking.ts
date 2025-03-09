@@ -62,9 +62,14 @@ export function usePerformanceTracking(
       
       // Process batch if getting large or it's been a while
       if (batchQueueRef.current.length > 10 || (batchQueueRef.current.length > 0 && now - batchQueueRef.current[0].time > 2000)) {
-        // Record batch all at once for better performance
-        performanceMonitor.recordRenderBatch(componentName, batchQueueRef.current);
+        // We'll process batches individually since PerformanceMonitor expects a different format
+        const entries = [...batchQueueRef.current];
         batchQueueRef.current = [];
+        
+        // Record each entry individually (still more efficient than recording during render)
+        entries.forEach(entry => {
+          performanceMonitor.recordRender(componentName, entry.duration);
+        });
       }
     } else {
       // Record immediately if not batching
@@ -102,7 +107,10 @@ export function usePerformanceTracking(
     return () => {
       // Process any remaining batched data on unmount
       if (batchUpdates && batchQueueRef.current.length > 0) {
-        performanceMonitor.recordRenderBatch(componentName, batchQueueRef.current);
+        // Process remaining batched renders before unmount
+        batchQueueRef.current.forEach(entry => {
+          performanceMonitor.recordRender(componentName, entry.duration);
+        });
         batchQueueRef.current = [];
       }
       

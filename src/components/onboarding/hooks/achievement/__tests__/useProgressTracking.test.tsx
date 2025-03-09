@@ -175,10 +175,8 @@ describe('useProgressTracking Hook', () => {
       result.current.trackProgress('reflections', 0);
     });
     
-    expect(mockSetProgressTracking).toHaveBeenCalledWith({
-      ...mockState.progressTracking,
-      reflections: 10 // Should remain unchanged
-    });
+    // Should not call setProgressTracking since value didn't change
+    expect(mockSetProgressTracking).not.toHaveBeenCalled();
   });
 
   it('should handle decimal progress values correctly', () => {

@@ -9,6 +9,8 @@ export enum DeviceCapability {
   HIGH = 'high'
 }
 
+export type PerformanceMode = DeviceCapability | 'auto';
+
 export enum RenderFrequency {
   NORMAL = 'normal',
   FREQUENT = 'frequent',

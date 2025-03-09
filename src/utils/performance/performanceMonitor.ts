@@ -3,6 +3,9 @@
 export * from './PerformanceMonitor';
 
 // Re-export the singleton instance
-import { performanceMonitor } from './PerformanceMonitor';
+import { PerformanceMonitor } from './PerformanceMonitor';
+
+// Create and export the singleton instance
+const performanceMonitor = new PerformanceMonitor();
 export { performanceMonitor };
 export default performanceMonitor;

@@ -1,3 +1,4 @@
+
 // Achievement tracker types
 
 export interface AchievementTrackerProps {
@@ -50,6 +51,7 @@ export interface IAchievementData {
   requiredAmount?: number;
   secret?: boolean;
   tier?: number;
+  progress?: number;
   
   requiredStep?: string;
   requiredSteps?: string[];
@@ -59,6 +61,7 @@ export interface IAchievementData {
   trackedValue?: string;
   tieredLevels?: number;
   pointsPerTier?: number;
+  awarded?: boolean;
 }
 
 export interface ProgressTrackingResult {
@@ -68,10 +71,10 @@ export interface ProgressTrackingResult {
   unlockedAchievements: IAchievementData[];
   updated?: boolean;
   
+  getProgressValue: (type: string) => number;
   trackProgress: (type: string, amount: number) => void;
   resetProgress: (type: string) => void;
   logActivity: (activityType: string, details?: Record<string, any>) => void;
-  getProgressValue: (type: string) => number;
   trackMultipleProgress: (progressUpdates: Record<string, number>) => void;
 }
 
@@ -96,7 +99,7 @@ export interface FeatureTooltipData {
   title: string;
   description: string;
   targetElement: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position: 'top' | 'bottom' | 'left' | 'right';
   hasArrow?: boolean;
   showOnce?: boolean;
   showAfterStep?: string;
@@ -113,12 +116,13 @@ export interface GuidedTourStep {
   title: string;
   description: string;
   targetElement: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position: 'top' | 'bottom' | 'left' | 'right';
   hasArrow?: boolean;
   highlightElement?: boolean;
-  elementId?: string;
+  elementId: string;
   target?: string;
-  content?: string;
+  content: string;
+  targetSelector?: string;
 }
 
 export interface TourStep {
@@ -128,6 +132,7 @@ export interface TourStep {
   elementId: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
   target?: string;
+  targetSelector?: string;
 }
 
 export interface GuidedTourData {

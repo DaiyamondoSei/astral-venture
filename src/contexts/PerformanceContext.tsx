@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-import { DeviceCapability, getPerformanceCategory } from '@/utils/performanceUtils';
+import { DeviceCapability, PerformanceMode, getPerformanceCategory } from '@/utils/performanceUtils';
 
 interface PerformanceContextType {
   isLowPerformance: boolean;
@@ -16,7 +16,7 @@ interface PerformanceContextType {
   enableComplexAnimations: boolean;
   performanceCategory: DeviceCapability;
   setPerformanceCategory: (category: DeviceCapability) => void;
-  setManualPerformanceMode: (mode: DeviceCapability | 'auto') => void;
+  setManualPerformanceMode: (mode: PerformanceMode) => void;
   startMonitoring: () => void;
   stopMonitoring: () => void;
 }
@@ -64,7 +64,7 @@ export const PerformanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   // Set manual performance mode 
-  const setManualPerformanceMode = (mode: DeviceCapability | 'auto') => {
+  const setManualPerformanceMode = (mode: PerformanceMode) => {
     if (mode === 'auto') {
       const detectedCategory = getPerformanceCategory();
       setPerformanceCategory(detectedCategory);

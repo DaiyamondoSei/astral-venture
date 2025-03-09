@@ -82,7 +82,7 @@ const PerformanceInsights: React.FC = () => {
         return;
       }
       
-      if (Array.isArray(data)) {
+      if (data && Array.isArray(data)) {
         setBackendMetrics(data as PerformanceMetric[]);
         
         if (data.length > 0) {
@@ -175,7 +175,7 @@ const PerformanceInsights: React.FC = () => {
   }
 
   // Get queued metrics count
-  const queuedMetrics = (performanceMonitor.getMetrics() as any).queuedMetrics || 0;
+  const queuedMetrics = (performanceMonitor.getMetrics() as any).queuedMetrics || [];
   const queuedMetricsCount = typeof queuedMetrics.length === 'number' ? queuedMetrics.length : 0;
 
   return (

@@ -1,52 +1,79 @@
 
 import { useState, useEffect } from 'react';
-import { useAchievementTracker as useInternalAchievementTracker } from './achievement/useAchievementTracker';
-import { AchievementTrackerProps, IAchievementData } from './achievement/types';
+import { useProgressTracking } from './achievement/useProgressTracking';
+import { useAchievementState } from './achievement/useAchievementState';
+import { IAchievementData } from './achievement/types';
+import { onboardingAchievements } from '../data';
 
-interface UseAchievementTrackerExtraProps {
+interface UseAchievementTrackerProps {
   userId?: string;
-  completedSteps?: Record<string, boolean>;
-  stepInteractions?: any[];
-  currentStreak?: number;
-  reflectionCount?: number;
-  meditationMinutes?: number;
-  totalPoints?: number;
-  uniqueChakrasActivated?: number;
-  wisdomResourcesExplored?: number;
+  initialAchievements?: IAchievementData[];
+  onUnlock?: (achievement: IAchievementData) => void;
 }
 
-export function useAchievementTracker(props: AchievementTrackerProps, extraProps: UseAchievementTrackerExtraProps) {
-  // Create internal props
-  const internalProps: AchievementTrackerProps = {
-    ...props,
-    userId: extraProps.userId,
-    completedSteps: extraProps.completedSteps,
-    stepInteractions: extraProps.stepInteractions,
-    currentStreak: extraProps.currentStreak,
-    reflectionCount: extraProps.reflectionCount,
-    meditationMinutes: extraProps.meditationMinutes
-  };
+/**
+ * Hook to track and manage user achievements
+ */
+export function useAchievementTracker(props: UseAchievementTrackerProps = {}) {
+  const { userId, initialAchievements = [], onUnlock } = props;
   
-  // Use the internal achievement tracker
-  const trackerResult = useInternalAchievementTracker(internalProps);
+  // Initialize achievement state
+  const achievementState = useAchievementState(initialAchievements);
+  const [achievements] = useState<IAchievementData[]>(onboardingAchievements);
   
-  // Track additional statistics
+  // Create progress tracking
+  const progressTracking = useProgressTracking(
+    achievementState, 
+    (newProgress) => {
+      achievementState.progressTracking = newProgress;
+    }
+  );
+  
+  // Check for newly earned achievements based on progress
   useEffect(() => {
-    if (extraProps.totalPoints) {
-      trackerResult.trackProgress?.('total_energy_points', extraProps.totalPoints);
-    }
-    if (extraProps.uniqueChakrasActivated) {
-      trackerResult.trackProgress?.('unique_chakras_activated', extraProps.uniqueChakrasActivated);
-    }
-    if (extraProps.wisdomResourcesExplored) {
-      trackerResult.trackProgress?.('wisdom_resources_explored', extraProps.wisdomResourcesExplored);
-    }
-  }, [
-    extraProps.totalPoints,
-    extraProps.uniqueChakrasActivated,
-    extraProps.wisdomResourcesExplored,
-    trackerResult.trackProgress
-  ]);
+    // For each achievement, check if it should be unlocked
+    achievements.forEach(achievement => {
+      // Skip already earned achievements
+      if (achievementState.earnedAchievements.some(a => a.id === achievement.id)) {
+        return;
+      }
+      
+      // Check if this achievement meets unlock conditions
+      let shouldUnlock = false;
+      
+      // Different types of achievements have different unlock conditions
+      if (achievement.trackingType && achievement.requiredAmount) {
+        const currentValue = progressTracking.getProgressValue(achievement.trackingType);
+        shouldUnlock = currentValue >= achievement.requiredAmount;
+      }
+      
+      // Unlock the achievement if conditions are met
+      if (shouldUnlock) {
+        // Add to earned achievements
+        achievementState.earnedAchievements.push(achievement);
+        
+        // Call onUnlock callback if provided
+        if (onUnlock) {
+          onUnlock(achievement);
+        }
+        
+        // Update other achievement state properties
+        achievementState.hasNewAchievements = true;
+        achievementState.recentAchievements.push(achievement);
+        achievementState.currentAchievement = achievement;
+      }
+    });
+  }, [achievementState.progressTracking, achievements, onUnlock]);
   
-  return trackerResult;
+  // Return the combined state and methods
+  return {
+    ...achievementState,
+    ...progressTracking,
+    checkAchievements: () => {
+      // Functionality for manually checking achievements
+      console.log('Checking achievements');
+    }
+  };
 }
+
+export default useAchievementTracker;
