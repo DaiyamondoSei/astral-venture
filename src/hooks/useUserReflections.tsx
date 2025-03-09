@@ -1,46 +1,53 @@
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserReflections } from '@/services/reflection/reflectionOperations';
-import { evaluateEmotionalDepth } from '@/utils/emotion';
+import { getUserReflections, EnergyReflection } from '@/services/reflection/reflectionOperations';
+import { useUser } from './useUser';
 
-export const useUserReflections = () => {
-  const [loading, setLoading] = useState(true);
-  const [reflections, setReflections] = useState<any[]>([]);
-  const [depthScores, setDepthScores] = useState<number[]>([]);
-  const { user } = useAuth();
+export function useUserReflections() {
+  const [reflections, setReflections] = useState<EnergyReflection[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const user = useUser();
 
   useEffect(() => {
-    const fetchReflections = async () => {
-      if (!user) return;
-      
-      setLoading(true);
-      try {
-        // Fetch user reflections
-        const userReflections = await fetchUserReflections(user.id, 10);
-        setReflections(userReflections);
-        
-        // Evaluate emotional depth of each reflection for progress tracking
-        if (userReflections.length > 0) {
-          const scores = userReflections.map(r => evaluateEmotionalDepth(r.content));
-          setDepthScores(scores);
-        }
-      } catch (error) {
-        console.error('Error fetching reflections:', error);
+    async function loadReflections() {
+      if (!user) {
         setReflections([]);
-        setDepthScores([]);
-      } finally {
-        setLoading(false);
+        setIsLoading(false);
+        return;
       }
-    };
-    
-    fetchReflections();
+
+      try {
+        setIsLoading(true);
+        const userReflections = await getUserReflections(user.id);
+        setReflections(userReflections);
+        setError(null);
+      } catch (err) {
+        console.error('Error loading reflections:', err);
+        setError('Failed to load reflections');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadReflections();
   }, [user]);
 
-  return {
-    loading,
-    reflections,
-    depthScores,
-    reflectionCount: reflections.length
+  const refreshReflections = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      const userReflections = await getUserReflections(user.id);
+      setReflections(userReflections);
+      setError(null);
+    } catch (err) {
+      console.error('Error refreshing reflections:', err);
+      setError('Failed to refresh reflections');
+    } finally {
+      setIsLoading(false);
+    }
   };
-};
+
+  return { reflections, isLoading, error, refreshReflections };
+}

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { useUser } from '@/hooks/useAuth';
+import { useUser } from '@/hooks/useUser';
 import { useLogout } from '@/hooks/useLogout';
 
 const DashboardPage = () => {

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { useConsciousness } from '@/contexts/ConsciousnessContext';
-import { useUser } from '@/hooks/useAuth';
+import { useUser } from '@/hooks/useUser';
 import { useToast } from '@/hooks/use-toast';
 import { dreamService } from '@/services/consciousness/dreamService';
 import type { DreamRecord, ChakraType } from '@/types/consciousness';

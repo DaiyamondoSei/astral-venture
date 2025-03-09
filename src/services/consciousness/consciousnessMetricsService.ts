@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import type { ConsciousnessMetrics, ConsciousnessLevel, ConsciousnessProgress } from '@/types/consciousness';
+import type { ConsciousnessMetrics, ConsciousnessLevel, ConsciousnessProgress, ChakraType } from '@/types/consciousness';
 
 /**
  * Service for managing consciousness metrics data
@@ -31,7 +30,7 @@ export const consciousnessMetricsService = {
         energyClarity: data.energy_clarity,
         chakraBalance: data.chakra_balance,
         lastAssessment: data.last_assessment,
-        history: data.history || []
+        history: data.history ? data.history as ConsciousnessMetrics['history'] : []
       };
     } catch (error) {
       console.error('Error fetching consciousness metrics:', error);
@@ -59,7 +58,7 @@ export const consciousnessMetricsService = {
           energy_clarity: metrics.energyClarity,
           chakra_balance: metrics.chakraBalance,
           last_assessment: metrics.lastAssessment || new Date().toISOString(),
-          history: metrics.history
+          history: metrics.history as any
         });
       
       if (error) throw error;
@@ -125,6 +124,13 @@ export const consciousnessMetricsService = {
       
       const dreamRecallPercentage = dreamData ? Math.min(100, (dreamData.length / 30) * 100) : 0;
       
+      const chakraSystemData = {
+        chakras: chakraData?.chakras as Record<string, any> || {},
+        overallBalance: chakraData?.overall_balance || 0,
+        dominantChakra: chakraData?.dominant_chakra as ChakraType || null,
+        lastUpdated: chakraData?.last_updated || new Date().toISOString()
+      };
+      
       return {
         userId,
         currentLevel: metrics.level,
@@ -133,17 +139,7 @@ export const consciousnessMetricsService = {
         meditationMinutes: 0, // We would calculate this from session data
         reflectionCount: dreamData?.length || 0,
         dreamRecallPercentage,
-        chakraSystem: chakraData ? {
-          chakras: chakraData.chakras,
-          overallBalance: chakraData.overall_balance,
-          dominantChakra: chakraData.dominant_chakra,
-          lastUpdated: chakraData.last_updated
-        } : {
-          chakras: {} as any,
-          overallBalance: 0,
-          dominantChakra: null,
-          lastUpdated: new Date().toISOString()
-        },
+        chakraSystem: chakraSystemData,
         nextMilestone: {
           description: 'Deepen your meditation practice',
           pointsNeeded: 100,

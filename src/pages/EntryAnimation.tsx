@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EntryAnimationView from '@/components/EntryAnimationView';
-import { useUser } from '@/hooks/useAuth';
+import { useUser } from '@/hooks/useUser';
 
 const EntryAnimationPage = () => {
   const user = useUser();

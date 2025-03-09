@@ -21,7 +21,7 @@ export const chakraService = {
       if (!data) return null;
       
       return {
-        chakras: data.chakras || this.createDefaultChakraSystem().chakras,
+        chakras: data.chakras ? data.chakras as Record<ChakraType, ChakraStatus> : this.createDefaultChakraSystem().chakras,
         overallBalance: data.overall_balance || 0,
         dominantChakra: data.dominant_chakra as ChakraType || null,
         lastUpdated: data.last_updated || new Date().toISOString()
@@ -41,7 +41,7 @@ export const chakraService = {
         .from('chakra_systems')
         .upsert({
           user_id: userId,
-          chakras: chakraSystem.chakras,
+          chakras: chakraSystem.chakras as any,
           overall_balance: chakraSystem.overallBalance,
           dominant_chakra: chakraSystem.dominantChakra,
           last_updated: new Date().toISOString()

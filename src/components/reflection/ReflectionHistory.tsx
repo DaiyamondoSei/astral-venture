@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { useConsciousness } from '@/contexts/ConsciousnessContext';
-import { useUser } from '@/hooks/useAuth';
+import { useUser } from '@/hooks/useUser';
 
 const ReflectionHistory = () => {
   const [isLoading, setIsLoading] = useState(true);
