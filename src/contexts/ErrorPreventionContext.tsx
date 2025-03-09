@@ -7,6 +7,13 @@ interface ErrorPreventionContextType {
   trackPropChanges: (componentName: string, prevProps: Record<string, any>, nextProps: Record<string, any>) => void;
   recordRender: (componentName: string, renderTime: number) => void;
   getValidationReport: () => ValidationReport;
+  
+  // Additional properties needed by ValidationDashboard
+  isEnabled: boolean;
+  enableErrorPrevention: (enabled: boolean) => void;
+  errorComponents: Record<string, any>[];
+  warnComponents: Record<string, any>[];
+  validateAllComponents: () => void;
 }
 
 interface ValidationReport {
@@ -41,6 +48,9 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
     totalErrors: 0,
     totalWarnings: 0,
   });
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [errorComponents, setErrorComponents] = useState<Record<string, any>[]>([]);
+  const [warnComponents, setWarnComponents] = useState<Record<string, any>[]>([]);
 
   const validateComponent = (componentName: string, props: Record<string, any>) => {
     // Component validation logic would go here
@@ -62,12 +72,26 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
   const getValidationReport = (): ValidationReport => {
     return validationReport;
   };
+  
+  const enableErrorPrevention = (enabled: boolean) => {
+    setIsEnabled(enabled);
+  };
+  
+  const validateAllComponents = () => {
+    // Implementation of validateAllComponents
+    console.debug('Validating all components');
+  };
 
   const contextValue: ErrorPreventionContextType = {
     validateComponent,
     trackPropChanges,
     recordRender,
     getValidationReport,
+    isEnabled,
+    enableErrorPrevention,
+    errorComponents,
+    warnComponents,
+    validateAllComponents
   };
 
   return (

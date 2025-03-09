@@ -1,260 +1,220 @@
-// Fix the import casing issue
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
+import { DeviceCapability } from '@/utils/performanceUtils';
 
-export interface RenderCostMetrics {
+export interface RenderCostReport {
+  totalComponents: number;
   totalRenders: number;
+  totalRenderTime: number;
   averageRenderTime: number;
-  longestRender: number;
-  lastRenderTime: number;
-  renderFrequency: number; // Renders per second
-  totalRenderTimePercent: number; // % of total app time spent rendering
-  inefficientRenderThreshold: number;
-  inefficientRenderCount: number;
+  expensiveComponents: ExpensiveComponent[];
+  frequentComponents: FrequentComponent[];
+  deviceCategory: DeviceCapability;
+  recommendations: string[];
 }
 
-export interface RenderOptimizationSuggestion {
-  type: 'memo' | 'callback' | 'state' | 'effect' | 'general';
-  priority: 'critical' | 'high' | 'medium' | 'low';
-  description: string;
-  code?: string;
+export interface ExpensiveComponent {
+  name: string;
+  renderTime: number;
+  renderCount: number;
+  totalCost: number;
 }
 
-export interface ComponentRenderAnalysis {
-  component: string;
-  metrics: RenderCostMetrics;
-  suggestions: RenderOptimizationSuggestion[];
-  recentRenders: {
-    timestamp: number;
-    duration: number;
-    propsChanged?: boolean;
-    stateChanged?: boolean;
-  }[];
+export interface FrequentComponent {
+  name: string;
+  renderCount: number;
+  averageRenderTime: number;
+  totalCost: number;
 }
 
-class RenderCostAnalyzer {
-  private componentMetrics: Map<string, RenderCostMetrics> = new Map();
-  private renderHistory: Map<string, {timestamp: number, duration: number}[]> = new Map();
-  private startTime: number = Date.now();
-  private isEnabled: boolean = process.env.NODE_ENV === 'development';
-  
-  constructor() {
-    // Initialize with empty metrics
-    this.reset();
+/**
+ * Analyzer for component render cost and performance impact
+ */
+export class RenderCostAnalyzer {
+  private static instance: RenderCostAnalyzer;
+  private lastAnalysisTime: number = 0;
+  private lastReport: RenderCostReport | null = null;
+  private analysisInterval: number = 5000; // 5 seconds
+
+  private constructor() {
+    // Private constructor for singleton
   }
-  
-  public recordRender(
-    componentName: string, 
-    renderTime: number, 
-    props?: Record<string, any>,
-    prevProps?: Record<string, any>,
-    state?: Record<string, any>,
-    prevState?: Record<string, any>
-  ): void {
-    // Skip if disabled or not in development
-    if (!this.isEnabled) return;
-    
-    // Get or initialize metrics for this component
-    let metrics = this.componentMetrics.get(componentName);
-    if (!metrics) {
-      metrics = this.getInitialMetrics();
-      this.componentMetrics.set(componentName, metrics);
+
+  public static getInstance(): RenderCostAnalyzer {
+    if (!RenderCostAnalyzer.instance) {
+      RenderCostAnalyzer.instance = new RenderCostAnalyzer();
     }
-    
-    // Update metrics
-    metrics.totalRenders++;
-    metrics.lastRenderTime = renderTime;
-    metrics.averageRenderTime = (metrics.averageRenderTime * (metrics.totalRenders - 1) + renderTime) / metrics.totalRenders;
-    metrics.longestRender = Math.max(metrics.longestRender, renderTime);
-    
-    // Check if this is an inefficient render
-    if (renderTime > metrics.inefficientRenderThreshold) {
-      metrics.inefficientRenderCount++;
-    }
-    
-    // Update render frequency (renders per second)
-    const totalTimeSeconds = (Date.now() - this.startTime) / 1000;
-    metrics.renderFrequency = metrics.totalRenders / totalTimeSeconds;
-    
-    // Add to render history, but keep it smaller (10 entries max)
-    let history = this.renderHistory.get(componentName) || [];
-    history.push({ timestamp: Date.now(), duration: renderTime });
-    
-    // Keep only the last 10 renders in history instead of 20
-    if (history.length > 10) {
-      history = history.slice(history.length - 10);
-    }
-    
-    this.renderHistory.set(componentName, history);
-    
-    // Calculate total app render time percentage
-    const totalRenderTime = performanceMonitor.getMetrics().totalRenderTime;
-    if (totalRenderTime > 0) {
-      metrics.totalRenderTimePercent = (metrics.averageRenderTime * metrics.totalRenders) / totalRenderTime * 100;
-    }
+    return RenderCostAnalyzer.instance;
   }
-  
-  public getComponentAnalysis(componentName: string): ComponentRenderAnalysis | null {
-    // Skip if disabled
-    if (!this.isEnabled) return null;
+
+  /**
+   * Analyze render cost of all components
+   */
+  public analyzeRenderCost(): RenderCostReport {
+    const now = Date.now();
     
-    const metrics = this.componentMetrics.get(componentName);
-    const history = this.renderHistory.get(componentName);
-    
-    if (!metrics || !history) {
-      return null;
+    // Return cached report if it's recent enough
+    if (this.lastReport && now - this.lastAnalysisTime < this.analysisInterval) {
+      return this.lastReport;
     }
     
-    // Generate optimization suggestions, but only for significant issues
-    const suggestions: RenderOptimizationSuggestion[] = [];
+    // Get metrics from performance monitor
+    const metrics = performanceMonitor.getMetrics();
     
-    // Only check for very frequent renders (higher threshold)
-    if (metrics.renderFrequency > 8) { // More than 8 renders per second
-      suggestions.push({
-        type: 'memo',
-        priority: metrics.renderFrequency > 15 ? 'critical' : 'high',
-        description: `Component renders very frequently (${metrics.renderFrequency.toFixed(1)} renders/sec). Consider using React.memo() or optimizing parent components.`
-      });
-    }
-    
-    // Only check for very long render times (higher threshold)
-    if (metrics.averageRenderTime > 25) { // More than 25ms on average
-      suggestions.push({
-        type: 'general',
-        priority: metrics.averageRenderTime > 50 ? 'critical' : 'high',
-        description: `Component has high average render time (${metrics.averageRenderTime.toFixed(1)}ms). Consider optimizing render function.`
-      });
-    }
-    
-    // Only check for very significant render time percentage
-    if (metrics.totalRenderTimePercent > 40) {
-      suggestions.push({
-        type: 'general',
-        priority: 'high',
-        description: `Component accounts for ${metrics.totalRenderTimePercent.toFixed(1)}% of all render time. Consider optimizing or splitting into smaller components.`
-      });
-    }
-    
-    return {
-      component: componentName,
-      metrics,
-      suggestions,
-      recentRenders: history.map(h => ({ timestamp: h.timestamp, duration: h.duration }))
-    };
-  }
-  
-  public getAllComponentAnalyses(): ComponentRenderAnalysis[] {
-    // Skip if disabled
-    if (!this.isEnabled) return [];
-    
-    // Only process the most concerning components
-    const topComponents = Array.from(this.componentMetrics.entries())
-      .sort((a, b) => b[1].totalRenderTimePercent - a[1].totalRenderTimePercent)
-      .slice(0, 10) // Only analyze top 10 components instead of all
-      .map(([component]) => component);
-    
-    return topComponents.map(component => {
-      const analysis = this.getComponentAnalysis(component);
-      return analysis || {
-        component,
-        metrics: this.getInitialMetrics(),
-        suggestions: [],
-        recentRenders: []
-      };
+    // Calculate total render time from component metrics
+    let totalRenderTime = 0;
+    Object.values(metrics.components).forEach(component => {
+      totalRenderTime += component.averageRenderTime * component.renderCount;
     });
-  }
-  
-  public getHighImpactComponents(): ComponentRenderAnalysis[] {
-    // Skip if disabled
-    if (!this.isEnabled) return [];
     
-    return this.getAllComponentAnalyses()
-      .filter(analysis => 
-        analysis.metrics.totalRenderTimePercent > 15 || // Takes up more than 15% of render time
-        analysis.metrics.renderFrequency > 5 || // Renders more than 5 times per second
-        analysis.metrics.averageRenderTime > 25 // Takes more than 25ms to render
-      )
-      .sort((a, b) => b.metrics.totalRenderTimePercent - a.metrics.totalRenderTimePercent)
-      .slice(0, 5); // Limit to 5 components
-  }
-  
-  public getComponentsWithFrequentRenders(): ComponentRenderAnalysis[] {
-    // Skip if disabled
-    if (!this.isEnabled) return [];
+    // Calculate total renders
+    const totalRenders = Object.values(metrics.components).reduce(
+      (sum, component) => sum + component.renderCount, 
+      0
+    );
     
-    return this.getAllComponentAnalyses()
-      .filter(analysis => analysis.metrics.renderFrequency > 5) // More than 5 renders per second
-      .sort((a, b) => b.metrics.renderFrequency - a.metrics.renderFrequency)
-      .slice(0, 5); // Limit to 5 components
-  }
-  
-  public getComponentsWithSlowRenders(): ComponentRenderAnalysis[] {
-    // Skip if disabled
-    if (!this.isEnabled) return [];
+    // Calculate average render time
+    const averageRenderTime = totalRenders > 0 
+      ? totalRenderTime / totalRenders 
+      : 0;
     
-    return this.getAllComponentAnalyses()
-      .filter(analysis => analysis.metrics.averageRenderTime > 25) // More than 25ms
-      .sort((a, b) => b.metrics.averageRenderTime - a.metrics.averageRenderTime)
-      .slice(0, 5); // Limit to 5 components
-  }
-  
-  public reset(): void {
-    this.componentMetrics.clear();
-    this.renderHistory.clear();
-    this.startTime = Date.now();
-  }
-  
-  // Auto-reset every 5 minutes to prevent memory buildup
-  public startAutoReset(): void {
-    if (!this.isEnabled) return;
+    // Find expensive components (high render time)
+    const expensiveComponents: ExpensiveComponent[] = Object.values(metrics.components)
+      .filter(component => component.averageRenderTime > 10)
+      .map(component => ({
+        name: component.componentName,
+        renderTime: component.averageRenderTime,
+        renderCount: component.renderCount,
+        totalCost: component.averageRenderTime * component.renderCount
+      }))
+      .sort((a, b) => b.totalCost - a.totalCost)
+      .slice(0, 5);
     
-    // Every 5 minutes, clear old data to prevent memory issues
-    setInterval(() => {
-      // Only reset if we have more than 20 components tracked
-      if (this.componentMetrics.size > 20) {
-        // Keep only the components with high impact
-        const highImpactComponents = this.getHighImpactComponents().map(a => a.component);
-        
-        // Create new Maps with only the high impact components
-        const newMetrics = new Map<string, RenderCostMetrics>();
-        const newHistory = new Map<string, {timestamp: number, duration: number}[]>();
-        
-        highImpactComponents.forEach(component => {
-          const metrics = this.componentMetrics.get(component);
-          const history = this.renderHistory.get(component);
-          
-          if (metrics) newMetrics.set(component, metrics);
-          if (history) newHistory.set(component, history);
-        });
-        
-        this.componentMetrics = newMetrics;
-        this.renderHistory = newHistory;
-      }
-    }, 300000); // 5 minutes
-  }
-  
-  private getInitialMetrics(): RenderCostMetrics {
-    return {
-      totalRenders: 0,
-      averageRenderTime: 0,
-      longestRender: 0,
-      lastRenderTime: 0,
-      renderFrequency: 0,
-      totalRenderTimePercent: 0,
-      inefficientRenderThreshold: 25, // Increased from 16 to 25ms
-      inefficientRenderCount: 0
+    // Find frequently rendering components
+    const frequentComponents: FrequentComponent[] = Object.values(metrics.components)
+      .filter(component => component.renderCount > 20)
+      .map(component => ({
+        name: component.componentName,
+        renderCount: component.renderCount,
+        averageRenderTime: component.averageRenderTime,
+        totalCost: component.averageRenderTime * component.renderCount
+      }))
+      .sort((a, b) => b.renderCount - a.renderCount)
+      .slice(0, 5);
+    
+    // Generate recommendations
+    const recommendations: string[] = [];
+    
+    if (expensiveComponents.length > 0) {
+      recommendations.push(
+        `Optimize the render performance of ${expensiveComponents[0].name} which takes ${expensiveComponents[0].renderTime.toFixed(2)}ms per render`
+      );
+    }
+    
+    if (frequentComponents.length > 0) {
+      recommendations.push(
+        `Reduce unnecessary renders in ${frequentComponents[0].name} which renders ${frequentComponents[0].renderCount} times`
+      );
+    }
+    
+    if (totalRenders > 500) {
+      recommendations.push(
+        'Consider implementing React.memo for components that render frequently'
+      );
+    }
+    
+    if (averageRenderTime > 16) {
+      recommendations.push(
+        'Overall render performance is poor. Look for expensive operations in render functions'
+      );
+    }
+    
+    // Determine device capability
+    const deviceCategory = this.getDeviceCapability();
+    
+    // Create report
+    const report: RenderCostReport = {
+      totalComponents: Object.keys(metrics.components).length,
+      totalRenders,
+      totalRenderTime,
+      averageRenderTime,
+      expensiveComponents,
+      frequentComponents,
+      deviceCategory,
+      recommendations
     };
+    
+    // Cache report
+    this.lastReport = report;
+    this.lastAnalysisTime = now;
+    
+    return report;
   }
   
-  // Method to enable/disable the analyzer
-  public setEnabled(enabled: boolean): void {
-    this.isEnabled = enabled && process.env.NODE_ENV === 'development';
+  /**
+   * Get device capability category
+   */
+  private getDeviceCapability(): DeviceCapability {
+    // Simple detection based on user agent and hardware
+    if (typeof window === 'undefined') return DeviceCapability.MEDIUM;
+    
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const cpuCores = navigator.hardwareConcurrency || 2;
+    
+    if (isMobile && cpuCores <= 4) {
+      return DeviceCapability.LOW;
+    } else if (cpuCores >= 8) {
+      return DeviceCapability.HIGH;
+    } else {
+      return DeviceCapability.MEDIUM;
+    }
+  }
+  
+  /**
+   * Check if a component is rendering too frequently
+   */
+  public isRenderingTooFrequently(componentName: string, threshold: number = 20): boolean {
+    const metrics = performanceMonitor.getComponentMetrics(componentName);
+    if (!metrics) return false;
+    
+    return metrics.renderCount > threshold;
+  }
+  
+  /**
+   * Check if a component is too expensive to render
+   */
+  public isRenderTooExpensive(componentName: string, threshold: number = 16): boolean {
+    const metrics = performanceMonitor.getComponentMetrics(componentName);
+    if (!metrics) return false;
+    
+    return metrics.averageRenderTime > threshold;
+  }
+  
+  /**
+   * Get optimization suggestions for a component
+   */
+  public getOptimizationSuggestions(componentName: string): string[] {
+    const metrics = performanceMonitor.getComponentMetrics(componentName);
+    if (!metrics) return [];
+    
+    const suggestions: string[] = [];
+    
+    if (metrics.renderCount > 30 && !componentName.includes('Memo')) {
+      suggestions.push('Use React.memo to prevent unnecessary re-renders');
+    }
+    
+    if (metrics.averageRenderTime > 10) {
+      suggestions.push('Look for expensive operations in the render function');
+      suggestions.push('Consider using useMemo for expensive calculations');
+    }
+    
+    if (metrics.renderCount > 50) {
+      suggestions.push('Check for missing dependency arrays in useEffect or useCallback');
+      suggestions.push('Verify that state updates are not happening in render');
+    }
+    
+    return suggestions;
   }
 }
 
-// Create singleton instance
-export const renderCostAnalyzer = new RenderCostAnalyzer();
-
-// Start auto-reset to prevent memory issues
-if (process.env.NODE_ENV === 'development') {
-  renderCostAnalyzer.startAutoReset();
-}
+// Export singleton instance
+export const renderCostAnalyzer = RenderCostAnalyzer.getInstance();

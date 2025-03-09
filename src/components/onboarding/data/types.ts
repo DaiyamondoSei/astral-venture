@@ -70,5 +70,5 @@ export interface TourStep {
   elementId: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
   target?: string;
-  targetSelector?: string; // Added missing property
+  targetSelector?: string; // Make targetSelector optional to match the hook types
 }

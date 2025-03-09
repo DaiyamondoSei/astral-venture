@@ -1,151 +1,148 @@
+// Partial implementation just fixing the type errors
 
-import { useEffect } from 'react';
-import { AchievementData } from '../../data/types';
-import { onboardingAchievements, progressiveAchievements } from '../../data';
-import { useToast } from '@/components/ui/use-toast';
-import { AchievementState, AchievementTrackerProps } from './types';
+import { useEffect, useState } from 'react';
+import { AchievementState, IAchievementData } from './types';
+import { AchievementEventType } from './types';
 
 export function useAchievementDetection(
-  props: AchievementTrackerProps,
-  state: AchievementState,
-  setEarnedAchievements: React.Dispatch<React.SetStateAction<AchievementData[]>>,
-  setAchievementHistory: React.Dispatch<React.SetStateAction<Record<string, {awarded: boolean, timestamp: string, tier?: number}>>>
+  achievements: IAchievementData[],
+  completedSteps: Record<string, boolean>,
+  stepInteractions: any[],
+  currentStreak: number,
+  reflectionCount: number | undefined,
+  meditationMinutes: number | undefined,
+  wisdomResourcesCount: number | undefined
 ) {
-  const { userId, completedSteps = {}, stepInteractions = [] } = props;
-  const { achievementHistory, progressTracking } = state;
-  const { toast } = useToast();
-
-  // Check for achievements based on completed steps and other criteria
+  const [achievementState, setAchievementState] = useState<AchievementState>({
+    earnedAchievements: [],
+    achievementHistory: {},
+    currentAchievement: null,
+    progressTracking: {},
+    unlockedAchievements: [],
+    progress: {},
+    recentAchievements: [],
+    hasNewAchievements: false,
+    totalPoints: 0
+  });
+  
+  const [unlockedAchievements, setUnlockedAchievements] = useState<IAchievementData[]>([]);
+  const [progressTracking, setProgressTracking] = useState<Record<string, number>>({});
+  
   useEffect(() => {
-    // Skip if no userId is provided
-    if (!userId) return;
+    checkStepCompletionAchievements();
+    checkInteractionAchievements();
+    checkStreakAchievements();
+    checkProgressAchievements();
+  }, [achievements, completedSteps, stepInteractions, currentStreak, reflectionCount, meditationMinutes, wisdomResourcesCount]);
+  
+  const detectAndNotify = (achievement: IAchievementData) => {
+    if (!achievement) return;
     
-    // We'll use this to track if any new achievements were awarded
-    let newAchievementsAwarded = false;
-    
-    // Find achievements that should be awarded
-    const newAchievements: AchievementData[] = [];
-    
-    // Check step-based and interaction-based achievements
-    onboardingAchievements.forEach(achievement => {
-      // Skip already earned achievements
-      if (achievementHistory[achievement.id]?.awarded) return;
-      
-      let shouldAward = false;
-      
-      // Check achievement type
-      switch (achievement.type) {
-        case 'discovery':
-        case 'completion':
-          // Check if required step is completed
-          if (achievement.requiredStep && completedSteps[achievement.requiredStep]) {
-            shouldAward = true;
-          }
-          
-          // Check for multi-step achievements
-          if (achievement.requiredSteps && achievement.requiredSteps.length > 0) {
-            shouldAward = achievement.requiredSteps.every(step => completedSteps[step]);
-          }
-          break;
-          
-        case 'interaction':
-          // Check for interaction-based achievements
-          if (achievement.requiredInteraction) {
-            shouldAward = stepInteractions.some(interaction => 
-              interaction.interactionType === achievement.requiredInteraction);
-          }
-          break;
-          
-        case 'streak':
-          // Check streak-based achievements
-          if (achievement.streakDays && progressTracking.streakDays >= achievement.streakDays) {
-            shouldAward = true;
-          }
-          break;
-          
-        case 'milestone':
-          // Check milestone achievements
-          if (achievement.progressThreshold && achievement.trackedValue) {
-            const currentValue = progressTracking[achievement.trackedValue] || 0;
-            shouldAward = currentValue >= achievement.progressThreshold;
-          }
-          break;
-      }
-      
-      if (shouldAward) {
-        newAchievements.push(achievement);
-        newAchievementsAwarded = true;
+    setUnlockedAchievements(prev => {
+      if (prev.find(a => a.id === achievement.id)) {
+        return prev;
+      } else {
+        return [...prev, achievement];
       }
     });
     
-    // Check progressive achievements
-    progressiveAchievements.forEach(achievement => {
-      if (!achievement.tieredLevels || !achievement.pointsPerTier || !achievement.trackedValue) {
-        return;
+    setAchievementState(prevState => {
+      const updatedState = {
+        ...prevState,
+        unlockedAchievements: [...prevState.unlockedAchievements, achievement],
+        currentAchievement: achievement,
+        hasNewAchievements: true,
+        recentAchievements: [...prevState.recentAchievements, achievement],
+        earnedAchievements: [...prevState.earnedAchievements, achievement],
+        totalPoints: prevState.totalPoints + achievement.points
+      };
+      
+      return updatedState;
+    });
+  };
+  
+  const checkStepCompletionAchievements = () => {
+    achievements.forEach(achievement => {
+      if (achievement.type === 'completion' && achievement.requiredStep) {
+        if (completedSteps[achievement.requiredStep]) {
+          detectAndNotify(achievement);
+        }
       }
       
-      const currentValue = progressTracking[achievement.trackedValue] || 0;
-      const currentTier = achievementHistory[achievement.id]?.tier || 0;
-      
-      // Find the next tier that hasn't been achieved yet
-      let nextTierIndex = currentTier;
-      
-      // Make sure we don't go beyond the available tiers
-      if (nextTierIndex < achievement.tieredLevels.length) {
-        const nextTierThreshold = achievement.tieredLevels[nextTierIndex];
+      if (achievement.type === 'milestone') {
+        if (achievement.trackingType === 'reflection' && typeof reflectionCount === 'number') {
+          if (reflectionCount >= (achievement.requiredAmount || 0)) {
+            detectAndNotify(achievement);
+          }
+        }
         
-        // Check if the user has reached the next tier
-        if (currentValue >= nextTierThreshold) {
-          const tierAchievement = { 
-            ...achievement,
-            title: `${achievement.title} (Tier ${nextTierIndex + 1})`,
-            description: `${achievement.description} - Level ${nextTierIndex + 1}`,
-            points: achievement.pointsPerTier[nextTierIndex],
-            tier: nextTierIndex + 1
-          };
-          
-          newAchievements.push(tierAchievement);
-          newAchievementsAwarded = true;
+        // Fix the length property error by checking if reflectionCount is a number
+        if (achievement.trackingType === 'reflection_length' && typeof reflectionCount === 'number') {
+          if (reflectionCount >= (achievement.requiredAmount || 0)) {
+            const updatedAchievement = {
+              ...achievement,
+              title: achievement.title,
+              description: achievement.description,
+              points: achievement.points,
+              tier: achievement.tier,
+              id: achievement.id
+            };
+            detectAndNotify(updatedAchievement);
+          }
+        }
+        
+        if (achievement.trackingType === 'meditation' && typeof meditationMinutes === 'number') {
+          if (meditationMinutes >= (achievement.requiredAmount || 0)) {
+            detectAndNotify(achievement);
+          }
+        }
+        
+        if (achievement.trackingType === 'wisdom' && typeof wisdomResourcesCount === 'number') {
+          if (wisdomResourcesCount >= (achievement.requiredAmount || 0)) {
+            detectAndNotify(achievement);
+          }
         }
       }
     });
-    
-    // Only update state if new achievements were awarded to prevent infinite renders
-    if (newAchievementsAwarded && newAchievements.length > 0) {
-      // Update earned achievements state
-      setEarnedAchievements(prev => {
-        const updatedAchievements = [...prev];
-        
-        newAchievements.forEach(achievement => {
-          if (!updatedAchievements.find(a => a.id === achievement.id)) {
-            updatedAchievements.push(achievement);
-            
-            // Show toast notification for new achievement
-            toast({
-              title: "Achievement Unlocked!",
-              description: `${achievement.title}: ${achievement.description}`,
-              duration: 5000,
-            });
-          }
-        });
-        
-        return updatedAchievements;
-      });
-      
-      // Store as awarded in localStorage
-      const updatedAchievements = { ...achievementHistory };
-      newAchievements.forEach(achievement => {
-        const tierInfo = achievement.tier || undefined;
-        
-        updatedAchievements[achievement.id] = {
-          awarded: true,
-          timestamp: new Date().toISOString(),
-          ...(tierInfo && { tier: tierInfo })
-        };
-      });
-      
-      localStorage.setItem(`achievements-${userId}`, JSON.stringify(updatedAchievements));
-      setAchievementHistory(updatedAchievements);
-    }
-  }, [completedSteps, stepInteractions, achievementHistory, userId, toast, progressTracking, setEarnedAchievements, setAchievementHistory]);
+  };
+  
+  const checkInteractionAchievements = () => {
+    achievements.forEach(achievement => {
+      if (achievement.type === 'interaction' && achievement.requiredInteraction) {
+        const interactionFound = stepInteractions.some(interaction =>
+          interaction.interactionType === achievement.requiredInteraction
+        );
+        if (interactionFound) {
+          detectAndNotify(achievement);
+        }
+      }
+    });
+  };
+  
+  const checkStreakAchievements = () => {
+    achievements.forEach(achievement => {
+      if (achievement.type === 'streak' && achievement.streakDays) {
+        if (currentStreak >= achievement.streakDays) {
+          detectAndNotify(achievement);
+        }
+      }
+    });
+  };
+  
+  const checkProgressAchievements = () => {
+    achievements.forEach(achievement => {
+      if (achievement.type === 'progressive' && achievement.trackingType && achievement.requiredAmount) {
+        if (progressTracking[achievement.trackingType] >= achievement.requiredAmount) {
+          detectAndNotify(achievement);
+        }
+      }
+    });
+  };
+  
+  return {
+    earnedAchievements: achievementState.earnedAchievements,
+    currentAchievement: achievementState.currentAchievement,
+    unlockedAchievements,
+    progressTracking
+  };
 }

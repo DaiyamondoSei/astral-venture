@@ -2,7 +2,7 @@
 // Re-export from the properly cased file to maintain backward compatibility
 export * from './PerformanceMonitor';
 
-// Re-export the singleton instance
+// Create and export the singleton instance
 import { PerformanceMonitor } from './PerformanceMonitor';
 
 // Create and export the singleton instance

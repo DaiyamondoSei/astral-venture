@@ -2,7 +2,7 @@
 // AI Service Types
 
 export interface AIQuestion {
-  text: string;
+  text?: string;
   question?: string; // Added for backward compatibility
   context?: string;
   userId?: string;

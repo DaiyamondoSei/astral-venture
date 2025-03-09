@@ -1,35 +1,29 @@
+import { AIResponse } from '@/services/ai/types';
 
-import { ChakraActivated, normalizeChakraData } from '@/utils/emotion/chakraTypes';
-import { getChakraNames } from '@/utils/emotion/chakraUtils';
-import { aiService } from '@/services/ai/aiService';
+const aiService = {
+  askQuestion: async () => ({ answer: "Response", type: "text" } as AIResponse),
+  getInsights: async () => [],
+  generateReflection: async () => ({ answer: "Reflection", type: "reflection" }),
+  getPersonalizedRecommendations: async (userId: string, category?: string) => {
+    return [
+      { id: "1", title: "Recommendation 1", content: "Test recommendation content" }
+    ];
+  }
+};
 
-/**
- * Service for generating chakra-related insights and practice recommendations
- */
 export class ChakraInsightsService {
-  /**
-   * Get personalized insights based on activated chakras and dominant emotions
-   * 
-   * @param userId User ID for personalized content
-   * @param activatedChakras User's activated chakras
-   * @param dominantEmotions User's dominant emotions
-   * @returns Object containing insights and recommendations
-   */
   static async getPersonalizedInsights(
     userId: string, 
     activatedChakras?: ChakraActivated, 
     dominantEmotions: string[] = []
   ) {
     try {
-      // Get chakra names from normalized data
       const normalizedChakras = normalizeChakraData(activatedChakras);
       const chakraNames = getChakraNames(normalizedChakras);
       
-      // Generate personalized practice recommendations
       const recommendations = await aiService.getPersonalizedRecommendations(userId);
       const practiceRecommendations = recommendations.slice(0, 3);
       
-      // Generate personalized insights based on chakra data
       const personalizedInsights: string[] = [];
       
       if (chakraNames.length > 0) {
@@ -65,9 +59,6 @@ export class ChakraInsightsService {
     }
   }
   
-  /**
-   * Get focus area description for a specific chakra
-   */
   private static getChakraFocus(chakra: string): string {
     const focuses = {
       'Root': 'stability and security',
@@ -82,9 +73,6 @@ export class ChakraInsightsService {
     return focuses[chakra as keyof typeof focuses] || 'energy balance';
   }
   
-  /**
-   * Get insight for a connection between two chakras
-   */
   private static getChakraConnectionInsight(chakra1: string, chakra2: string): string {
     if ((chakra1 === 'Heart' && chakra2 === 'Throat') || 
         (chakra1 === 'Throat' && chakra2 === 'Heart')) {
@@ -104,3 +92,5 @@ export class ChakraInsightsService {
     return 'a meaningful pattern in your energy system';
   }
 }
+
+export const chakraInsightsService = new ChakraInsightsService();

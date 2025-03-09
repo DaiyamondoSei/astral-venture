@@ -9,7 +9,8 @@ export enum DeviceCapability {
   HIGH = 'high'
 }
 
-export type PerformanceMode = DeviceCapability | 'auto';
+// Export low, medium, high as string literals for backward compatibility
+export type PerformanceMode = DeviceCapability | 'auto' | 'low' | 'medium' | 'high';
 
 export enum RenderFrequency {
   NORMAL = 'normal',
@@ -34,8 +35,8 @@ export function getPerformanceCategory(): DeviceCapability {
   // Check for hardware concurrency (CPU cores)
   const cpuCores = navigator.hardwareConcurrency || 0;
   
-  // Device memory is not supported in all browsers
-  const deviceMemory = (navigator as any).deviceMemory !== undefined ? (navigator as any).deviceMemory : 4;
+  // Device memory is not supported in all browsers, use a safe fallback
+  const deviceMemory = typeof (navigator as any).deviceMemory !== 'undefined' ? (navigator as any).deviceMemory : 4;
   
   // Use user agent for additional signals
   const isOldBrowser = /MSIE|Trident/.test(navigator.userAgent);
@@ -54,8 +55,9 @@ export function getPerformanceCategory(): DeviceCapability {
  * Start monitoring performance
  */
 export function monitorPerformance(): void {
-  import('./performance/PerformanceMonitor').then(({ performanceMonitor }) => {
-    performanceMonitor.startMonitoring();
+  import('./performance/PerformanceMonitor').then((module) => {
+    const instance = module.performanceMonitor || new module.PerformanceMonitor();
+    instance.startMonitoring();
   });
 }
 
@@ -64,7 +66,7 @@ export function monitorPerformance(): void {
  */
 export function throttleForPerformance<T extends (...args: any[]) => any>(
   fn: T, 
-  deviceCapability: DeviceCapability, 
+  deviceCapability: DeviceCapability | PerformanceMode, 
   options: { low?: number; medium?: number; high?: number } = {}
 ): (...args: Parameters<T>) => ReturnType<T> | undefined {
   const { low = 500, medium = 250, high = 100 } = options;
@@ -74,16 +76,25 @@ export function throttleForPerformance<T extends (...args: any[]) => any>(
   let throttleTime: number;
   
   // Set throttle time based on device capability
-  switch (deviceCapability) {
+  const capability = typeof deviceCapability === 'string' ? deviceCapability : DeviceCapability.MEDIUM;
+  
+  switch (capability) {
     case DeviceCapability.LOW:
+    case 'low':
       throttleTime = low;
       break;
     case DeviceCapability.MEDIUM:
+    case 'medium':
       throttleTime = medium;
       break;
     case DeviceCapability.HIGH:
+    case 'high':
       throttleTime = high;
       break;
+    case 'auto':
+      // Determine based on device capability
+      const detectedCapability = getPerformanceCategory();
+      return throttleForPerformance(fn, detectedCapability, options);
     default:
       throttleTime = medium;
   }

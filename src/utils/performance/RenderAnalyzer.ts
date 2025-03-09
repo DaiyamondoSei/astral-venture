@@ -47,9 +47,14 @@ export class RenderAnalyzer {
     
     // Get full metrics from performance monitor if available
     const metrics = performanceMonitor.getComponentMetrics();
-    const metricData = metrics[componentName];
+    const metricData = metrics[componentName] || {
+      componentName,
+      renderCount: 0,
+      averageRenderTime: 0
+    };
+    
     const lastRenderTime = renderTime;
-    const averageRenderTime = metricData?.averageRenderTime || renderTime;
+    const averageRenderTime = metricData.averageRenderTime || renderTime;
     
     // Determine render frequency
     let renderFrequency = RenderFrequency.NORMAL;
@@ -100,13 +105,14 @@ export class RenderAnalyzer {
     
     return Object.values(metrics)
       .filter(metric => {
+        if (!metric) return false;
         // Components with excessive renders or slow render times
-        return metric.renderCount > 50 || metric.averageRenderTime > 16;
+        return (metric.renderCount > 50 || (metric.averageRenderTime || 0) > 16);
       })
       .map(metric => ({
-        componentName: metric.componentName,
-        renderTime: metric.averageRenderTime,
-        renderCount: metric.renderCount
+        componentName: metric.componentName || 'unknown',
+        renderTime: metric.averageRenderTime || 0,
+        renderCount: metric.renderCount || 0
       }))
       .sort((a, b) => b.renderTime - a.renderTime);
   }
