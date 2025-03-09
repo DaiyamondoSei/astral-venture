@@ -90,7 +90,7 @@ const QuantumThemeProvider: React.FC<QuantumThemeProviderProps> = ({
       }
     }
     // High-end devices can handle all settings
-  }, [config.deviceCapability]);
+  }, [config.deviceCapability, animationLevel]);
   
   // Color getters
   const getPrimaryColor = (): string => {

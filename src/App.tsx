@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -11,8 +10,8 @@ import EntryAnimationPage from '@/pages/EntryAnimationPage';
 import DashboardPage from '@/pages/DashboardPage';
 import DesignSystemDemo from '@/pages/DesignSystemDemo';
 import NotFoundPage from '@/pages/NotFoundPage';
+import OnboardingPage from './pages/OnboardingPage';
 
-// Create a client
 const queryClient = new QueryClient();
 
 function App() {
@@ -27,6 +26,7 @@ function App() {
                 <Route path="/entry-animation" element={<EntryAnimationPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/design-system" element={<DesignSystemDemo />} />
+                <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Router>
