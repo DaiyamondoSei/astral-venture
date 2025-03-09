@@ -1,122 +1,96 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-import { getPerformanceCategory, type DeviceCapability } from '@/utils/performanceUtils';
+import { DeviceCapability, getPerformanceCategory } from '@/utils/performanceUtils';
 
-// Context type
-export interface PerformanceContextType {
-  deviceCapability: DeviceCapability;
+interface PerformanceContextType {
   isLowPerformance: boolean;
-  isMediumPerformance: boolean;
-  isHighPerformance: boolean;
+  fpsTarget: number;
+  enableAnimations: boolean;
   enableParticles: boolean;
-  enableComplexAnimations: boolean;
   enableBlur: boolean;
   enableShadows: boolean;
-  setManualPerformanceMode: (mode: DeviceCapability | 'auto') => void;
+  enableGlow: boolean;
+  performanceCategory: DeviceCapability;
+  setPerformanceCategory: (category: DeviceCapability) => void;
+  startMonitoring: () => void;
+  stopMonitoring: () => void;
 }
 
-// Create the context with default values
+// Create context with default values
 const PerformanceContext = createContext<PerformanceContextType>({
-  deviceCapability: 'medium',
   isLowPerformance: false,
-  isMediumPerformance: true,
-  isHighPerformance: false,
+  fpsTarget: 60,
+  enableAnimations: true,
   enableParticles: true,
-  enableComplexAnimations: true,
   enableBlur: true,
   enableShadows: true,
-  setManualPerformanceMode: () => {}
+  enableGlow: true,
+  performanceCategory: DeviceCapability.MEDIUM,
+  setPerformanceCategory: () => {},
+  startMonitoring: () => {},
+  stopMonitoring: () => {}
 });
 
-// Provider component
-export const PerformanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State for device capability
-  const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>('medium');
-  
-  // States for feature flags
-  const [enableParticles, setEnableParticles] = useState(true);
-  const [enableComplexAnimations, setEnableComplexAnimations] = useState(true);
-  const [enableBlur, setEnableBlur] = useState(true);
-  const [enableShadows, setEnableShadows] = useState(true);
-  
-  // Manual override mode
-  const [manualMode, setManualMode] = useState<DeviceCapability | 'auto'>('auto');
-  
-  // Initialize device capability on mount
+export const PerformanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [performanceCategory, setPerformanceCategory] = useState<DeviceCapability>(DeviceCapability.MEDIUM);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize performance settings based on device capability
   useEffect(() => {
-    const updateCapabilities = () => {
-      // Use manual mode if set
-      const capability = manualMode === 'auto' 
-        ? getPerformanceCategory() 
-        : manualMode;
-      
-      setDeviceCapability(capability);
-      
-      // Update feature flags based on capability
-      switch (capability) {
-        case 'low':
-          setEnableParticles(false);
-          setEnableComplexAnimations(false);
-          setEnableBlur(false);
-          setEnableShadows(false);
-          break;
-        case 'medium':
-          setEnableParticles(true);
-          setEnableComplexAnimations(false);
-          setEnableBlur(true);
-          setEnableShadows(true);
-          break;
-        case 'high':
-          setEnableParticles(true);
-          setEnableComplexAnimations(true);
-          setEnableBlur(true);
-          setEnableShadows(true);
-          break;
-      }
-      
-      // Store for debugging
-      if (typeof window !== 'undefined') {
-        (window as any).__deviceCapability = capability;
-      }
-    };
-    
-    // Initial update
-    updateCapabilities();
-    
-    // Setup listener for changes (e.g. window resize that might change performance mode)
-    window.addEventListener('resize', updateCapabilities);
-    return () => window.removeEventListener('resize', updateCapabilities);
-  }, [manualMode]);
-  
-  // Handler for manual mode setting
-  const setManualPerformanceMode = (mode: DeviceCapability | 'auto') => {
-    setManualMode(mode);
-    
-    // Store user preference
-    if (mode !== 'auto' && typeof localStorage !== 'undefined') {
-      localStorage.setItem('performanceMode', mode);
-    } else if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('performanceMode');
+    if (!isInitialized) {
+      const detectedCategory = getPerformanceCategory();
+      setPerformanceCategory(detectedCategory);
+      setIsInitialized(true);
     }
+  }, [isInitialized]);
+
+  // Start performance monitoring
+  const startMonitoring = () => {
+    performanceMonitor.startMonitoring();
   };
-  
+
+  // Stop performance monitoring
+  const stopMonitoring = () => {
+    performanceMonitor.stopMonitoring();
+  };
+
+  // Determine feature availability based on performance category
+  const isLowPerformance = performanceCategory === DeviceCapability.LOW;
+  const fpsTarget = isLowPerformance ? 30 : 60;
+  const enableAnimations = performanceCategory !== DeviceCapability.LOW;
+  const enableParticles = performanceCategory === DeviceCapability.HIGH;
+  const enableBlur = performanceCategory !== DeviceCapability.LOW;
+  const enableShadows = performanceCategory !== DeviceCapability.LOW;
+  const enableGlow = performanceCategory === DeviceCapability.HIGH;
+
+  // Value object to be provided by context
+  const contextValue = {
+    isLowPerformance,
+    fpsTarget,
+    enableAnimations,
+    enableParticles,
+    enableBlur,
+    enableShadows,
+    enableGlow,
+    performanceCategory,
+    setPerformanceCategory,
+    startMonitoring,
+    stopMonitoring
+  };
+
   return (
-    <PerformanceContext.Provider value={{
-      deviceCapability,
-      isLowPerformance: deviceCapability === 'low',
-      isMediumPerformance: deviceCapability === 'medium' || deviceCapability === 'high',
-      isHighPerformance: deviceCapability === 'high',
-      enableParticles,
-      enableComplexAnimations,
-      enableBlur,
-      enableShadows,
-      setManualPerformanceMode
-    }}>
+    <PerformanceContext.Provider value={contextValue}>
       {children}
     </PerformanceContext.Provider>
   );
 };
 
-// Hook for using the context
-export const usePerformance = () => useContext(PerformanceContext);
+// Custom hook for using the performance context
+export const usePerformance = () => {
+  const context = useContext(PerformanceContext);
+  if (!context) {
+    throw new Error('usePerformance must be used within a PerformanceProvider');
+  }
+  return context;
+};

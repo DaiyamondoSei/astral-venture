@@ -1,163 +1,136 @@
-import PerformanceMonitor from './performanceMonitor';
 
-// Updated RenderAnalysis type to include component property
+import { performanceMonitor } from './performanceMonitor';
+import { RenderFrequency, calculateRenderFrequency } from '@/utils/performanceUtils';
+
+// Define the interface for component render analysis
 export interface RenderAnalysis {
-  component: string;
+  componentName: string;
   renderCount: number;
   averageRenderTime: number;
   lastRenderTime: number;
+  maxRenderTime?: number;
+  minRenderTime?: number;
   renderFrequency: RenderFrequency;
-  suggestion: string;
+  possibleOptimizations?: string[];
+  isOptimizable: boolean;
 }
 
-export enum RenderFrequency {
-  NORMAL = 'normal',
-  FREQUENT = 'frequent',
-  EXCESSIVE = 'excessive',
-}
-
-export interface RenderAnalyzerConfig {
-  thresholdFrequentRenders: number;
-  thresholdExcessiveRenders: number;
-  thresholdSlowRenderTime: number;
+// Interface for render metrics
+export interface RenderMetrics {
+  componentName: string;
+  renderTime: number;
+  renderCount: number;
+  props?: Record<string, any>;
+  state?: Record<string, any>;
 }
 
 export class RenderAnalyzer {
-  private config: RenderAnalyzerConfig;
+  private static instance: RenderAnalyzer;
+  private analyzedComponents: Map<string, RenderAnalysis> = new Map();
+  private timeWindow: number = 10000; // 10 seconds window for frequency analysis
 
-  constructor(config: RenderAnalyzerConfig = {
-    thresholdFrequentRenders: 10,
-    thresholdExcessiveRenders: 20,
-    thresholdSlowRenderTime: 30,
-  }) {
-    this.config = config;
+  private constructor() {}
+
+  public static getInstance(): RenderAnalyzer {
+    if (!RenderAnalyzer.instance) {
+      RenderAnalyzer.instance = new RenderAnalyzer();
+    }
+    return RenderAnalyzer.instance;
   }
 
-  analyzeRender(componentName: string): RenderAnalysis | null {
-    const performanceMonitor = PerformanceMonitor.getInstance();
-    const metrics = performanceMonitor.getComponentMetrics(componentName);
-
-    if (!metrics) {
-      return null;
-    }
-
-    let renderFrequency = RenderFrequency.NORMAL;
-    let suggestion = '';
-
-    if (metrics.renderCount > this.config.thresholdExcessiveRenders) {
-      renderFrequency = RenderFrequency.EXCESSIVE;
-      suggestion = 'Consider using React.memo or useMemo to prevent unnecessary renders';
-    } else if (metrics.renderCount > this.config.thresholdFrequentRenders) {
-      renderFrequency = RenderFrequency.FREQUENT;
-      suggestion = 'Check if this component can be optimized with useMemo or useCallback';
-    }
-
-    if (metrics.averageRenderTime > this.config.thresholdSlowRenderTime) {
-      renderFrequency = RenderFrequency.EXCESSIVE;
-      suggestion += suggestion ? '. Also, c' : 'C';
-      suggestion += 'onsider optimizing the render function or splitting into smaller components';
-    }
-
-    if (renderFrequency === RenderFrequency.NORMAL) {
-      return null;
-    }
-
-    return {
-      component: componentName,
-      renderCount: metrics.renderCount,
-      averageRenderTime: metrics.averageRenderTime,
-      lastRenderTime: metrics.lastRenderTime,
-      renderFrequency,
-      suggestion
-    };
-  }
-
-  findComponentsWithPerformanceIssues(): RenderAnalysis[] {
-    const performanceMonitor = PerformanceMonitor.getInstance();
-    const allMetrics = performanceMonitor.getComponentMetrics();
+  /**
+   * Analyze the render metrics for a component
+   */
+  public analyzeComponent(metrics: RenderMetrics): RenderAnalysis {
+    // Get existing component analysis or create new one
+    const existingAnalysis = this.analyzedComponents.get(metrics.componentName);
     
-    return Object.keys(allMetrics)
-      .map(componentName => {
-        const metrics = allMetrics[componentName];
-        
-        // Skip components with very few renders
-        if (metrics.renderCount < 3) return null;
-        
-        let renderFrequency = RenderFrequency.NORMAL;
-        let suggestion = '';
-        
-        // Analyze render frequency
-        if (metrics.renderCount > 20) {
-          renderFrequency = RenderFrequency.EXCESSIVE;
-          suggestion = 'Consider using React.memo or useMemo to prevent unnecessary renders';
-        } else if (metrics.renderCount > 10) {
-          renderFrequency = RenderFrequency.FREQUENT;
-          suggestion = 'Check if this component can be optimized with useMemo or useCallback';
-        }
-        
-        // Add render time analysis
-        if (metrics.averageRenderTime > 30) {
-          renderFrequency = RenderFrequency.EXCESSIVE;
-          suggestion += suggestion ? '. Also, c' : 'C';
-          suggestion += 'onsider optimizing the render function or splitting into smaller components';
-        }
-        
-        // Only return components with performance issues
-        if (renderFrequency !== RenderFrequency.NORMAL) {
-          return {
-            component: componentName,
-            renderCount: metrics.renderCount,
-            averageRenderTime: metrics.averageRenderTime,
-            lastRenderTime: metrics.lastRenderTime,
-            renderFrequency,
-            suggestion
-          };
-        }
-        
-        return null;
-      })
-      .filter(Boolean) as RenderAnalysis[];
-  }
-
-  getRenderAnalysis(componentName: string): RenderAnalysis | null {
-    const performanceMonitor = PerformanceMonitor.getInstance();
-    const metrics = performanceMonitor.getComponentMetrics(componentName);
-
-    if (!metrics) {
-      return null;
-    }
-
-    let renderFrequency = RenderFrequency.NORMAL;
-    let suggestion = '';
-
-    if (metrics.renderCount > this.config.thresholdExcessiveRenders) {
-      renderFrequency = RenderFrequency.EXCESSIVE;
-      suggestion = 'Consider using React.memo or useMemo to prevent unnecessary renders';
-    } else if (metrics.renderCount > this.config.thresholdFrequentRenders) {
-      renderFrequency = RenderFrequency.FREQUENT;
-      suggestion = 'Check if this component can be optimized with useMemo or useCallback';
-    }
-
-    if (metrics.averageRenderTime > this.config.thresholdSlowRenderTime) {
-      renderFrequency = RenderFrequency.EXCESSIVE;
-      suggestion += suggestion ? '. Also, c' : 'C';
-      suggestion += 'onsider optimizing the render function or splitting into smaller components';
-    }
-
-    if (renderFrequency === RenderFrequency.NORMAL) {
-      return null;
-    }
-
-    return {
-      component: componentName,
-      renderCount: metrics.renderCount,
-      averageRenderTime: metrics.averageRenderTime,
-      lastRenderTime: metrics.lastRenderTime,
+    // Get performance metrics from monitor
+    const perfMetrics = PerformanceMonitor.getInstance().getComponentMetrics(metrics.componentName);
+    
+    // Calculate render frequency
+    const renderFrequency = calculateRenderFrequency(
+      metrics.renderCount, 
+      this.timeWindow
+    );
+    
+    // Determine possible optimizations
+    const possibleOptimizations = this.determinePossibleOptimizations(
+      metrics,
       renderFrequency,
-      suggestion
+      perfMetrics
+    );
+    
+    // Create updated analysis
+    const analysis: RenderAnalysis = {
+      componentName: metrics.componentName,
+      renderCount: metrics.renderCount,
+      averageRenderTime: perfMetrics?.averageRenderTime || metrics.renderTime,
+      lastRenderTime: metrics.renderTime,
+      maxRenderTime: perfMetrics?.maxRenderTime || metrics.renderTime,
+      minRenderTime: perfMetrics?.minRenderTime || metrics.renderTime,
+      renderFrequency,
+      possibleOptimizations,
+      isOptimizable: possibleOptimizations.length > 0
     };
+    
+    // Update analyzed components map
+    this.analyzedComponents.set(metrics.componentName, analysis);
+    
+    return analysis;
+  }
+  
+  /**
+   * Batch analyze multiple components
+   */
+  public batchAnalyze(metricsArray: RenderMetrics[]): Map<string, RenderAnalysis> {
+    metricsArray.forEach(metrics => this.analyzeComponent(metrics));
+    return this.analyzedComponents;
+  }
+  
+  /**
+   * Get analysis for a specific component
+   */
+  public getComponentAnalysis(componentName: string): RenderAnalysis | undefined {
+    return this.analyzedComponents.get(componentName);
+  }
+  
+  /**
+   * Get all components that might need optimization
+   */
+  public getOptimizableCandidates(): RenderAnalysis[] {
+    return Array.from(this.analyzedComponents.values())
+      .filter(analysis => analysis.isOptimizable);
+  }
+  
+  /**
+   * Determine possible optimizations for a component
+   */
+  private determinePossibleOptimizations(
+    metrics: RenderMetrics,
+    frequency: RenderFrequency,
+    perfMetrics?: any
+  ): string[] {
+    const optimizations: string[] = [];
+    
+    // Check for excessive renders
+    if (frequency === RenderFrequency.EXCESSIVE) {
+      optimizations.push('Use React.memo or shouldComponentUpdate to prevent unnecessary renders');
+    }
+    
+    // Check for slow render times
+    if (perfMetrics?.averageRenderTime > 16) { // 60fps threshold
+      optimizations.push('Optimize render method or split into smaller components');
+    }
+    
+    // Check for large props or state
+    if (metrics.props && Object.keys(metrics.props).length > 20) {
+      optimizations.push('Consider reducing the number of props passed to this component');
+    }
+    
+    return optimizations;
   }
 }
 
-// Use proper TypeScript export syntax for types
-export type { RenderAnalysis };
+// Export singleton instance
+export const renderAnalyzer = RenderAnalyzer.getInstance();

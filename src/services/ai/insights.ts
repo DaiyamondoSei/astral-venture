@@ -1,65 +1,82 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { HistoricalReflection } from '@/components/reflection/types';
 import { AIInsight } from './types';
 
 /**
- * Process user reflections to generate AI insights
- * 
- * @param reflections - Array of user reflections to analyze
- * @returns Array of AI insights generated from the reflections
+ * Processes and analyzes user data to extract meaningful insights
  */
-export async function generateInsightsFromReflections(
-  reflections: HistoricalReflection[]
-): Promise<AIInsight[]> {
-  try {
-    // First, we prepare the reflection data
-    const reflectionTexts = reflections.map(r => ({
-      id: r.id,
-      content: r.content,
-      dominant_emotion: r.dominant_emotion,
-      chakras_activated: r.chakras_activated,
-      emotional_depth: r.emotional_depth,
-      created_at: r.created_at
-    }));
-    
-    // Call our Supabase Edge Function for AI analysis
-    const { data, error } = await supabase.functions.invoke('generate-insights', {
-      body: { reflections: reflectionTexts }
-    });
-    
-    if (error) throw error;
-    
-    return data.insights;
-  } catch (error) {
-    console.error('Error generating insights:', error);
+export function processUserInsights(
+  userData: any[], 
+  includeRecommendations: boolean = true
+): AIInsight[] {
+  // This is a fallback implementation when the AI service is unavailable
+  const insights: AIInsight[] = [];
+  
+  if (!userData || userData.length === 0) {
     return [];
   }
+  
+  // Add a simple insight based on the amount of data
+  insights.push({
+    id: 'local-insight-1',
+    type: 'reflection',
+    title: 'Your Self-Reflection Journey',
+    content: `You've recorded ${userData.length} reflections. Regular self-reflection is a powerful tool for personal growth.`,
+    createdAt: new Date().toISOString(),
+    relevanceScore: 0.9,
+    tags: ['reflection', 'growth']
+  });
+  
+  // Add a recommendation if enabled
+  if (includeRecommendations) {
+    insights.push({
+      id: 'local-recommendation-1',
+      type: 'practice',
+      title: 'Suggested Practice',
+      content: 'Try beginning your day with a 5-minute meditation focused on setting your intentions for the day.',
+      createdAt: new Date().toISOString(),
+      relevanceScore: 0.8,
+      tags: ['meditation', 'recommendation', 'morning-routine']
+    });
+  }
+  
+  return insights;
 }
 
 /**
- * Get personalized practice recommendations based on user history
- * 
- * @param userId - User ID for personalization
- * @returns Array of practice recommendations
+ * Get insights that might be relevant for a user's current situation
  */
-export async function getPersonalizedRecommendations(
-  userId: string
-): Promise<string[]> {
-  try {
-    const { data, error } = await supabase.functions.invoke('get-recommendations', {
-      body: { userId }
+export function getContextualInsights(
+  context: string, 
+  previousInsights: AIInsight[] = []
+): AIInsight[] {
+  const insights: AIInsight[] = [];
+  
+  // Check context keywords and provide relevant insights
+  const lowercaseContext = context.toLowerCase();
+  
+  if (lowercaseContext.includes('stress') || lowercaseContext.includes('anxiety')) {
+    insights.push({
+      id: 'contextual-stress-1',
+      type: 'meditation',
+      title: 'Stress Relief Meditation',
+      content: 'A simple breathing technique can help reduce stress. Try breathing in for 4 counts, holding for 4, and exhaling for 6 counts.',
+      createdAt: new Date().toISOString(),
+      relevanceScore: 0.95,
+      tags: ['stress', 'anxiety', 'breathing']
     });
-    
-    if (error) throw error;
-    
-    return data.recommendations;
-  } catch (error) {
-    console.error('Error getting personalized recommendations:', error);
-    return [
-      "Practice mindful breathing for 5 minutes",
-      "Try a chakra balancing meditation",
-      "Journal about your energy experiences"
-    ];
   }
+  
+  if (lowercaseContext.includes('sleep') || lowercaseContext.includes('rest')) {
+    insights.push({
+      id: 'contextual-sleep-1',
+      type: 'wisdom',
+      title: 'Improving Sleep Quality',
+      content: 'Creating a consistent sleep schedule helps your body establish a natural rhythm. Try to go to bed and wake up at the same time each day.',
+      createdAt: new Date().toISOString(),
+      relevanceScore: 0.9,
+      tags: ['sleep', 'rest', 'routine']
+    });
+  }
+  
+  return insights;
 }
