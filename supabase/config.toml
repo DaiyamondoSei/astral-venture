@@ -1,3 +1,11 @@
 
-# A string used as a secret for authorization header
 project_id = "wkmyvthtyjcdzhzvfyji"
+
+[functions.get-practice-progress]
+verify_jwt = true
+
+[functions.track-practice-completion]
+verify_jwt = true
+
+[functions.handle-portal-interaction]
+verify_jwt = true

@@ -1,13 +1,40 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { AIQueryRequest, AIQueryResponse } from "../types.ts";
+import { corsHeaders, createResponse, createErrorResponse } from "../../shared/responseUtils.ts";
 import { extractInsights } from "../services/insightExtractor.ts";
 import { getCachedResponse, cacheResponse } from "../services/cacheHandler.ts";
-import { corsHeaders } from "../../shared/responseUtils.ts";
 import { createCacheKey } from "../utils/cacheUtils.ts";
 import { trackUsage } from "../services/usageTracker.ts";
 import { fetchContextData, buildRichContext } from "./contextHandler.ts";
 import { callOpenAI } from "./openaiHandler.ts";
+
+// Define the request interface
+interface AIQueryRequest {
+  query: string;
+  context?: string;
+  userId?: string;
+  reflectionId?: string;
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    useCache?: boolean;
+    stream?: boolean;
+    cacheKey?: string;
+    cacheTtl?: number;
+  };
+}
+
+// Define the response interface
+interface AIQueryResponse {
+  answer: string;
+  insights: any[];
+  metrics: {
+    processingTime: number;
+    tokenUsage?: number;
+    model?: string;
+  };
+}
 
 /**
  * Process an AI query, with optimized caching and error handling
@@ -49,10 +76,7 @@ export async function processAIQuery(user: any, req: Request): Promise<Response>
     // Get OpenAI API key
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "OpenAI API key not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return createErrorResponse("OpenAI API key not configured", null, 500);
     }
     
     // Initialize Supabase client
@@ -116,19 +140,15 @@ export async function processAIQuery(user: any, req: Request): Promise<Response>
     };
     
     // Create response object
-    const response = new Response(
-      JSON.stringify(result),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const response = createResponse(result);
     
     // Cache the response if caching is enabled
     if (useCache) {
       await cacheResponse(cacheKey, response.clone(), false, cacheTtl);
     }
     
-    // Track usage for billing/quotas if needed
+    // Track usage for billing/quotas if needed (as a background task)
     if (userId) {
-      // Use EdgeRuntime.waitUntil to handle this as a background task
       EdgeRuntime.waitUntil(
         trackUsage(supabaseAdmin, userId, {
           model,
@@ -148,16 +168,6 @@ export async function processAIQuery(user: any, req: Request): Promise<Response>
     return response;
   } catch (error) {
     console.error("Error processing AI query:", error);
-    
-    return new Response(
-      JSON.stringify({ 
-        error: "Failed to process AI query", 
-        details: error.message 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
-    );
+    return createErrorResponse("Failed to process AI query", error.message);
   }
 }

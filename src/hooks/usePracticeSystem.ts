@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   fetchPractices, 
@@ -11,6 +11,8 @@ import {
   PracticeCompletion,
   PracticeProgress
 } from '@/services/practice/practiceService';
+import practiceDataPreloader from '@/utils/practiceDataPreloader';
+import { usePerfConfig } from './usePerfConfig';
 
 interface UsePracticeSystemProps {
   type?: string;
@@ -36,6 +38,7 @@ export function usePracticeSystem({
   level
 }: UsePracticeSystemProps = {}): UsePracticeSystemResult {
   const { user } = useAuth();
+  const { config } = usePerfConfig();
   const [practices, setPractices] = useState<Practice[]>([]);
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null);
   const [progress, setProgress] = useState<PracticeProgress | null>(null);
@@ -43,21 +46,47 @@ export function usePracticeSystem({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Use virtualization based on performance config
+  const useOptimizedLoading = config.enableVirtualization;
+  
   // Fetch practices based on level and filters
-  const fetchPracticeData = async () => {
+  const fetchPracticeData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
     try {
       const userLevel = level || 1;
-      const practicesData = await fetchPractices(userLevel, type, category);
+      
+      // Try to get from cache first if no filters are applied
+      let practicesData: Practice[] = [];
+      
+      if (!type && !category && useOptimizedLoading) {
+        // Use preloaded data if available
+        if (userLevel === 1) {
+          practicesData = await practiceDataPreloader.preloadBasicPractices();
+        } else {
+          practicesData = await practiceDataPreloader.preloadPracticesForLevel(userLevel);
+        }
+        
+        // If cache is empty, fetch normally
+        if (practicesData.length === 0) {
+          practicesData = await fetchPractices(userLevel, type, category);
+        }
+      } else {
+        // Standard fetch with filters
+        practicesData = await fetchPractices(userLevel, type, category);
+      }
+      
       setPractices(practicesData);
       
       if (user?.id) {
-        const userProgress = await fetchPracticeProgress(user.id);
-        setProgress(userProgress);
+        // Fetch user progress and completions
+        const [userProgress, userCompletions] = await Promise.all([
+          fetchPracticeProgress(user.id),
+          fetchCompletedPractices(user.id)
+        ]);
         
-        const userCompletions = await fetchCompletedPractices(user.id);
+        setProgress(userProgress);
         setCompletedPractices(userCompletions);
       }
     } catch (err: any) {
@@ -66,19 +95,30 @@ export function usePracticeSystem({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, type, category, level, useOptimizedLoading]);
   
   // Load practices on initial render
   useEffect(() => {
     fetchPracticeData();
-  }, [user?.id, type, category, level]);
+  }, [fetchPracticeData]);
   
   // Select a practice by ID
-  const selectPractice = async (id: string) => {
+  const selectPractice = useCallback(async (id: string) => {
     setIsLoading(true);
     
     try {
-      const practice = await fetchPracticeById(id);
+      // Try to get from cache first if available
+      let practice = null;
+      
+      if (useOptimizedLoading) {
+        practice = await practiceDataPreloader.getPracticeById(id);
+      }
+      
+      // If not in cache, fetch normally
+      if (!practice) {
+        practice = await fetchPracticeById(id);
+      }
+      
       setSelectedPractice(practice);
     } catch (err) {
       console.error('Error selecting practice:', err);
@@ -86,10 +126,10 @@ export function usePracticeSystem({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [useOptimizedLoading]);
   
   // Complete a practice
-  const completePractice = async (duration: number, reflection?: string) => {
+  const completePractice = useCallback(async (duration: number, reflection?: string) => {
     if (!user?.id || !selectedPractice) {
       setError('Unable to record practice. Please try again.');
       return false;
@@ -118,12 +158,12 @@ export function usePracticeSystem({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, selectedPractice, fetchPracticeData]);
   
   // Function to manually refresh all data
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     await fetchPracticeData();
-  };
+  }, [fetchPracticeData]);
   
   return {
     practices,

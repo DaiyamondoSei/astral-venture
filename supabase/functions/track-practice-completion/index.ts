@@ -1,276 +1,289 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers
+// Define CORS headers for browser compatibility
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders,
-    });
-  }
-  
+// Handle CORS preflight requests
+function handleCorsRequest(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
+// Authorization middleware
+async function withAuth(req: Request, handler: Function): Promise<Response> {
   try {
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Get request body
-    const { userId, practiceId, duration, reflection } = await req.json();
-    
-    // Validate inputs
-    if (!userId || !practiceId) {
+    // Get JWT token from request
+    const authorization = req.headers.get('Authorization') || '';
+    if (!authorization.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: userId and practiceId" }), 
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    console.log(`Tracking practice completion: userId=${userId}, practiceId=${practiceId}`);
+    const token = authorization.replace('Bearer ', '');
     
-    // Get practice details
-    const { data: practice, error: practiceError } = await supabase
+    // Initialize Supabase client with admin privileges
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+    
+    // Verify the token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', details: authError?.message }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Call the handler with the authenticated user
+    return await handler(user, req);
+  } catch (error) {
+    console.error("Auth error:", error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error during authentication' }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
+// Process practice completion
+async function processPracticeCompletion(user: any, req: Request): Promise<Response> {
+  try {
+    const { userId, practiceId, duration, reflection } = await req.json();
+    
+    // Validate the request
+    if (!userId || !practiceId || !duration) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Verify the user ID matches the authenticated user
+    if (userId !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "User ID mismatch" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Initialize Supabase client
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+    
+    // Get practice details to calculate energy points
+    const { data: practice, error: practiceError } = await supabaseAdmin
       .from('practices')
-      .select('*')
+      .select('energy_points, type, chakra_association')
       .eq('id', practiceId)
       .single();
     
-    if (practiceError) {
+    if (practiceError || !practice) {
       return new Response(
-        JSON.stringify({ error: "Error fetching practice: " + practiceError.message }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Practice not found", details: practiceError?.message }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
     // Calculate energy points
-    const energyPointsEarned = practice.energy_points;
+    let energyPointsEarned = practice.energy_points;
     
-    // Record completion
-    const { data: completion, error: completionError } = await supabase
+    // Bonus points for longer meditation sessions
+    if (practice.type === 'meditation' && duration > 10) {
+      energyPointsEarned += Math.floor(duration / 5); // Bonus points for every 5 minutes
+    }
+    
+    // Record practice completion
+    const { data: completion, error: completionError } = await supabaseAdmin
       .from('practice_completions')
       .insert({
         user_id: userId,
         practice_id: practiceId,
-        duration: duration || practice.duration,
+        duration,
         energy_points_earned: energyPointsEarned,
-        reflection: reflection || null,
-        practice_type: practice.type
+        reflection,
+        chakras_activated: practice.chakra_association,
+        completed_at: new Date().toISOString()
       })
       .select()
       .single();
     
     if (completionError) {
       return new Response(
-        JSON.stringify({ error: "Error recording completion: " + completionError.message }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Failed to record completion", details: completionError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    // Add energy points to user
-    const { error: pointsError } = await supabase
-      .from('user_profiles')
-      .update({ 
-        energy_points: supabase.rpc('increment_points', { 
-          row_id: userId, 
-          points_to_add: energyPointsEarned 
-        }),
-        last_active_at: new Date().toISOString()
-      })
-      .eq('id', userId);
+    // Update user's total energy points
+    const { data: userProfile, error: userError } = await supabaseAdmin
+      .rpc('increment_points', {
+        row_id: userId,
+        points_to_add: energyPointsEarned
+      });
     
-    if (pointsError) {
-      console.error("Error updating user points:", pointsError);
-      // Continue despite points error
+    if (userError) {
+      console.error("Error updating user points:", userError);
+      // Continue even if points update fails
     }
     
-    // Update streak
-    await updateUserStreak(supabase, userId);
+    // Update user streak and stats (as a background task)
+    EdgeRuntime.waitUntil(updateUserPracticeStats(supabaseAdmin, userId, practice.type));
     
-    // Check for achievements
-    await checkForAchievements(supabase, userId, practice.type);
-    
-    // Return success with completion details
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        completion: {
-          id: completion.id,
-          completedAt: completion.completed_at,
-          energyPointsEarned
-        }
+      JSON.stringify({
+        success: true,
+        completionId: completion.id,
+        energyPointsEarned,
+        chakrasActivated: practice.chakra_association
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-    
   } catch (error) {
-    console.error("Error processing practice completion:", error);
-    
+    console.error("Error in practice completion:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}
 
-/**
- * Update the user's streak information
- */
-async function updateUserStreak(supabase: any, userId: string): Promise<void> {
+// Background task to update user practice stats
+async function updateUserPracticeStats(supabaseClient: any, userId: string, practiceType: string) {
   try {
-    // Check current streak
-    const { data: streakData, error: streakError } = await supabase
-      .from('user_streaks')
+    // Get last completion date
+    const { data: lastCompletion } = await supabaseClient
+      .from('practice_completions')
+      .select('completed_at')
+      .eq('user_id', userId)
+      .order('completed_at', { ascending: false })
+      .limit(2);
+    
+    if (!lastCompletion || lastCompletion.length < 2) {
+      // First completion or not enough data for streak
+      return;
+    }
+    
+    // Check if this is a continuation of a streak (completed within last 36 hours)
+    const lastCompletionDate = new Date(lastCompletion[1].completed_at);
+    const now = new Date();
+    const hoursDifference = (now.getTime() - lastCompletionDate.getTime()) / (1000 * 60 * 60);
+    
+    let streakIncrement = 0;
+    
+    if (hoursDifference <= 36) {
+      // Continuation of streak
+      streakIncrement = 1;
+    } else {
+      // Streak broken
+      streakIncrement = 0;
+      // Reset streak
+      await supabaseClient
+        .from('user_streaks')
+        .update({ current_streak: 0 })
+        .eq('user_id', userId);
+    }
+    
+    if (streakIncrement > 0) {
+      // Update streak
+      const { data: streak } = await supabaseClient
+        .from('user_streaks')
+        .select('current_streak, longest_streak')
+        .eq('user_id', userId)
+        .single();
+      
+      if (streak) {
+        const newCurrentStreak = streak.current_streak + streakIncrement;
+        const newLongestStreak = Math.max(streak.longest_streak, newCurrentStreak);
+        
+        await supabaseClient
+          .from('user_streaks')
+          .update({
+            current_streak: newCurrentStreak,
+            longest_streak: newLongestStreak
+          })
+          .eq('user_id', userId);
+      }
+    }
+    
+    // Update practice stats
+    const { data: stats, error: statsError } = await supabaseClient
+      .from('practice_stats')
       .select('*')
       .eq('user_id', userId)
       .single();
     
-    if (streakError && streakError.code !== 'PGRST116') {
-      console.error("Error fetching streak:", streakError);
+    if (statsError && statsError.code !== 'PGRST116') {
+      // Error other than "not found"
+      console.error("Error retrieving practice stats:", statsError);
       return;
     }
     
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    
-    // If no streak record exists, create one
-    if (!streakData) {
-      await supabase
-        .from('user_streaks')
+    // Create or update practice stats
+    if (!stats) {
+      // Create new stats
+      await supabaseClient
+        .from('practice_stats')
         .insert({
           user_id: userId,
-          current_streak: 1,
-          longest_streak: 1,
-          last_activity_date: today
+          total_completed: 1,
+          favorite_type: practiceType,
+          practice_counts: { [practiceType]: 1 },
+          last_completed_at: new Date().toISOString()
         });
-      return;
+    } else {
+      // Update existing stats
+      const practiceCounts = stats.practice_counts || {};
+      practiceCounts[practiceType] = (practiceCounts[practiceType] || 0) + 1;
+      
+      // Determine favorite type
+      let favoriteType = stats.favorite_type;
+      let maxCount = 0;
+      
+      for (const [type, count] of Object.entries(practiceCounts)) {
+        if (count > maxCount) {
+          maxCount = count as number;
+          favoriteType = type;
+        }
+      }
+      
+      await supabaseClient
+        .from('practice_stats')
+        .update({
+          total_completed: stats.total_completed + 1,
+          favorite_type: favoriteType,
+          practice_counts: practiceCounts,
+          last_completed_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
     }
-    
-    // Calculate if streak continues or resets
-    const lastActivityDate = streakData.last_activity_date ? 
-      new Date(streakData.last_activity_date) : 
-      new Date(0);
-    
-    const lastActivityDay = lastActivityDate.toISOString().split('T')[0];
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayString = yesterday.toISOString().split('T')[0];
-    
-    let newStreak = streakData.current_streak;
-    
-    // If last activity was today, streak doesn't change
-    if (lastActivityDay === today) {
-      return;
-    }
-    // If last activity was yesterday, streak increases
-    else if (lastActivityDay === yesterdayString) {
-      newStreak += 1;
-    }
-    // Otherwise, streak resets to 1
-    else {
-      newStreak = 1;
-    }
-    
-    // Calculate longest streak
-    const longestStreak = Math.max(newStreak, streakData.longest_streak || 0);
-    
-    // Update streak record
-    await supabase
-      .from('user_streaks')
-      .update({
-        current_streak: newStreak,
-        longest_streak: longestStreak,
-        last_activity_date: today
-      })
-      .eq('user_id', userId);
-    
-    // Check for streak achievements
-    if (newStreak >= 30) {
-      await updateAchievement(supabase, userId, 'thirty_day_streak', 1, true);
-    }
-    else if (newStreak >= 7) {
-      await updateAchievement(supabase, userId, 'seven_day_streak', 1, true);
-    }
-    else if (newStreak >= 3) {
-      await updateAchievement(supabase, userId, 'three_day_streak', 1, true);
-    }
-    
   } catch (error) {
-    console.error("Error updating streak:", error);
+    console.error("Error updating practice stats:", error);
   }
 }
 
-/**
- * Check for and update practice-related achievements
- */
-async function checkForAchievements(supabase: any, userId: string, practiceType: string): Promise<void> {
-  try {
-    // Check first practice achievement
-    if (practiceType === 'meditation') {
-      await updateAchievement(supabase, userId, 'first_meditation', 1, true);
-    } else if (practiceType === 'quantum-task') {
-      await updateAchievement(supabase, userId, 'first_quantum-task', 1, true);
-    }
-    
-    // Count total practices by type
-    const { count: meditationCount, error: meditationError } = await supabase
-      .from('practice_completions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('practice_type', 'meditation');
-    
-    if (!meditationError) {
-      if (meditationCount >= 20) {
-        await updateAchievement(supabase, userId, 'meditation_20_completed', 1, true);
-      }
-      else if (meditationCount >= 5) {
-        await updateAchievement(supabase, userId, 'meditation_5_completed', 1, true);
-      }
-    }
-    
-    const { count: taskCount, error: taskError } = await supabase
-      .from('practice_completions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('practice_type', 'quantum-task');
-    
-    if (!taskError) {
-      if (taskCount >= 20) {
-        await updateAchievement(supabase, userId, 'quantum_task_master', 1, true);
-      }
-      else if (taskCount >= 5) {
-        await updateAchievement(supabase, userId, 'quantum_task_5_completed', 1, true);
-      }
-    }
-    
-  } catch (error) {
-    console.error("Error checking achievements:", error);
+// Main edge function handler
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return handleCorsRequest();
   }
-}
-
-/**
- * Update achievement progress or award achievement
- */
-async function updateAchievement(
-  supabase: any, 
-  userId: string, 
-  achievementId: string, 
-  progress: number, 
-  autoAward: boolean
-): Promise<void> {
-  try {
-    await supabase.rpc('update_achievement_progress', {
-      user_id_param: userId,
-      achievement_id_param: achievementId,
-      progress_value: progress,
-      auto_award: autoAward
-    });
-  } catch (error) {
-    console.error(`Error updating achievement ${achievementId}:`, error);
-  }
-}
+  
+  // Process with authentication
+  return withAuth(req, processPracticeCompletion);
+});

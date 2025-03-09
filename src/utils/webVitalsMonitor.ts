@@ -1,8 +1,6 @@
 
 /**
- * Simplified Web Vitals Monitor
- * 
- * Lightweight performance monitoring for essential metrics.
+ * Web Vitals Monitor - Streamlined, efficient performance tracking
  */
 
 // Basic performance marker storage
@@ -13,6 +11,7 @@ interface PerformanceMark {
   duration?: number;
 }
 
+// Storage for performance marks
 const marks: Map<string, PerformanceMark> = new Map();
 
 /**
@@ -72,96 +71,144 @@ export function markEnd(name: string): number {
   }
 }
 
+// LCP observer
+let lcpObserver: PerformanceObserver | null = null;
+
+// CLS values and entries
+let clsValue = 0;
+let clsEntries: PerformanceEntry[] = [];
+
+// FID observer
+let fidObserver: PerformanceObserver | null = null;
+
 /**
- * Initialize Web Vitals monitoring with a minimal footprint
+ * Initialize Web Vitals monitoring
  */
 export function initWebVitals(): void {
-  if (typeof window === 'undefined') return;
-  
-  // Register performance observer for Core Web Vitals if supported
-  if ('PerformanceObserver' in window) {
-    try {
-      // LCP (Largest Contentful Paint)
-      const lcpObserver = new PerformanceObserver((entryList) => {
-        const entries = entryList.getEntries();
-        const lastEntry = entries[entries.length - 1];
+  if (typeof window === 'undefined' || typeof PerformanceObserver === 'undefined') {
+    console.warn('Web Vitals monitoring not supported in this environment');
+    return;
+  }
+
+  try {
+    // Clean up any existing observers first
+    cleanupObservers();
+    
+    // LCP (Largest Contentful Paint)
+    lcpObserver = new PerformanceObserver((entryList) => {
+      const entries = entryList.getEntries();
+      const lastEntry = entries[entries.length - 1] as PerformanceEntry;
+      
+      if (lastEntry) {
+        const lcp = lastEntry.startTime;
+        const lcpValue = Math.round(lcp);
         
-        if (lastEntry) {
-          const lcp = lastEntry.startTime;
-          const lcpValue = Math.round(lcp);
-          console.log(`LCP: ${lcpValue}ms`);
-          
-          // Automatically classify performance
-          if (lcpValue < 2500) {
-            console.log('LCP: Good');
-          } else if (lcpValue < 4000) {
-            console.log('LCP: Needs Improvement');
-          } else {
-            console.log('LCP: Poor');
-          }
-        }
-      });
-      
-      lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
-      
-      // CLS (Cumulative Layout Shift)
-      let clsValue = 0;
-      let clsEntries: PerformanceEntry[] = [];
-      
-      const clsObserver = new PerformanceObserver((entryList) => {
-        const entries = entryList.getEntries();
-        
-        entries.forEach(entry => {
-          // Ignore layout shifts when user is interacting
-          if (!(entry as any).hadRecentInput) {
-            const currentEntry = entry as PerformanceEntry & { value: number };
-            clsValue += currentEntry.value;
-            clsEntries.push(currentEntry);
-          }
+        // Store in marks for reporting
+        marks.set('LCP', {
+          name: 'LCP',
+          startTime: 0,
+          endTime: lcpValue,
+          duration: lcpValue
         });
         
-        console.log(`Current CLS: ${clsValue.toFixed(3)}`);
+        // Log performance classification
+        classifyMetric('LCP', lcpValue, [2500, 4000]);
+      }
+    });
+    
+    lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+    
+    // CLS (Cumulative Layout Shift)
+    const clsObserver = new PerformanceObserver((entryList) => {
+      const entries = entryList.getEntries();
+      
+      entries.forEach(entry => {
+        // Ignore layout shifts when user is interacting
+        if (!(entry as any).hadRecentInput) {
+          const currentEntry = entry as PerformanceEntry & { value: number };
+          clsValue += currentEntry.value;
+          clsEntries.push(currentEntry);
+          
+          // Store in marks for reporting
+          marks.set('CLS', {
+            name: 'CLS',
+            startTime: 0,
+            endTime: 0,
+            duration: clsValue
+          });
+          
+          // Log performance classification
+          classifyMetric('CLS', clsValue, [0.1, 0.25]);
+        }
+      });
+    });
+    
+    clsObserver.observe({ type: 'layout-shift', buffered: true });
+    
+    // FID (First Input Delay)
+    fidObserver = new PerformanceObserver((entryList) => {
+      const firstInput = entryList.getEntries()[0] as PerformanceEventTiming;
+      
+      if (firstInput) {
+        const delay = firstInput.processingStart - firstInput.startTime;
+        const fidValue = Math.round(delay);
         
-        // Classify CLS
-        if (clsValue < 0.1) {
-          console.log('CLS: Good');
-        } else if (clsValue < 0.25) {
-          console.log('CLS: Needs Improvement');
-        } else {
-          console.log('CLS: Poor');
-        }
-      });
-      
-      clsObserver.observe({ type: 'layout-shift', buffered: true });
-      
-      // FID (First Input Delay)
-      const fidObserver = new PerformanceObserver((entryList) => {
-        const firstInput = entryList.getEntries()[0];
-        if (firstInput) {
-          const delay = (firstInput as PerformanceEventTiming).processingStart - firstInput.startTime;
-          const fidValue = Math.round(delay);
-          
-          console.log(`FID: ${fidValue}ms`);
-          
-          // Classify FID
-          if (fidValue < 100) {
-            console.log('FID: Good');
-          } else if (fidValue < 300) {
-            console.log('FID: Needs Improvement');
-          } else {
-            console.log('FID: Poor');
-          }
-        }
-      });
-      
-      fidObserver.observe({ type: 'first-input', buffered: true });
-      
-      console.log('Web Vitals monitoring initialized');
-    } catch (err) {
-      console.warn('Performance observer for Web Vitals not fully supported');
-    }
+        // Store in marks for reporting
+        marks.set('FID', {
+          name: 'FID',
+          startTime: firstInput.startTime,
+          endTime: firstInput.processingStart,
+          duration: fidValue
+        });
+        
+        // Log performance classification
+        classifyMetric('FID', fidValue, [100, 300]);
+      }
+    });
+    
+    fidObserver.observe({ type: 'first-input', buffered: true });
+    
+    console.info('Web Vitals monitoring initialized');
+  } catch (err) {
+    console.warn('Performance observer for Web Vitals not fully supported:', err);
+  }
+}
+
+/**
+ * Cleanup observers to prevent memory leaks
+ */
+function cleanupObservers(): void {
+  if (lcpObserver) {
+    lcpObserver.disconnect();
+    lcpObserver = null;
+  }
+  
+  if (fidObserver) {
+    fidObserver.disconnect();
+    fidObserver = null;
+  }
+  
+  // Reset CLS tracking
+  clsValue = 0;
+  clsEntries = [];
+}
+
+/**
+ * Classify a metric's performance
+ */
+function classifyMetric(
+  name: string, 
+  value: number, 
+  thresholds: [number, number]
+): void {
+  const [good, needsImprovement] = thresholds;
+  
+  if (value < good) {
+    console.info(`${name}: ${value} - Good`);
+  } else if (value < needsImprovement) {
+    console.info(`${name}: ${value} - Needs Improvement`);
   } else {
-    console.warn('PerformanceObserver not supported - Web Vitals will not be measured');
+    console.warn(`${name}: ${value} - Poor`);
   }
 }
 
@@ -179,10 +226,38 @@ export function getPerformanceMark(name: string): PerformanceMark | undefined {
   return marks.get(name);
 }
 
+/**
+ * Get core web vitals metrics
+ */
+export function getWebVitals(): Record<string, number> {
+  const vitals: Record<string, number> = {};
+  
+  const lcp = marks.get('LCP');
+  if (lcp?.duration) vitals.LCP = lcp.duration;
+  
+  const cls = marks.get('CLS');
+  if (cls?.duration) vitals.CLS = cls.duration;
+  
+  const fid = marks.get('FID');
+  if (fid?.duration) vitals.FID = fid.duration;
+  
+  return vitals;
+}
+
+/**
+ * Clean up monitoring when no longer needed
+ */
+export function shutdown(): void {
+  cleanupObservers();
+  marks.clear();
+}
+
 export default {
   initWebVitals,
   markStart,
   markEnd,
   getPerformanceReport,
-  getPerformanceMark
+  getPerformanceMark,
+  getWebVitals,
+  shutdown
 };

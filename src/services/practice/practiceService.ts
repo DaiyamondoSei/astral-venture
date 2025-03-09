@@ -1,6 +1,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { 
+  mapDbPracticesToPractices, 
+  mapDbPracticeToPractice, 
+  mapDbCompletionsToCompletions 
+} from './practiceMappers';
 
 export interface Practice {
   id: string;
@@ -64,7 +69,7 @@ export async function fetchPractices(
       return [];
     }
     
-    return data as Practice[];
+    return mapDbPracticesToPractices(data || []);
   } catch (error) {
     console.error('Error in fetchPractices:', error);
     return [];
@@ -87,7 +92,7 @@ export async function fetchPracticeById(id: string): Promise<Practice | null> {
       return null;
     }
     
-    return data as Practice;
+    return mapDbPracticeToPractice(data);
   } catch (error) {
     console.error('Error in fetchPracticeById:', error);
     return null;
@@ -174,16 +179,7 @@ export async function fetchCompletedPractices(userId: string): Promise<PracticeC
       return [];
     }
     
-    return data.map(item => ({
-      id: item.id,
-      userId: item.user_id,
-      practiceId: item.practice_id,
-      completedAt: item.completed_at,
-      duration: item.duration,
-      energyPointsEarned: item.energy_points_earned,
-      reflection: item.reflection,
-      chakrasActivated: item.chakras_activated
-    }));
+    return mapDbCompletionsToCompletions(data || []);
   } catch (error) {
     console.error('Error in fetchCompletedPractices:', error);
     return [];

@@ -1,2 +1,5 @@
 
-project_id = "wkmyvthtyjcdzhzvfyji"
+# project_id = "wkmyvthtyjcdzhzvfyji"
+
+[global.env_variables]
+# Don't commit any secrets in this file.
