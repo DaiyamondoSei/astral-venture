@@ -5,13 +5,13 @@ import ProgressValue from '@/components/progress/ProgressValue';
 import { motion } from 'framer-motion';
 import { Sparkles, Trophy, Zap, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { AchievementData } from './data/types';
+import { IAchievementData } from './data/types';
 import { getProgressColor } from './hooks/achievement';
 
 interface AchievementProgressTrackerProps {
   progressPercentage: number;
   totalPoints: number;
-  nextAchievement?: AchievementData;
+  nextAchievement?: IAchievementData;
   streakDays?: number;
   animate?: boolean;
 }
@@ -41,7 +41,7 @@ const AchievementProgressTracker: React.FC<AchievementProgressTrackerProps> = ({
 
   // Calculate achievement progress if available
   const achievementProgress = nextAchievement && nextAchievement.progress ? 
-    (nextAchievement.progress.current / nextAchievement.progress.required) * 100 : 0;
+    (nextAchievement.progress / nextAchievement.requiredAmount) * 100 : 0;
 
   return (
     <motion.div 

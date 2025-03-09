@@ -1,3 +1,4 @@
+
 export interface IAchievementData {
   id: string;
   title: string;
@@ -12,3 +13,15 @@ export interface IAchievementData {
   awarded?: boolean;
   unlockCriteria?: string;
 }
+
+export interface FeatureTooltipData {
+  id: string;
+  title: string;
+  description: string;
+  position: 'top' | 'right' | 'bottom' | 'left';
+  elementId?: string;
+  condition?: string;
+  delay?: number;
+}
+
+export type AchievementData = IAchievementData;

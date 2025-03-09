@@ -1,10 +1,11 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Award, X } from 'lucide-react';
-import { AchievementData } from './data/types';
+import { IAchievementData } from './data/types';
 
 interface AchievementNotificationProps {
-  achievement: AchievementData;
+  achievement: IAchievementData;
   onDismiss: () => void;
 }
 

@@ -1,9 +1,9 @@
 
 import { useState, useCallback, useEffect } from 'react';
-import { AchievementData } from '../data/types';
+import { IAchievementData } from '../data/types';
 
 interface UseAchievementNotificationReturn {
-  currentNotification: AchievementData | null;
+  currentNotification: IAchievementData | null;
   showProgressTracker: boolean;
   handleDismiss: () => void;
   showProgress: (duration?: number) => () => void;
@@ -13,12 +13,12 @@ interface UseAchievementNotificationReturn {
  * Hook to manage achievement notifications and progress tracker visibility
  */
 export function useAchievementNotification(
-  earnedAchievements: AchievementData[],
+  earnedAchievements: IAchievementData[],
   dismissAchievement: (id: string) => void
 ): UseAchievementNotificationReturn {
-  const [currentNotification, setCurrentNotification] = useState<AchievementData | null>(null);
+  const [currentNotification, setCurrentNotification] = useState<IAchievementData | null>(null);
   const [showProgressTracker, setShowProgressTracker] = useState<boolean>(false);
-  const [notificationQueue, setNotificationQueue] = useState<AchievementData[]>([]);
+  const [notificationQueue, setNotificationQueue] = useState<IAchievementData[]>([]);
 
   // Process earned achievements and add them to the queue
   useEffect(() => {

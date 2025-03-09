@@ -1,37 +1,39 @@
 
-// AI Question type for sending requests
-export interface AIQuestion {
-  question: string;
-  reflectionIds?: string[];
-  context?: string;
-  stream?: boolean;
-}
+/**
+ * AI Service Types
+ */
 
-// AI Response type for receiving responses
 export interface AIResponse {
-  answer: string;
-  relatedInsights?: any[];
-  suggestedPractices?: string[];
-  meta?: {
-    model: string;
-    tokenUsage: number;
-    processingTime?: number;
-    streaming?: boolean;
-  };
+  text: string;
+  sources?: string[];
+  type?: 'text' | 'error' | 'loading';
 }
 
-// AI Insight type for reflection analysis
+export interface AIModelInfo {
+  model: string;
+  tokens: number;
+}
+
 export interface AIInsight {
-  id?: string;
+  type: string;
   content: string;
-  category: string;
-  confidence?: number;
-  relevance?: number;
-  created_at?: string;
-  reflection_id?: string;
+  confidence: number;
+  relatedConcepts?: string[];
 }
 
-// Supported AI models
-export type AIModel = 
-  | "gpt-4o"         // High quality, higher cost, slower
-  | "gpt-4o-mini";   // Good quality, lower cost, faster
+export interface AIAssistantRequest {
+  question: string;
+  context?: string;
+  userId?: string;
+  sessionId?: string;
+  history?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+}
+
+export interface AIAssistantResponse {
+  response: AIResponse;
+  modelInfo?: AIModelInfo;
+  insights?: AIInsight[];
+}
