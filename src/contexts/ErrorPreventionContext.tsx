@@ -1,150 +1,153 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef
+} from 'react';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-
-// Context type definition
-export interface ErrorPreventionContextType {
-  isErrorPreventionEnabled: boolean;
-  enableErrorPrevention: (enable: boolean) => void;
-  validateComponent: (componentName: string, props: any) => ComponentValidationResult[];
-  trackPropChanges: (componentName: string, prevProps: any, newProps: any) => PropChangeResult[];
-  recordRender: (componentName: string, renderTime: number) => void;
-}
-
-// Validation result structure
-export interface ComponentValidationResult {
-  componentName: string;
-  valid: boolean;
+interface ValidationResult {
+  isValid: boolean;
   errors: string[];
-  warnings: string[];
-  timestamp: number;
 }
 
-// Prop change analysis
-export interface PropChangeResult {
+interface ErrorLogEntry {
   componentName: string;
-  propName: string;
-  oldValue: any;
-  newValue: any;
-  changeDetected: boolean;
+  message: string;
+  timestamp: Date;
 }
 
-// Create context with default values
-const ErrorPreventionContext = createContext<ErrorPreventionContextType>({
-  isErrorPreventionEnabled: true,
+// Define a type for the component registry
+type ComponentRegistry = {
+  [componentName: string]: {
+    component: React.ComponentType<any>;
+    propTypes?: React.ValidationMap<any>;
+  };
+};
+
+interface ErrorPreventionContextType {
+  validateComponent: (componentName: string, props: any) => ValidationResult;
+  enableErrorPrevention: (enable: boolean) => void;
+  errorLogs: ErrorLogEntry[];
+  clearErrorLogs: () => void;
+  isEnabled: boolean; // Added for compatibility
+  disableErrorPrevention: (disable: boolean) => void; // Added for compatibility
+  validateAllComponents: () => ValidationResult[]; // Added for compatibility
+}
+
+export const ErrorPreventionContext = React.createContext<ErrorPreventionContextType>({
+  validateComponent: () => ({ isValid: true, errors: [] }),
   enableErrorPrevention: () => {},
-  validateComponent: () => [],
-  trackPropChanges: () => [],
-  recordRender: () => {}
+  errorLogs: [],
+  clearErrorLogs: () => {},
+  isEnabled: true, // Added for compatibility
+  disableErrorPrevention: () => {}, // Added for compatibility
+  validateAllComponents: () => [] // Added for compatibility
 });
 
-// Provider component
-export const ErrorPreventionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isEnabled, setIsEnabled] = useState(true);
-  
-  // Enable or disable error prevention
-  const enableErrorPrevention = (enable: boolean) => {
-    setIsEnabled(enable);
-  };
-  
-  // Validate component props
-  const validateComponent = (componentName: string, props: any): ComponentValidationResult[] => {
-    if (!isEnabled) return [];
-    
-    const validationErrors: string[] = [];
-    const validationWarnings: string[] = [];
-    
-    // Validate required props
-    if (!props) {
-      validationErrors.push('Component props are undefined');
-      return [{
-        componentName,
-        valid: false,
-        errors: validationErrors,
-        warnings: validationWarnings,
-        timestamp: Date.now()
-      }];
-    }
-    
-    // Check if this is a function component with a display name
-    if (typeof componentName !== 'string' || componentName.length === 0) {
-      validationWarnings.push('Component name is missing');
-    }
-    
-    // Basic prop validation - could be extended with specific validation rules
-    Object.entries(props).forEach(([propName, propValue]) => {
-      // Check for undefined values that aren't explicitly set as undefined
-      if (propValue === undefined && props.hasOwnProperty(propName)) {
-        validationWarnings.push(`Prop "${propName}" is undefined`);
+export const useErrorPrevention = () => useContext(ErrorPreventionContext);
+
+export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [enabled, setEnabled] = useState(true);
+  const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
+  const componentRegistry = useRef<ComponentRegistry>({});
+
+  // Function to register a component with its propTypes
+  const registerComponent = useCallback(
+    (componentName: string, component: React.ComponentType<any>, propTypes?: React.ValidationMap<any>) => {
+      componentRegistry.current[componentName] = { component, propTypes };
+    },
+    []
+  );
+
+  // useEffect to automatically register all components in the app
+  useEffect(() => {
+    // Get all components in the app
+    const allComponents = document.querySelectorAll('[data-component-name]');
+
+    // Register each component with its propTypes
+    allComponents.forEach((component) => {
+      const componentName = component.getAttribute('data-component-name');
+      if (componentName) {
+        // @ts-ignore:next-line
+        registerComponent(componentName, component, component.propTypes);
       }
     });
-    
-    return [{
-      componentName,
-      valid: validationErrors.length === 0,
-      errors: validationErrors,
-      warnings: validationWarnings,
-      timestamp: Date.now()
-    }];
-  };
-  
-  // Track prop changes between renders
-  const trackPropChanges = (
-    componentName: string, 
-    prevProps: any, 
-    newProps: any
-  ): PropChangeResult[] => {
-    if (!isEnabled || !prevProps || !newProps) return [];
-    
-    const results: PropChangeResult[] = [];
-    
-    // Compare all props from previous render
-    Object.keys(prevProps).forEach(propName => {
-      results.push({
-        componentName,
-        propName,
-        oldValue: prevProps[propName],
-        newValue: newProps[propName],
-        changeDetected: prevProps[propName] !== newProps[propName]
-      });
-    });
-    
-    // Check for new props
-    Object.keys(newProps).forEach(propName => {
-      if (!prevProps.hasOwnProperty(propName)) {
-        results.push({
-          componentName,
-          propName,
-          oldValue: undefined,
-          newValue: newProps[propName],
-          changeDetected: true
-        });
+  }, [registerComponent]);
+
+  // Function to validate a component's props
+  const validateComponent = useCallback(
+    (componentName: string, props: any): ValidationResult => {
+      if (!enabled) {
+        return { isValid: true, errors: [] };
       }
-    });
-    
-    return results;
-  };
+
+      const componentData = componentRegistry.current[componentName];
+      if (!componentData || !componentData.propTypes) {
+        return { isValid: true, errors: [] };
+      }
+
+      const propTypes = componentData.propTypes;
+      const errors: string[] = [];
+
+      for (const propName in propTypes) {
+        if (propTypes.hasOwnProperty(propName)) {
+          const validator = propTypes[propName];
+          if (validator) {
+            try {
+              // @ts-ignore:next-line
+              validator(props, propName, componentName, 'prop', propName);
+            } catch (error: any) {
+              errors.push(error.message);
+              setErrorLogs((prevLogs) => [
+                ...prevLogs,
+                {
+                  componentName,
+                  message: error.message,
+                  timestamp: new Date(),
+                },
+              ]);
+            }
+          }
+        }
+      }
+
+      return { isValid: errors.length === 0, errors };
+    },
+    [enabled, registerComponent]
+  );
+
+  // Function to enable error prevention
+  const enableErrorPrevention = useCallback((enable: boolean) => {
+    setEnabled(enable);
+  }, []);
+
+  // Function to clear error logs
+  const clearErrorLogs = useCallback(() => {
+    setErrorLogs([]);
+  }, []);
   
-  // Record component render time
-  const recordRender = (componentName: string, renderTime: number) => {
-    if (!isEnabled) return;
-    
-    // Use performance monitor to record render
-    performanceMonitor.reportRender(componentName, renderTime);
+  // Create the context value
+  const contextValue: ErrorPreventionContextType = {
+    validateComponent,
+    enableErrorPrevention,
+    errorLogs,
+    clearErrorLogs,
+    // Added for compatibility with older code
+    isEnabled: enabled,
+    disableErrorPrevention: (disable: boolean) => enableErrorPrevention(!disable),
+    validateAllComponents: () => {
+      // This is a simple implementation to maintain compatibility
+      return Object.keys(componentRegistry.current).map(componentName => 
+        validateComponent(componentName, {})
+      );
+    }
   };
-  
+
   return (
-    <ErrorPreventionContext.Provider value={{
-      isErrorPreventionEnabled: isEnabled,
-      enableErrorPrevention,
-      validateComponent,
-      trackPropChanges,
-      recordRender
-    }}>
+    <ErrorPreventionContext.Provider value={contextValue}>
       {children}
     </ErrorPreventionContext.Provider>
   );
 };
-
-// Hook for using the context
-export const useErrorPrevention = () => useContext(ErrorPreventionContext);

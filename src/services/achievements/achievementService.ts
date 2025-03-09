@@ -1,158 +1,91 @@
 
-import { AchievementEventType } from '@/components/onboarding/hooks/achievement/types';
+import { supabase } from '@/lib/supabaseClient';
+import { AchievementEventType, AchievementType } from '@/components/onboarding/hooks/achievement/types';
 
 /**
- * Service to track and manage achievement events
+ * Track an achievement event
+ * 
+ * @param userId The user ID
+ * @param eventType The type of achievement event
+ * @param data Additional data for the event
  */
-export class AchievementService {
-  private userId: string | undefined;
-  private eventListeners: Map<string, Array<(data: any) => void>> = new Map();
-  
-  constructor(userId?: string) {
-    this.userId = userId;
-  }
-  
-  /**
-   * Set the user ID for this service instance
-   */
-  setUserId(userId: string) {
-    this.userId = userId;
-  }
-  
-  /**
-   * Track an achievement event
-   * @param eventType The type of achievement event
-   * @param data Optional data related to the event
-   */
-  trackEvent(eventType: AchievementEventType, data: any = {}) {
-    if (!this.userId) {
-      console.warn('Achievement event tracked without userId');
+export async function trackAchievementEvent(
+  userId: string,
+  eventType: AchievementEventType,
+  data?: Record<string, any>
+) {
+  try {
+    if (!userId) {
+      console.error('Cannot track achievement event: No user ID provided');
+      return;
     }
     
-    const eventData = {
-      eventType,
-      userId: this.userId,
-      timestamp: new Date().toISOString(),
-      ...data
-    };
+    console.log(`Tracking achievement event: ${eventType}`, data);
     
-    // Log the event
-    console.log(`Achievement event tracked: ${eventType}`, eventData);
-    
-    // Store event in local storage for persistence
-    this.storeEvent(eventData);
-    
-    // Notify listeners
-    this.notifyListeners(eventType, eventData);
-    
-    return eventData;
-  }
-  
-  /**
-   * Store event in local storage
-   */
-  private storeEvent(eventData: any) {
-    if (!this.userId) return;
-    
-    try {
-      const eventsKey = `achievement-events-${this.userId}`;
-      const storedEvents = JSON.parse(localStorage.getItem(eventsKey) || '[]');
-      storedEvents.push(eventData);
+    // Record the event in the database
+    const { error } = await supabase
+      .from('user_activities')
+      .insert({
+        user_id: userId,
+        activity_type: eventType,
+        metadata: data || {},
+      });
       
-      // Limit stored events to prevent excessive storage use
-      const limitedEvents = storedEvents.slice(-100);
-      localStorage.setItem(eventsKey, JSON.stringify(limitedEvents));
-    } catch (error) {
-      console.error('Error storing achievement event:', error);
-    }
-  }
-  
-  /**
-   * Add an event listener
-   * @param eventType The event type to listen for, or '*' for all events
-   * @param callback Function to call when the event occurs
-   */
-  addEventListener(eventType: string, callback: (data: any) => void) {
-    if (!this.eventListeners.has(eventType)) {
-      this.eventListeners.set(eventType, []);
+    if (error) {
+      console.error('Error tracking achievement event:', error);
     }
     
-    this.eventListeners.get(eventType)?.push(callback);
-    
-    return () => this.removeEventListener(eventType, callback);
-  }
-  
-  /**
-   * Remove an event listener
-   */
-  removeEventListener(eventType: string, callback: (data: any) => void) {
-    const listeners = this.eventListeners.get(eventType);
-    if (!listeners) return;
-    
-    const index = listeners.indexOf(callback);
-    if (index !== -1) {
-      listeners.splice(index, 1);
-    }
-  }
-  
-  /**
-   * Notify all listeners of an event
-   */
-  private notifyListeners(eventType: string, data: any) {
-    // Notify specific event listeners
-    const listeners = this.eventListeners.get(eventType) || [];
-    listeners.forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error('Error in achievement event listener:', error);
-      }
-    });
-    
-    // Notify wildcard listeners
-    const wildcardListeners = this.eventListeners.get('*') || [];
-    wildcardListeners.forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error('Error in wildcard achievement event listener:', error);
-      }
-    });
-  }
-  
-  /**
-   * Get achievement history from local storage
-   */
-  getAchievementHistory(): Record<string, any> {
-    if (!this.userId) return {};
-    
-    try {
-      const historyKey = `achievements-${this.userId}`;
-      return JSON.parse(localStorage.getItem(historyKey) || '{}');
-    } catch (error) {
-      console.error('Error retrieving achievement history:', error);
-      return {};
-    }
-  }
-  
-  /**
-   * Clear all achievement data for testing purposes
-   * @param confirm Confirmation string to prevent accidental clearing
-   */
-  clearAllData(confirm: string) {
-    if (confirm !== 'CLEAR_ACHIEVEMENTS_DATA' || !this.userId) return;
-    
-    try {
-      localStorage.removeItem(`achievements-${this.userId}`);
-      localStorage.removeItem(`achievement-events-${this.userId}`);
-      console.log('Achievement data cleared');
-    } catch (error) {
-      console.error('Error clearing achievement data:', error);
-    }
+    return { success: !error };
+  } catch (err) {
+    console.error('Failed to track achievement event:', err);
+    return { success: false, error: err };
   }
 }
 
-// Create a singleton instance for global use
-export const achievementService = new AchievementService();
-
-export default achievementService;
+/**
+ * Unlock an achievement for a user
+ * 
+ * @param userId The user ID
+ * @param achievementId The achievement ID
+ * @param data Additional data for the achievement
+ */
+export async function unlockAchievement(
+  userId: string,
+  achievementId: string,
+  data?: Record<string, any>
+) {
+  try {
+    if (!userId || !achievementId) {
+      console.error('Cannot unlock achievement: Missing user ID or achievement ID');
+      return { success: false };
+    }
+    
+    console.log(`Unlocking achievement ${achievementId} for user ${userId}`);
+    
+    // Record the achievement in the database
+    const { error } = await supabase
+      .from('user_achievements')
+      .insert({
+        user_id: userId,
+        achievement_id: achievementId,
+        unlocked_at: new Date().toISOString(),
+        metadata: data || {},
+      });
+      
+    if (error) {
+      // Check if it's a duplicate - achievement already unlocked
+      if (error.code === '23505') { // Unique violation
+        console.log(`Achievement ${achievementId} already unlocked for user ${userId}`);
+        return { success: true, alreadyUnlocked: true };
+      }
+      
+      console.error('Error unlocking achievement:', error);
+      return { success: false, error };
+    }
+    
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to unlock achievement:', err);
+    return { success: false, error: err };
+  }
+}

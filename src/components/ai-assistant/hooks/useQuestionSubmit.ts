@@ -1,6 +1,6 @@
 
 import { useCallback } from 'react';
-import { askAIAssistant } from '@/services/ai/assistant';
+import { processQuestion, askAIAssistant } from '@/services/ai/assistant';
 import { AIQuestion, AIResponse } from '@/services/ai/types';
 
 interface AssistantState {

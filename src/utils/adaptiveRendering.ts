@@ -1,153 +1,200 @@
 
 /**
- * Adaptive rendering utilities for optimizing performance
- * Adjusts rendering quality based on device capabilities
+ * Adaptive Rendering System
+ * 
+ * This module provides utilities for adapting the rendering behavior
+ * based on device performance and user preferences.
  */
 
 import { getPerformanceCategory } from './performanceUtils';
 
-/**
- * Different quality levels for adaptive rendering
- */
-export type RenderQuality = 'low' | 'medium' | 'high';
+// Configuration for different performance levels
+const PERFORMANCE_CONFIGS = {
+  high: {
+    enableAnimations: true,
+    enableParticles: true,
+    enableGlow: true,
+    particleCount: 100,
+    animationFrameRate: 60,
+    renderDistance: 'far',
+    effectDetail: 'high',
+  },
+  medium: {
+    enableAnimations: true,
+    enableParticles: true,
+    enableGlow: true,
+    particleCount: 60,
+    animationFrameRate: 45,
+    renderDistance: 'medium',
+    effectDetail: 'medium',
+  },
+  low: {
+    enableAnimations: true,
+    enableParticles: false,
+    enableGlow: false,
+    particleCount: 30,
+    animationFrameRate: 30,
+    renderDistance: 'near',
+    effectDetail: 'low',
+  },
+  minimal: {
+    enableAnimations: false,
+    enableParticles: false,
+    enableGlow: false,
+    particleCount: 0,
+    animationFrameRate: 24,
+    renderDistance: 'near',
+    effectDetail: 'minimal',
+  },
+};
+
+// Global performance level - defaulting to medium
+let performanceLevel = 'medium';
+
+// Feature overrides for specific scenarios
+const featureOverrides: Record<string, boolean> = {};
 
 /**
- * Controls for optimized rendering
+ * Initialize the adaptive rendering system
  */
-export interface AdaptiveRenderingControls {
-  // Whether to render particles
-  enableParticles: boolean;
+export const initAdaptiveRendering = () => {
+  // Determine initial performance level based on device capabilities
+  performanceLevel = detectDevicePerformance();
+  console.log(`Adaptive rendering initialized with performance level: ${performanceLevel}`);
   
-  // Maximum number of particles to render
-  maxParticles: number;
+  // Add event listener for visibility changes to adapt rendering when tab is inactive
+  document.addEventListener('visibilitychange', adjustForVisibility);
   
-  // Whether to use blur effects
-  enableBlur: boolean;
-  
-  // Blur intensity (0-10)
-  blurIntensity: number;
-  
-  // Whether to use shadows
-  enableShadows: boolean;
-  
-  // Shadow quality (0-10)
-  shadowQuality: number;
-  
-  // Whether to use complex animations
-  enableComplexAnimations: boolean;
-  
-  // Animation frame rate limiter
-  frameRateLimit: number;
-  
-  // Whether to render non-essential decorative elements
-  renderDecorations: boolean;
-}
+  // Set up performance monitoring
+  setupPerformanceMonitoring();
+};
 
 /**
- * Get adaptive rendering controls based on device capabilities
+ * Detect device performance level
  */
-export function getAdaptiveRenderingControls(): AdaptiveRenderingControls {
-  const deviceCapability = getPerformanceCategory();
+const detectDevicePerformance = (): string => {
+  // Simple detection based on user agent and device memory
+  const memory = (navigator as any).deviceMemory || 4;
+  const isHighEnd = memory >= 6;
+  const isLowEnd = memory <= 2;
   
-  switch(deviceCapability) {
-    case 'low':
-      return {
-        enableParticles: false,
-        maxParticles: 10,
-        enableBlur: false,
-        blurIntensity: 0,
-        enableShadows: false,
-        shadowQuality: 0,
-        enableComplexAnimations: false,
-        frameRateLimit: 30,
-        renderDecorations: false
-      };
-      
-    case 'medium':
-      return {
-        enableParticles: true,
-        maxParticles: 50,
-        enableBlur: true,
-        blurIntensity: 3,
-        enableShadows: true,
-        shadowQuality: 3,
-        enableComplexAnimations: false,
-        frameRateLimit: 60,
-        renderDecorations: true
-      };
-      
-    case 'high':
-    default:
-      return {
-        enableParticles: true,
-        maxParticles: 200,
-        enableBlur: true,
-        blurIntensity: 5,
-        enableShadows: true,
-        shadowQuality: 8,
-        enableComplexAnimations: true,
-        frameRateLimit: 60,
-        renderDecorations: true
-      };
+  // Check if it's a mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+  
+  if (isHighEnd && !isMobile) {
+    return 'high';
+  } else if (isLowEnd || isMobile) {
+    return 'low';
+  } else {
+    return 'medium';
   }
-}
+};
 
 /**
- * Get the appropriate number of items to render based on device capability
- * Useful for limiting lists, grids, etc. on lower-end devices
+ * Adjust rendering when visibility changes
  */
-export function getAdaptiveItemCount(
-  lowCount: number, 
-  mediumCount: number, 
-  highCount: number
-): number {
-  const deviceCapability = getPerformanceCategory();
-  
-  switch(deviceCapability) {
-    case 'low': return lowCount;
-    case 'medium': return mediumCount;
-    case 'high': return highCount;
-    default: return mediumCount;
+const adjustForVisibility = () => {
+  if (document.hidden) {
+    // Tab is inactive, reduce rendering quality
+    setFeatureOverride('enableAnimations', false);
+    setFeatureOverride('enableParticles', false);
+  } else {
+    // Tab is active again, restore default settings
+    clearFeatureOverride('enableAnimations');
+    clearFeatureOverride('enableParticles');
   }
-}
+};
 
 /**
- * Get animation duration adjusted for device capability
- * Can be used to speed up animations on lower-end devices
+ * Set up ongoing performance monitoring
  */
-export function getAdaptiveAnimationDuration(
-  baseDuration: number
-): number {
-  const deviceCapability = getPerformanceCategory();
+const setupPerformanceMonitoring = () => {
+  // Check FPS periodically and adjust settings if needed
+  let lastTime = performance.now();
+  let frames = 0;
   
-  switch(deviceCapability) {
-    case 'low': return baseDuration * 0.5; // Faster animations on low-end devices
-    case 'medium': return baseDuration * 0.8;
-    case 'high': return baseDuration;
-    default: return baseDuration;
-  }
-}
+  const checkPerformance = () => {
+    frames++;
+    const currentTime = performance.now();
+    
+    if (currentTime > lastTime + 1000) {
+      const fps = Math.round((frames * 1000) / (currentTime - lastTime));
+      lastTime = currentTime;
+      frames = 0;
+      
+      // Adjust performance level based on FPS
+      if (fps < 30 && performanceLevel !== 'minimal') {
+        performanceLevel = 'minimal';
+        console.log('Performance dropped, reducing quality to minimal');
+      } else if (fps < 45 && performanceLevel !== 'low' && performanceLevel !== 'minimal') {
+        performanceLevel = 'low';
+        console.log('Performance dropped, reducing quality to low');
+      } else if (fps > 55 && performanceLevel === 'minimal') {
+        performanceLevel = 'low';
+        console.log('Performance improved, increasing quality to low');
+      } else if (fps > 55 && performanceLevel === 'low') {
+        performanceLevel = 'medium';
+        console.log('Performance improved, increasing quality to medium');
+      }
+    }
+    
+    requestAnimationFrame(checkPerformance);
+  };
+  
+  requestAnimationFrame(checkPerformance);
+};
 
 /**
- * Determine if an optional visual effect should be rendered
+ * Get the current performance level
  */
-export function shouldRenderEffect(effectImportance: 'low' | 'medium' | 'high'): boolean {
-  const deviceCapability = getPerformanceCategory();
+export const getPerformanceLevel = (): string => {
+  return performanceLevel;
+};
+
+/**
+ * Get a specific setting for the current performance level
+ */
+export const getAdaptiveSetting = <T>(settingName: string): T => {
+  const config = PERFORMANCE_CONFIGS[performanceLevel as keyof typeof PERFORMANCE_CONFIGS];
   
-  switch(effectImportance) {
-    case 'low':
-      // Only render low-importance effects on high-end devices
-      return deviceCapability === 'high';
-      
-    case 'medium':
-      // Render medium-importance effects on medium and high-end devices
-      return deviceCapability === 'medium' || deviceCapability === 'high';
-      
-    case 'high':
-      // Always render high-importance effects
-      return true;
-      
-    default:
-      return deviceCapability === 'high';
+  // Check if there's an override for this feature
+  if (featureOverrides.hasOwnProperty(settingName)) {
+    return featureOverrides[settingName] as unknown as T;
   }
-}
+  
+  // Return the setting from the current performance level
+  return config[settingName as keyof typeof config] as unknown as T;
+};
+
+/**
+ * Check if a feature is enabled
+ */
+export const isFeatureEnabled = (featureName: string): boolean => {
+  return getAdaptiveSetting<boolean>(featureName);
+};
+
+/**
+ * Override a specific feature setting
+ */
+export const setFeatureOverride = (featureName: string, value: boolean): void => {
+  featureOverrides[featureName] = value;
+};
+
+/**
+ * Clear a feature override and return to using the performance level setting
+ */
+export const clearFeatureOverride = (featureName: string): void => {
+  delete featureOverrides[featureName];
+};
+
+/**
+ * Set performance level manually
+ */
+export const setPerformanceLevel = (level: 'high' | 'medium' | 'low' | 'minimal'): void => {
+  if (PERFORMANCE_CONFIGS.hasOwnProperty(level)) {
+    performanceLevel = level;
+    console.log(`Performance level manually set to: ${level}`);
+  }
+};

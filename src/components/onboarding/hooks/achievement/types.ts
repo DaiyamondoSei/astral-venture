@@ -6,10 +6,14 @@
 // Achievement state interface
 export interface AchievementState {
   unlockedAchievements: IAchievementData[];
+  earnedAchievements: string[]; // For backward compatibility
   progress: Record<string, number>;
   recentAchievements: IAchievementData[];
   hasNewAchievements: boolean;
   totalPoints: number;
+  achievementHistory: Record<string, any>; // Added for compatibility
+  currentAchievement: string | null; // Added for compatibility
+  progressTracking: Record<string, number>; // Added for compatibility
 }
 
 // Achievement tracking result
@@ -17,6 +21,11 @@ export interface ProgressTrackingResult {
   updated: boolean;
   unlockedAchievements: IAchievementData[];
   progress: Record<string, number>;
+  trackProgress?: (type: string, amount: number) => void; // Added for compatibility
+  resetProgress?: (type: string) => void; // Added for compatibility
+  logActivity?: (activityType: string, details?: Record<string, any>) => void; // Added for compatibility
+  getProgressValue?: (type: string) => number; // Added for compatibility
+  trackMultipleProgress?: (progressUpdates: Record<string, number>) => void; // Added for compatibility
 }
 
 // Achievement type enum
@@ -27,6 +36,36 @@ export enum AchievementType {
   STREAK = 'streak',
   PROGRESSIVE = 'progressive',
   MILESTONE = 'milestone'
+}
+
+// Achievement event type enum (for tracking activities)
+export enum AchievementEventType {
+  REFLECTION_COMPLETED = 'reflection_completed',
+  MEDITATION_COMPLETED = 'meditation_completed',
+  CHAKRA_ACTIVATED = 'chakra_activated',
+  WISDOM_EXPLORED = 'wisdom_explored',
+  STREAK_MILESTONE = 'streak_milestone'
+}
+
+// Achievement tracker props
+export interface AchievementTrackerProps {
+  achievementList?: IAchievementData[];
+  onUnlock?: (achievement: IAchievementData) => void;
+  onProgress?: (achievement: IAchievementData, progress: number) => void;
+}
+
+// Achievement tracker result
+export interface AchievementTrackerResult {
+  earnedAchievements: IAchievementData[];
+  currentAchievement: IAchievementData | null;
+  dismissAchievement: () => void;
+  getAchievementProgress: (id: string) => number;
+  getTotalPoints: () => number;
+  getProgressPercentage: () => number;
+  achievementHistory: Record<string, any>;
+  progressTracking: Record<string, number>;
+  trackProgress?: (type: string, amount: number) => void;
+  logActivity?: (activityType: string, details?: Record<string, any>) => void;
 }
 
 // Achievement data interface

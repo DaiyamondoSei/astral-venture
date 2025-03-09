@@ -83,3 +83,24 @@ export async function processQuestion(
     };
   }
 }
+
+/**
+ * Ask the AI assistant a question
+ * This function is a compatibility layer for the old askAIAssistant function
+ */
+export const askAIAssistant = async (
+  question: AIQuestion,
+  userId?: string
+): Promise<AIResponse> => {
+  try {
+    // Log user context for debugging
+    if (userId) {
+      console.log(`Processing question for user ${userId}`);
+    }
+    
+    return await fetchAssistantResponse(question);
+  } catch (error) {
+    console.error('Error in askAIAssistant:', error);
+    return createFallbackResponse(question.question);
+  }
+};
