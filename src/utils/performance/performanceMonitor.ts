@@ -1,8 +1,7 @@
 /**
- * Performance Monitor Utility - Optimized Version
+ * Performance Monitor Utility - Backend-optimized Version
  * 
- * Tracks component render times, memory usage, and other performance metrics
- * with minimal overhead
+ * Tracks component render times with minimal overhead and sends data to backend
  */
 
 // Basic performance metrics interface
@@ -11,39 +10,29 @@ export interface PerformanceMetrics {
   renderTimes: number[];
   lastRenderTime: number;
   averageRenderTime: number;
-  memoryUsage?: {
-    jsHeapSizeLimit: number;
-    totalJSHeapSize: number;
-    usedJSHeapSize: number;
-  };
   events: Array<{
     time: number;
     type: string;
     data?: any;
   }>;
-  componentStats?: Record<string, {
-    count: number;
-    total: number;
-    average: number;
-    max: number;
-  }>;
-  insights: string[];
-  renderTimeline: Array<{
-    component: string;
-    startTime: number;
-    endTime: number;
-    duration: number;
-  }>;
-  fps?: number;
   lastUpdated: number;
 }
 
-// Extend Performance interface to include memory property
-interface ExtendedPerformance extends Performance {
-  memory?: {
-    jsHeapSizeLimit: number;
-    totalJSHeapSize: number;
-    usedJSHeapSize: number;
+// Simplified render time metric for backend transmission
+interface RenderTimeMetric {
+  componentName: string;
+  renderTime: number;
+  timestamp: number;
+}
+
+// Interface for metrics to be sent to backend
+interface BatchedMetrics {
+  metrics: RenderTimeMetric[];
+  sessionId: string;
+  deviceInfo: {
+    userAgent: string;
+    screenWidth: number;
+    screenHeight: number;
   };
 }
 
@@ -54,16 +43,54 @@ class PerformanceMonitor {
   private lastNotifyTime: number = 0;
   private notifyThrottle: number = 1000; // Increased from 100ms to 1000ms
   private isEnabled: boolean = process.env.NODE_ENV === 'development';
-  private maxTrackedComponents: number = 20; // Limit total tracked components
+  private maxTrackedComponents: number = 10; // Reduced from 20 to 10
+  private metricQueue: RenderTimeMetric[] = [];
+  private flushInterval: number | null = null;
+  private sessionId: string = '';
+  private supabaseClient: any = null; // Will be initialized if available
   
   constructor() {
     // Only initialize in development mode
     if (this.isEnabled) {
-      this.trackMemoryUsage();
+      // Generate a session ID
+      this.sessionId = this.generateSessionId();
       
-      // Auto-cleanup every minute to prevent memory issues
-      setInterval(() => this.cleanupOldMetrics(), 60000);
+      // Set up flush interval to send metrics to backend periodically
+      this.flushInterval = window.setInterval(() => this.flushMetrics(), 30000); // Every 30 seconds
+      
+      // Clean up metrics every minute to prevent memory issues
+      window.setInterval(() => this.cleanupOldMetrics(), 60000);
+      
+      // Set up unload handler to flush metrics before page unload
+      window.addEventListener('beforeunload', () => this.flushMetrics(true));
+      
+      // Try to initialize Supabase client if available
+      this.initializeSupabaseClient();
     }
+  }
+  
+  /**
+   * Try to initialize Supabase client if available in the global scope
+   */
+  private initializeSupabaseClient() {
+    try {
+      // Dynamic import to avoid dependencies in production
+      import('@/lib/supabaseClient').then(module => {
+        this.supabaseClient = module.supabase;
+        console.log('Performance monitoring initialized with Supabase client');
+      }).catch(err => {
+        console.warn('Could not initialize Supabase client for performance monitoring:', err);
+      });
+    } catch (err) {
+      console.warn('Could not initialize Supabase client for performance monitoring');
+    }
+  }
+  
+  /**
+   * Generate a unique session ID
+   */
+  private generateSessionId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
   
   /**
@@ -71,7 +98,12 @@ class PerformanceMonitor {
    */
   public recordRender(componentName: string, duration: number): void {
     if (!this.isEnabled) return;
-    this.updateMetrics(componentName, duration);
+    
+    // Update local metrics for immediate feedback
+    this.updateLocalMetrics(componentName, duration);
+    
+    // Queue metric for backend transmission
+    this.queueMetricForBackend(componentName, duration);
   }
   
   /**
@@ -80,81 +112,93 @@ class PerformanceMonitor {
   public recordRenderBatch(componentName: string, renders: Array<{time: number, duration: number}>): void {
     if (!this.isEnabled || !renders.length) return;
     
-    // Get or create metrics for this component
-    if (!this.metrics[componentName]) {
-      // Check if we've reached max components
-      if (Object.keys(this.metrics).length >= this.maxTrackedComponents) {
-        // Remove the least recently updated component
-        const oldestComponent = Object.entries(this.metrics)
-          .sort(([, a], [, b]) => (a.lastUpdated || 0) - (b.lastUpdated || 0))[0][0];
-        delete this.metrics[oldestComponent];
-      }
-      
-      this.metrics[componentName] = {
-        componentName,
-        renderTimes: [],
-        events: [],
-        averageRenderTime: 0,
-        insights: [],
-        renderTimeline: []
-      };
-    }
-    
-    const metrics = this.metrics[componentName];
-    const renderTimes = metrics.renderTimes || [];
-    const renderTimeline = metrics.renderTimeline || [];
-    
-    // Process all renders efficiently in a single batch
-    let totalDuration = 0;
-    
-    // Only process the most recent renders to save memory
-    const recentRenders = renders.slice(-5); // Only use last 5 renders
-    
-    recentRenders.forEach(render => {
-      // Add render time
-      renderTimes.push(render.duration);
-      totalDuration += render.duration;
-      
-      // Only keep last 20 render times (reduced from 100)
-      if (renderTimes.length > 20) {
-        renderTimes.shift();
-      }
-      
-      // Add to timeline (limit to avoid memory issues)
-      if (renderTimeline.length < 20) { // Reduced from 50
-        renderTimeline.push({
-          component: componentName,
-          startTime: render.time - render.duration,
-          endTime: render.time,
-          duration: render.duration
-        });
-      }
+    // Update local metrics
+    renders.forEach(render => {
+      this.updateLocalMetrics(componentName, render.duration);
+      this.queueMetricForBackend(componentName, render.duration, render.time);
     });
-    
-    // Only keep last 20 timeline entries
-    if (renderTimeline.length > 20) { // Reduced from 50
-      renderTimeline.splice(0, renderTimeline.length - 20);
-    }
-    
-    // Update average once for the batch
-    const averageRenderTime = renderTimes.reduce((sum, time) => sum + time, 0) / renderTimes.length;
-    
-    // Update metrics in one go
-    this.metrics[componentName] = {
-      ...metrics,
-      renderTimes,
-      lastRenderTime: recentRenders[recentRenders.length - 1].duration,
-      averageRenderTime,
-      renderTimeline,
-      lastUpdated: Date.now()
-    };
-    
-    // Throttled notification of listeners
-    this.throttledNotify();
   }
   
-  // Private method to handle metric updates
-  private updateMetrics(componentName: string, duration: number): void {
+  /**
+   * Queue metric for backend transmission
+   */
+  private queueMetricForBackend(componentName: string, renderTime: number, timestamp: number = Date.now()): void {
+    // Add to queue for batched transmission
+    this.metricQueue.push({
+      componentName,
+      renderTime,
+      timestamp
+    });
+    
+    // If queue is getting large, flush immediately
+    if (this.metricQueue.length >= 50) {
+      this.flushMetrics();
+    }
+  }
+  
+  /**
+   * Flush metrics to backend
+   */
+  private async flushMetrics(isUnload: boolean = false): Promise<void> {
+    if (!this.isEnabled || this.metricQueue.length === 0) return;
+    
+    // Create a copy of the current queue and clear it
+    const metricsToSend = [...this.metricQueue];
+    this.metricQueue = [];
+    
+    // Prepare device info
+    const deviceInfo = {
+      userAgent: navigator.userAgent,
+      screenWidth: window.innerWidth,
+      screenHeight: window.innerHeight
+    };
+    
+    // Prepare the payload
+    const payload: BatchedMetrics = {
+      metrics: metricsToSend,
+      sessionId: this.sessionId,
+      deviceInfo
+    };
+    
+    try {
+      // Use the Supabase client if available
+      if (this.supabaseClient) {
+        await this.supabaseClient.functions.invoke('track-performance', {
+          body: payload
+        });
+        console.debug(`Sent ${metricsToSend.length} performance metrics to backend`);
+      } else if (!isUnload) {
+        // Use fetch for sending metrics if Supabase client is not available
+        // Skip this on page unload as fetch may not complete
+        fetch('/api/track-performance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          // Use keepalive for unload events
+          keepalive: isUnload
+        }).catch(err => {
+          console.warn('Error sending performance metrics:', err);
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to send performance metrics:', error);
+      
+      // If we failed to send, and it's not during unload, add back to queue
+      if (!isUnload) {
+        this.metricQueue = [...this.metricQueue, ...metricsToSend];
+        
+        // Limit queue size to prevent memory issues
+        if (this.metricQueue.length > 200) {
+          this.metricQueue = this.metricQueue.slice(-200);
+        }
+      }
+    }
+  }
+  
+  // Private method to handle local metric updates
+  private updateLocalMetrics(componentName: string, duration: number): void {
     if (!this.isEnabled) return;
     
     if (!this.metrics[componentName]) {
@@ -171,8 +215,7 @@ class PerformanceMonitor {
         renderTimes: [],
         events: [],
         averageRenderTime: 0,
-        insights: [],
-        renderTimeline: []
+        lastUpdated: Date.now()
       };
     }
     
@@ -180,8 +223,8 @@ class PerformanceMonitor {
     const renderTimes = this.metrics[componentName].renderTimes || [];
     renderTimes.push(duration);
     
-    // Only keep last 20 render times (reduced from 100)
-    if (renderTimes.length > 20) {
+    // Only keep last 10 render times (reduced from 20)
+    if (renderTimes.length > 10) {
       renderTimes.shift();
     }
     
@@ -189,27 +232,12 @@ class PerformanceMonitor {
     const averageRenderTime = 
       renderTimes.reduce((sum, time) => sum + time, 0) / renderTimes.length;
     
-    // Add to timeline
-    const renderTimeline = this.metrics[componentName].renderTimeline || [];
-    const now = performance.now();
-    
-    // Only keep recent timeline to avoid memory issues
-    if (renderTimeline.length < 20) { // Reduced from 50
-      renderTimeline.push({
-        component: componentName,
-        startTime: now - duration,
-        endTime: now,
-        duration
-      });
-    }
-    
     // Update metrics
     this.metrics[componentName] = {
       ...this.metrics[componentName],
       renderTimes,
       lastRenderTime: duration,
       averageRenderTime,
-      renderTimeline,
       lastUpdated: Date.now()
     };
     
@@ -251,9 +279,9 @@ class PerformanceMonitor {
     if (!this.isEnabled) return;
     
     const now = Date.now();
-    const maxAge = 10 * 60 * 1000; // 10 minutes
+    const maxAge = 5 * 60 * 1000; // 5 minutes (reduced from 10)
     
-    // Remove components that haven't been updated in 10 minutes
+    // Remove components that haven't been updated in 5 minutes
     Object.keys(this.metrics).forEach(componentName => {
       const lastUpdated = this.metrics[componentName].lastUpdated || 0;
       if (now - lastUpdated > maxAge) {
@@ -307,55 +335,6 @@ class PerformanceMonitor {
   }
   
   /**
-   * Track memory usage if available in the browser
-   */
-  private trackMemoryUsage(): void {
-    if (!this.isEnabled) return;
-    
-    const extendedPerformance = performance as ExtendedPerformance;
-    
-    if (typeof extendedPerformance === 'undefined' || 
-        !extendedPerformance.memory) {
-      return;
-    }
-    
-    // Update less frequently - every 10 seconds (instead of 5)
-    setInterval(() => {
-      if (!this.isEnabled) return;
-      
-      const memory = extendedPerformance.memory;
-      
-      if (!memory) return;
-      
-      // Only update for the most actively used components to reduce overhead
-      const now = Date.now();
-      const activeComponents = Object.keys(this.metrics)
-        .filter(comp => 
-          this.metrics[comp].lastUpdated && 
-          (now - (this.metrics[comp].lastUpdated || 0)) < 60000 && // 1 minute (reduced from 30 sec)
-          (this.metrics[comp].renderTimes?.length || 0) > 5 // Has been rendered at least 5 times
-        )
-        .slice(0, 5); // Only update top 5 active components
-      
-      if (activeComponents.length === 0) return;
-      
-      // Share memory data across all components to reduce redundancy
-      const memoryData = {
-        jsHeapSizeLimit: memory.jsHeapSizeLimit,
-        totalJSHeapSize: memory.totalJSHeapSize,
-        usedJSHeapSize: memory.usedJSHeapSize
-      };
-      
-      activeComponents.forEach(componentName => {
-        this.metrics[componentName].memoryUsage = memoryData;
-      });
-      
-      // Only notify if we updated components
-      this.throttledNotify();
-    }, 10000); // Every 10 seconds (doubled from 5)
-  }
-  
-  /**
    * Subscribe to metrics updates
    */
   public subscribe(callback: (metrics: Record<string, Partial<PerformanceMetrics>>) => void): () => void {
@@ -382,34 +361,69 @@ class PerformanceMonitor {
    */
   public clearMetrics(): void {
     this.metrics = {};
+    this.metricQueue = [];
     if (this.isEnabled) {
       this.notifyListeners();
     }
   }
   
   /**
-   * Add a performance insight for a component
+   * Get metrics formatted for visualization tools
    */
-  public addInsight(componentName: string, insight: string): void {
-    if (!this.isEnabled) return;
+  public getMetrics() {
+    if (!this.isEnabled) return {
+      componentsCount: 0,
+      totalRenderCount: 0,
+      totalRenderTime: 0,
+      lastUpdated: 0,
+      queuedMetrics: 0
+    };
     
-    if (!this.metrics[componentName]) {
-      this.recordRender(componentName, 0); // Create metrics entry if it doesn't exist
-    }
+    const componentsCount = Object.keys(this.metrics).length;
+    const totalRenderCount = Object.values(this.metrics).reduce(
+      (sum, metric) => sum + (metric.renderTimes?.length || 0), 0
+    );
     
-    const insights = this.metrics[componentName].insights || [];
+    // Calculate total render time
+    const totalRenderTime = Object.values(this.metrics).reduce((sum, metric) => {
+      const renderCount = metric.renderTimes?.length || 0;
+      const avgTime = metric.averageRenderTime || 0;
+      return sum + (renderCount * avgTime);
+    }, 0);
     
-    // Don't add duplicate insights
-    if (!insights.includes(insight)) {
-      insights.push(insight);
+    return {
+      componentsCount,
+      totalRenderCount,
+      totalRenderTime,
+      queuedMetrics: this.metricQueue.length,
+      lastUpdated: Math.max(
+        0,
+        ...Object.values(this.metrics)
+          .map(m => m.lastUpdated || 0)
+          .filter(Boolean)
+      )
+    };
+  }
+  
+  /**
+   * Enable or disable the monitor
+   */
+  public setEnabled(enabled: boolean): void {
+    const wasEnabled = this.isEnabled;
+    this.isEnabled = enabled && process.env.NODE_ENV === 'development';
+    
+    // If disabling, clear all data
+    if (wasEnabled && !this.isEnabled) {
+      this.clearMetrics();
       
-      // Only keep last 5 insights (reduced from 10)
-      if (insights.length > 5) {
-        insights.shift();
+      // Clear the flush interval
+      if (this.flushInterval !== null) {
+        clearInterval(this.flushInterval);
+        this.flushInterval = null;
       }
-      
-      this.metrics[componentName].insights = insights;
-      this.throttledNotify();
+    } else if (!wasEnabled && this.isEnabled) {
+      // If enabling, set up the flush interval
+      this.flushInterval = window.setInterval(() => this.flushMetrics(), 30000);
     }
   }
   
@@ -424,47 +438,6 @@ class PerformanceMonitor {
       const avgTime = metric.averageRenderTime || 0;
       return sum + (renderCount * avgTime);
     }, 0);
-  }
-  
-  /**
-   * Get metrics formatted for visualization tools
-   */
-  public getMetrics() {
-    if (!this.isEnabled) return {
-      componentsCount: 0,
-      totalRenderCount: 0,
-      totalRenderTime: 0,
-      lastUpdated: 0
-    };
-    
-    const componentsCount = Object.keys(this.metrics).length;
-    const totalRenderCount = Object.values(this.metrics).reduce(
-      (sum, metric) => sum + (metric.renderTimes?.length || 0), 0
-    );
-    
-    return {
-      componentsCount,
-      totalRenderCount,
-      totalRenderTime: this.totalRenderTime,
-      lastUpdated: Math.max(
-        0,
-        ...Object.values(this.metrics)
-          .map(m => m.lastUpdated || 0)
-          .filter(Boolean)
-      )
-    };
-  }
-  
-  /**
-   * Enable or disable the monitor
-   */
-  public setEnabled(enabled: boolean): void {
-    this.isEnabled = enabled && process.env.NODE_ENV === 'development';
-    
-    // If disabling, clear all data
-    if (!this.isEnabled) {
-      this.clearMetrics();
-    }
   }
 }
 

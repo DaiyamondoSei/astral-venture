@@ -17,6 +17,10 @@ const productionDefaults: PerfConfigContextType = {
   maxTrackedComponents: 0,
   batchUpdates: true,
   
+  // New backend integration settings
+  enableBackendIntegration: false,
+  backendSyncInterval: 0,
+  
   // Optimizations always enabled
   intelligentProfiling: false,
   inactiveTabThrottling: true,
@@ -36,10 +40,14 @@ const developmentDefaults: PerfConfigContextType = {
   enableDebugLogging: false, // Disabled by default
   
   // Advanced settings with balanced defaults
-  samplingRate: 0.2, // Only 20% sampling by default
-  throttleInterval: 1000, // 1 second throttle
-  maxTrackedComponents: 15,
+  samplingRate: 0.1, // Only 10% sampling by default (reduced from 0.2)
+  throttleInterval: 2000, // 2 second throttle (increased from 1000)
+  maxTrackedComponents: 10, // Reduced from 15
   batchUpdates: true,
+  
+  // New backend integration settings
+  enableBackendIntegration: true,
+  backendSyncInterval: 30000, // 30 seconds
   
   // Optimizations always enabled
   intelligentProfiling: true,

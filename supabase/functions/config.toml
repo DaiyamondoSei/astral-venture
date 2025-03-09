@@ -1,0 +1,8 @@
+
+project_id = "wkmyvthtyjcdzhzvfyji"
+
+[track-performance]
+verify_jwt = true
+
+[track-achievement]
+verify_jwt = true
