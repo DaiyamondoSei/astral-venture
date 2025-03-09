@@ -1,65 +1,70 @@
 
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import React from 'react';
 import { StepProps } from '../types';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Sparkles } from 'lucide-react';
 
-const CompleteStep: React.FC<StepProps> = ({ onInteraction }) => {
-  const [interacted, setInteracted] = useState(false);
-  
-  const handleInteraction = (type: string) => {
-    setInteracted(true);
-    if (onInteraction) onInteraction(type, 'complete');
+const CompleteStep: React.FC<StepProps> = ({ onComplete }) => {
+  const handleComplete = () => {
+    if (onComplete) {
+      onComplete();
+    }
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0, transition: { duration: 0.5 } }}
-      className="space-y-4 text-center"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="text-center"
     >
-      <Sparkles className="mx-auto h-12 w-12 text-quantum-500" />
-      <h2 className="text-2xl font-bold font-display tracking-tight text-primary">Your Journey Begins</h2>
-      <p className="text-muted-foreground">
-        You're now ready to explore Quanex and deepen your spiritual practice. Remember, this is just the beginning.
-      </p>
-      
-      <div className="grid grid-cols-3 gap-4 mt-6">
-        {['Meditate', 'Reflect', 'Learn'].map((activity, i) => (
-          <motion.div 
-            key={i} 
-            className="p-3 bg-quantum-500/10 rounded-lg text-sm cursor-pointer"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 + (i * 0.2) }}
-            whileHover={{ 
-              backgroundColor: 'rgba(136, 85, 255, 0.2)',
-              y: -2
-            }}
-            onClick={() => handleInteraction(`complete_activity_${activity.toLowerCase()}`)}
-          >
-            {activity}
-          </motion.div>
-        ))}
+      <div className="mb-6 flex justify-center">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1, rotate: 360 }}
+          transition={{ 
+            type: 'spring', 
+            stiffness: 260, 
+            damping: 20,
+            delay: 0.2 
+          }}
+          className="h-20 w-20 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center"
+        >
+          <Sparkles className="h-10 w-10 text-white" />
+        </motion.div>
       </div>
       
-      <motion.p 
-        className="text-sm text-muted-foreground mt-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.2 }}
+      <motion.h3
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.4 }}
+        className="text-xl font-semibold mb-4 text-white"
       >
-        You can revisit this guide anytime through the settings menu.
+        You're All Set!
+      </motion.h3>
+      
+      <motion.p
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="text-white/80 mb-8"
+      >
+        Congratulations on completing the onboarding process. Your journey to higher consciousness begins now. Explore the app to discover practices, track your progress, and deepen your awareness.
       </motion.p>
       
-      <motion.button
-        className="mt-6 px-6 py-3 rounded-md bg-gradient-to-r from-quantum-500 to-astral-500 text-white font-medium shadow-md"
-        whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(136, 85, 255, 0.5)" }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => handleInteraction('journey_begin')}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.8 }}
       >
-        Begin Your Cosmic Journey
-      </motion.button>
+        <Button 
+          onClick={handleComplete}
+          className="bg-gradient-to-r from-purple-500 to-blue-500 w-full py-6 text-lg"
+        >
+          Begin Your Journey
+        </Button>
+      </motion.div>
     </motion.div>
   );
 };

@@ -1,173 +1,239 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Define chakra types
 export type ChakraName = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
 
-export type ChakraStatus = 'blocked' | 'awakening' | 'active' | 'balanced' | 'transcendent';
-
-export type ChakraData = {
+export interface ChakraData {
   name: ChakraName;
   color: string;
-  status: ChakraStatus;
-  activationLevel: number; // 0-100
+  description: string;
   element: string;
-  activatedAt?: string;
-  position: { x: number; y: number };
-};
+  position: string;
+  mantra: string;
+  activated: boolean;
+  progress: number;
+  practices: ChakraPractice[];
+}
 
-export type ChakraPractice = {
+export interface ChakraPractice {
   id: string;
   name: string;
+  type: 'meditation' | 'reflection' | 'exercise';
   description: string;
   duration: number;
+  difficulty: number;
+  effects: string[];
   chakras: ChakraName[];
-  level: number;
-  benefits: string[];
-  imageUrl?: string;
-};
+  energyPoints: number;
+  title: string;
+}
 
-export type ChakraVisualizationData = {
+export interface ChakraVisualizationData {
   chakras: Record<ChakraName, ChakraData>;
-  dominantChakra: ChakraName | null;
-  overallBalance: number; // 0-100
-  chakraPractices: ChakraPractice[];
-  lastUpdated: string;
+  recommendedPractices: ChakraPractice[];
+  userChakraSystem: {
+    activatedChakras: ChakraName[];
+    overallBalance: number;
+  };
+}
+
+const CHAKRA_COLORS = {
+  root: '#FF5757',
+  sacral: '#FF9E43',
+  solar: '#FFDE59',
+  heart: '#7ED957',
+  throat: '#5CC9F5',
+  'third-eye': '#A85CFF',
+  crown: '#C588FF'
 };
 
-const defaultChakraData: Record<ChakraName, Omit<ChakraData, 'status' | 'activationLevel'>> = {
+const DEFAULT_CHAKRA_DATA: Record<ChakraName, Omit<ChakraData, 'activated' | 'progress' | 'practices'>> = {
   root: {
     name: 'root',
-    color: '#FF0000',
+    color: CHAKRA_COLORS.root,
+    description: 'Foundation, stability, security, and basic needs',
     element: 'Earth',
-    position: { x: 0, y: 300 }
+    position: 'Base of spine',
+    mantra: 'I am safe and secure'
   },
   sacral: {
     name: 'sacral',
-    color: '#FF7F00',
+    color: CHAKRA_COLORS.sacral,
+    description: 'Creativity, pleasure, emotions, and relationships',
     element: 'Water',
-    position: { x: 0, y: 250 }
+    position: 'Lower abdomen',
+    mantra: 'I feel and experience life fully'
   },
   solar: {
     name: 'solar',
-    color: '#FFFF00',
+    color: CHAKRA_COLORS.solar,
+    description: 'Personal power, confidence, and self-esteem',
     element: 'Fire',
-    position: { x: 0, y: 200 }
+    position: 'Upper abdomen',
+    mantra: 'I am powerful and confident'
   },
   heart: {
     name: 'heart',
-    color: '#00FF00',
+    color: CHAKRA_COLORS.heart,
+    description: 'Love, compassion, and harmony',
     element: 'Air',
-    position: { x: 0, y: 150 }
+    position: 'Center of chest',
+    mantra: 'I give and receive love freely'
   },
   throat: {
     name: 'throat',
-    color: '#0000FF',
-    element: 'Sound',
-    position: { x: 0, y: 100 }
+    color: CHAKRA_COLORS.throat,
+    description: 'Communication, expression, and truth',
+    element: 'Ether',
+    position: 'Throat',
+    mantra: 'I express my truth with clarity'
   },
   'third-eye': {
     name: 'third-eye',
-    color: '#4B0082',
+    color: CHAKRA_COLORS['third-eye'],
+    description: 'Intuition, perception, and insight',
     element: 'Light',
-    position: { x: 0, y: 50 }
+    position: 'Between eyebrows',
+    mantra: 'I see beyond illusion'
   },
   crown: {
     name: 'crown',
-    color: '#8B00FF',
+    color: CHAKRA_COLORS.crown,
+    description: 'Spiritual connection, consciousness, and enlightenment',
     element: 'Thought',
-    position: { x: 0, y: 0 }
+    position: 'Top of head',
+    mantra: 'I am connected to all that is'
   }
 };
 
 /**
- * Fetch chakra visualization data for a user
+ * Get chakra visualization data for the current user
  */
-export async function getChakraVisualizationData(userId: string): Promise<ChakraVisualizationData> {
+export async function getChakraVisualizationData(userId?: string): Promise<ChakraVisualizationData> {
   try {
-    // Fetch the user's chakra system data
-    const { data: chakraSystem, error } = await supabase
+    // If no user ID, return default data
+    if (!userId) {
+      return getDefaultVisualizationData();
+    }
+
+    // Fetch user's activated chakras
+    const { data: chakraSystem, error: chakraError } = await supabase
       .from('chakra_systems')
-      .select('chakras, dominant_chakra, overall_balance, last_updated')
+      .select('*')
       .eq('user_id', userId)
       .single();
-    
-    if (error) {
-      console.error('Error fetching chakra system data:', error);
-      throw error;
+
+    if (chakraError) {
+      console.error('Error fetching chakra data:', chakraError);
+      return getDefaultVisualizationData();
     }
-    
-    // Fetch recommended practices
+
+    // Fetch available practices for chakras
     const { data: practices, error: practicesError } = await supabase
       .from('practices')
-      .select('id, title, description, duration, chakra_association, level')
-      .limit(5);
-    
+      .select('*')
+      .in('type', ['meditation', 'reflection', 'exercise']);
+
     if (practicesError) {
-      console.error('Error fetching chakra practices:', practicesError);
+      console.error('Error fetching practices:', practicesError);
     }
-    
-    // Map chakra data into the expected format
-    const chakras = {} as Record<ChakraName, ChakraData>;
-    const chakraData = chakraSystem?.chakras as Record<string, ChakraStatus>;
-    
-    // Process each chakra
-    Object.keys(defaultChakraData).forEach((chakraKey) => {
-      const chakraName = chakraKey as ChakraName;
-      const status = (chakraData && chakraData[chakraName]) || 'blocked';
+
+    // Create the full chakra data
+    const activatedChakras: ChakraName[] = chakraSystem?.activated_chakras || [];
+    const chakras: Record<ChakraName, ChakraData> = {};
+
+    // Build chakra data for each chakra
+    Object.keys(DEFAULT_CHAKRA_DATA).forEach((chakraName) => {
+      const name = chakraName as ChakraName;
+      const isActivated = activatedChakras.includes(name);
       
-      // Calculate activation level based on status
-      const activationLevel = status === 'blocked' ? 10 :
-                             status === 'awakening' ? 30 :
-                             status === 'active' ? 60 :
-                             status === 'balanced' ? 80 : 100;
-      
-      chakras[chakraName] = {
-        ...defaultChakraData[chakraName],
-        status,
-        activationLevel
+      // Find practices for this chakra
+      const chakraPractices = (practices || [])
+        .filter(p => (p.chakra_association || []).includes(name))
+        .map(p => ({
+          id: p.id,
+          name: p.title,
+          title: p.title,
+          type: p.type,
+          description: p.description,
+          duration: p.duration,
+          difficulty: p.difficulty || 1,
+          effects: p.effects || [],
+          chakras: p.chakra_association || [],
+          energyPoints: p.energy_points || 5
+        }));
+
+      chakras[name] = {
+        ...DEFAULT_CHAKRA_DATA[name],
+        activated: isActivated,
+        progress: chakraSystem?.[`${name}_progress`] || 0,
+        practices: chakraPractices
       };
     });
-    
-    // Map practices into the expected format
-    const chakraPractices: ChakraPractice[] = practices?.map((practice) => ({
-      id: practice.id,
-      name: practice.title,
-      description: practice.description,
-      duration: practice.duration,
-      chakras: practice.chakra_association as ChakraName[] || [],
-      level: practice.level,
-      benefits: ['Balance', 'Harmony', 'Energy flow']
-    })) || [];
-    
+
+    // Determine recommended practices
+    const recommendedPractices = Object.values(chakras)
+      .flatMap(chakra => chakra.practices)
+      .filter((practice, index, self) => 
+        index === self.findIndex(p => p.id === practice.id)
+      )
+      .sort((a, b) => {
+        // Prioritize practices for activated chakras
+        const aActivated = a.chakras.some(c => activatedChakras.includes(c));
+        const bActivated = b.chakras.some(c => activatedChakras.includes(c));
+        if (aActivated && !bActivated) return -1;
+        if (!aActivated && bActivated) return 1;
+        return 0;
+      })
+      .slice(0, 5);
+
     return {
       chakras,
-      dominantChakra: (chakraSystem?.dominant_chakra as ChakraName) || null,
-      overallBalance: chakraSystem?.overall_balance || 50,
-      chakraPractices,
-      lastUpdated: chakraSystem?.last_updated || new Date().toISOString()
+      recommendedPractices,
+      userChakraSystem: {
+        activatedChakras,
+        overallBalance: calculateOverallBalance(chakras)
+      }
     };
   } catch (error) {
     console.error('Error in getChakraVisualizationData:', error);
-    
-    // Return default data in case of error
-    const chakras = {} as Record<ChakraName, ChakraData>;
-    
-    Object.keys(defaultChakraData).forEach((chakraKey) => {
-      const chakraName = chakraKey as ChakraName;
-      chakras[chakraName] = {
-        ...defaultChakraData[chakraName],
-        status: 'blocked',
-        activationLevel: 10
-      };
-    });
-    
-    return {
-      chakras,
-      dominantChakra: null,
-      overallBalance: 30,
-      chakraPractices: [],
-      lastUpdated: new Date().toISOString()
-    };
+    return getDefaultVisualizationData();
   }
+}
+
+/**
+ * Calculate overall chakra balance
+ */
+function calculateOverallBalance(chakras: Record<ChakraName, ChakraData>): number {
+  const activatedChakras = Object.values(chakras).filter(c => c.activated);
+  if (activatedChakras.length === 0) return 0;
+  
+  const totalProgress = activatedChakras.reduce((sum, chakra) => sum + chakra.progress, 0);
+  return totalProgress / activatedChakras.length;
+}
+
+/**
+ * Get default visualization data
+ */
+function getDefaultVisualizationData(): ChakraVisualizationData {
+  const chakras: Record<ChakraName, ChakraData> = {};
+  
+  Object.keys(DEFAULT_CHAKRA_DATA).forEach((chakraName) => {
+    const name = chakraName as ChakraName;
+    chakras[name] = {
+      ...DEFAULT_CHAKRA_DATA[name],
+      activated: false,
+      progress: 0,
+      practices: []
+    };
+  });
+  
+  return {
+    chakras,
+    recommendedPractices: [],
+    userChakraSystem: {
+      activatedChakras: [],
+      overallBalance: 0
+    }
+  };
 }

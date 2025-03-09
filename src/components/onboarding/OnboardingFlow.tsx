@@ -11,6 +11,7 @@ import ReflectionStep from './step-content/steps/ReflectionStep';
 import SacredGeometryStep from './step-content/steps/SacredGeometryStep';
 import CompleteStep from './step-content/steps/CompleteStep';
 import ConsciousnessAssessment from './ConsciousnessAssessment';
+import { StepProps } from './step-content/types';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -21,19 +22,24 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
   const [consciousnessScore, setConsciousnessScore] = useState<number | null>(null);
   
   // Create a handler for CompleteStep
-  const handleCompleteStep = () => {
-    onComplete();
+  const handleStepComplete = () => {
+    if (step === steps.length - 1) {
+      onComplete();
+    } else {
+      setStep(step + 1);
+    }
   };
   
+  // Define all the steps with their components
   const steps = [
-    { title: "Welcome", component: <WelcomeStep /> },
+    { title: "Welcome", component: <WelcomeStep onComplete={handleStepComplete} /> },
     { title: "Assessment", component: <ConsciousnessAssessment onComplete={setConsciousnessScore} /> },
-    { title: "Sacred Geometry", component: <SacredGeometryStep /> },
-    { title: "Chakras", component: <ChakrasStep /> },
-    { title: "Energy Points", component: <EnergyPointsStep /> },
-    { title: "Meditation", component: <MeditationStep /> },
-    { title: "Reflection", component: <ReflectionStep /> },
-    { title: "Complete", component: <CompleteStep onComplete={handleCompleteStep} /> }
+    { title: "Sacred Geometry", component: <SacredGeometryStep onComplete={handleStepComplete} /> },
+    { title: "Chakras", component: <ChakrasStep onComplete={handleStepComplete} /> },
+    { title: "Energy Points", component: <EnergyPointsStep onComplete={handleStepComplete} /> },
+    { title: "Meditation", component: <MeditationStep onComplete={handleStepComplete} /> },
+    { title: "Reflection", component: <ReflectionStep onComplete={handleStepComplete} /> },
+    { title: "Complete", component: <CompleteStep onComplete={onComplete} /> }
   ];
   
   const handleNext = () => {

@@ -1,107 +1,104 @@
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { CubeTheme } from './types';
+import { CubeConnection, MetatronsNode, GlowIntensity } from './MetatronsCube';
 
-export interface CubeLinesProps {
-  connections: {
-    id: string;
-    from: string;
-    to: string;
-    [key: string]: any;
-  }[];
-  nodes: Record<string, { x: number; y: number }>;
+interface CubeLinesProps {
+  connections: CubeConnection[];
+  nodes: MetatronsNode[];
+  primaryColor: string;
+  secondaryColor: string;
   activeNodeId?: string;
-  variant?: CubeTheme;
-  withAnimation?: boolean;
-  intensity?: number;
+  glowIntensity: GlowIntensity;
+  isSimplified: boolean;
 }
 
-const getLineColor = (theme: CubeTheme = 'default', isActive: boolean = false): string => {
-  const themes = {
-    default: {
-      active: 'rgba(167, 139, 250, 0.8)',
-      inactive: 'rgba(167, 139, 250, 0.3)'
-    },
-    cosmic: {
-      active: 'rgba(129, 140, 248, 0.8)',
-      inactive: 'rgba(129, 140, 248, 0.3)'
-    },
-    ethereal: {
-      active: 'rgba(236, 72, 153, 0.8)',
-      inactive: 'rgba(236, 72, 153, 0.3)'
-    },
-    quantum: {
-      active: 'rgba(6, 182, 212, 0.8)',
-      inactive: 'rgba(6, 182, 212, 0.3)'
+const CubeLines: React.FC<CubeLinesProps> = ({
+  connections,
+  nodes,
+  primaryColor,
+  secondaryColor,
+  activeNodeId,
+  glowIntensity,
+  isSimplified
+}) => {
+  // Create a map of nodes by id for easy lookup
+  const nodeMap = new Map<string, MetatronsNode>();
+  nodes.forEach(node => nodeMap.set(node.id, node));
+  
+  // Calculate SVG size based on the bounding box of all nodes
+  const getSvgSize = () => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    
+    nodes.forEach(node => {
+      minX = Math.min(minX, node.x - 5);
+      maxX = Math.max(maxX, node.x + 5);
+      minY = Math.min(minY, node.y - 5);
+      maxY = Math.max(maxY, node.y + 5);
+    });
+    
+    return {
+      width: maxX - minX + 10,
+      height: maxY - minY + 10,
+      viewBox: `${minX - 5} ${minY - 5} ${maxX - minX + 10} ${maxY - minY + 10}`
+    };
+  };
+  
+  const svgSize = getSvgSize();
+  
+  // Set filter intensity based on the glowIntensity prop
+  const getFilterDeviation = () => {
+    switch (glowIntensity) {
+      case 'low': return '1.5';
+      case 'medium': return '2.5';
+      case 'high': return '4';
+      default: return '2.5';
     }
   };
-
-  return isActive 
-    ? themes[theme].active 
-    : themes[theme].inactive;
-};
-
-const CubeLines: React.FC<CubeLinesProps> = ({ 
-  connections, 
-  nodes, 
-  activeNodeId,
-  variant = 'default',
-  withAnimation = false,
-  intensity = 5
-}) => {
-  const nodeConnections = connections.map(connection => {
-    const fromNode = nodes[connection.from];
-    const toNode = nodes[connection.to];
-    
-    if (!fromNode || !toNode) return null;
-    
-    const isActive = activeNodeId && 
-      (connection.from === activeNodeId || connection.to === activeNodeId);
-    
-    // Line thickness based on intensity and active state
-    const strokeWidth = isActive 
-      ? Math.min(2 + intensity * 0.1, 3)  
-      : Math.max(0.5, intensity * 0.08);
-
-    // Line opacity based on active state
-    const opacity = isActive 
-      ? 0.8 + (intensity * 0.02)
-      : 0.3 + (intensity * 0.01);
-    
-    const lineColor = getLineColor(variant, isActive);
-
-    // Animation variants for the lines
-    const variants = {
-      active: { 
-        opacity: opacity + 0.2,
-        strokeWidth: strokeWidth + 0.5
-      },
-      inactive: { 
-        opacity,
-        strokeWidth
-      }
-    };
-
-    return (
-      <motion.line
-        key={connection.id}
-        x1={fromNode.x}
-        y1={fromNode.y}
-        x2={toNode.x}
-        y2={toNode.y}
-        stroke={lineColor}
-        strokeWidth={strokeWidth}
-        strokeOpacity={opacity}
-        initial="inactive"
-        animate={isActive ? "active" : "inactive"}
-        variants={withAnimation ? variants : undefined}
-        transition={{ duration: 0.3 }}
-      />
-    );
-  });
-
-  return <>{nodeConnections}</>;
+  
+  return (
+    <svg
+      width={svgSize.width}
+      height={svgSize.height}
+      viewBox={svgSize.viewBox}
+      className="absolute pointer-events-none"
+    >
+      <defs>
+        <filter id="glow-line" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation={getFilterDeviation()} result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+      
+      {/* Draw connections between nodes */}
+      {connections.map((connection, index) => {
+        const source = nodeMap.get(connection.source);
+        const target = nodeMap.get(connection.target);
+        
+        if (!source || !target) return null;
+        
+        const isActive = connection.active || 
+                         source.id === activeNodeId || 
+                         target.id === activeNodeId;
+        
+        return (
+          <line
+            key={`${connection.source}-${connection.target}-${index}`}
+            x1={source.x}
+            y1={source.y}
+            x2={target.x}
+            y2={target.y}
+            stroke={isActive ? secondaryColor : primaryColor}
+            strokeWidth={isActive ? 1.5 : 0.8}
+            strokeOpacity={isActive ? 0.8 : 0.5}
+            filter={isSimplified ? '' : 'url(#glow-line)'}
+          />
+        );
+      })}
+    </svg>
+  );
 };
 
 export default CubeLines;

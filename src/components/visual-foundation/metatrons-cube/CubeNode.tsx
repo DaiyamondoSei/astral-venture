@@ -1,116 +1,103 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CubeTheme, GlowIntensity } from './types';
+import { MetatronsNode, GlowIntensity } from './MetatronsCube';
 
-export interface CubeNodeProps {
-  node: {
-    id: string;
-    x: number;
-    y: number;
-    [key: string]: any;
-  };
+interface CubeNodeProps {
+  node: MetatronsNode;
+  primaryColor: string;
+  secondaryColor: string;
   isActive?: boolean;
-  onClick?: () => void;
-  variant?: CubeTheme;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  withAnimation?: boolean;
-  intensity?: number;
+  onClick: (nodeId: string) => void;
+  glowIntensity: GlowIntensity;
+  isSimplified: boolean;
 }
 
-const getNodeSize = (size: string = 'md'): number => {
-  const sizes = {
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
-    full: 24
-  };
-  return sizes[size as keyof typeof sizes] || sizes.md;
-};
-
-const getNodeColor = (theme: CubeTheme = 'default', isActive: boolean = false): string => {
-  const themes = {
-    default: {
-      active: 'rgb(167, 139, 250)',
-      inactive: 'rgb(139, 92, 246, 0.5)'
-    },
-    cosmic: {
-      active: 'rgb(129, 140, 248)',
-      inactive: 'rgb(129, 140, 248, 0.5)'
-    },
-    ethereal: {
-      active: 'rgb(236, 72, 153)',
-      inactive: 'rgb(236, 72, 153, 0.5)'
-    },
-    quantum: {
-      active: 'rgb(6, 182, 212)',
-      inactive: 'rgb(6, 182, 212, 0.5)'
-    }
-  };
-
-  return isActive 
-    ? themes[theme].active 
-    : themes[theme].inactive;
-};
-
-const getGlowIntensity = (intensity: number = 5): GlowIntensity => {
-  if (intensity <= 3) return 'low';
-  if (intensity <= 7) return 'medium';
-  return 'high';
-};
-
-const CubeNode: React.FC<CubeNodeProps> = ({ 
-  node, 
-  isActive = false, 
+const CubeNode: React.FC<CubeNodeProps> = ({
+  node,
+  primaryColor,
+  secondaryColor,
+  isActive = false,
   onClick,
-  variant = 'default',
-  size = 'md',
-  withAnimation = false,
-  intensity = 5
+  glowIntensity,
+  isSimplified
 }) => {
-  const nodeSize = getNodeSize(size);
-  const nodeColor = getNodeColor(variant, isActive);
-  const glowIntensity = getGlowIntensity(intensity);
-  
-  // Calculate glow filter based on intensity
-  const getGlowFilter = () => {
-    const intensityMap = {
-      low: 'blur(2px)',
-      medium: 'blur(4px)',
-      high: 'blur(6px)'
-    };
-    
-    return intensityMap[glowIntensity];
-  };
-
-  // Animation variants based on active state
-  const variants = {
-    active: { 
-      scale: 1.2, 
-      filter: `drop-shadow(0 0 ${nodeSize/2}px ${nodeColor})` 
-    },
-    inactive: { 
-      scale: 1,
-      filter: `drop-shadow(0 0 ${nodeSize/4}px ${nodeColor})`
+  // Set filter intensity based on the glowIntensity prop
+  const getFilterDeviation = () => {
+    switch (glowIntensity) {
+      case 'low': return '2';
+      case 'medium': return '3';
+      case 'high': return '5';
+      default: return '3';
     }
   };
-
+  
+  // Determine node size
+  const nodeSize = node.size || (isActive ? 16 : 12);
+  
+  // Position styles
+  const positionStyles = {
+    left: `${node.x}px`,
+    top: `${node.y}px`,
+    width: `${nodeSize}px`,
+    height: `${nodeSize}px`,
+    marginLeft: `-${nodeSize / 2}px`,
+    marginTop: `-${nodeSize / 2}px`,
+  };
+  
+  // Animation variants
+  const variants = {
+    active: {
+      scale: [1, 1.15, 1],
+      transition: { 
+        duration: 2, 
+        repeat: Infinity,
+        repeatType: 'loop' as const
+      }
+    },
+    inactive: {
+      scale: 1
+    }
+  };
+  
+  const handleNodeClick = () => {
+    onClick(node.id);
+  };
+  
   return (
-    <motion.circle
-      cx={node.x}
-      cy={node.y}
-      r={nodeSize / 2}
-      fill={nodeColor}
-      filter={`drop-shadow(0 0 ${nodeSize/4}px ${nodeColor})`}
-      initial="inactive"
-      animate={isActive ? "active" : "inactive"}
-      variants={withAnimation ? variants : undefined}
-      transition={{ duration: 0.3 }}
-      style={{ filter: `drop-shadow(0 0 ${nodeSize/3}px ${nodeColor})` }}
-      onClick={onClick}
-      className="cursor-pointer transition-all duration-300"
-    />
+    <>
+      <motion.div
+        className="absolute rounded-full cursor-pointer z-10"
+        style={positionStyles}
+        onClick={handleNodeClick}
+        variants={variants}
+        animate={node.pulsing ? 'active' : 'inactive'}
+        whileHover={{ scale: 1.2 }}
+        title={node.tooltip}
+      >
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          style={{
+            backgroundColor: isActive ? secondaryColor : primaryColor,
+            boxShadow: isSimplified ? 'none' : `0 0 ${getFilterDeviation()}px ${isActive ? secondaryColor : primaryColor}`
+          }}
+        />
+        
+        {node.label && (
+          <div 
+            className="absolute whitespace-nowrap text-xs font-medium text-white"
+            style={{
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%) translateY(8px)',
+              textShadow: '0 0 4px rgba(0,0,0,0.8)'
+            }}
+          >
+            {node.label}
+          </div>
+        )}
+      </motion.div>
+    </>
   );
 };
 

@@ -3,9 +3,44 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { usePerfConfig } from '@/hooks/usePerfConfig';
 import { cn } from '@/lib/utils';
-import { MetatronsCubeProps, CubeTheme } from './types';
 import CubeLines from './CubeLines';
 import CubeNode from './CubeNode';
+
+// Types for the component
+export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'quantum';
+export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type GlowIntensity = 'low' | 'medium' | 'high';
+
+export interface MetatronsNode {
+  id: string;
+  x: number;
+  y: number;
+  size?: number;
+  active?: boolean;
+  pulsing?: boolean;
+  label?: string;
+  tooltip?: string;
+}
+
+export interface CubeConnection {
+  source: string;
+  target: string;
+  active?: boolean;
+  pulsing?: boolean;
+  color?: string;
+}
+
+export interface MetatronsCubeProps {
+  className?: string;
+  size?: CubeSize;
+  variant?: CubeTheme;
+  nodes: MetatronsNode[];
+  connections: CubeConnection[];
+  activeNodeId?: string;
+  onNodeClick?: (nodeId: string) => void;
+  withAnimation?: boolean;
+  intensity?: number;
+}
 
 const themeColors: Record<CubeTheme, { primary: string; secondary: string; background: string }> = {
   default: {
@@ -70,6 +105,13 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
   
   const glowIntensity = shouldUseSimpleRendering ? 'low' : 'medium';
   
+  // Handle node click
+  const handleNodeClick = (nodeId: string) => {
+    if (onNodeClick) {
+      onNodeClick(nodeId);
+    }
+  };
+  
   return (
     <div 
       className={cn(
@@ -104,7 +146,7 @@ const MetatronsCube: React.FC<MetatronsCubeProps> = ({
             primaryColor={primaryColor}
             secondaryColor={secondaryColor}
             isActive={node.id === activeNodeId}
-            onClick={onNodeClick}
+            onClick={handleNodeClick}
             glowIntensity={glowIntensity}
             isSimplified={shouldUseSimpleRendering}
           />

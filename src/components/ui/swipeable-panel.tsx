@@ -1,141 +1,159 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useMotionValue, motion, PanInfo, useTransform } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion, useAnimation, PanInfo } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export interface SwipeablePanelProps {
   children: React.ReactNode;
-  direction?: 'up' | 'down' | 'left' | 'right';
-  initialPosition?: 'open' | 'closed';
-  openSize?: string | number;
-  closedSize?: string | number;
-  onOpen?: () => void;
-  onClose?: () => void;
-  dragHandleHeight?: number;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  height: {
+    peek: string;
+    half: string;
+    full: string;
+  };
+  initialState: 'peek' | 'half' | 'full';
   className?: string;
-  showHandle?: boolean;
-  minSwipeDistance?: number;
-  restrictToWindowEdges?: boolean;
+  position?: 'top' | 'bottom';
 }
 
 const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
   children,
-  direction = 'up',
-  initialPosition = 'closed',
-  openSize = '80vh',
-  closedSize = '0px',
-  onOpen,
-  onClose,
-  dragHandleHeight = 24,
+  isOpen,
+  onOpenChange,
+  height,
+  initialState = 'half',
   className,
-  showHandle = true,
-  minSwipeDistance = 50,
-  restrictToWindowEdges = true,
+  position = 'bottom'
 }) => {
-  const [isOpen, setIsOpen] = useState(initialPosition === 'open');
-  const panelRef = useRef<HTMLDivElement>(null);
-  const constraintsRef = useRef<HTMLDivElement>(null);
+  const [panelState, setPanelState] = useState<'peek' | 'half' | 'full'>(initialState);
+  const controls = useAnimation();
   
-  // Set up motion values based on direction
-  const isVertical = direction === 'up' || direction === 'down';
-  const dragProp = isVertical ? 'y' : 'x';
-  const dragMotionValue = useMotionValue(0);
+  // Convert height strings to numeric values for calculations
+  const getNumericHeight = (heightStr: string): number => {
+    if (heightStr.endsWith('%')) {
+      return parseFloat(heightStr) / 100;
+    } else if (heightStr.endsWith('px')) {
+      return parseFloat(heightStr) / window.innerHeight;
+    }
+    return 0.5; // Default to 50% if invalid format
+  };
   
+  const peekHeight = getNumericHeight(height.peek);
+  const halfHeight = getNumericHeight(height.half);
+  const fullHeight = getNumericHeight(height.full);
+  
+  // Set the height based on current state
+  const getStateHeight = (): number => {
+    switch (panelState) {
+      case 'peek': return peekHeight;
+      case 'half': return halfHeight;
+      case 'full': return fullHeight;
+      default: return halfHeight;
+    }
+  };
+  
+  // Update panel state when isOpen changes
   useEffect(() => {
-    setIsOpen(initialPosition === 'open');
-  }, [initialPosition]);
-
-  // Handle drag end
+    if (isOpen) {
+      controls.start({
+        y: position === 'bottom' 
+          ? `${(1 - getStateHeight()) * 100}%` 
+          : `${getStateHeight() * 100 - 100}%`,
+        transition: { type: 'spring', damping: 30, stiffness: 300 }
+      });
+    } else {
+      controls.start({
+        y: position === 'bottom' ? '100%' : '-100%',
+        transition: { type: 'spring', damping: 30, stiffness: 300 }
+      });
+    }
+  }, [isOpen, panelState, controls, position]);
+  
+  // Handle drag end events
   const handleDragEnd = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const offset = isVertical ? info.offset.y : info.offset.x;
-    const velocity = isVertical ? info.velocity.y : info.velocity.x;
+    const velocity = position === 'bottom' ? -info.velocity.y : info.velocity.y;
+    const offset = position === 'bottom' ? -info.offset.y : info.offset.y;
     
-    // Determine direction sign (negative values for up/left)
-    const directionSign = direction === 'up' || direction === 'left' ? -1 : 1;
+    // Fast swipe in either direction
+    if (Math.abs(velocity) > 500) {
+      if (velocity > 0) {
+        // Swipe up (or down for top panel)
+        if (panelState === 'peek') {
+          setPanelState('half');
+        } else if (panelState === 'half') {
+          setPanelState('full');
+        }
+      } else {
+        // Swipe down (or up for top panel)
+        if (panelState === 'full') {
+          setPanelState('half');
+        } else if (panelState === 'half') {
+          setPanelState('peek');
+        } else if (panelState === 'peek') {
+          onOpenChange(false);
+        }
+      }
+      return;
+    }
     
-    // Check if swipe was against the open/close direction
-    const isSwipeWithDirection = (offset * directionSign) < 0;
+    // Distance calculation for slower drags
+    const height = window.innerHeight;
+    const totalTravel = position === 'bottom' 
+      ? height * (1 - peekHeight) 
+      : height * fullHeight;
     
-    // Decide whether to open or close based on:
-    // 1. Velocity (fast swipe)
-    // 2. Offset distance (moved far enough)
-    // 3. Current state and swipe direction
-    if (
-      Math.abs(velocity) > 500 || 
-      Math.abs(offset) > minSwipeDistance
-    ) {
-      if (isSwipeWithDirection && !isOpen) {
-        setIsOpen(true);
-        onOpen?.();
-      } else if (!isSwipeWithDirection && isOpen) {
-        setIsOpen(false);
-        onClose?.();
+    // Calculate next state based on position
+    const positionRatio = offset / totalTravel;
+    
+    if (positionRatio > 0.6) {
+      if (panelState !== 'full') {
+        setPanelState('full');
+      }
+    } else if (positionRatio > 0.3) {
+      if (panelState !== 'half') {
+        setPanelState('half');
+      }
+    } else if (positionRatio > 0.1) {
+      if (panelState !== 'peek') {
+        setPanelState('peek');
       }
     } else {
-      // If velocity and distance aren't enough, revert to current state
-      setIsOpen(isOpen);
+      onOpenChange(false);
     }
   };
   
-  // Generate variants for animations
-  const variants = {
-    open: { 
-      [dragProp]: 0 
-    },
-    closed: { 
-      [dragProp]: direction === 'up' ? '100%' : 
-                  direction === 'down' ? '-100%' : 
-                  direction === 'left' ? '100%' : '-100%' 
-    }
-  };
-
-  // Calculate style properties
-  const style: React.CSSProperties = {
-    position: 'relative',
-    overflow: 'hidden',
-    width: isVertical ? '100%' : openSize,
-    height: isVertical ? openSize : '100%',
-    borderRadius: '12px',
-    boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)',
-    backgroundColor: 'var(--background)',
-    touchAction: 'none'
-  };
-
-  const handleStyle: React.CSSProperties = {
-    width: isVertical ? '40px' : '4px',
-    height: isVertical ? '4px' : '40px',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: '4px',
-    margin: '8px auto',
-    cursor: 'grab'
-  };
-
   return (
-    <div ref={constraintsRef} className={cn("swipeable-panel-container", className)}>
-      <motion.div
-        ref={panelRef}
-        className="swipeable-panel"
-        style={style}
-        initial={initialPosition}
-        animate={isOpen ? 'open' : 'closed'}
-        variants={variants}
-        transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-        drag={dragProp}
-        dragConstraints={constraintsRef}
-        dragElastic={0.1}
-        onDragEnd={handleDragEnd}
-        dragMomentum={false}
-      >
-        {showHandle && (
-          <div className="drag-handle" style={{ paddingTop: '8px' }}>
-            <div style={handleStyle} />
-          </div>
-        )}
-        <div className="panel-content" style={{ height: '100%', overflowY: 'auto', padding: '0 16px' }}>
-          {children}
-        </div>
-      </motion.div>
-    </div>
+    <motion.div
+      className={cn(
+        "fixed inset-x-0 z-50 bg-background/80 backdrop-blur-sm shadow-lg",
+        position === 'bottom' ? "bottom-0 rounded-t-xl" : "top-0 rounded-b-xl",
+        className
+      )}
+      initial={{ y: position === 'bottom' ? '100%' : '-100%' }}
+      animate={controls}
+      drag="y"
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={0.2}
+      onDragEnd={handleDragEnd}
+      dragMomentum={false}
+      style={{ touchAction: 'none' }}
+    >
+      {/* Handle for dragging */}
+      <div className="relative w-full">
+        <div 
+          className={cn(
+            "absolute left-1/2 transform -translate-x-1/2 w-12 h-1 rounded-full bg-muted-foreground/30",
+            position === 'bottom' ? "top-2" : "bottom-2"
+          )}
+        />
+      </div>
+      
+      {/* Panel content with scrollable area */}
+      <div className="h-full max-h-[calc(100vh-2rem)] overflow-auto p-6 pt-8">
+        {children}
+      </div>
+    </motion.div>
   );
 };
 

@@ -1,123 +1,135 @@
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createInsightPrompt } from "../utils/promptUtils.ts";
 
-export async function fetchContextData(supabaseClient: any, userId?: string, reflectionId?: string) {
-  const data: Record<string, any> = {};
-  
-  if (!userId) return data;
-  
+/**
+ * Fetches user context from various data sources for personalized AI responses
+ */
+export async function fetchUserContext(userId: string) {
   try {
-    // Fetch user profile data if userId is provided
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('user_profiles')
-      .select('username, astral_level, energy_points, preferences')
-      .eq('id', userId)
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") || "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+    
+    // Get user profile data
+    const { data: profileData, error: profileError } = await supabaseClient
+      .from("user_profiles")
+      .select("*")
+      .eq("id", userId)
       .single();
     
     if (profileError) {
       console.error("Error fetching user profile:", profileError);
-    } else if (profile) {
-      data.userProfile = profile;
     }
     
-    // Fetch reflection data if reflectionId is provided
-    if (reflectionId) {
-      const { data: reflection, error: reflectionError } = await supabaseClient
-        .from('energy_reflections')
-        .select('content, energy_level, chakras, emotions, created_at')
-        .eq('id', reflectionId)
-        .single();
-      
-      if (reflectionError) {
-        console.error("Error fetching reflection:", reflectionError);
-      } else if (reflection) {
-        data.reflection = reflection;
-      }
-      
-      // Get recent reflections for additional context
-      const { data: recentReflections, error: recentError } = await supabaseClient
-        .from('energy_reflections')
-        .select('content, energy_level, created_at')
-        .eq('user_id', userId)
-        .neq('id', reflectionId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      
-      if (recentError) {
-        console.error("Error fetching recent reflections:", recentError);
-      } else if (recentReflections && recentReflections.length > 0) {
-        data.recentReflections = recentReflections;
-      }
+    // Get recent reflections
+    const { data: reflections, error: reflectionsError } = await supabaseClient
+      .from("energy_reflections")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    
+    if (reflectionsError) {
+      console.error("Error fetching reflections:", reflectionsError);
     }
     
-    // Fetch chakra system data
-    const { data: chakraSystem, error: chakraError } = await supabaseClient
-      .from('chakra_systems')
-      .select('chakras')
-      .eq('user_id', userId)
+    // Get chakra system data
+    const { data: chakraData, error: chakraError } = await supabaseClient
+      .from("chakra_systems")
+      .select("*")
+      .eq("user_id", userId)
       .single();
     
-    if (chakraError && chakraError.code !== 'PGRST116') {
-      console.error("Error fetching chakra system:", chakraError);
-    } else if (chakraSystem) {
-      data.chakraSystem = chakraSystem.chakras;
+    if (chakraError) {
+      console.error("Error fetching chakra data:", chakraError);
     }
+    
+    // Get consciousness metrics
+    const { data: metricsData, error: metricsError } = await supabaseClient
+      .from("consciousness_metrics")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (metricsError) {
+      console.error("Error fetching consciousness metrics:", metricsError);
+    }
+    
+    return {
+      profile: profileData || null,
+      recentReflections: reflections || [],
+      chakraSystem: chakraData || null,
+      consciousnessMetrics: metricsData || null
+    };
   } catch (error) {
-    console.error("Error in fetchContextData:", error);
+    console.error("Error in fetchUserContext:", error);
+    return {
+      profile: null,
+      recentReflections: [],
+      chakraSystem: null,
+      consciousnessMetrics: null
+    };
   }
-  
-  return data;
 }
 
-export function buildRichContext(context: string = "", contextData: Record<string, any> = {}) {
-  let richContext = context || "";
+/**
+ * Builds a contextualized prompt based on user data and the current query
+ */
+export function buildContextualizedPrompt(
+  message: string,
+  userContext: any,
+  reflectionContent?: string
+): string {
+  // Start with the user's message
+  let prompt = message;
   
-  // Add user profile context if available
-  if (contextData.userProfile) {
-    const profile = contextData.userProfile;
-    richContext += `\n\nUser Information:\n- Level: ${profile.astral_level || 1}\n- Energy Points: ${profile.energy_points || 0}`;
+  // Add relevant context based on what's available
+  const contextParts = [];
+  
+  // Add reflection content if provided
+  if (reflectionContent) {
+    contextParts.push(`Here is my reflection: "${reflectionContent}"`);
+  }
+  
+  // Add user's consciousness level if available
+  if (userContext.profile?.astral_level) {
+    contextParts.push(`My consciousness level is: ${userContext.profile.astral_level}`);
+  }
+  
+  // Add activated chakras if available
+  if (userContext.chakraSystem?.activated_chakras?.length > 0) {
+    const chakras = userContext.chakraSystem.activated_chakras.join(", ");
+    contextParts.push(`My currently activated chakras are: ${chakras}`);
+  }
+  
+  // Add recent reflection themes if available
+  if (userContext.recentReflections?.length > 0) {
+    const themes = userContext.recentReflections
+      .map((r: any) => r.themes || [])
+      .flat()
+      .filter((t: string, i: number, arr: string[]) => arr.indexOf(t) === i)
+      .slice(0, 5)
+      .join(", ");
     
-    if (profile.preferences) {
-      richContext += `\n- Preferences: ${typeof profile.preferences === 'object' ? JSON.stringify(profile.preferences) : profile.preferences}`;
+    if (themes) {
+      contextParts.push(`Recent themes in my reflections: ${themes}`);
     }
   }
   
-  // Add reflection context if available
-  if (contextData.reflection) {
-    const reflection = contextData.reflection;
-    richContext += `\n\nCurrent Reflection:\n"${reflection.content}"\n`;
-    richContext += `- Energy Level: ${reflection.energy_level || 'Not specified'}\n`;
-    
-    if (reflection.emotions && reflection.emotions.length > 0) {
-      richContext += `- Emotions: ${Array.isArray(reflection.emotions) ? reflection.emotions.join(', ') : reflection.emotions}\n`;
-    }
-    
-    if (reflection.chakras && reflection.chakras.length > 0) {
-      richContext += `- Chakras: ${Array.isArray(reflection.chakras) ? reflection.chakras.join(', ') : reflection.chakras}\n`;
-    }
+  // Combine all context parts
+  if (contextParts.length > 0) {
+    prompt += "\n\nContext:\n" + contextParts.join("\n");
   }
   
-  // Add recent reflections context if available
-  if (contextData.recentReflections && contextData.recentReflections.length > 0) {
-    richContext += `\n\nRecent Reflections:\n`;
-    contextData.recentReflections.forEach((reflection: any, index: number) => {
-      richContext += `${index + 1}. "${reflection.content.substring(0, 100)}${reflection.content.length > 100 ? '...' : ''}"\n`;
-    });
-  }
-  
-  // Add chakra system context if available
-  if (contextData.chakraSystem) {
-    richContext += `\n\nChakra System Status:\n`;
-    
-    for (const [chakra, status] of Object.entries(contextData.chakraSystem)) {
-      richContext += `- ${chakra}: ${status}\n`;
-    }
-  }
-  
-  // Add insight generation prompt if this is for a reflection
-  if (contextData.reflection) {
-    richContext += `\n\n${createInsightPrompt()}`;
-  }
-  
-  return richContext;
+  return prompt;
 }
