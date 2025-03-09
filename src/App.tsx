@@ -17,6 +17,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import DesignSystemDemo from '@/pages/DesignSystemDemo';
 import NotFoundPage from '@/pages/NotFoundPage';
 import OnboardingPage from '@/pages/OnboardingPage';
+import PracticePage from '@/pages/PracticePage';
 import { useEffect } from 'react';
 import { preloadPanelData } from '@/utils/panelDataPreloader';
 
@@ -67,6 +68,16 @@ function App() {
                           <SwipeIndicator position="top" />
                           <SwipeIndicator position="bottom" />
                           <DashboardPage />
+                        </>
+                      } 
+                    />
+                    <Route 
+                      path="/practice" 
+                      element={
+                        <>
+                          <SwipeIndicator position="top" />
+                          <SwipeIndicator position="bottom" />
+                          <PracticePage />
                         </>
                       } 
                     />
