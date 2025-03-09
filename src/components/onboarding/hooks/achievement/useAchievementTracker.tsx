@@ -27,8 +27,10 @@ export function useAchievementTracker(props: AchievementTrackerProps = {}): Achi
       const fetchAchievements = async () => {
         try {
           setIsLoading(true);
-          // Fetch from database via Supabase function
-          const { data, error } = await supabase.from('user_achievements').select('*').eq('user_id', user.id);
+          // Use RPC function instead of direct query to avoid table schema issues
+          const { data, error } = await supabase.rpc('get_user_achievements', { 
+            user_id_param: user.id 
+          });
           
           if (error) {
             console.error('Error fetching achievements:', error);
@@ -37,7 +39,7 @@ export function useAchievementTracker(props: AchievementTrackerProps = {}): Achi
           
           if (data) {
             // Transform the achievement data
-            const processedAchievements = data.map(achievement => {
+            const processedAchievements = data.map((achievement: any) => {
               // Check if achievement_data exists and is not null
               if (achievement.achievement_data) {
                 return {
@@ -279,7 +281,7 @@ export function useAchievementTracker(props: AchievementTrackerProps = {}): Achi
   return {
     earnedAchievements: state.earnedAchievements.map(id => 
       achievementList.find(a => a.id === id)
-    ).filter(Boolean) as any[],
+    ).filter(Boolean) as IAchievementData[],
     currentAchievement: state.currentAchievement 
       ? achievementList.find(a => a.id === state.currentAchievement) 
       : null,

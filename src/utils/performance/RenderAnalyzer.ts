@@ -1,239 +1,185 @@
+
 import { performanceMonitor } from './performanceMonitor';
 
-export interface RenderAnalysis {
-  component: string;
+export interface ComponentRenderMetrics {
+  componentName: string;
   renderCount: number;
   averageRenderTime: number;
-  maxRenderTime: number;
-  renderFrequency: 'low' | 'medium' | 'high' | 'excessive';
-  possibleOptimizations: string[];
-  suggestions: Array<{
-    type: string;
-    description: string;
-    priority: 'low' | 'medium' | 'high' | 'critical';
-  }>;
+  lastRenderTime: number;
+  slowestRenderTime: number;
+  renderFrequency: number; // renders per second
 }
 
-/**
- * Utility for analyzing component render behavior and suggesting optimizations
- */
+export interface RenderInsight {
+  type: 'info' | 'warning' | 'critical';
+  message: string;
+  component: string;
+  metrics?: Partial<ComponentRenderMetrics>;
+  recommendation?: string;
+}
+
 class RenderAnalyzer {
-  private renderStats: Map<string, {
-    count: number;
-    totalTime: number;
-    maxTime: number;
-    lastRenderTimestamp: number;
-    renderTimes: number[];
-    renderIntervals: number[];
-  }> = new Map();
-
-  /**
-   * Record a component render
-   */
-  public recordRender(component: string, duration: number): void {
-    const now = Date.now();
-    const stats = this.renderStats.get(component) || {
-      count: 0,
-      totalTime: 0,
-      maxTime: 0,
-      lastRenderTimestamp: 0,
-      renderTimes: [],
-      renderIntervals: []
-    };
-
-    // Calculate interval if not the first render
-    if (stats.lastRenderTimestamp > 0) {
-      const interval = now - stats.lastRenderTimestamp;
-      stats.renderIntervals.push(interval);
-      
-      // Keep only last 100 intervals
-      if (stats.renderIntervals.length > 100) {
-        stats.renderIntervals.shift();
-      }
+  private startTime: number = Date.now();
+  private insights: RenderInsight[] = [];
+  private lastAnalysisTime: number = 0;
+  private isEnabled: boolean = process.env.NODE_ENV === 'development';
+  
+  constructor() {
+    // Set up interval for periodic analysis
+    if (this.isEnabled) {
+      setInterval(() => this.analyzeRenderMetrics(), 10000); // Every 10 seconds
     }
-
-    // Update stats
-    stats.count++;
-    stats.totalTime += duration;
-    stats.maxTime = Math.max(stats.maxTime, duration);
-    stats.lastRenderTimestamp = now;
-    stats.renderTimes.push(duration);
-
-    // Keep only last 100 render times
-    if (stats.renderTimes.length > 100) {
-      stats.renderTimes.shift();
-    }
-
-    this.renderStats.set(component, stats);
   }
-
+  
   /**
-   * Get frequency category based on render intervals
+   * Analyze component render metrics to generate insights
    */
-  private getRenderFrequency(intervals: number[]): 'low' | 'medium' | 'high' | 'excessive' {
-    if (intervals.length === 0) return 'low';
-
-    const avgInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
-
-    if (avgInterval < 100) return 'excessive';
-    if (avgInterval < 500) return 'high';
-    if (avgInterval < 2000) return 'medium';
-    return 'low';
-  }
-
-  /**
-   * Generate optimization suggestions based on render stats
-   */
-  private generateSuggestions(component: string, stats: any): Array<{
-    type: string;
-    description: string;
-    priority: 'low' | 'medium' | 'high' | 'critical';
-  }> {
-    const suggestions: Array<{
-      type: string;
-      description: string;
-      priority: 'low' | 'medium' | 'high' | 'critical';
-    }> = [];
-
-    // Check for high render count
-    if (stats.count > 50) {
-      suggestions.push({
-        type: 'memo',
-        description: `${component} has rendered ${stats.count} times. Consider using React.memo or useMemo.`,
-        priority: stats.count > 100 ? 'critical' : 'high'
-      });
-    }
-
-    // Check for slow renders
-    const avgRenderTime = stats.totalTime / stats.count;
-    if (avgRenderTime > 16) {
-      suggestions.push({
-        type: 'complexity',
-        description: `${component} takes an average of ${avgRenderTime.toFixed(2)}ms to render. Consider simplifying or code-splitting.`,
-        priority: avgRenderTime > 50 ? 'critical' : 'high'
-      });
-    }
-
-    // Check for rapid re-renders
-    if (stats.renderIntervals.length > 0) {
-      const rapidRenders = stats.renderIntervals.filter(interval => interval < 100).length;
-      const rapidRenderPercentage = (rapidRenders / stats.renderIntervals.length) * 100;
-      
-      if (rapidRenderPercentage > 20) {
-        suggestions.push({
-          type: 'state',
-          description: `${component} re-renders frequently (${rapidRenderPercentage.toFixed(1)}% of renders occur within 100ms). Check for unnecessary state updates.`,
-          priority: rapidRenderPercentage > 50 ? 'critical' : 'high'
-        });
-      }
-    }
-
-    // Add custom performance insights if available
-    const componentMetrics = performanceMonitor.getComponentMetrics(component);
+  public analyzeRenderMetrics(): RenderInsight[] {
+    if (!this.isEnabled) return [];
     
-    // Don't try to access insights if they don't exist
-    if (componentMetrics && componentMetrics.customInsights) {
-      componentMetrics.customInsights.forEach((insight: string) => {
-        suggestions.push({
-          type: 'custom',
-          description: insight,
-          priority: 'medium'
-        });
-      });
+    // Check if we need to analyze (throttle to avoid too frequent analysis)
+    const now = Date.now();
+    if (now - this.lastAnalysisTime < 5000) { // At least 5s between analysis
+      return this.insights;
     }
-
-    return suggestions;
-  }
-
-  /**
-   * Find components with performance issues
-   */
-  public findComponentsWithPerformanceIssues(): RenderAnalysis[] {
-    const result: RenderAnalysis[] = [];
-
-    for (const [component, stats] of this.renderStats.entries()) {
-      // Skip components with very few renders
-      if (stats.count < 3) continue;
-
-      const suggestions = this.generateSuggestions(component, stats);
+    
+    this.lastAnalysisTime = now;
+    this.insights = [];
+    
+    // Get metrics from performance monitor
+    const metrics = performanceMonitor.getAllMetrics();
+    const totalElapsedSeconds = (now - this.startTime) / 1000;
+    
+    Object.entries(metrics).forEach(([componentName, metric]) => {
+      // Skip if missing key metrics
+      if (!metric.renderTimes || !metric.averageRenderTime) return;
       
-      // Only include components with suggestions
-      if (suggestions.length > 0) {
-        result.push({
-          component,
-          renderCount: stats.count,
-          averageRenderTime: stats.totalTime / stats.count,
-          maxRenderTime: stats.maxTime,
-          renderFrequency: this.getRenderFrequency(stats.renderIntervals),
-          possibleOptimizations: suggestions.map(s => s.description),
-          suggestions
-        });
-      }
-    }
-
-    // Sort by highest priority
-    return result.sort((a, b) => {
-      const priorityOrder = {
-        critical: 0,
-        high: 1,
-        medium: 2,
-        low: 3
+      const renderCount = metric.renderTimes.length;
+      const averageRenderTime = metric.averageRenderTime;
+      const lastRenderTime = metric.lastRenderTime || 0;
+      
+      // Calculate render frequency (renders per second)
+      const renderFrequency = renderCount / Math.max(1, totalElapsedSeconds);
+      
+      // Find slowest render time
+      const slowestRenderTime = Math.max(...(metric.renderTimes || [0]));
+      
+      // Collect component metrics
+      const componentMetrics: ComponentRenderMetrics = {
+        componentName,
+        renderCount,
+        averageRenderTime,
+        lastRenderTime,
+        slowestRenderTime,
+        renderFrequency
       };
       
-      const aPriority = Math.min(...a.suggestions.map(s => priorityOrder[s.priority]));
-      const bPriority = Math.min(...b.suggestions.map(s => priorityOrder[s.priority]));
-      
-      return aPriority - bPriority;
+      // Generate insights based on metrics
+      this.generateInsightsForComponent(componentMetrics);
     });
-  }
-
-  /**
-   * Get analysis for a specific component
-   */
-  public getComponentAnalysis(component: string): RenderAnalysis | null {
-    const stats = this.renderStats.get(component);
-    if (!stats || stats.count < 2) return null;
-
-    const suggestions = this.generateSuggestions(component, stats);
     
-    return {
-      component,
-      renderCount: stats.count,
-      averageRenderTime: stats.totalTime / stats.count,
-      maxRenderTime: stats.maxTime,
-      renderFrequency: this.getRenderFrequency(stats.renderIntervals),
-      possibleOptimizations: suggestions.map(s => s.description),
-      suggestions
-    };
+    return this.insights;
   }
-
+  
   /**
-   * Get components with slow renders
+   * Generate insights for a specific component based on its metrics
    */
-  public getComponentsWithSlowRenders(): RenderAnalysis[] {
-    return this.findComponentsWithPerformanceIssues().filter(
-      analysis => analysis.averageRenderTime > 16
-    );
+  private generateInsightsForComponent(metrics: ComponentRenderMetrics): void {
+    const { componentName, renderCount, averageRenderTime, slowestRenderTime, renderFrequency } = metrics;
+    
+    // Check for frequent renders (more than 3 per second is suspicious)
+    if (renderFrequency > 3) {
+      this.insights.push({
+        type: renderFrequency > 10 ? 'critical' : 'warning',
+        message: `High render frequency: ${renderFrequency.toFixed(1)} renders/second`,
+        component: componentName,
+        metrics,
+        recommendation: 'Consider using React.memo() or checking for unnecessary state updates'
+      });
+    }
+    
+    // Check for slow average render times (more than 16ms is slow - below 60fps)
+    if (averageRenderTime > 16) {
+      this.insights.push({
+        type: averageRenderTime > 50 ? 'critical' : 'warning',
+        message: `Slow average render time: ${averageRenderTime.toFixed(2)}ms`,
+        component: componentName,
+        metrics,
+        recommendation: 'Optimize render function or reduce complexity'
+      });
+    }
+    
+    // Check for very slow individual renders (more than 100ms)
+    if (slowestRenderTime > 100) {
+      this.insights.push({
+        type: 'warning',
+        message: `Extremely slow render detected: ${slowestRenderTime.toFixed(2)}ms`,
+        component: componentName,
+        metrics,
+        recommendation: 'Check for expensive operations in render method'
+      });
+    }
+    
+    // Add custom insights if available from performance monitor
+    const fullMetrics = performanceMonitor.getComponentMetrics(componentName);
+    
+    // Note: customInsights is a new field that would be added to PerformanceMetrics
+    // We need to handle it safely in case it doesn't exist yet
+    const customInsights = (fullMetrics as any).customInsights;
+    if (customInsights && Array.isArray(customInsights)) {
+      customInsights.forEach(insight => {
+        this.insights.push({
+          ...insight,
+          component: componentName
+        });
+      });
+    }
   }
-
+  
   /**
-   * Get components with high impact on performance
+   * Get insights for a specific component
    */
-  public getHighImpactComponents(): RenderAnalysis[] {
-    return this.findComponentsWithPerformanceIssues().filter(
-      analysis => analysis.suggestions.some(s => 
-        s.priority === 'critical' || s.priority === 'high'
-      )
-    );
+  public getInsightsForComponent(componentName: string): RenderInsight[] {
+    return this.insights.filter(insight => insight.component === componentName);
   }
-
+  
   /**
-   * Reset all tracked stats
+   * Get critical insights across all components
    */
-  public reset(): void {
-    this.renderStats.clear();
+  public getCriticalInsights(): RenderInsight[] {
+    return this.insights.filter(insight => insight.type === 'critical');
+  }
+  
+  /**
+   * Get all insights
+   */
+  public getAllInsights(): RenderInsight[] {
+    return [...this.insights];
+  }
+  
+  /**
+   * Add a custom insight
+   */
+  public addCustomInsight(insight: RenderInsight): void {
+    this.insights.push(insight);
+  }
+  
+  /**
+   * Clear all insights
+   */
+  public clearInsights(): void {
+    this.insights = [];
+  }
+  
+  /**
+   * Enable or disable the analyzer
+   */
+  public setEnabled(enabled: boolean): void {
+    this.isEnabled = enabled && process.env.NODE_ENV === 'development';
   }
 }
 
-// Export a singleton instance
+// Create singleton instance
 export const renderAnalyzer = new RenderAnalyzer();
+
+export default renderAnalyzer;

@@ -1,6 +1,5 @@
-
 // Fix the import casing issue
-import { performanceMonitor } from '../performance/performanceMonitor';
+import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
 export interface RenderCostMetrics {
   totalRenders: number;

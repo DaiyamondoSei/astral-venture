@@ -1,7 +1,6 @@
 
-import { useEffect, useRef } from 'react';
-import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
-import { usePerfConfig } from './usePerfConfig';
+import { useRef, useEffect } from 'react';
+import { useErrorPrevention as useErrorPreventionContext } from '@/contexts/ErrorPreventionContext';
 
 interface ErrorPreventionOptions {
   trackRenders?: boolean;
@@ -11,72 +10,68 @@ interface ErrorPreventionOptions {
 }
 
 /**
- * A hook to monitor component rendering and help prevent errors
+ * Hook for component error prevention, validation, and performance tracking
  * 
- * @param componentName The name of the component to monitor
- * @param options Options for error prevention monitoring
+ * @param componentName Name of the component to monitor
+ * @param props Component props to validate and track
+ * @param options Configuration options
  */
 export function useErrorPrevention(
   componentName: string,
+  props: Record<string, any> = {},
   options: ErrorPreventionOptions = {}
-) {
-  const startTimeRef = useRef(performance.now());
-  const renderCountRef = useRef(0);
-  const perfConfig = usePerfConfig();
+): void {
+  // Skip in production for performance
+  if (process.env.NODE_ENV !== 'development') return;
   
-  // Skip most logic in production
-  if (process.env.NODE_ENV !== 'development') {
-    return;
-  }
+  const {
+    trackRenders = false,
+    validateProps = false,
+    trackPropChanges = false,
+    throttleInterval = 0
+  } = options;
   
-  const shouldTrack = perfConfig.enableRenderTracking && (options.trackRenders !== false);
+  // Get error prevention context
+  const errorPrevention = useErrorPreventionContext();
   
-  // Track render start time
+  // Store previous render timestamp and props
+  const lastRenderTimeRef = useRef<number>(0);
+  const prevPropsRef = useRef<Record<string, any>>({});
+  
+  // Record render start time
+  const renderStartTimeRef = useRef<number>(performance.now());
+  
+  // Validate props on render if enabled
   useEffect(() => {
-    if (!shouldTrack) return;
+    if (validateProps) {
+      errorPrevention.validateComponent(componentName, props);
+    }
     
-    renderCountRef.current += 1;
-    const renderTime = performance.now() - startTimeRef.current;
+    // Track prop changes between renders if enabled
+    if (trackPropChanges && prevPropsRef.current) {
+      errorPrevention.trackPropChanges(componentName, prevPropsRef.current, props);
+    }
     
-    // Only record if render took more than 5ms
-    if (renderTime > 5) {
-      renderCostAnalyzer.recordRender(componentName, renderTime);
+    // Save current props for next render comparison
+    prevPropsRef.current = { ...props };
+    
+    // Track render time if enabled
+    if (trackRenders) {
+      const now = performance.now();
+      const renderTime = now - renderStartTimeRef.current;
       
-      // Log slow renders
-      if (renderTime > 50 && perfConfig.enableDebugLogging) {
-        console.warn(
-          `[Performance] Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`
-        );
+      // Apply throttling if configured
+      if (throttleInterval <= 0 || now - lastRenderTimeRef.current >= throttleInterval) {
+        errorPrevention.recordRender(componentName, renderTime);
+        lastRenderTimeRef.current = now;
       }
     }
     
-    // Reset for next render
-    startTimeRef.current = performance.now();
-    
-    // Simplified impact analysis - only run occasionally
-    if (renderCountRef.current % 10 === 0) {
-      const analysis = renderCostAnalyzer.getComponentAnalysis(componentName);
-      
-      if (analysis && analysis.suggestions.length > 0) {
-        const highPriorityIssues = analysis.suggestions.filter(s => s.priority === 'high' || s.priority === 'critical');
-        
-        if (highPriorityIssues.length > 0 && perfConfig.enableDebugLogging) {
-          console.warn(
-            `[Performance] Issues detected in ${componentName}:`,
-            highPriorityIssues.map(i => i.description).join('\n')
-          );
-        }
-      }
-    }
+    // Clean up on unmount
+    return () => {
+      // No cleanup needed for this hook
+    };
   });
-  
-  // Simplified props validation
-  if (perfConfig.enableValidation && options.validateProps) {
-    // This would use prop validation logic, simplified for now
-  }
-  
-  return {
-    componentName,
-    renderCount: renderCountRef.current
-  };
 }
+
+export default useErrorPrevention;

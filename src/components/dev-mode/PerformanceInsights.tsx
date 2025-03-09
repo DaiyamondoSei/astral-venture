@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -72,10 +71,9 @@ const PerformanceInsights: React.FC = () => {
     try {
       setIsLoadingBackend(true);
       
-      // Check if the table exists first
+      // Check if the table exists first using our new RPC function
       const { data, error } = await supabase
-        .rpc('get_performance_metrics', { limit_count: 5 })
-        .catch(() => ({ data: null, error: new Error('Performance metrics table does not exist yet') }));
+        .rpc('get_performance_metrics', { limit_count: 5 });
         
       if (error) {
         console.error('Error fetching backend metrics:', error);

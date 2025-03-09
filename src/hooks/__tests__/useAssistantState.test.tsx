@@ -1,87 +1,103 @@
 
-import { renderHook, act } from '@testing-library/react';
+import { render, renderHook, act } from '@testing-library/react';
 import { useAssistantState } from '@/components/ai-assistant/hooks/useAssistantState';
 
-// Mock the API response
-jest.mock('../../utils/ai/AICodeAssistant', () => ({
-  aiCodeAssistant: {
-    registerIntent: jest.fn((description, relatedComponents) => 'mock-intent-id'),
-    updateIntentStatus: jest.fn(() => true),
-    getIntents: jest.fn(() => []),
-    generateSuggestions: jest.fn(() => [])
-  }
-}));
+// Mock data for testing
+type AIResponse = {
+  text: string;
+  sources?: string[];
+  type?: 'text' | 'error' | 'loading';
+};
 
 describe('useAssistantState', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('should initialize with default state', () => {
     const { result } = renderHook(() => useAssistantState());
     
     expect(result.current.question).toBe('');
-    expect(result.current.response).toEqual({ content: '', metadata: {} });
-    expect(result.current.loading).toBe(false);
-    expect(result.current.messages).toEqual([]);
-    expect(result.current.error).toBe(null);
+    expect(result.current.response).toEqual({ text: '', type: 'text' });
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.hasError).toBe(false);
   });
 
-  it('should update loading state', () => {
+  it('should update question', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setLoading(true);
+      result.current.setQuestion('How do I meditate?');
     });
     
-    expect(result.current.loading).toBe(true);
+    expect(result.current.question).toBe('How do I meditate?');
   });
 
-  it('should add a message to the conversation', () => {
-    const { result } = renderHook(() => useAssistantState());
-    const message = { role: 'user', content: 'Hello', timestamp: new Date() };
-    
-    act(() => {
-      result.current.addMessage(message);
-    });
-    
-    expect(result.current.messages).toContain(message);
-  });
-
-  it('should add an AI response to the conversation', () => {
+  it('should update response', () => {
     const { result } = renderHook(() => useAssistantState());
     
     act(() => {
-      result.current.setResponse({
-        content: 'Hello from AI',
-        metadata: { processingTime: 500 }
+      result.current.setResponse({ 
+        text: 'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.',
+        type: 'text'
       });
     });
     
-    // Check if response is set properly
-    expect(result.current.response.content).toBe('Hello from AI');
+    expect(result.current.response.text).toBe(
+      'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.'
+    );
   });
 
-  it('should clear the conversation', () => {
+  it('should handle submission state', () => {
     const { result } = renderHook(() => useAssistantState());
-    const message = { role: 'user', content: 'Hello', timestamp: new Date() };
     
     act(() => {
-      result.current.addMessage(message);
+      result.current.setIsSubmitting(true);
+    });
+    
+    expect(result.current.isSubmitting).toBe(true);
+    
+    act(() => {
+      result.current.setIsSubmitting(false);
+    });
+    
+    expect(result.current.isSubmitting).toBe(false);
+  });
+
+  it('should handle error state', () => {
+    const { result } = renderHook(() => useAssistantState());
+    
+    act(() => {
+      result.current.setResponse({ 
+        text: 'Failed to process your request. Please try again.',
+        type: 'error'
+      });
+      result.current.setHasError(true);
+    });
+    
+    expect(result.current.hasError).toBe(true);
+    expect(result.current.response.type).toBe('error');
+  });
+
+  it('should reset state', () => {
+    const { result } = renderHook(() => useAssistantState());
+    
+    // Set some state first
+    act(() => {
+      result.current.setQuestion('How do I meditate?');
+      result.current.setResponse({ 
+        text: 'Meditation is a practice where an individual uses a technique to focus their mind on a particular object, thought, or activity.',
+        type: 'text'
+      });
+      result.current.setIsSubmitting(true);
+      result.current.setHasError(true);
+    });
+    
+    // Then reset
+    act(() => {
       result.current.reset();
     });
     
-    expect(result.current.messages).toHaveLength(0);
-  });
-
-  it('should set an error', () => {
-    const { result } = renderHook(() => useAssistantState());
-    const error = 'Test error';
-    
-    act(() => {
-      result.current.setError(error);
-    });
-    
-    expect(result.current.error).toBe(error);
+    // Verify reset state
+    expect(result.current.question).toBe('');
+    expect(result.current.response).toEqual({ text: '', type: 'text' });
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.hasError).toBe(false);
   });
 });

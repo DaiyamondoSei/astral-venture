@@ -1,128 +1,129 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { startGlobalComponentMonitoring, validateAllMonitoredComponents } from '@/utils/componentDoc';
-import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
-interface ValidationResult {
+// Types for error prevention
+export interface ValidationResult {
   valid: boolean;
-  errors: string[];
+  errors?: string[];
 }
 
-interface ErrorPreventionContextType {
-  isEnabled: boolean;
-  enableErrorPrevention: () => void;
-  disableErrorPrevention: () => void;
-  validateAllComponents: () => ValidationResult;
-  getHighImpactComponents: () => any[];
-  getSlowComponents: () => any[];
-  resetMetrics: () => void;
+export interface ErrorPreventionContextType {
+  validateComponent: (componentName: string, props: Record<string, any>) => ValidationResult;
+  recordRender: (componentName: string, renderTime: number) => void;
+  registerValidationRules: (componentName: string, rules: ValidationRule[]) => void;
+  trackPropChanges: (componentName: string, prevProps: Record<string, any>, newProps: Record<string, any>) => void;
+  getComponentErrors: (componentName: string) => string[];
+  getCurrentValidationStatus: () => Record<string, ValidationResult>;
+  clearValidationErrors: (componentName: string) => void;
 }
 
-const ErrorPreventionContext = createContext<ErrorPreventionContextType>({
-  isEnabled: false,
-  enableErrorPrevention: () => {},
-  disableErrorPrevention: () => {},
-  validateAllComponents: () => ({ valid: true, errors: [] }),
-  getHighImpactComponents: () => [],
-  getSlowComponents: () => [],
-  resetMetrics: () => {}
+export interface ValidationRule {
+  prop: string;
+  validate: (value: any) => boolean;
+  message: string;
+}
+
+// Create context with default values
+export const ErrorPreventionContext = createContext<ErrorPreventionContextType>({
+  validateComponent: () => ({ valid: true, errors: [] }),
+  recordRender: () => {},
+  registerValidationRules: () => {},
+  trackPropChanges: () => {},
+  getComponentErrors: () => [],
+  getCurrentValidationStatus: () => ({}),
+  clearValidationErrors: () => {}
 });
 
-export const useErrorPreventionContext = () => useContext(ErrorPreventionContext);
-
+// Provider component
 export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Only enabled in development by default, always disabled in production
-  const [isEnabled, setIsEnabled] = useState(process.env.NODE_ENV === 'development');
-  
-  useEffect(() => {
-    if (isEnabled && process.env.NODE_ENV === 'development') {
-      console.log('Error prevention system enabled');
-      startGlobalComponentMonitoring();
-      
-      // Enable the analyzers
-      renderCostAnalyzer.setEnabled(true);
-      
-      // Set up interval to check for issues, but less frequently (every 30 seconds)
-      const intervalId = setInterval(() => {
-        const highImpactComponents = renderCostAnalyzer.getHighImpactComponents();
-        
-        if (highImpactComponents.length > 0) {
-          const criticalComponents = highImpactComponents.filter(
-            comp => comp.suggestions.some(s => s.priority === 'critical')
-          );
-          
-          if (criticalComponents.length > 0) {
-            console.warn(
-              'Critical performance issues detected in components:',
-              criticalComponents.map(c => c.component).join(', ')
-            );
-          }
-        }
-      }, 30000); // Check every 30 seconds instead of 10
-      
-      return () => {
-        clearInterval(intervalId);
-        renderCostAnalyzer.setEnabled(false);
-      };
-    } else {
-      // Make sure analyzers are disabled
-      renderCostAnalyzer.setEnabled(false);
-    }
-  }, [isEnabled]);
-  
-  // These functions should do nothing in production
-  const enableErrorPrevention = () => {
-    if (process.env.NODE_ENV === 'development') {
-      setIsEnabled(true);
-    }
+  const [validationRules, setValidationRules] = useState<Record<string, ValidationRule[]>>({});
+  const [validationStatus, setValidationStatus] = useState<Record<string, ValidationResult>>({});
+
+  // Register validation rules for a component
+  const registerValidationRules = (componentName: string, rules: ValidationRule[]) => {
+    setValidationRules(prev => ({
+      ...prev,
+      [componentName]: rules
+    }));
   };
-  
-  const disableErrorPrevention = () => {
-    setIsEnabled(false);
-    renderCostAnalyzer.setEnabled(false);
+
+  // Validate component props against registered rules
+  const validateComponent = (componentName: string, props: Record<string, any>): ValidationResult => {
+    const rules = validationRules[componentName] || [];
+    const errors: string[] = [];
+    
+    rules.forEach(rule => {
+      if (props.hasOwnProperty(rule.prop) && !rule.validate(props[rule.prop])) {
+        errors.push(rule.message);
+      }
+    });
+    
+    const result = { valid: errors.length === 0, errors };
+    
+    // Update validation status
+    setValidationStatus(prev => ({
+      ...prev,
+      [componentName]: result
+    }));
+    
+    return result;
   };
-  
-  const validateAllComponents = (): ValidationResult => {
-    if (process.env.NODE_ENV === 'development') {
-      const result = validateAllMonitoredComponents();
-      return result ? { 
-        valid: result.valid, 
-        errors: result.errors || [] 
-      } : { valid: true, errors: [] };
-    }
-    return { valid: true, errors: [] };
+
+  // Record component render time using performance monitor
+  const recordRender = (componentName: string, renderTime: number) => {
+    performanceMonitor.recordRender(componentName, renderTime);
   };
-  
-  const getHighImpactComponents = () => {
-    return process.env.NODE_ENV === 'development' 
-      ? renderCostAnalyzer.getHighImpactComponents()
-      : [];
-  };
-  
-  const getSlowComponents = () => {
-    return process.env.NODE_ENV === 'development' 
-      ? renderCostAnalyzer.getComponentsWithSlowRenders()
-      : [];
-  };
-  
-  const resetMetrics = () => {
-    if (process.env.NODE_ENV === 'development') {
-      renderCostAnalyzer.reset();
-      performanceMonitor.clearMetrics();
+
+  // Track prop changes between renders
+  const trackPropChanges = (componentName: string, prevProps: Record<string, any>, newProps: Record<string, any>) => {
+    const changes: Record<string, { from: any, to: any }> = {};
+    let hasChanges = false;
+    
+    // Find changed props
+    Object.keys(newProps).forEach(key => {
+      if (prevProps[key] !== newProps[key]) {
+        changes[key] = { from: prevProps[key], to: newProps[key] };
+        hasChanges = true;
+      }
+    });
+    
+    // Log changes in development mode
+    if (hasChanges && process.env.NODE_ENV === 'development') {
+      console.debug(`[${componentName}] Props changed:`, changes);
     }
   };
-  
+
+  // Get component validation errors
+  const getComponentErrors = (componentName: string): string[] => {
+    const status = validationStatus[componentName];
+    return status && status.errors ? status.errors : [];
+  };
+
+  // Get current validation status for all components
+  const getCurrentValidationStatus = (): Record<string, ValidationResult> => {
+    return validationStatus;
+  };
+
+  // Clear validation errors for a component
+  const clearValidationErrors = (componentName: string) => {
+    setValidationStatus(prev => {
+      const newStatus = { ...prev };
+      delete newStatus[componentName];
+      return newStatus;
+    });
+  };
+
   return (
     <ErrorPreventionContext.Provider
       value={{
-        isEnabled,
-        enableErrorPrevention,
-        disableErrorPrevention,
-        validateAllComponents,
-        getHighImpactComponents,
-        getSlowComponents,
-        resetMetrics
+        validateComponent,
+        recordRender,
+        registerValidationRules,
+        trackPropChanges,
+        getComponentErrors,
+        getCurrentValidationStatus,
+        clearValidationErrors
       }}
     >
       {children}
@@ -130,5 +131,5 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
   );
 };
 
-// Export the context hook with a name distinct from the hook in useErrorPrevention.ts
-export { useErrorPreventionContext as useErrorPrevention };
+// Hook to use error prevention context
+export const useErrorPrevention = () => useContext(ErrorPreventionContext);

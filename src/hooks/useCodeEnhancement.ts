@@ -37,7 +37,7 @@ export function useCodeEnhancement(
   // Only run this on mount
   useEffect(() => {
     // Higher sampling threshold - only monitor 10% of components
-    sampledRef.current = Math.random() < (config.samplingRate * 0.5);
+    sampledRef.current = Math.random() < 0.1; // Use fixed sampling rate for now
   }, []); // Empty deps array to only run on mount
   
   // If component is not in the sample, skip monitoring completely
@@ -56,7 +56,7 @@ export function useCodeEnhancement(
   
   // Only enable monitoring for high priority components or by random chance
   const priorityFactor = priority === 'high' ? 0.8 : priority === 'medium' ? 0.3 : 0.1;
-  const shouldMonitor = Math.random() < (config.samplingRate * priorityFactor);
+  const shouldMonitor = Math.random() < priorityFactor;
   
   if (!shouldMonitor) return;
   
@@ -64,8 +64,8 @@ export function useCodeEnhancement(
   if (config.enablePerformanceTracking && (complexity > 1 || priority === 'high')) {
     usePerformanceTracking(componentName, {
       enabled: true,
-      throttleInterval: config.throttleInterval * 2, // Double the throttle interval
-      batchUpdates: config.batchUpdates
+      throttleInterval: 1000, // Use fixed throttle value
+      batchUpdates: true
     });
   }
   
@@ -77,7 +77,7 @@ export function useCodeEnhancement(
       hooks,
       childComponents,
       enabled: true,
-      throttleInterval: config.throttleInterval * 2 // Double the throttle interval
+      throttleInterval: 1000 // Use fixed throttle value
     });
   }
   
@@ -88,12 +88,7 @@ export function useCodeEnhancement(
     // Only pass in the props we need to track
     const propsToTrack = { complexity };
     
-    useErrorPrevention(componentName, propsToTrack, {
-      trackRenders: trackRenders && config.enableRenderTracking && complexity > 1,
-      validateProps: validateProps && config.enableValidation,
-      trackPropChanges: trackPropChanges && config.enablePropTracking && complexity > 1,
-      throttleInterval: config.throttleInterval * 3 // Triple the throttle interval
-    });
+    useErrorPrevention(componentName, propsToTrack);
   }
   
   // Skip lifecycle logging to reduce console noise

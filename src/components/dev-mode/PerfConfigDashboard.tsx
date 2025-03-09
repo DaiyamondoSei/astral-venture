@@ -88,7 +88,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Performance Tracking</span>
                         <Switch 
                           checked={config.enablePerformanceTracking} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ enablePerformanceTracking: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ enablePerformanceTracking: checked })}
                         />
                       </div>
                       
@@ -96,7 +96,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Render Tracking</span>
                         <Switch 
                           checked={config.enableRenderTracking} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ enableRenderTracking: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ enableRenderTracking: checked })}
                         />
                       </div>
                       
@@ -104,7 +104,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Props Validation</span>
                         <Switch 
                           checked={config.enableValidation} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ enableValidation: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ enableValidation: checked })}
                         />
                       </div>
                       
@@ -112,7 +112,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Props Change Tracking</span>
                         <Switch 
                           checked={config.enablePropTracking} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ enablePropTracking: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ enablePropTracking: checked })}
                         />
                       </div>
                       
@@ -120,7 +120,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Debug Logging</span>
                         <Switch 
                           checked={config.enableDebugLogging} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ enableDebugLogging: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ enableDebugLogging: checked })}
                         />
                       </div>
                     </div>
@@ -137,7 +137,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Intelligent Profiling</span>
                         <Switch 
                           checked={config.intelligentProfiling} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ intelligentProfiling: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ intelligentProfiling: checked })}
                         />
                       </div>
                       
@@ -145,7 +145,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Inactive Tab Throttling</span>
                         <Switch 
                           checked={config.inactiveTabThrottling} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ inactiveTabThrottling: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ inactiveTabThrottling: checked })}
                         />
                       </div>
                       
@@ -153,7 +153,7 @@ const PerfConfigDashboard = () => {
                         <span className="text-sm">Batch Updates</span>
                         <Switch 
                           checked={config.batchUpdates} 
-                          onCheckedChange={(checked) => config.setPerformanceConfig({ batchUpdates: checked })}
+                          onCheckedChange={(checked) => config.updateConfig({ batchUpdates: checked })}
                         />
                       </div>
                     </div>
@@ -177,7 +177,7 @@ const PerfConfigDashboard = () => {
                           min={1} 
                           max={100} 
                           step={1} 
-                          onValueChange={(value) => config.setPerformanceConfig({ 
+                          onValueChange={(value) => config.updateConfig({ 
                             samplingRate: value[0] / 100 
                           })}
                         />
@@ -193,7 +193,7 @@ const PerfConfigDashboard = () => {
                           min={0} 
                           max={2000} 
                           step={100}
-                          onValueChange={(value) => config.setPerformanceConfig({ 
+                          onValueChange={(value) => config.updateConfig({ 
                             throttleInterval: value[0] 
                           })}
                         />
@@ -209,7 +209,7 @@ const PerfConfigDashboard = () => {
                           min={5} 
                           max={100} 
                           step={5}
-                          onValueChange={(value) => config.setPerformanceConfig({ 
+                          onValueChange={(value) => config.updateConfig({ 
                             maxTrackedComponents: value[0] 
                           })}
                         />
