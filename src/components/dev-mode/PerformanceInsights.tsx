@@ -29,15 +29,25 @@ const PerformanceInsights: React.FC = () => {
 
     // Get initial metrics
     setMetrics(performanceMonitor.getAllMetrics());
+    
+    // Auto-refresh every 10 seconds
+    const intervalId = setInterval(() => {
+      if (isOpen) {
+        refreshMetrics();
+      }
+    }, 10000);
 
     return () => {
       unsubscribe();
+      clearInterval(intervalId);
     };
-  }, [refreshKey]);
+  }, [refreshKey, isOpen]);
 
+  // Filter to only show the most important metrics
   const componentsSortedByRenderTime = Object.values(metrics)
-    .filter(m => m.averageRenderTime !== undefined)
-    .sort((a, b) => (b.averageRenderTime || 0) - (a.averageRenderTime || 0));
+    .filter(m => m.averageRenderTime !== undefined && m.averageRenderTime > 10) // Only show components above 10ms
+    .sort((a, b) => (b.averageRenderTime || 0) - (a.averageRenderTime || 0))
+    .slice(0, 5); // Show only top 5
 
   const clearMetrics = () => {
     performanceMonitor.clearMetrics();
@@ -53,7 +63,7 @@ const PerformanceInsights: React.FC = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 left-4 z-50 bg-purple-700 hover:bg-purple-800"
+        className="fixed bottom-4 left-4 z-50 bg-purple-700 hover:bg-purple-800 opacity-70 hover:opacity-100"
         size="sm"
       >
         <Zap className="w-4 h-4 mr-2" />
@@ -63,12 +73,12 @@ const PerformanceInsights: React.FC = () => {
   }
 
   return (
-    <Card className="fixed bottom-4 left-4 w-96 h-96 z-50 shadow-xl overflow-hidden">
+    <Card className="fixed bottom-4 left-4 w-80 h-80 z-50 shadow-xl overflow-hidden opacity-90 hover:opacity-100">
       <CardHeader className="p-3 bg-purple-700 text-white">
         <div className="flex justify-between items-center">
           <CardTitle className="text-base flex items-center">
             <Zap className="w-4 h-4 mr-2" />
-            Performance Insights
+            Performance Monitor
           </CardTitle>
           <div className="flex space-x-1">
             <Button variant="ghost" size="sm" onClick={refreshMetrics} className="h-7 w-7 p-0 text-white">
@@ -85,8 +95,7 @@ const PerformanceInsights: React.FC = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-1">
           <TabsList className="bg-purple-800/50 h-8">
             <TabsTrigger value="overview" className="text-xs h-7">Overview</TabsTrigger>
-            <TabsTrigger value="components" className="text-xs h-7">Components</TabsTrigger>
-            <TabsTrigger value="timeline" className="text-xs h-7">Timeline</TabsTrigger>
+            <TabsTrigger value="slow" className="text-xs h-7">Slow Components</TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>
@@ -105,7 +114,7 @@ const PerformanceInsights: React.FC = () => {
                     Slowest Components
                   </h3>
                   <ul className="space-y-2">
-                    {componentsSortedByRenderTime.slice(0, 5).map((metric, index) => (
+                    {componentsSortedByRenderTime.slice(0, 3).map((metric, index) => (
                       <li key={index} className="text-sm flex justify-between items-center">
                         <span className="font-medium">{metric.componentName}</span>
                         <span className="text-amber-600 font-mono">
@@ -116,71 +125,54 @@ const PerformanceInsights: React.FC = () => {
                   </ul>
                 </>
               )}
+              
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={clearMetrics} 
+                className="w-full mt-4"
+              >
+                Clear Metrics
+              </Button>
+              
+              <div className="text-xs text-muted-foreground mt-2">
+                Performance monitoring is enabled for development only.
+                <br />
+                <strong>Tip:</strong> Disable for better performance.
+              </div>
             </div>
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="components" className="h-full mt-0">
-          <ScrollArea className="h-full">
-            <div className="p-3 space-y-4">
-              {Object.values(metrics).length > 0 ? (
-                Object.values(metrics).map((metric, index) => (
-                  <div key={index} className="border rounded p-2 space-y-1 text-sm">
-                    <div className="font-medium flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {metric.componentName}
-                    </div>
-                    <div className="grid grid-cols-2 text-xs gap-y-1">
-                      <span className="text-muted-foreground">Render count:</span>
-                      <span>{metric.renderTimes?.length || 0}</span>
-                      <span className="text-muted-foreground">Average time:</span>
-                      <span>{metric.averageRenderTime?.toFixed(2) || 0}ms</span>
-                      <span className="text-muted-foreground">Last render:</span>
-                      <span>{metric.lastRenderTime?.toFixed(2) || 0}ms</span>
-                    </div>
-                    {metric.insights && metric.insights.length > 0 && (
-                      <div className="mt-2 text-xs space-y-1">
-                        <span className="font-medium">Insights:</span>
-                        <ul className="ml-2 space-y-1">
-                          {metric.insights.map((insight, i) => (
-                            <li key={i} className="text-amber-600">{insight}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center text-muted-foreground">
-                  No components tracked yet
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </TabsContent>
-
-        <TabsContent value="timeline" className="h-full mt-0">
+        <TabsContent value="slow" className="h-full mt-0">
           <ScrollArea className="h-full p-3">
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">Recent Renders</h3>
-              {Object.values(metrics).some(m => m.renderTimeline && m.renderTimeline.length > 0) ? (
-                <div className="space-y-1">
-                  {Object.values(metrics)
-                    .flatMap(m => m.renderTimeline || [])
-                    .sort((a, b) => b.endTime - a.endTime)
-                    .slice(0, 20)
-                    .map((timeline, index) => (
-                      <div key={index} className="text-xs border-l-2 border-purple-200 pl-2 py-1">
-                        <div className="font-medium">{timeline.component}</div>
-                        <div className="text-muted-foreground">
-                          {timeline.duration.toFixed(2)}ms at {new Date(timeline.endTime).toLocaleTimeString()}
-                        </div>
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Slow Rendering Components</h3>
+              
+              {componentsSortedByRenderTime.length > 0 ? (
+                <div className="space-y-2">
+                  {componentsSortedByRenderTime.map((metric, index) => (
+                    <div key={index} className="border rounded p-2 space-y-1 text-sm">
+                      <div className="font-medium flex items-center text-amber-600">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {metric.componentName}
                       </div>
-                    ))}
+                      <div className="grid grid-cols-2 text-xs gap-y-1">
+                        <span className="text-muted-foreground">Renders:</span>
+                        <span>{metric.renderTimes?.length || 0}</span>
+                        <span className="text-muted-foreground">Avg time:</span>
+                        <span className="font-bold">{metric.averageRenderTime?.toFixed(2) || 0}ms</span>
+                      </div>
+                      
+                      <div className="text-xs text-amber-500 mt-1">
+                        Consider optimizing or memoizing this component
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="text-center text-muted-foreground">
-                  No render timeline data yet
+                <div className="text-center text-muted-foreground p-4">
+                  No slow components detected yet
                 </div>
               )}
             </div>

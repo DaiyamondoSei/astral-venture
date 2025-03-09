@@ -24,17 +24,21 @@ const ErrorPreventionContext = createContext<ErrorPreventionContextType>({
   resetMetrics: () => {}
 });
 
-export const useErrorPrevention = () => useContext(ErrorPreventionContext);
+export const useErrorPreventionContext = () => useContext(ErrorPreventionContext);
 
 export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Only enabled in development by default, always disabled in production
   const [isEnabled, setIsEnabled] = useState(process.env.NODE_ENV === 'development');
   
   useEffect(() => {
-    if (isEnabled) {
+    if (isEnabled && process.env.NODE_ENV === 'development') {
       console.log('Error prevention system enabled');
       startGlobalComponentMonitoring();
       
-      // Set up interval to check for issues
+      // Enable the analyzers
+      renderCostAnalyzer.setEnabled(true);
+      
+      // Set up interval to check for issues, but less frequently (every 30 seconds)
       const intervalId = setInterval(() => {
         const highImpactComponents = renderCostAnalyzer.getHighImpactComponents();
         
@@ -50,30 +54,53 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
             );
           }
         }
-      }, 10000); // Check every 10 seconds
+      }, 30000); // Check every 30 seconds instead of 10
       
-      return () => clearInterval(intervalId);
+      return () => {
+        clearInterval(intervalId);
+        renderCostAnalyzer.setEnabled(false);
+      };
+    } else {
+      // Make sure analyzers are disabled
+      renderCostAnalyzer.setEnabled(false);
     }
   }, [isEnabled]);
   
-  const enableErrorPrevention = () => setIsEnabled(true);
-  const disableErrorPrevention = () => setIsEnabled(false);
+  // These functions should do nothing in production
+  const enableErrorPrevention = () => {
+    if (process.env.NODE_ENV === 'development') {
+      setIsEnabled(true);
+    }
+  };
+  
+  const disableErrorPrevention = () => {
+    setIsEnabled(false);
+    renderCostAnalyzer.setEnabled(false);
+  };
   
   const validateAllComponents = () => {
-    return validateAllMonitoredComponents() || { valid: true, errors: [] };
+    return process.env.NODE_ENV === 'development' 
+      ? validateAllMonitoredComponents() || { valid: true, errors: [] }
+      : { valid: true, errors: [] };
   };
   
   const getHighImpactComponents = () => {
-    return renderCostAnalyzer.getHighImpactComponents();
+    return process.env.NODE_ENV === 'development' 
+      ? renderCostAnalyzer.getHighImpactComponents()
+      : [];
   };
   
   const getSlowComponents = () => {
-    return renderCostAnalyzer.getComponentsWithSlowRenders();
+    return process.env.NODE_ENV === 'development' 
+      ? renderCostAnalyzer.getComponentsWithSlowRenders()
+      : [];
   };
   
   const resetMetrics = () => {
-    renderCostAnalyzer.reset();
-    performanceMonitor.clearMetrics();
+    if (process.env.NODE_ENV === 'development') {
+      renderCostAnalyzer.reset();
+      performanceMonitor.clearMetrics();
+    }
   };
   
   return (
@@ -92,3 +119,6 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
     </ErrorPreventionContext.Provider>
   );
 };
+
+// Export the context hook with a name distinct from the hook in useErrorPrevention.ts
+export { useErrorPreventionContext as useErrorPrevention };

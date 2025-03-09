@@ -1,7 +1,8 @@
+
 import { useEffect, useRef } from 'react';
 import { renderCostAnalyzer } from '@/utils/error-prevention/RenderCostAnalyzer';
 import { DeepPropAnalyzer } from '@/utils/error-prevention/DeepPropAnalyzer';
-import { monitorComponent, validateProps } from '@/utils/componentDoc';
+import { monitorComponent } from '@/utils/componentDoc';
 
 /**
  * Hook to enable error prevention on a component
@@ -22,12 +23,15 @@ export function useErrorPrevention(
     batchUpdates?: boolean;
   } = {}
 ) {
+  // Skip all tracking in production
+  if (process.env.NODE_ENV !== 'development') return { getComponentAnalysis: () => null };
+  
   const {
     trackRenders = true,
     validateProps: shouldValidateProps = true,
     trackPropChanges = true,
     trackStateChanges = false,
-    throttleInterval = 0,
+    throttleInterval = 1000, // Increase default throttle interval
     batchUpdates = true
   } = options;
   
@@ -37,50 +41,63 @@ export function useErrorPrevention(
   // Start tracking render time
   const renderStartTimeRef = useRef<number>(0);
   
-  if (trackRenders) {
+  // Skip tracking if outside throttle interval
+  const lastTrackTimeRef = useRef<number>(0);
+  const now = Date.now();
+  const shouldTrack = now - lastTrackTimeRef.current > throttleInterval;
+  
+  if (trackRenders && shouldTrack) {
     renderStartTimeRef.current = performance.now();
+    lastTrackTimeRef.current = now;
   }
   
-  // Validate props if needed
+  // Validate props if needed, but less frequently
   useEffect(() => {
+    // Only run if we should be tracking
+    if (!shouldTrack) return;
+    
     if (shouldValidateProps) {
       monitorComponent(componentName, props);
     }
     
-    // Track prop changes if needed
+    // Track prop changes if needed, and we have previous props
     if (trackPropChanges && prevPropsRef.current) {
       const propChanges = DeepPropAnalyzer.analyzePropChanges(prevPropsRef.current, props);
       
-      if (propChanges.length > 0) {
-        console.debug(`[${componentName}] Props changed:`, 
-          propChanges.map(change => DeepPropAnalyzer.formatPropChange(change))
+      // Only log if there are significant changes
+      if (propChanges.length > 0 && propChanges.some(c => c.importance === 'high')) {
+        console.debug(`[${componentName}] Significant props changed:`, 
+          propChanges
+            .filter(c => c.importance === 'high')
+            .map(change => DeepPropAnalyzer.formatPropChange(change))
         );
       }
     }
     
     // Update prevProps for next render
     prevPropsRef.current = { ...props };
-  }, [componentName, props, shouldValidateProps, trackPropChanges]);
+  }, [componentName, props, shouldValidateProps, trackPropChanges, shouldTrack]);
   
   // Track render time when component renders
   useEffect(() => {
-    if (trackRenders) {
-      const renderEndTime = performance.now();
-      const renderDuration = renderEndTime - renderStartTimeRef.current;
-      
-      renderCostAnalyzer.recordRender(
-        componentName,
-        renderDuration,
-        props,
-        prevPropsRef.current
-      );
-      
-      // Log slow renders
-      if (renderDuration > 16) {
-        console.warn(`[${componentName}] Slow render: ${renderDuration.toFixed(2)}ms`);
-      }
+    // Skip if we're not tracking or outside throttle interval
+    if (!trackRenders || !shouldTrack) return;
+    
+    const renderEndTime = performance.now();
+    const renderDuration = renderEndTime - renderStartTimeRef.current;
+    
+    renderCostAnalyzer.recordRender(
+      componentName,
+      renderDuration,
+      props,
+      prevPropsRef.current
+    );
+    
+    // Only log very slow renders
+    if (renderDuration > 50) { // Increased threshold from 16ms to 50ms
+      console.warn(`[${componentName}] Very slow render: ${renderDuration.toFixed(2)}ms`);
     }
-  });
+  }, [componentName, props, trackRenders, shouldTrack]);
   
   return {
     // Expose any useful metrics or functions

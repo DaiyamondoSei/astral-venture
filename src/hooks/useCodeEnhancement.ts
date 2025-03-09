@@ -18,7 +18,7 @@ interface CodeEnhancementOptions {
 
 /**
  * Unified hook for performance tracking, render tracking, and error prevention
- * with automatic sampling and throttling
+ * with automatic sampling and throttling - optimized for minimal overhead
  * 
  * @param componentName Name of the component using this hook
  * @param options Enhancement options and component metadata
@@ -34,12 +34,13 @@ export function useCodeEnhancement(
   const config = usePerfConfig();
   const sampledRef = useRef<boolean>(false);
   
-  // Determine if this component should be monitored based on sampling rate
+  // Only run this on mount
   useEffect(() => {
-    sampledRef.current = Math.random() < config.samplingRate;
-  }, [config.samplingRate, componentName]);
+    // Higher sampling threshold - only monitor 10% of components
+    sampledRef.current = Math.random() < (config.samplingRate * 0.5);
+  }, []); // Empty deps array to only run on mount
   
-  // If component is not in the sample, skip monitoring
+  // If component is not in the sample, skip monitoring completely
   if (!sampledRef.current) return;
   
   const {
@@ -47,54 +48,53 @@ export function useCodeEnhancement(
     dependencies = [],
     hooks = [],
     childComponents = [],
-    trackRenders = true,
-    validateProps = true,
-    trackPropChanges = true,
+    trackRenders = false, // Default to false to reduce overhead
+    validateProps = false, // Default to false to reduce overhead
+    trackPropChanges = false, // Default to false to reduce overhead
     priority = 'medium'
   } = options;
   
-  // Only enable monitoring based on priority and max components limit
-  const priorityFactor = priority === 'high' ? 1 : priority === 'medium' ? 0.6 : 0.3;
+  // Only enable monitoring for high priority components or by random chance
+  const priorityFactor = priority === 'high' ? 0.8 : priority === 'medium' ? 0.3 : 0.1;
   const shouldMonitor = Math.random() < (config.samplingRate * priorityFactor);
   
   if (!shouldMonitor) return;
   
-  // Only use performance tracking if globally enabled
-  usePerformanceTracking(componentName, {
-    enabled: config.enablePerformanceTracking,
-    throttleInterval: config.throttleInterval,
-    batchUpdates: config.batchUpdates
-  });
+  // Only use performance tracking if globally enabled and for high complexity components
+  if (config.enablePerformanceTracking && (complexity > 1 || priority === 'high')) {
+    usePerformanceTracking(componentName, {
+      enabled: true,
+      throttleInterval: config.throttleInterval * 2, // Double the throttle interval
+      batchUpdates: config.batchUpdates
+    });
+  }
   
-  // Only use render tracking if globally enabled
-  useRenderTracking(componentName, {
-    complexity,
-    dependencies,
-    hooks,
-    childComponents,
-    enabled: config.enableRenderTracking && trackRenders,
-    throttleInterval: config.throttleInterval
-  });
+  // Only use render tracking if globally enabled and for high complexity or high priority components
+  if (config.enableRenderTracking && trackRenders && (complexity > 2 || priority === 'high')) {
+    useRenderTracking(componentName, {
+      complexity,
+      dependencies,
+      hooks,
+      childComponents,
+      enabled: true,
+      throttleInterval: config.throttleInterval * 2 // Double the throttle interval
+    });
+  }
   
-  // Only use error prevention if globally enabled
-  const props = { complexity, dependencies, hooks, childComponents };
-  useErrorPrevention(componentName, props, {
-    trackRenders: trackRenders && config.enableRenderTracking,
-    validateProps: validateProps && config.enableValidation,
-    trackPropChanges: trackPropChanges && config.enablePropTracking
-  });
-  
-  // Log component lifecycle with less verbosity
-  useEffect(() => {
-    if (!config.enableDebugLogging) return;
+  // Only use error prevention for validation if enabled and for complex components
+  if ((config.enableValidation && validateProps) || 
+      (config.enablePropTracking && trackPropChanges && complexity > 1)) {
     
-    // Only log component mounting for high-complexity components
-    if (complexity > 2 || priority === 'high') {
-      console.debug(`[${componentName}] Component mounted`);
-      
-      return () => {
-        console.debug(`[${componentName}] Component unmounted`);
-      };
-    }
-  }, [componentName, complexity, priority, config.enableDebugLogging]);
+    // Only pass in the props we need to track
+    const propsToTrack = { complexity };
+    
+    useErrorPrevention(componentName, propsToTrack, {
+      trackRenders: trackRenders && config.enableRenderTracking && complexity > 1,
+      validateProps: validateProps && config.enableValidation,
+      trackPropChanges: trackPropChanges && config.enablePropTracking && complexity > 1,
+      throttleInterval: config.throttleInterval * 3 // Triple the throttle interval
+    });
+  }
+  
+  // Skip lifecycle logging to reduce console noise
 }

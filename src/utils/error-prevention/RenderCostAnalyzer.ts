@@ -34,6 +34,7 @@ class RenderCostAnalyzer {
   private componentMetrics: Map<string, RenderCostMetrics> = new Map();
   private renderHistory: Map<string, {timestamp: number, duration: number}[]> = new Map();
   private startTime: number = Date.now();
+  private isEnabled: boolean = process.env.NODE_ENV === 'development';
   
   constructor() {
     // Initialize with empty metrics
@@ -48,6 +49,9 @@ class RenderCostAnalyzer {
     state?: Record<string, any>,
     prevState?: Record<string, any>
   ): void {
+    // Skip if disabled or not in development
+    if (!this.isEnabled) return;
+    
     // Get or initialize metrics for this component
     let metrics = this.componentMetrics.get(componentName);
     if (!metrics) {
@@ -70,13 +74,13 @@ class RenderCostAnalyzer {
     const totalTimeSeconds = (Date.now() - this.startTime) / 1000;
     metrics.renderFrequency = metrics.totalRenders / totalTimeSeconds;
     
-    // Add to render history
+    // Add to render history, but keep it smaller (10 entries max)
     let history = this.renderHistory.get(componentName) || [];
     history.push({ timestamp: Date.now(), duration: renderTime });
     
-    // Keep only the last 20 renders in history
-    if (history.length > 20) {
-      history = history.slice(history.length - 20);
+    // Keep only the last 10 renders in history instead of 20
+    if (history.length > 10) {
+      history = history.slice(history.length - 10);
     }
     
     this.renderHistory.set(componentName, history);
@@ -89,6 +93,9 @@ class RenderCostAnalyzer {
   }
   
   public getComponentAnalysis(componentName: string): ComponentRenderAnalysis | null {
+    // Skip if disabled
+    if (!this.isEnabled) return null;
+    
     const metrics = this.componentMetrics.get(componentName);
     const history = this.renderHistory.get(componentName);
     
@@ -96,20 +103,20 @@ class RenderCostAnalyzer {
       return null;
     }
     
-    // Generate optimization suggestions
+    // Generate optimization suggestions, but only for significant issues
     const suggestions: RenderOptimizationSuggestion[] = [];
     
-    // Check for frequent renders
-    if (metrics.renderFrequency > 5) { // More than 5 renders per second
+    // Only check for very frequent renders (higher threshold)
+    if (metrics.renderFrequency > 8) { // More than 8 renders per second
       suggestions.push({
         type: 'memo',
-        priority: metrics.renderFrequency > 10 ? 'critical' : 'high',
+        priority: metrics.renderFrequency > 15 ? 'critical' : 'high',
         description: `Component renders very frequently (${metrics.renderFrequency.toFixed(1)} renders/sec). Consider using React.memo() or optimizing parent components.`
       });
     }
     
-    // Check for long render times
-    if (metrics.averageRenderTime > 16) { // More than one frame (16ms) on average
+    // Only check for very long render times (higher threshold)
+    if (metrics.averageRenderTime > 25) { // More than 25ms on average
       suggestions.push({
         type: 'general',
         priority: metrics.averageRenderTime > 50 ? 'critical' : 'high',
@@ -117,8 +124,8 @@ class RenderCostAnalyzer {
       });
     }
     
-    // Check for component taking up significant app render time
-    if (metrics.totalRenderTimePercent > 30) {
+    // Only check for very significant render time percentage
+    if (metrics.totalRenderTimePercent > 40) {
       suggestions.push({
         type: 'general',
         priority: 'high',
@@ -135,7 +142,16 @@ class RenderCostAnalyzer {
   }
   
   public getAllComponentAnalyses(): ComponentRenderAnalysis[] {
-    return Array.from(this.componentMetrics.keys()).map(component => {
+    // Skip if disabled
+    if (!this.isEnabled) return [];
+    
+    // Only process the most concerning components
+    const topComponents = Array.from(this.componentMetrics.entries())
+      .sort((a, b) => b[1].totalRenderTimePercent - a[1].totalRenderTimePercent)
+      .slice(0, 10) // Only analyze top 10 components instead of all
+      .map(([component]) => component);
+    
+    return topComponents.map(component => {
       const analysis = this.getComponentAnalysis(component);
       return analysis || {
         component,
@@ -147,31 +163,72 @@ class RenderCostAnalyzer {
   }
   
   public getHighImpactComponents(): ComponentRenderAnalysis[] {
+    // Skip if disabled
+    if (!this.isEnabled) return [];
+    
     return this.getAllComponentAnalyses()
       .filter(analysis => 
-        analysis.metrics.totalRenderTimePercent > 10 || // Takes up more than 10% of render time
-        analysis.metrics.renderFrequency > 3 || // Renders more than 3 times per second
-        analysis.metrics.averageRenderTime > 16 // Takes more than one frame to render
+        analysis.metrics.totalRenderTimePercent > 15 || // Takes up more than 15% of render time
+        analysis.metrics.renderFrequency > 5 || // Renders more than 5 times per second
+        analysis.metrics.averageRenderTime > 25 // Takes more than 25ms to render
       )
-      .sort((a, b) => b.metrics.totalRenderTimePercent - a.metrics.totalRenderTimePercent);
+      .sort((a, b) => b.metrics.totalRenderTimePercent - a.metrics.totalRenderTimePercent)
+      .slice(0, 5); // Limit to 5 components
   }
   
   public getComponentsWithFrequentRenders(): ComponentRenderAnalysis[] {
+    // Skip if disabled
+    if (!this.isEnabled) return [];
+    
     return this.getAllComponentAnalyses()
-      .filter(analysis => analysis.metrics.renderFrequency > 2) // More than 2 renders per second
-      .sort((a, b) => b.metrics.renderFrequency - a.metrics.renderFrequency);
+      .filter(analysis => analysis.metrics.renderFrequency > 5) // More than 5 renders per second
+      .sort((a, b) => b.metrics.renderFrequency - a.metrics.renderFrequency)
+      .slice(0, 5); // Limit to 5 components
   }
   
   public getComponentsWithSlowRenders(): ComponentRenderAnalysis[] {
+    // Skip if disabled
+    if (!this.isEnabled) return [];
+    
     return this.getAllComponentAnalyses()
-      .filter(analysis => analysis.metrics.averageRenderTime > 16) // More than one frame
-      .sort((a, b) => b.metrics.averageRenderTime - a.metrics.averageRenderTime);
+      .filter(analysis => analysis.metrics.averageRenderTime > 25) // More than 25ms
+      .sort((a, b) => b.metrics.averageRenderTime - a.metrics.averageRenderTime)
+      .slice(0, 5); // Limit to 5 components
   }
   
   public reset(): void {
     this.componentMetrics.clear();
     this.renderHistory.clear();
     this.startTime = Date.now();
+  }
+  
+  // Auto-reset every 5 minutes to prevent memory buildup
+  public startAutoReset(): void {
+    if (!this.isEnabled) return;
+    
+    // Every 5 minutes, clear old data to prevent memory issues
+    setInterval(() => {
+      // Only reset if we have more than 20 components tracked
+      if (this.componentMetrics.size > 20) {
+        // Keep only the components with high impact
+        const highImpactComponents = this.getHighImpactComponents().map(a => a.component);
+        
+        // Create new Maps with only the high impact components
+        const newMetrics = new Map<string, RenderCostMetrics>();
+        const newHistory = new Map<string, {timestamp: number, duration: number}[]>();
+        
+        highImpactComponents.forEach(component => {
+          const metrics = this.componentMetrics.get(component);
+          const history = this.renderHistory.get(component);
+          
+          if (metrics) newMetrics.set(component, metrics);
+          if (history) newHistory.set(component, history);
+        });
+        
+        this.componentMetrics = newMetrics;
+        this.renderHistory = newHistory;
+      }
+    }, 300000); // 5 minutes
   }
   
   private getInitialMetrics(): RenderCostMetrics {
@@ -182,11 +239,21 @@ class RenderCostAnalyzer {
       lastRenderTime: 0,
       renderFrequency: 0,
       totalRenderTimePercent: 0,
-      inefficientRenderThreshold: 16, // One frame at 60fps
+      inefficientRenderThreshold: 25, // Increased from 16 to 25ms
       inefficientRenderCount: 0
     };
+  }
+  
+  // Method to enable/disable the analyzer
+  public setEnabled(enabled: boolean): void {
+    this.isEnabled = enabled && process.env.NODE_ENV === 'development';
   }
 }
 
 // Create singleton instance
 export const renderCostAnalyzer = new RenderCostAnalyzer();
+
+// Start auto-reset to prevent memory issues
+if (process.env.NODE_ENV === 'development') {
+  renderCostAnalyzer.startAutoReset();
+}
