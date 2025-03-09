@@ -14,6 +14,3 @@ export const updateUserPoints = async (userId: string, pointsToAdd: number): Pro
     throw error;
   }
 };
-
-// Export function for use in other files
-export { updateUserPoints };

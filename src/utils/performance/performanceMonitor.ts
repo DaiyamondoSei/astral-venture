@@ -9,8 +9,7 @@ import { PerformanceMonitor } from './PerformanceMonitor';
 const performanceMonitor = new PerformanceMonitor();
 
 // Add additional methods to the singleton instance for better reporting
-// @ts-ignore - Extending the instance with custom methods
-performanceMonitor.reportSlowRender = function(componentName: string, duration: number) {
+performanceMonitor.reportSlowRender = function(componentName: string, duration: number): void {
   if (!componentName || typeof duration !== 'number') return;
   
   // Only report if we're in development or if explicitly configured to report in production

@@ -9,6 +9,7 @@ import { Trash, RefreshCw, AlertTriangle, Clock, Zap, Cloud, Database } from 'lu
 import { usePerfConfig } from '@/hooks/usePerfConfig';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
+import { ComponentMetrics } from '@/utils/performance/PerformanceMonitor';
 
 // Define the PerformanceMetric type to avoid type errors
 interface PerformanceMetric {
@@ -22,7 +23,7 @@ interface PerformanceMetric {
 
 // Component for displaying performance insights and metrics
 const PerformanceInsights: React.FC = () => {
-  const [metrics, setMetrics] = useState<Record<string, any>>({});
+  const [metrics, setMetrics] = useState<Record<string, ComponentMetrics>>({});
   const [activeTab, setActiveTab] = useState('overview');
   const [refreshKey, setRefreshKey] = useState(0);
   const [isOpen, setIsOpen] = useState(false);

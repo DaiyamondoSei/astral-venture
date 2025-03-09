@@ -18,8 +18,8 @@ export const getReflectionInsights = async (
       reflectionIds: reflectionId ? [reflectionId] : []
     };
     
-    return await api.getAiResponse(aiQuestion)
-      .then(data => data.response);
+    const response = await api.getAiResponse(aiQuestion);
+    return response.answer;
   } catch (error) {
     console.error('Error getting reflection insights:', error);
     return null;

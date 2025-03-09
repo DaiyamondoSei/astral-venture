@@ -1,6 +1,6 @@
 
 import { useCallback } from 'react';
-import { processQuestion, askAIAssistant } from '@/services/ai/assistant';
+import { askAIAssistant } from '@/services/ai/assistant';
 import { AIQuestion, AIResponse, AIQuestionOptions } from '@/services/ai/types';
 
 interface AssistantState {
@@ -79,9 +79,13 @@ export const useQuestionSubmit = ({
   }, []);
   
   // Generate cache key from question and context
-  const getCacheKey = useCallback((question: string, reflectionId?: string): string => {
-    return `${userId}:${question}:${reflectionId || ''}`;
-  }, [userId]);
+  const getCacheKey = useCallback((question: AIQuestion | string): string => {
+    const questionText = typeof question === 'string' ? question : question.text;
+    const questionReflectionId = typeof question === 'string' ? selectedReflectionId : 
+      (question.reflectionIds && question.reflectionIds.length > 0 ? question.reflectionIds[0] : undefined);
+    
+    return `${userId}:${questionText}:${questionReflectionId || ''}`;
+  }, [userId, selectedReflectionId]);
   
   // Check if response is cached
   const getFromCache = useCallback((cacheKey: string, isStreamingRequest: boolean): AIResponse | null => {
@@ -131,16 +135,21 @@ export const useQuestionSubmit = ({
   }, []);
   
   // Memoized submit function to prevent recreating on every render
-  const submitQuestion = useCallback(async (question: string) => {
+  const submitQuestion = useCallback(async (question: AIQuestion | string) => {
+    // Create a properly formatted question object
+    const questionObj: AIQuestion = typeof question === 'string' 
+      ? { text: question } 
+      : question;
+    
     // Validate inputs
-    if (!question.trim() || !userId) {
+    if (!questionObj.text.trim() || !userId) {
       console.log('Invalid question or missing userId');
       return null;
     }
     
     // Generate a request ID to prevent duplicate submissions
-    const requestId = `${userId}:${question}:${Date.now()}`;
-    const cacheKey = getCacheKey(question, selectedReflectionId);
+    const requestId = `${userId}:${questionObj.text}:${Date.now()}`;
+    const cacheKey = getCacheKey(questionObj);
     
     // Check if this exact request is already pending
     if (pendingRequests.has(requestId)) {
@@ -181,9 +190,9 @@ export const useQuestionSubmit = ({
       }
       
       console.log("Submitting question:", {
-        question,
-        reflectionContext: reflectionContext ? `${reflectionContext.substring(0, 20)}...` : null,
-        selectedReflectionId,
+        question: questionObj.text,
+        reflectionContext: questionObj.context ? `${questionObj.context.substring(0, 20)}...` : null,
+        selectedReflectionId: questionObj.reflectionIds && questionObj.reflectionIds.length > 0 ? questionObj.reflectionIds[0] : null,
         userId,
         isOnline: navigator.onLine,
         useStreaming
@@ -197,15 +206,8 @@ export const useQuestionSubmit = ({
       // Performance tracking
       const startTime = performance.now();
       
-      // Prepare question data
-      const questionData: AIQuestion = {
-        text: question,
-        question,
-        reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
-        context: reflectionContext || '',
-        stream: useStreaming, // Only enable streaming if online and connection is good
-        userId // Pass the userId for backend context
-      };
+      // Ensure question has the stream property set
+      questionObj.stream = useStreaming;
       
       // Create options object with timeout and cacheKey
       const options: AIQuestionOptions = {
@@ -214,7 +216,7 @@ export const useQuestionSubmit = ({
       }; 
       
       // Call the API with exponential backoff retry mechanism
-      const aiResponse = await askAIAssistant(questionData, options);
+      const aiResponse = await askAIAssistant(questionObj, options);
       
       const responseTime = performance.now() - startTime;
       console.log(`AI response received in ${responseTime.toFixed(2)}ms`);
@@ -251,8 +253,6 @@ export const useQuestionSubmit = ({
     }
   }, [
     userId, 
-    selectedReflectionId, 
-    reflectionContext, 
     isMounted, 
     state, 
     getCacheKey, 
