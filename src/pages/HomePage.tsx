@@ -7,7 +7,8 @@ import SwipeablePanelController from '@/components/panels/SwipeablePanelControll
 import SwipeIndicator from '@/components/panels/SwipeIndicator';
 
 const HomePage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
   
   return (
     <div className="relative min-h-screen overflow-hidden">

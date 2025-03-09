@@ -3,13 +3,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-
-interface SeedOfLifeInteractionState {
-  portalEnergy: number;
-  interactionCount: number;
-  resonanceLevel: number;
-  lastInteractionTime: number | null;
-}
+import { usePortalState } from './usePortalState';
+import { 
+  handlePortalInteractionBackend, 
+  resetPortalInteractionBackend,
+  updatePortalEnergyBackend 
+} from '@/services/portal/portalService';
 
 interface InteractionResult {
   newEnergy: number;
@@ -22,128 +21,115 @@ interface InteractionResult {
  * Offloads data persistence to the backend for improved performance
  */
 export function useSeedOfLifeInteraction(userLevel: number = 1) {
-  const [state, setState] = useState<SeedOfLifeInteractionState>({
+  const { user } = useAuth();
+  const { 
+    portalState, 
+    isLoading, 
+    error 
+  } = usePortalState(user?.id);
+  
+  const [state, setState] = useState({
     portalEnergy: 0,
     interactionCount: 0,
     resonanceLevel: 1,
-    lastInteractionTime: null
+    lastInteractionTime: null as number | null
   });
   
-  const { user } = useAuth();
-  
-  // Fetch initial state from backend if user is authenticated
+  // Sync local state with fetched portal state
   useEffect(() => {
-    const fetchInteractionState = async () => {
-      if (!user) return;
-      
-      try {
-        // Use RPC function to avoid TypeScript issues with table access
-        const { data, error } = await supabase
-          .rpc('get_user_portal_state', { user_id_param: user.id });
-          
-        if (error) {
-          console.error('Error fetching interaction state:', error);
-          return;
-        }
-        
-        if (data && data.length > 0) {
-          const portalData = data[0];
-          setState({
-            portalEnergy: portalData.portal_energy || 0,
-            interactionCount: portalData.interaction_count || 0,
-            resonanceLevel: portalData.resonance_level || 1,
-            lastInteractionTime: portalData.last_interaction_time ? new Date(portalData.last_interaction_time).getTime() : null
-          });
-        }
-      } catch (error) {
-        console.error('Unexpected error fetching interaction state:', error);
-      }
-    };
-    
-    fetchInteractionState();
-  }, [user]);
+    if (portalState) {
+      setState({
+        portalEnergy: portalState.portalEnergy,
+        interactionCount: portalState.interactionCount,
+        resonanceLevel: portalState.resonanceLevel,
+        lastInteractionTime: portalState.lastInteractionTime 
+          ? new Date(portalState.lastInteractionTime).getTime() 
+          : null
+      });
+    }
+  }, [portalState]);
   
   /**
    * Handle user interaction with the Seed of Life portal
    * Each interaction increases energy and potentially resonance
    */
   const handlePortalInteraction = useCallback(async (): Promise<InteractionResult> => {
-    const now = Date.now();
-    const timeSinceLastInteraction = state.lastInteractionTime 
-      ? now - state.lastInteractionTime
-      : Infinity;
-    
-    // Calculate energy increase based on:
-    // 1. Base energy gain
-    // 2. Bonus for rapid interactions (combos)
-    // 3. User level bonus
-    const baseEnergyGain = 15;
-    const comboMultiplier = timeSinceLastInteraction < 2000 ? 1.5 : 1;
-    const levelBonus = userLevel * 2;
-    
-    const energyGain = baseEnergyGain * comboMultiplier + levelBonus;
-    const newEnergy = Math.min(100, state.portalEnergy + energyGain);
-    
-    // Increase resonance level based on interaction count
-    const newInteractionCount = state.interactionCount + 1;
-    let newResonance = state.resonanceLevel;
-    
-    if (newInteractionCount >= 5 && newResonance < 2) {
-      newResonance = 2;
-    } else if (newInteractionCount >= 10 && newResonance < 3) {
-      newResonance = 3;
-    } else if (newInteractionCount >= 15 && newResonance < 4) {
-      newResonance = 4;
-    } else if (newInteractionCount >= 20 && newResonance < 5) {
-      newResonance = 5;
-    }
-    
-    // Update state locally first for instant feedback
-    setState({
-      portalEnergy: newEnergy,
-      interactionCount: newInteractionCount,
-      resonanceLevel: newResonance,
-      lastInteractionTime: now
-    });
-    
-    // Persist to backend if user is authenticated
-    if (user) {
-      try {
-        // Offload to backend using supabase edge function
-        await supabase.functions.invoke('update-portal-interaction', {
-          body: {
-            userId: user.id,
-            portalEnergy: newEnergy,
-            interactionCount: newInteractionCount,
-            resonanceLevel: newResonance,
-            lastInteractionTime: new Date(now).toISOString()
-          }
-        });
-        
-        // If energy reaches 100%, grant energy points
-        if (newEnergy >= 100) {
-          const pointsToAdd = 50 * newResonance; // Scale points with resonance level
-          await supabase.functions.invoke('increment-energy-points', {
-            body: { 
-              userId: user.id, 
-              pointsToAdd 
-            }
-          });
-          
-          toast.success(`Portal activated! +${pointsToAdd} energy points added.`);
-          
-          // Reset portal energy after activation
-          setState(prevState => ({
-            ...prevState,
-            portalEnergy: 0
-          }));
-        }
-      } catch (error) {
-        console.error('Error persisting interaction state:', error);
+    if (!user) {
+      // For non-authenticated users, just update local state
+      const now = Date.now();
+      const timeSinceLastInteraction = state.lastInteractionTime 
+        ? now - state.lastInteractionTime
+        : Infinity;
+      
+      // Calculate energy increase based on user level and combo timing
+      const baseEnergyGain = 15;
+      const comboMultiplier = timeSinceLastInteraction < 2000 ? 1.5 : 1;
+      const levelBonus = userLevel * 2;
+      
+      const energyGain = baseEnergyGain * comboMultiplier + levelBonus;
+      const newEnergy = Math.min(100, state.portalEnergy + energyGain);
+      
+      // Calculate new resonance level based on interaction count
+      const newInteractionCount = state.interactionCount + 1;
+      let newResonance = state.resonanceLevel;
+      
+      if (newInteractionCount >= 20 && newResonance < 5) {
+        newResonance = 5;
+      } else if (newInteractionCount >= 15 && newResonance < 4) {
+        newResonance = 4;
+      } else if (newInteractionCount >= 10 && newResonance < 3) {
+        newResonance = 3;
+      } else if (newInteractionCount >= 5 && newResonance < 2) {
+        newResonance = 2;
       }
+      
+      // Update local state for immediate feedback
+      setState({
+        portalEnergy: newEnergy,
+        interactionCount: newInteractionCount,
+        resonanceLevel: newResonance,
+        lastInteractionTime: now
+      });
+      
+      return { newEnergy, newResonance };
     }
     
-    return { newEnergy, newResonance };
+    try {
+      // Use the backend service to handle portal interaction
+      const result = await handlePortalInteractionBackend(
+        user.id, 
+        state.portalEnergy, 
+        state.interactionCount, 
+        state.resonanceLevel,
+        state.lastInteractionTime,
+        userLevel
+      );
+      
+      // Update local state with results from backend
+      setState({
+        portalEnergy: result.newEnergy,
+        interactionCount: result.newInteractionCount,
+        resonanceLevel: result.newResonance,
+        lastInteractionTime: Date.now()
+      });
+      
+      // Show toast if portal is fully activated
+      if (result.energyPointsAdded > 0) {
+        toast.success(`Portal activated! +${result.energyPointsAdded} energy points added.`);
+      }
+      
+      return { 
+        newEnergy: result.newEnergy, 
+        newResonance: result.newResonance 
+      };
+    } catch (error) {
+      console.error('Error in portal interaction:', error);
+      toast.error('Something went wrong with the portal interaction');
+      return { 
+        newEnergy: state.portalEnergy, 
+        newResonance: state.resonanceLevel 
+      };
+    }
   }, [state, userLevel, user]);
   
   /**
@@ -162,18 +148,10 @@ export function useSeedOfLifeInteraction(userLevel: number = 1) {
     // Persist reset to backend if user is authenticated
     if (user) {
       try {
-        // Use the edge function for consistency
-        await supabase.functions.invoke('update-portal-interaction', {
-          body: {
-            userId: user.id,
-            portalEnergy: 0,
-            interactionCount: 0,
-            resonanceLevel: 1,
-            lastInteractionTime: null
-          }
-        });
+        await resetPortalInteractionBackend(user.id);
       } catch (error) {
         console.error('Error resetting interaction state:', error);
+        toast.error('Failed to reset portal state');
       }
     }
   }, [user]);
@@ -192,25 +170,27 @@ export function useSeedOfLifeInteraction(userLevel: number = 1) {
     // Persist to backend if user is authenticated
     if (user) {
       try {
-        await supabase.functions.invoke('update-portal-interaction', {
-          body: {
-            userId: user.id,
-            portalEnergy: clampedEnergy,
-            interactionCount: state.interactionCount,
-            resonanceLevel: state.resonanceLevel,
-            lastInteractionTime: state.lastInteractionTime 
-              ? new Date(state.lastInteractionTime).toISOString() 
-              : null
-          }
-        });
+        await updatePortalEnergyBackend(
+          user.id,
+          clampedEnergy,
+          state.interactionCount,
+          state.resonanceLevel,
+          state.lastInteractionTime
+        );
       } catch (error) {
         console.error('Error updating energy level:', error);
+        toast.error('Failed to update portal energy');
       }
     }
   }, [state, user]);
   
   return {
-    ...state,
+    portalEnergy: state.portalEnergy,
+    interactionCount: state.interactionCount,
+    resonanceLevel: state.resonanceLevel,
+    lastInteractionTime: state.lastInteractionTime,
+    isLoading,
+    error,
     handlePortalInteraction,
     resetInteraction,
     setEnergy
