@@ -4,9 +4,11 @@
  */
 export interface AIQuestion {
   text: string;
+  question?: string;
   context?: string;
   reflectionIds?: string[];
   userId?: string;
+  stream?: boolean;
 }
 
 /**
@@ -17,6 +19,7 @@ export interface AIQuestionOptions {
   stream?: boolean;
   priority?: 'low' | 'medium' | 'high';
   maxTokens?: number;
+  cacheKey?: string;
 }
 
 /**
@@ -29,9 +32,12 @@ export interface AIResponse {
   relatedInsights?: string[];
   reflectionId?: string;
   type?: 'text' | 'error' | 'stream';
-  processingTime?: number;
-  tokenUsage?: number;
-  model?: string;
+  meta?: {
+    processingTime?: number;
+    tokenUsage?: number;
+    model?: string;
+  };
+  sources?: any[];
 }
 
 /**
@@ -92,4 +98,3 @@ export interface ChakraInsightsOptions {
   detailLevel?: 'basic' | 'detailed';
   timeframe?: 'recent' | 'all';
 }
-

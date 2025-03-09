@@ -1,113 +1,263 @@
 
-import { AIInsight } from './types';
-import { generateRandomId } from '@/utils/idGenerator';
+/**
+ * AI insight processing utilities
+ */
+
+import { AIResponse, AIInsight } from '@/services/ai/types';
 
 /**
- * Generate random insights for demo purposes
+ * Process and extract insights from AI responses
+ * @param response The AI response text to process
+ * @returns Array of extracted insights
  */
-export const generateInsights = (count: number = 3): AIInsight[] => {
-  const insights: AIInsight[] = [];
-  
-  // Generate chakra insights
-  insights.push({
-    id: generateRandomId(),
-    type: 'chakra',
-    text: 'Your root chakra appears to be imbalanced based on your recent reflections. Consider grounding exercises.',
-    confidence: 0.85,
-    relevance: 0.9,
-    title: 'Root Chakra Imbalance'
-  });
-  
-  // Generate emotional insights
-  insights.push({
-    id: generateRandomId(),
-    type: 'emotion',
-    text: 'Your reflections show a pattern of anxiety when discussing future plans.',
-    confidence: 0.78,
-    relevance: 0.82,
-    title: 'Anxiety Pattern Detected'
-  });
-  
-  // Generate practice recommendations
-  insights.push({
-    id: generateRandomId(),
-    type: 'practice',
-    text: 'Based on your energy patterns, a daily 10-minute meditation focused on the heart chakra would be beneficial.',
-    confidence: 0.92,
-    relevance: 0.88,
-    title: 'Heart Chakra Meditation'
-  });
-  
-  // Generate wisdom insights
-  insights.push({
-    id: generateRandomId(),
-    type: 'wisdom',
-    text: 'Your reflections indicate a growing awareness of the interconnectedness of all things.',
-    confidence: 0.75,
-    relevance: 0.7,
-    title: 'Expanding Consciousness'
-  });
-  
-  // Return the specified number of insights
-  return insights.slice(0, count);
-};
+export function extractInsights(response: string): string[] {
+  if (!response || typeof response !== 'string') {
+    return [];
+  }
 
-/**
- * Generate insights specifically about chakras
- */
-export const generateChakraInsights = (count: number = 2): AIInsight[] => {
-  const chakraInsights: AIInsight[] = [
-    {
-      id: generateRandomId(),
-      type: 'chakra',
-      text: 'Your crown chakra shows signs of opening, indicating spiritual growth.',
-      confidence: 0.82,
-      relevance: 0.85,
-      title: 'Crown Chakra Opening'
-    },
-    {
-      id: generateRandomId(),
-      type: 'chakra',
-      text: 'Your solar plexus chakra appears blocked, which may be causing feelings of low self-esteem.',
-      confidence: 0.88,
-      relevance: 0.9,
-      title: 'Solar Plexus Blockage'
-    },
-    {
-      id: generateRandomId(),
-      type: 'chakra',
-      text: 'Your throat chakra is very active, reflecting your increasing ability to express yourself.',
-      confidence: 0.76,
-      relevance: 0.8,
-      title: 'Throat Chakra Activation'
+  // Look for insight sections in the AI response
+  const insightPatterns = [
+    /Key Insights:([\s\S]*?)(?=\n\n|\n#|$)/i,
+    /Insights:([\s\S]*?)(?=\n\n|\n#|$)/i,
+    /Main Takeaways:([\s\S]*?)(?=\n\n|\n#|$)/i,
+  ];
+
+  for (const pattern of insightPatterns) {
+    const match = response.match(pattern);
+    if (match && match[1]) {
+      // Extract individual insights from the matched section
+      return match[1]
+        .split(/\n-|\n•|\n\d+\./)
+        .map(insight => insight.trim())
+        .filter(insight => insight.length > 0);
     }
+  }
+
+  // If no structured insights found, extract sentences that might be insights
+  // based on insight-like language patterns
+  const potentialInsights = response
+    .split(/\.\s+|\n+/)
+    .map(s => s.trim())
+    .filter(s => 
+      s.length > 15 && 
+      s.length < 150 &&
+      !s.startsWith('http') &&
+      (
+        s.includes('should') ||
+        s.includes('could') ||
+        s.includes('might') ||
+        s.includes('consider') ||
+        s.includes('important') ||
+        s.includes('significant') ||
+        s.includes('key') ||
+        s.includes('critical')
+      )
+    );
+
+  return potentialInsights.slice(0, 5); // Limit to 5 potential insights
+}
+
+/**
+ * Process and extract suggested practices from AI responses
+ * @param response The AI response text to process
+ * @returns Array of extracted practice suggestions
+ */
+export function extractSuggestedPractices(response: string): string[] {
+  if (!response || typeof response !== 'string') {
+    return [];
+  }
+
+  // Look for practice suggestion sections in the AI response
+  const practicePatterns = [
+    /Suggested Practices:([\s\S]*?)(?=\n\n|\n#|$)/i,
+    /Recommended Practices:([\s\S]*?)(?=\n\n|\n#|$)/i,
+    /Practices to Consider:([\s\S]*?)(?=\n\n|\n#|$)/i,
+    /Try these practices:([\s\S]*?)(?=\n\n|\n#|$)/i,
+  ];
+
+  for (const pattern of practicePatterns) {
+    const match = response.match(pattern);
+    if (match && match[1]) {
+      // Extract individual practices from the matched section
+      return match[1]
+        .split(/\n-|\n•|\n\d+\./)
+        .map(practice => practice.trim())
+        .filter(practice => practice.length > 0);
+    }
+  }
+
+  // If no structured practices found, look for practice-like phrases
+  const practicePhrases = [
+    "try to", "practice", "exercise", "consider", 
+    "I recommend", "you might want to", "it helps to",
+    "a good practice is", "beneficial to"
   ];
   
-  return chakraInsights.slice(0, count);
-};
+  const sentences = response.split(/\.\s+|\n+/);
+  const potentialPractices = sentences.filter(sentence => {
+    const lowerSentence = sentence.toLowerCase();
+    return practicePhrases.some(phrase => lowerSentence.includes(phrase)) &&
+           sentence.length > 20 &&
+           sentence.length < 200;
+  });
+
+  return potentialPractices.slice(0, 3); // Limit to 3 potential practices
+}
 
 /**
- * Generate insights about emotional patterns
+ * Generate structured insights from an AI response
+ * @param aiResponse The AI response object
+ * @returns Array of structured insights with metadata
  */
-export const generateEmotionalInsights = (count: number = 2): AIInsight[] => {
-  const emotionalInsights: AIInsight[] = [
-    {
-      id: generateRandomId(),
-      type: 'emotion',
-      text: 'There's a pattern of sadness emerging when you discuss past relationships.',
-      confidence: 0.79,
-      relevance: 0.83,
-      title: 'Relationship Sadness Pattern'
-    },
-    {
-      id: generateRandomId(),
-      type: 'emotion',
-      text: 'Your reflections show increasing joy when discussing creative projects.',
-      confidence: 0.91,
-      relevance: 0.87,
-      title: 'Creativity Joy Connection'
-    }
+export function generateStructuredInsights(aiResponse: AIResponse): AIInsight[] {
+  const insights = extractInsights(aiResponse.answer || "");
+  
+  return insights.map((text, index) => ({
+    id: `insight-${index}-${Date.now()}`,
+    type: determineInsightType(text),
+    text,
+    confidence: calculateConfidence(text),
+    relevance: calculateRelevance(text),
+    title: generateInsightTitle(text)
+  }));
+}
+
+/**
+ * Determine the insight type based on content analysis
+ */
+function determineInsightType(text: string): 'chakra' | 'emotion' | 'practice' | 'wisdom' {
+  const lowerText = text.toLowerCase();
+  
+  if (lowerText.includes('chakra') || 
+      lowerText.includes('energy center') || 
+      lowerText.includes('energy flow')) {
+    return 'chakra';
+  }
+  
+  if (lowerText.includes('feel') || 
+      lowerText.includes('emotion') || 
+      lowerText.includes('mood') ||
+      lowerText.includes('anxiety') ||
+      lowerText.includes('stress') ||
+      lowerText.includes('happiness')) {
+    return 'emotion';
+  }
+  
+  if (lowerText.includes('practice') || 
+      lowerText.includes('exercise') || 
+      lowerText.includes('technique') ||
+      lowerText.includes('try') ||
+      lowerText.includes('doing')) {
+    return 'practice';
+  }
+  
+  return 'wisdom';
+}
+
+/**
+ * Calculate confidence score based on text analysis
+ */
+function calculateConfidence(text: string): number {
+  // Simple heuristic for confidence scoring
+  const confidenceFactors = {
+    length: 0,
+    certainty: 0,
+    specificity: 0
+  };
+  
+  // Length factor
+  if (text.length > 100) confidenceFactors.length = 0.3;
+  else if (text.length > 50) confidenceFactors.length = 0.2;
+  else confidenceFactors.length = 0.1;
+  
+  // Certainty factor
+  const uncertaintyPhrases = ['might', 'maybe', 'perhaps', 'possibly', 'could'];
+  const certaintyPhrases = ['definitely', 'certainly', 'clearly', 'indeed', 'undoubtedly'];
+  
+  const hasUncertainty = uncertaintyPhrases.some(phrase => text.toLowerCase().includes(phrase));
+  const hasCertainty = certaintyPhrases.some(phrase => text.toLowerCase().includes(phrase));
+  
+  if (hasCertainty && !hasUncertainty) confidenceFactors.certainty = 0.4;
+  else if (!hasUncertainty) confidenceFactors.certainty = 0.3;
+  else if (hasCertainty) confidenceFactors.certainty = 0.2;
+  else confidenceFactors.certainty = 0.1;
+  
+  // Specificity factor
+  const specificTerms = ['specifically', 'exactly', 'precisely', 'in particular'];
+  const hasSpecificity = specificTerms.some(term => text.toLowerCase().includes(term));
+  
+  confidenceFactors.specificity = hasSpecificity ? 0.3 : 0.1;
+  
+  // Calculate total confidence (0.3 to 0.9 range)
+  const baseConfidence = 0.3;
+  const totalFactors = confidenceFactors.length + confidenceFactors.certainty + confidenceFactors.specificity;
+  
+  return Math.min(0.9, baseConfidence + totalFactors);
+}
+
+/**
+ * Calculate relevance score based on text analysis
+ */
+function calculateRelevance(text: string): number {
+  // Simple heuristic for relevance scoring
+  const baseRelevance = 0.5;
+  
+  // Relevance boosting factors
+  const relevanceBoosts = [
+    { terms: ['important', 'critical', 'essential', 'key', 'fundamental'], boost: 0.2 },
+    { terms: ['chakra', 'energy', 'meditation', 'practice', 'mindfulness'], boost: 0.15 },
+    { terms: ['balance', 'harmony', 'peace', 'healing', 'growth'], boost: 0.1 }
   ];
   
-  return emotionalInsights.slice(0, count);
-};
+  let totalBoost = 0;
+  const lowerText = text.toLowerCase();
+  
+  relevanceBoosts.forEach(({ terms, boost }) => {
+    if (terms.some(term => lowerText.includes(term))) {
+      totalBoost += boost;
+    }
+  });
+  
+  return Math.min(0.95, baseRelevance + totalBoost);
+}
+
+/**
+ * Generate a title for an insight based on its content
+ */
+function generateInsightTitle(text: string): string {
+  // Extract first sentence or first X characters
+  const firstSentence = text.split('.')[0].trim();
+  
+  if (firstSentence.length < 40) {
+    return firstSentence;
+  }
+  
+  // Extract key phrases
+  const keyPhrases = [
+    'the importance of',
+    'understanding',
+    'how to',
+    'why',
+    'the connection between',
+    'the relationship between',
+    'the impact of',
+    'the role of',
+    'the benefit of',
+    'the practice of'
+  ];
+  
+  for (const phrase of keyPhrases) {
+    if (text.toLowerCase().includes(phrase)) {
+      const index = text.toLowerCase().indexOf(phrase);
+      const relevantText = text.slice(index);
+      const endOfPhrase = relevantText.indexOf('.') !== -1 ? 
+                          relevantText.indexOf('.') : 
+                          Math.min(50, relevantText.length);
+      
+      return relevantText.substring(0, endOfPhrase);
+    }
+  }
+  
+  // Fallback to first 40 chars with ellipsis
+  return firstSentence.substring(0, 40) + '...';
+}

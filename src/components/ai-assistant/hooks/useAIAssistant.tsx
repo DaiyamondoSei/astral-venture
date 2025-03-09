@@ -56,6 +56,7 @@ export const useAIAssistant = ({
       // Create a properly formatted question object
       const aiQuestion: AIQuestion = {
         text: state.question,
+        question: state.question,
         context: reflectionContext,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         userId: user.id

@@ -43,6 +43,11 @@ export function useErrorPrevention(
   
   // Validate props on render if enabled
   useEffect(() => {
+    if (!errorPrevention) {
+      console.warn(`ErrorPreventionContext not available for ${componentName}`);
+      return;
+    }
+    
     if (validateProps) {
       errorPrevention.validateComponent(componentName, props);
     }

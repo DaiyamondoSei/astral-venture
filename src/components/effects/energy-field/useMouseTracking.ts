@@ -14,7 +14,7 @@ interface ClickWave {
 
 interface UseMouseTrackingProps {
   containerRef: RefObject<HTMLElement>;
-  isMounted: boolean;
+  isMounted: { current: boolean } | boolean;
   reactToClick?: boolean;
 }
 
@@ -50,7 +50,7 @@ export const useMouseTracking = ({
     
     // Reset click wave after animation completes
     setTimeout(() => {
-      if (isMounted) {
+      if (typeof isMounted === 'object' ? isMounted.current : isMounted) {
         setClickWave(null);
       }
     }, 1000); // Match the duration of the ClickWave animation
@@ -79,3 +79,5 @@ export const useMouseTracking = ({
   
   return { mousePosition, clickWave };
 };
+
+export default useMouseTracking;

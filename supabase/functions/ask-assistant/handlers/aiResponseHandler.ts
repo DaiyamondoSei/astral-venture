@@ -26,7 +26,12 @@ export async function processAIResponse(
       insights,
       reflectionId,
       suggestedPractices,
-      relatedInsights: []
+      relatedInsights: [],
+      meta: {
+        model: model,
+        tokenUsage: totalTokens,
+        processingTime
+      }
     },
     {
       processingTime,
