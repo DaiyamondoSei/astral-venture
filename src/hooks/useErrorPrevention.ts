@@ -18,13 +18,17 @@ export function useErrorPrevention(
     validateProps?: boolean;
     trackPropChanges?: boolean;
     trackStateChanges?: boolean;
+    throttleInterval?: number;
+    batchUpdates?: boolean;
   } = {}
 ) {
   const {
     trackRenders = true,
     validateProps: shouldValidateProps = true,
     trackPropChanges = true,
-    trackStateChanges = false
+    trackStateChanges = false,
+    throttleInterval = 0,
+    batchUpdates = true
   } = options;
   
   // Keep track of previous props for comparison

@@ -1,91 +1,67 @@
 
-import { useState, useCallback, useEffect } from 'react';
-import { AchievementData } from '../../data/types';
-import { AchievementTrackerProps, AchievementState, AchievementTrackerResult } from './types';
+import { useEffect, useState } from 'react';
+import { IAchievementData } from '../../data/types';
 import { useAchievementState } from './useAchievementState';
-import { useAchievementDetection } from './useAchievementDetection';
-import { useAchievementProgress } from './useAchievementProgress';
-import { useProgressTracking } from './useProgressTracking';
 
-export function useAchievementTracker(props: AchievementTrackerProps): AchievementTrackerResult {
-  const [earnedAchievements, setEarnedAchievements] = useState<AchievementData[]>([]);
+interface AchievementTrackerProps {
+  onUnlock?: (achievement: IAchievementData) => void;
+  onProgress?: (achievement: IAchievementData, progress: number) => void;
+  achievementList?: IAchievementData[];
+}
+
+export function useAchievementTracker({
+  onUnlock,
+  onProgress,
+  achievementList = [],
+}: AchievementTrackerProps) {
+  const [unlockedAchievements, setUnlockedAchievements] = useState<IAchievementData[]>([]);
+  const [inProgressAchievements, setInProgressAchievements] = useState<IAchievementData[]>([]);
   
-  // Initialize state with proper defaults
-  const achievementState = useAchievementState({
-    achievements: props.achievements || [],
-    currentStreak: props.currentStreak || 0,
-    reflectionCount: props.reflectionCount || 0,
-    meditationMinutes: props.meditationMinutes || 0,
-    totalPoints: props.totalPoints || 0,
-    uniqueChakrasActivated: props.uniqueChakrasActivated || 0,
-    wisdomResourcesExplored: props.wisdomResourcesExplored || 0
-  });
-
-  // Extract state for sub-hooks
-  const [state, actions] = achievementState;
-  const [achievementHistoryState, setAchievementHistory] = useState(state.achievementHistory || []);
-  const [progressTrackingState, setProgressTracking] = useState(state.progressTracking || {});
-  const [currentAchievement, setCurrentAchievement] = useState(state.currentAchievement);
-
-  // Track achievement progress
-  useAchievementDetection(
-    props,
-    { 
-      ...state, 
-      achievementHistory: achievementHistoryState, 
-      progressTracking: progressTrackingState,
-      earnedAchievements,
-      currentAchievement
-    },
-    setEarnedAchievements,
-    setAchievementHistory
-  );
-
-  // Get achievement progress calculations
+  // Get achievement state from context
   const { 
-    getAchievementProgress, 
-    getTotalPoints, 
-    getProgressPercentage 
-  } = useAchievementProgress(
-    props,
-    { 
-      ...state, 
-      achievementHistory: achievementHistoryState, 
-      progressTracking: progressTrackingState,
-      earnedAchievements,
-      currentAchievement
-    }
-  );
-
-  // Get progress tracking utilities
-  const { trackProgress, logActivity } = useProgressTracking(
-    { 
-      ...state, 
-      progressTracking: progressTrackingState,
-      achievementHistory: achievementHistoryState,
-      earnedAchievements,
-      currentAchievement
-    },
-    setProgressTracking
-  );
-
-  // Dismiss achievement
-  const dismissAchievement = useCallback((achievementId: string) => {
-    setEarnedAchievements(prevAchievements => 
-      prevAchievements.filter(achievement => achievement.id !== achievementId)
-    );
-  }, []);
-
-  return {
-    earnedAchievements,
-    currentAchievement,
-    dismissAchievement,
-    trackProgress,
-    logActivity,
+    state: { achievements = [] },
+    updateAchievement,
+    unlockAchievement,
     getAchievementProgress,
-    getTotalPoints,
-    getProgressPercentage,
-    achievementHistory: achievementHistoryState,
-    progressTracking: progressTrackingState
+  } = useAchievementState();
+  
+  // Handle achievement unlocking
+  const handleUnlockAchievement = (achievement: IAchievementData) => {
+    unlockAchievement(achievement.id);
+    
+    if (onUnlock) {
+      onUnlock(achievement);
+    }
+    
+    // Update local state
+    setUnlockedAchievements(prev => [...prev, achievement]);
+    setInProgressAchievements(prev => 
+      prev.filter(a => a.id !== achievement.id)
+    );
+  };
+  
+  // Track progress for progressive achievements
+  const trackProgress = (achievement: IAchievementData, progress: number) => {
+    updateAchievement(achievement.id, { progress });
+    
+    if (onProgress) {
+      onProgress(achievement, progress);
+    }
+    
+    // If achievement is complete, unlock it
+    if (progress >= 1) {
+      handleUnlockAchievement(achievement);
+    } else if (!inProgressAchievements.some(a => a.id === achievement.id)) {
+      // Add to in-progress if not already there
+      setInProgressAchievements(prev => [...prev, achievement]);
+    }
+  };
+  
+  return {
+    unlockedAchievements,
+    inProgressAchievements,
+    trackProgress,
+    unlockAchievement: handleUnlockAchievement,
+    getProgress: getAchievementProgress,
   };
 }

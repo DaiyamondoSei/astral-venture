@@ -81,9 +81,7 @@ export function useCodeEnhancement(
   useErrorPrevention(componentName, props, {
     trackRenders: trackRenders && config.enableRenderTracking,
     validateProps: validateProps && config.enableValidation,
-    trackPropChanges: trackPropChanges && config.enablePropTracking,
-    throttleInterval: config.throttleInterval,
-    batchUpdates: config.batchUpdates
+    trackPropChanges: trackPropChanges && config.enablePropTracking
   });
   
   // Log component lifecycle with less verbosity

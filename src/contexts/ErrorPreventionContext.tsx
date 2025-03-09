@@ -60,7 +60,7 @@ export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = 
   const disableErrorPrevention = () => setIsEnabled(false);
   
   const validateAllComponents = () => {
-    return validateAllMonitoredComponents();
+    return validateAllMonitoredComponents() || { valid: true, errors: [] };
   };
   
   const getHighImpactComponents = () => {
