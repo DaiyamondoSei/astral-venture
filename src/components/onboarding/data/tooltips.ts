@@ -12,7 +12,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'This dashboard is your gateway to spiritual growth and self-discovery.',
     position: 'bottom',
     elementId: 'dashboard-main',
-    targetElement: 'dashboard-main', // Added missing property
+    targetElement: 'dashboard-main',
+    targetSelector: '#dashboard-main',
     condition: 'isFirstLogin',
     delay: 1000
   },
@@ -22,7 +23,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Track your progress with energy points. Earn them through activities and reflections.',
     position: 'bottom',
     elementId: 'energy-display',
-    targetElement: 'energy-display', // Added missing property
+    targetElement: 'energy-display',
+    targetSelector: '#energy-display',
     condition: 'hasCompletedWelcome', 
     delay: 2000
   },
@@ -32,7 +34,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Activate and balance your chakras to enhance your spiritual journey.',
     position: 'left',
     elementId: 'chakra-display',
-    targetElement: 'chakra-display', // Added missing property
+    targetElement: 'chakra-display',
+    targetSelector: '#chakra-display',
     condition: 'hasViewedChakraTooltip',
     delay: 2000
   },
@@ -42,7 +45,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Take time each day to reflect on your thoughts and feelings.',
     position: 'right',
     elementId: 'reflection-card',
-    targetElement: 'reflection-card', // Added missing property
+    targetElement: 'reflection-card',
+    targetSelector: '#reflection-card',
     condition: 'hasViewedChakraTooltip',
     delay: 2000
   },
@@ -52,7 +56,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Explore the patterns that connect all things in the universe.',
     position: 'top',
     elementId: 'sacred-geometry-icon',
-    targetElement: 'sacred-geometry-icon', // Added missing property
+    targetElement: 'sacred-geometry-icon',
+    targetSelector: '#sacred-geometry-icon',
     condition: 'hasCompletedOnboarding',
     delay: 2000
   },
@@ -62,7 +67,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Discover guided meditations to calm your mind and elevate your consciousness.',
     position: 'left',
     elementId: 'meditation-card',
-    targetElement: 'meditation-card', // Added missing property
+    targetElement: 'meditation-card',
+    targetSelector: '#meditation-card',
     condition: 'hasCompletedOnboarding',
     delay: 2000
   },
@@ -72,7 +78,8 @@ const featureTooltips: FeatureTooltipData[] = [
     description: 'Track your progress and unlock special achievements as you grow.',
     position: 'bottom',
     elementId: 'achievements-button',
-    targetElement: 'achievements-button', // Added missing property
+    targetElement: 'achievements-button',
+    targetSelector: '#achievements-button',
     condition: 'hasUsedAppForOneDay',
     delay: 2000
   }

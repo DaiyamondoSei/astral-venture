@@ -1,6 +1,6 @@
 
-import { achievements } from './achievements';
-import { tooltips } from './tooltips';
+import achievements from './achievements';
+import tooltips from './tooltips';
 import { guidedTours } from './tours';
 
 export { achievements, tooltips, guidedTours };
