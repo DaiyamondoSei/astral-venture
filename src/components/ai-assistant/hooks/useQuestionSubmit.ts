@@ -23,7 +23,8 @@ interface UseQuestionSubmitProps {
 const responseCache = new Map<string, {
   response: AIResponse,
   timestamp: number,
-  expiresAt: number
+  expiresAt: number,
+  isStreamingResponse: boolean
 }>();
 
 // Default cache TTL (10 minutes)
@@ -83,12 +84,12 @@ export const useQuestionSubmit = ({
   }, [userId]);
   
   // Check if response is cached
-  const getFromCache = useCallback((cacheKey: string): AIResponse | null => {
+  const getFromCache = useCallback((cacheKey: string, isStreamingRequest: boolean): AIResponse | null => {
     const cached = responseCache.get(cacheKey);
     if (!cached) return null;
     
-    // Check if cache is still valid
-    if (Date.now() > cached.expiresAt) {
+    // Check if cache is still valid and matches request type
+    if (Date.now() > cached.expiresAt || (isStreamingRequest && !cached.isStreamingResponse)) {
       responseCache.delete(cacheKey);
       return null;
     }
@@ -98,7 +99,7 @@ export const useQuestionSubmit = ({
   }, []);
   
   // Add response to cache
-  const addToCache = useCallback((cacheKey: string, response: AIResponse, ttl: number = DEFAULT_CACHE_TTL) => {
+  const addToCache = useCallback((cacheKey: string, response: AIResponse, isStreamingResponse: boolean, ttl: number = DEFAULT_CACHE_TTL) => {
     // Clean up expired entries first
     cleanupCache();
     
@@ -106,7 +107,8 @@ export const useQuestionSubmit = ({
     responseCache.set(cacheKey, {
       response,
       timestamp: Date.now(),
-      expiresAt: Date.now() + ttl
+      expiresAt: Date.now() + ttl,
+      isStreamingResponse
     });
     
     console.log(`Added to cache with TTL of ${ttl}ms, cache size: ${responseCache.size}`);
@@ -130,8 +132,11 @@ export const useQuestionSubmit = ({
       return null;
     }
     
+    // Determine if we should use streaming based on network conditions
+    const shouldUseStreaming = navigator.onLine && navigator.connection?.effectiveType !== 'slow-2g';
+    
     // Check if we have a cached response
-    const cachedResponse = getFromCache(cacheKey);
+    const cachedResponse = getFromCache(cacheKey, shouldUseStreaming);
     if (cachedResponse && isMounted.current) {
       console.log('Using cached response');
       state.setResponse(cachedResponse);
@@ -164,7 +169,8 @@ export const useQuestionSubmit = ({
         reflectionContext: reflectionContext ? `${reflectionContext.substring(0, 20)}...` : null,
         selectedReflectionId,
         userId,
-        isOnline: navigator.onLine
+        isOnline: navigator.onLine,
+        useStreaming: shouldUseStreaming
       });
       
       // Check online status before proceeding
@@ -181,7 +187,7 @@ export const useQuestionSubmit = ({
         question,
         reflectionIds: selectedReflectionId ? [selectedReflectionId] : [],
         context: reflectionContext || '',
-        stream: navigator.onLine // Only enable streaming if online
+        stream: shouldUseStreaming // Only enable streaming if online and connection is good
       };
       
       // Create options object with timeout
@@ -197,7 +203,7 @@ export const useQuestionSubmit = ({
       console.log(`AI response received in ${responseTime.toFixed(2)}ms`);
       
       // Cache the response for future use
-      addToCache(cacheKey, aiResponse);
+      addToCache(cacheKey, aiResponse, shouldUseStreaming);
       
       // Only update state if component is still mounted
       if (isMounted.current) {

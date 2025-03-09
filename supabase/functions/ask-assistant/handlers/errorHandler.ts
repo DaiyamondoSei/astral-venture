@@ -1,15 +1,67 @@
 
 import { createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
 
-export function handleError(error: Error): Response {
+interface ExtendedError extends Error {
+  code?: string;
+  status?: number;
+  details?: unknown;
+}
+
+export function handleError(error: unknown): Response {
   console.error("Error in ask-assistant function:", error);
   
-  // Determine if it's a quota error
-  const isQuotaError = error.message && error.message.includes("quota");
+  const err = error as ExtendedError;
+  
+  // Determine error type with more precision
+  const isQuotaError = err.message && (
+    err.message.includes("quota") || 
+    err.message.includes("rate limit") ||
+    err.message.includes("capacity") ||
+    (err.code === "429")
+  );
+  
+  const isNetworkError = err.message && (
+    err.message.includes("network") ||
+    err.message.includes("connection") ||
+    err.message.includes("timeout") ||
+    err.message.includes("ETIMEDOUT") ||
+    err.message.includes("ECONNREFUSED")
+  );
+  
+  const isAuthError = err.message && (
+    err.message.includes("authentication") ||
+    err.message.includes("unauthorized") ||
+    err.message.includes("not allowed") ||
+    err.message.includes("permission") ||
+    (err.code === "401" || err.status === 401 || err.code === "403" || err.status === 403)
+  );
+  
+  // Determine the appropriate error code
+  let errorCode: ErrorCode;
+  let errorMessage: string;
+  
+  if (isQuotaError) {
+    errorCode = ErrorCode.QUOTA_EXCEEDED;
+    errorMessage = "AI service quota exceeded, please try again later";
+  } else if (isNetworkError) {
+    errorCode = ErrorCode.SERVICE_UNAVAILABLE;
+    errorMessage = "Unable to connect to AI service, please try again later";
+  } else if (isAuthError) {
+    errorCode = ErrorCode.UNAUTHORIZED;
+    errorMessage = "Authentication failed or unauthorized access";
+  } else {
+    errorCode = ErrorCode.INTERNAL_ERROR;
+    errorMessage = "Failed to process request";
+  }
   
   return createErrorResponse(
-    isQuotaError ? ErrorCode.QUOTA_EXCEEDED : ErrorCode.INTERNAL_ERROR,
-    isQuotaError ? "AI service quota exceeded" : "Failed to process request",
-    { errorMessage: error.message }
+    errorCode,
+    errorMessage,
+    { 
+      errorMessage: err.message,
+      errorCode: err.code,
+      errorStatus: err.status,
+      errorDetails: err.details 
+    }
   );
 }

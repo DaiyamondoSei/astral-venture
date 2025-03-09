@@ -12,7 +12,8 @@ import { handleError } from "./errorHandler.ts";
 const responseCache = new Map<string, {
   response: Response,
   timestamp: number,
-  expiresAt: number
+  expiresAt: number,
+  isStreamingResponse: boolean
 }>();
 
 // Cache management
@@ -75,10 +76,10 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
       );
     }
     
-    // Check if we have a cached response
-    if (cacheKey && !stream) { // Don't use cache for streaming requests
+    // Check if we have a cached response - Only use for non-streaming requests
+    if (cacheKey && !stream) {
       const cached = responseCache.get(cacheKey);
-      if (cached && Date.now() <= cached.expiresAt) {
+      if (cached && !cached.isStreamingResponse && Date.now() <= cached.expiresAt) {
         console.log("Cache hit:", cacheKey);
         return cached.response.clone(); // Return a clone of the cached response
       }
@@ -134,7 +135,7 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
       metrics.totalTokens
     );
     
-    // Cache the response if we have a cache key
+    // Cache the response if we have a cache key (only for non-streaming responses)
     if (cacheKey) {
       // Clean up cache first
       cleanupCache();
@@ -142,7 +143,8 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
       responseCache.set(cacheKey, {
         response: response.clone(), // Store a clone of the response
         timestamp: Date.now(),
-        expiresAt: Date.now() + DEFAULT_CACHE_TTL
+        expiresAt: Date.now() + DEFAULT_CACHE_TTL,
+        isStreamingResponse: false
       });
       
       console.log(`Added to cache with key: ${cacheKey}, cache size: ${responseCache.size}`);
