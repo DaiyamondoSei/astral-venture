@@ -28,3 +28,22 @@ export interface MetatronsCubeProps {
   withAnimation?: boolean;
   intensity?: number;
 }
+
+// Add CubeNode and CubeLine types for cubeUtils.ts
+export interface CubeNode {
+  id: string;
+  x: number;
+  y: number;
+  radius?: number;
+  status?: string;
+  isActive?: boolean;
+  label?: string;
+}
+
+export interface CubeLine {
+  id: string;
+  from: string;
+  to: string;
+  status?: string;
+  isActive?: boolean;
+}

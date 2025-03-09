@@ -34,6 +34,16 @@ const infoPanelVariants = {
 };
 
 const InfoPanel: React.FC<InfoPanelProps> = ({ node, onClose, theme }) => {
+  // Convert theme string to a valid variant
+  const getVariant = (themeStr: string) => {
+    if (themeStr === 'default' || themeStr === 'cosmic' || themeStr === 'ethereal' || themeStr === 'quantum') {
+      return themeStr;
+    }
+    return 'default'; // Fallback to default if not valid
+  };
+
+  const variantTheme = getVariant(theme);
+
   return (
     <motion.div
       className="absolute left-full ml-6 w-64"
@@ -44,7 +54,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ node, onClose, theme }) => {
     >
       <GlassmorphicContainer
         className="p-4 relative"
-        variant={theme === 'default' ? 'default' : theme}
+        variant={variantTheme}
         intensity="medium"
         withGlow
       >

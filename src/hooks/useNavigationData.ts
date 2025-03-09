@@ -42,8 +42,7 @@ export const useNavigationData = (userLevel = 1) => {
         const { data, error } = await supabase.functions.invoke<NavigationDataResponse>(
           'get-navigation-nodes', 
           {
-            method: 'GET',
-            query: { 
+            body: { 
               level: userLevel.toString(),
               theme
             }

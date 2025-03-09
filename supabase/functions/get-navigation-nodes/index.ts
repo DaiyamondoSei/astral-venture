@@ -1,168 +1,222 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Define CORS headers for cross-origin requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders, handleCorsRequest } from "../shared/responseUtils.ts";
+import { withAuth } from "../shared/authUtils.ts";
 
-interface NavigationNode {
-  id: string;
-  label: string;
-  description: string;
-  icon_type: string;
-  position_x: number;
-  position_y: number;
-  route: string;
-  is_active: boolean;
-  is_disabled: boolean;
-  sort_order: number;
-  requires_auth: boolean;
-}
-
-interface NavigationConnection {
-  id: string;
-  from_node_id: string;
-  to_node_id: string;
-  strength: number;
-  is_visible: boolean;
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+// Processing function with authentication
+async function handler(user: any, req: Request): Promise<Response> {
   try {
-    const url = new URL(req.url);
-    const userLevel = url.searchParams.get('level') || '1';
-    const theme = url.searchParams.get('theme') || 'default';
+    // Parse request body
+    const { level = '1', theme = 'default' } = await req.json();
     
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Generate nodes based on user level and theme
+    const { nodes, connections } = generateNavigationData(parseInt(level), theme, user.id);
     
-    // Get user authorization if available
-    const authHeader = req.headers.get('Authorization');
-    let userId = null;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      
-      if (!error && user) {
-        userId = user.id;
-        console.log(`Authenticated request from user: ${userId}`);
-      }
-    }
-    
-    // In a real implementation, we would query the database for nodes and connections
-    // For now, we'll simulate a database response with static data
-    
-    // Mock data retrieval based on user level and auth status
-    // In a real implementation, this would be a database query
-    const nodes = Array.from({ length: 7 }, (_, i) => ({
-      id: i.toString(),
-      label: i === 0 ? 'Core' : ['Practices', 'Wisdom', 'Progress', 'Dreams', 'Insights', 'Community'][i-1],
-      description: i === 0 ? 'Your spiritual journey center' : `Description for node ${i}`,
-      icon_type: ['seed-of-life', 'flower-of-life', 'tree-of-life', 'golden-ratio', 'merkaba', 'fibonacci', 'torus'][i],
-      position_x: i === 0 ? 50 : [30, 70, 20, 80, 30, 70][i-1],
-      position_y: i === 0 ? 50 : [25, 25, 50, 50, 75, 75][i-1],
-      route: i === 0 ? '/dashboard' : [`/practices`, `/wisdom`, `/progress`, `/dreams`, `/insights`, `/community`][i-1],
-      is_active: true,
-      is_disabled: parseInt(userLevel) < i,
-      sort_order: i,
-      requires_auth: i > 3
-    }));
-    
-    // Create connections between nodes
-    const connections = [
-      // Center connections
-      { id: 'c0-1', from_node_id: '0', to_node_id: '1', strength: 1, is_visible: true },
-      { id: 'c0-2', from_node_id: '0', to_node_id: '2', strength: 1, is_visible: true },
-      { id: 'c0-3', from_node_id: '0', to_node_id: '3', strength: 1, is_visible: true },
-      { id: 'c0-4', from_node_id: '0', to_node_id: '4', strength: 1, is_visible: true },
-      { id: 'c0-5', from_node_id: '0', to_node_id: '5', strength: 1, is_visible: true },
-      { id: 'c0-6', from_node_id: '0', to_node_id: '6', strength: 1, is_visible: true },
-      // Outer hexagon
-      { id: 'c1-2', from_node_id: '1', to_node_id: '2', strength: 0.8, is_visible: true },
-      { id: 'c2-4', from_node_id: '2', to_node_id: '4', strength: 0.8, is_visible: true },
-      { id: 'c4-6', from_node_id: '4', to_node_id: '6', strength: 0.8, is_visible: true },
-      { id: 'c6-5', from_node_id: '6', to_node_id: '5', strength: 0.8, is_visible: true },
-      { id: 'c5-3', from_node_id: '5', to_node_id: '3', strength: 0.8, is_visible: true },
-      { id: 'c3-1', from_node_id: '3', to_node_id: '1', strength: 0.8, is_visible: true },
-      // Cross connections
-      { id: 'c1-5', from_node_id: '1', to_node_id: '5', strength: 0.6, is_visible: true },
-      { id: 'c2-6', from_node_id: '2', to_node_id: '6', strength: 0.6, is_visible: true },
-      { id: 'c3-4', from_node_id: '3', to_node_id: '4', strength: 0.6, is_visible: true }
-    ];
-    
-    // Apply any user-specific filtering
-    if (userId) {
-      // Here we could add personalized logic based on user's progress, etc.
-      console.log('Applying user-specific navigation customization');
-    }
-    
-    // Apply theme-specific visual adjustments if needed
-    const themeAdjustments = {
-      default: {},
-      cosmic: { intensity: 1.2 },
-      ethereal: { intensity: 0.8 },
-      quantum: { intensity: 1.5 }
-    };
-    
-    // Transform database format to client format
-    const clientNodes = nodes.map(node => ({
-      id: node.id,
-      label: node.label,
-      description: node.description,
-      iconType: node.icon_type,
-      x: node.position_x,
-      y: node.position_y,
-      route: node.route,
-      isActive: node.is_active,
-      isDisabled: node.is_disabled
-    }));
-    
-    const clientConnections = connections.map(conn => ({
-      id: conn.id,
-      from: conn.from_node_id,
-      to: conn.to_node_id,
-      strength: conn.strength
-    }));
-    
-    // Return the navigation data
+    // Create response
     return new Response(
-      JSON.stringify({ 
-        nodes: clientNodes, 
-        connections: clientConnections,
+      JSON.stringify({
+        nodes,
+        connections,
         meta: {
-          themeSettings: themeAdjustments[theme as keyof typeof themeAdjustments] || themeAdjustments.default,
-          userLevel: parseInt(userLevel),
+          themeSettings: getThemeSettings(theme),
+          userLevel: parseInt(level),
           timestamp: new Date().toISOString()
         }
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   } catch (error) {
-    console.error('Error in get-navigation-nodes function:', error);
-    
+    console.error('Error in get-navigation-nodes:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Unknown error occurred',
-        errorCode: 'NAVIGATION_ERROR'
-      }),
+      JSON.stringify({ error: error.message || 'An error occurred' }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }
+}
+
+// Generate nodes and connections
+function generateNavigationData(level: number, theme: string, userId: string) {
+  // Base nodes (always present)
+  const baseNodes = [
+    {
+      id: 'root',
+      label: 'Center',
+      x: 50,
+      y: 50,
+      description: 'Core connection to everything',
+      route: '/dashboard'
+    },
+    {
+      id: 'meditation',
+      label: 'Meditation',
+      x: 50,
+      y: 20,
+      description: 'Enhance your meditation practice',
+      route: '/meditation'
+    },
+    {
+      id: 'reflection',
+      label: 'Reflection',
+      x: 80,
+      y: 50,
+      description: 'Reflect on your journey',
+      route: '/reflection'
+    },
+    {
+      id: 'dreams',
+      label: 'Dreams',
+      x: 50,
+      y: 80,
+      description: 'Explore your dream state',
+      route: '/dreams'
+    },
+    {
+      id: 'chakras',
+      label: 'Chakras',
+      x: 20,
+      y: 50,
+      description: 'Balance your energy centers',
+      route: '/chakras'
+    }
+  ];
+  
+  // Add level-dependent nodes
+  let nodes = [...baseNodes];
+  
+  if (level >= 2) {
+    nodes.push({
+      id: 'astral',
+      label: 'Astral',
+      x: 30,
+      y: 30,
+      description: 'Explore astral projection',
+      route: '/astral'
+    });
+  }
+  
+  if (level >= 3) {
+    nodes.push({
+      id: 'quantum',
+      label: 'Quantum',
+      x: 70,
+      y: 30,
+      description: 'Quantum consciousness techniques',
+      route: '/quantum'
+    });
+  }
+  
+  if (level >= 4) {
+    nodes.push({
+      id: 'transcendence',
+      label: 'Transcendence',
+      x: 70,
+      y: 70,
+      description: 'Transcend ordinary consciousness',
+      route: '/transcendence'
+    });
+  }
+  
+  if (level >= 5) {
+    nodes.push({
+      id: 'unity',
+      label: 'Unity',
+      x: 30,
+      y: 70,
+      description: 'Experience universal oneness',
+      route: '/unity'
+    });
+  }
+  
+  // Generate connections between nodes
+  const connections = [];
+  
+  // Connect root to all base nodes
+  for (const node of nodes) {
+    if (node.id !== 'root') {
+      connections.push({
+        id: `root-${node.id}`,
+        from: 'root',
+        to: node.id
+      });
+    }
+  }
+  
+  // Add more complex connections for higher levels
+  if (level >= 3) {
+    connections.push(
+      { id: 'meditation-astral', from: 'meditation', to: 'astral' },
+      { id: 'chakras-astral', from: 'chakras', to: 'astral' },
+      { id: 'meditation-quantum', from: 'meditation', to: 'quantum' },
+      { id: 'reflection-quantum', from: 'reflection', to: 'quantum' }
+    );
+  }
+  
+  if (level >= 4) {
+    connections.push(
+      { id: 'quantum-transcendence', from: 'quantum', to: 'transcendence' },
+      { id: 'reflection-transcendence', from: 'reflection', to: 'transcendence' },
+      { id: 'dreams-transcendence', from: 'dreams', to: 'transcendence' }
+    );
+  }
+  
+  if (level >= 5) {
+    connections.push(
+      { id: 'chakras-unity', from: 'chakras', to: 'unity' },
+      { id: 'dreams-unity', from: 'dreams', to: 'unity' },
+      { id: 'astral-unity', from: 'astral', to: 'unity' },
+      { id: 'unity-transcendence', from: 'unity', to: 'transcendence' }
+    );
+  }
+  
+  return { nodes, connections };
+}
+
+// Get theme-specific settings
+function getThemeSettings(theme: string) {
+  const baseColors = {
+    default: { 
+      primary: '#3498db', 
+      secondary: '#2ecc71',
+      accent: '#9b59b6'
+    },
+    cosmic: { 
+      primary: '#8e44ad', 
+      secondary: '#3498db',
+      accent: '#2c3e50'
+    },
+    ethereal: { 
+      primary: '#1abc9c', 
+      secondary: '#f1c40f',
+      accent: '#e74c3c'
+    },
+    quantum: { 
+      primary: '#e67e22', 
+      secondary: '#34495e',
+      accent: '#16a085'
+    }
+  };
+  
+  return {
+    colors: baseColors[theme as keyof typeof baseColors] || baseColors.default,
+    glowIntensity: theme === 'cosmic' || theme === 'quantum' ? 'high' : 'medium',
+    animations: theme === 'ethereal' ? 'fluid' : 'standard'
+  };
+}
+
+// Entry point for the edge function
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return handleCorsRequest();
+  }
+
+  // Process with authentication
+  return withAuth(req, handler);
 });

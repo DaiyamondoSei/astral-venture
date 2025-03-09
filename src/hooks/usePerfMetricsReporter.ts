@@ -1,154 +1,221 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePerfConfig } from './usePerfConfig';
-import { v4 as uuidv4 } from 'uuid';
 
-interface ComponentMetric {
+interface PerformanceMetric {
   componentName: string;
-  averageRenderTime: number;
+  renderTime: number;
   renderCount: number;
-  slowRenders: number;
+  timestamp: number;
+  type: 'render' | 'load' | 'interaction';
 }
 
-export const usePerfMetricsReporter = () => {
-  const { config } = usePerfConfig();
-  const [sessionId] = useState(() => uuidv4());
-  const [metrics, setMetrics] = useState<Record<string, ComponentMetric>>({});
-  const [lastReportTime, setLastReportTime] = useState(0);
-  const [isReporting, setIsReporting] = useState(false);
-  
-  // Device info for context
-  const deviceInfo = {
-    userAgent: navigator.userAgent,
-    screenWidth: window.screen.width,
-    screenHeight: window.screen.height
+interface WebVital {
+  name: string;
+  value: number;
+  category: 'loading' | 'interaction' | 'visual_stability';
+}
+
+interface PerformanceReport {
+  metrics: PerformanceMetric[];
+  webVitals: WebVital[];
+  deviceInfo: {
+    deviceCategory: string;
+    viewport: {
+      width: number;
+      height: number;
+    };
+    devicePixelRatio: number;
+    userAgent: string;
+    deviceMemory?: number;
+    connection?: {
+      effectiveType: string;
+      downlink: number;
+      rtt: number;
+    };
   };
-  
-  // Record a render for a component
-  const recordRender = useCallback((
-    componentName: string, 
-    renderTime: number
-  ) => {
-    setMetrics(prev => {
-      const existing = prev[componentName] || {
-        componentName,
-        renderCount: 0,
-        averageRenderTime: 0,
-        slowRenders: 0
-      };
-      
-      const newRenderCount = existing.renderCount + 1;
-      // Calculate the new average using weighted approach
-      const newAverage = 
-        (existing.averageRenderTime * existing.renderCount + renderTime) / newRenderCount;
-      
-      return {
-        ...prev,
-        [componentName]: {
-          componentName,
-          renderCount: newRenderCount,
-          averageRenderTime: newAverage,
-          slowRenders: existing.slowRenders + (renderTime > 16.67 ? 1 : 0) // Slower than 60fps
-        }
-      };
-    });
-  }, []);
-  
-  // Reset metrics 
-  const resetMetrics = useCallback(() => {
-    setMetrics({});
-  }, []);
-  
-  // Report metrics to backend
-  const reportMetrics = useCallback(async () => {
-    const metricsArray = Object.values(metrics);
-    
-    if (metricsArray.length === 0) return;
-    
-    setIsReporting(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('track-performance', {
-        method: 'POST',
-        body: {
-          metrics: metricsArray,
-          sessionId,
-          deviceInfo
-        }
-      });
-      
-      if (error) {
-        console.error('Error reporting performance metrics:', error);
-      } else {
-        console.log(`Successfully reported ${metricsArray.length} metrics`, data);
-        setLastReportTime(Date.now());
-        resetMetrics();
-      }
-    } catch (err) {
-      console.error('Exception reporting performance metrics:', err);
-    } finally {
-      setIsReporting(false);
-    }
-  }, [metrics, sessionId, resetMetrics]);
-  
-  // Periodically report metrics in background
+  appVersion: string;
+  sessionId: string;
+}
+
+/**
+ * Hook to collect and report performance metrics to the backend
+ */
+export function usePerfMetricsReporter() {
+  const { config } = usePerfConfig();
+  const metricsBuffer = useRef<PerformanceMetric[]>([]);
+  const webVitalsBuffer = useRef<WebVital[]>([]);
+  const sessionId = useRef<string>('');
+  const reportingTimer = useRef<number | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize the session ID
   useEffect(() => {
-    // Skip if we should not track performance
-    if (!config.enableVirtualization) return;
-    
-    const now = Date.now();
-    const timeSinceLastReport = now - lastReportTime;
-    
-    // Report metrics after user has been active for a while
-    if (timeSinceLastReport > 5 * 60 * 1000 && Object.keys(metrics).length > 0) {
-      reportMetrics();
+    if (!sessionId.current) {
+      sessionId.current = generateSessionId();
     }
+    setIsInitialized(true);
     
-    // Schedule periodic reporting
-    const intervalId = setInterval(() => {
-      if (Object.keys(metrics).length > 0) {
+    return () => {
+      // Send any remaining metrics on unmount
+      if (metricsBuffer.current.length > 0 || webVitalsBuffer.current.length > 0) {
         reportMetrics();
       }
-    }, 10 * 60 * 1000); // Report every 10 minutes if we have metrics
-    
-    return () => {
-      clearInterval(intervalId);
     };
-  }, [metrics, lastReportTime, reportMetrics, config.enableVirtualization]);
-  
-  // Report metrics before the user leaves the page
+  }, []);
+
+  // Track web vitals
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (Object.keys(metrics).length > 0) {
-        // Use a synchronous approach for beforeunload
-        const metricsArray = Object.values(metrics);
-        
-        navigator.sendBeacon(
-          `${supabase.supabaseUrl}/functions/v1/track-performance`,
-          JSON.stringify({
-            metrics: metricsArray,
-            sessionId,
-            deviceInfo
-          })
-        );
+    if (!config.enablePerformanceTracking || !isInitialized) return;
+    
+    // Simplified web vitals tracking
+    const trackWebVitals = () => {
+      try {
+        if (typeof window !== 'undefined' && 'performance' in window) {
+          // Get basic navigation timing
+          const navTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+          if (navTiming) {
+            addWebVital('ttfb', navTiming.responseStart - navTiming.requestStart, 'loading');
+            addWebVital('dom-load', navTiming.domContentLoadedEventEnd - navTiming.fetchStart, 'loading');
+            addWebVital('full-load', navTiming.loadEventEnd - navTiming.fetchStart, 'loading');
+          }
+          
+          // Get first paint metrics
+          const paintEntries = performance.getEntriesByType('paint');
+          for (const entry of paintEntries) {
+            const paintEntry = entry as PerformanceEntry;
+            addWebVital(
+              paintEntry.name, 
+              paintEntry.startTime, 
+              'visual_stability'
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error tracking web vitals:', error);
       }
     };
     
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    // Track initially and on load
+    window.addEventListener('load', trackWebVitals);
+    setTimeout(trackWebVitals, 3000); // Initial delayed check
+    
+    // Set up periodic reporting
+    reportingTimer.current = window.setInterval(reportMetrics, 30000); // Report every 30 seconds
     
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('load', trackWebVitals);
+      if (reportingTimer.current) {
+        window.clearInterval(reportingTimer.current);
+      }
     };
-  }, [metrics, sessionId]);
-  
-  return {
-    recordRender,
-    reportMetrics,
-    resetMetrics,
-    metrics: Object.values(metrics),
-    isReporting
+  }, [config.enablePerformanceTracking, isInitialized]);
+
+  // Generate a unique session ID
+  const generateSessionId = (): string => {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   };
-};
+
+  // Add a component render metric
+  const addComponentMetric = (
+    componentName: string, 
+    renderTime: number, 
+    type: 'render' | 'load' | 'interaction' = 'render'
+  ) => {
+    if (!config.enablePerformanceTracking || !isInitialized) return;
+    
+    metricsBuffer.current.push({
+      componentName,
+      renderTime,
+      renderCount: 1,
+      timestamp: Date.now(),
+      type
+    });
+    
+    // Report if buffer gets large
+    if (metricsBuffer.current.length >= 20) {
+      reportMetrics();
+    }
+  };
+
+  // Add a web vital
+  const addWebVital = (
+    name: string, 
+    value: number, 
+    category: 'loading' | 'interaction' | 'visual_stability'
+  ) => {
+    if (!config.enablePerformanceTracking || !isInitialized) return;
+    
+    webVitalsBuffer.current.push({
+      name,
+      value,
+      category
+    });
+  };
+
+  // Report metrics to the backend
+  const reportMetrics = async () => {
+    if (
+      (!metricsBuffer.current.length && !webVitalsBuffer.current.length) || 
+      !isInitialized
+    ) return;
+    
+    try {
+      // Build the report
+      const report: PerformanceReport = {
+        metrics: [...metricsBuffer.current],
+        webVitals: [...webVitalsBuffer.current],
+        deviceInfo: getDeviceInfo(),
+        appVersion: '1.0.0', // Replace with actual version
+        sessionId: sessionId.current
+      };
+      
+      // Call the edge function
+      await supabase.functions.invoke('track-performance', {
+        body: report
+      });
+      
+      // Clear the buffers after successful report
+      metricsBuffer.current = [];
+      webVitalsBuffer.current = [];
+    } catch (error) {
+      console.error('Failed to report performance metrics:', error);
+    }
+  };
+
+  // Get device information
+  const getDeviceInfo = () => {
+    const info = {
+      deviceCategory: config.deviceCapability,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      devicePixelRatio: window.devicePixelRatio || 1,
+      userAgent: navigator.userAgent,
+      deviceMemory: (navigator as any).deviceMemory,
+      connection: null as any
+    };
+    
+    // Add connection info if available
+    const conn = (navigator as any).connection;
+    if (conn) {
+      info.connection = {
+        effectiveType: conn.effectiveType,
+        downlink: conn.downlink,
+        rtt: conn.rtt
+      };
+    }
+    
+    return info;
+  };
+
+  return {
+    addComponentMetric,
+    addWebVital,
+    reportNow: reportMetrics
+  };
+}
 
 export default usePerfMetricsReporter;

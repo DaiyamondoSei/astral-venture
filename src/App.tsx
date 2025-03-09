@@ -14,7 +14,16 @@ import DesignSystemDemo from '@/pages/DesignSystemDemo';
 import NotFoundPage from '@/pages/NotFoundPage';
 import OnboardingPage from '@/pages/OnboardingPage';
 
-const queryClient = new QueryClient();
+// Create Query Client with defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   return (

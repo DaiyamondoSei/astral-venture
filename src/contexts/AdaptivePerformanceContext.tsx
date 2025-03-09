@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { detectDeviceCapability } from '@/utils/adaptiveRendering';
 
 // Simple enum for device capability
@@ -21,6 +21,7 @@ interface AdaptivePerformanceContextType {
     enableComplexAnimations: boolean;
     enableHighResImages: boolean;
   };
+  webVitals?: Record<string, number>;
   // Functions
   setManualPerformanceMode: (mode: DeviceCapability | 'auto') => void;
   adaptElementCount: (baseCount: number) => number;
@@ -51,11 +52,40 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
     return 'auto';
   });
   
+  // Basic web vitals tracking
+  const [webVitals, setWebVitals] = useState<Record<string, number>>({});
+  
   // Calculated device capability
   const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(() => {
     const detectedCapability = detectDeviceCapability();
     return DeviceCapability[detectedCapability.toUpperCase() as keyof typeof DeviceCapability];
   });
+  
+  // Update web vitals when available
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'performance' in window) {
+      const updateVitals = () => {
+        const navTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+        if (navTiming) {
+          setWebVitals({
+            fcp: performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0,
+            lcp: 0, // Would need web-vitals library for this
+            ttfb: navTiming.responseStart - navTiming.requestStart,
+            domLoad: navTiming.domContentLoadedEventEnd - navTiming.fetchStart,
+            fullLoad: navTiming.loadEventEnd - navTiming.fetchStart,
+          });
+        }
+      };
+      
+      // Update initially and on load
+      window.addEventListener('load', updateVitals);
+      setTimeout(updateVitals, 3000); // Initial delayed check
+      
+      return () => {
+        window.removeEventListener('load', updateVitals);
+      };
+    }
+  }, []);
   
   // Device detection - run only when manual mode changes
   useEffect(() => {
@@ -68,17 +98,17 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   }, [manualMode]);
   
   // Manual mode setter
-  const setManualPerformanceMode = (mode: DeviceCapability | 'auto') => {
+  const setManualPerformanceMode = useCallback((mode: DeviceCapability | 'auto') => {
     setManualMode(mode);
     
     // Store preference in localStorage for persistence
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('performanceMode', mode);
     }
-  };
+  }, []);
   
   // Helper function for adapting rendering based on performance
-  const adaptElementCount = (baseCount: number): number => {
+  const adaptElementCount = useCallback((baseCount: number): number => {
     const factors: Record<DeviceCapability, number> = {
       [DeviceCapability.LOW]: 0.3,
       [DeviceCapability.MEDIUM]: 0.7,
@@ -86,7 +116,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
     };
     
     return Math.max(3, Math.floor(baseCount * factors[deviceCapability]));
-  };
+  }, [deviceCapability]);
   
   // Compute derived feature flags
   const features = {
@@ -100,6 +130,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
     deviceCapability,
     manualPerformanceMode: manualMode,
     features,
+    webVitals,
     setManualPerformanceMode,
     adaptElementCount
   };
@@ -110,3 +141,5 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
     </AdaptivePerformanceContext.Provider>
   );
 };
+
+export default AdaptivePerformanceContext;

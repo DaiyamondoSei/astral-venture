@@ -1,91 +1,143 @@
 
-interface PerformanceMetric {
-  componentName: string;
-  averageRenderTime: number;
-  renderCount: number;
-  slowRenders: number;
-  timestamp: string;
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Simple validation for performance data
+export function validatePerformancePayload(data: any) {
+  if (!data) {
+    return { valid: false, error: "Missing performance data" };
+  }
+  
+  // Check essential fields
+  if (!data.sessionId) {
+    return { valid: false, error: "Missing sessionId" };
+  }
+  
+  // Ensure metrics and vitals are arrays
+  if (data.metrics && !Array.isArray(data.metrics)) {
+    return { valid: false, error: "metrics must be an array" };
+  }
+  
+  if (data.webVitals && !Array.isArray(data.webVitals)) {
+    return { valid: false, error: "webVitals must be an array" };
+  }
+  
+  // Check device info
+  if (!data.deviceInfo || typeof data.deviceInfo !== 'object') {
+    return { valid: false, error: "Missing or invalid deviceInfo" };
+  }
+  
+  return { valid: true };
 }
 
-// Validate and normalize performance metrics
-export function validatePerformanceMetrics(metrics: any[]): PerformanceMetric[] {
-  if (!Array.isArray(metrics)) {
-    throw new Error('Metrics must be an array');
-  }
+// Process and aggregate metrics for storage
+export function processMetrics(rawData: any, userId: string) {
+  // Compute aggregate metrics
+  const aggregateMetrics = aggregateComponentMetrics(rawData.metrics || []);
   
-  return metrics
-    .filter(metric => {
-      // Basic validation
-      if (!metric || typeof metric !== 'object') return false;
-      if (!metric.componentName || typeof metric.componentName !== 'string') return false;
-      if (typeof metric.averageRenderTime !== 'number' || isNaN(metric.averageRenderTime)) return false;
-      if (typeof metric.renderCount !== 'number' || isNaN(metric.renderCount)) return false;
-      
-      return true;
-    })
-    .map(metric => ({
-      componentName: metric.componentName,
-      averageRenderTime: Number(metric.averageRenderTime.toFixed(2)), // Round to 2 decimal places
-      renderCount: metric.renderCount,
-      slowRenders: metric.slowRenders || 0,
-      timestamp: metric.timestamp || new Date().toISOString()
-    }));
-}
-
-// Calculate performance insights based on metrics
-export function calculatePerformanceInsights(metrics: PerformanceMetric[]) {
-  if (metrics.length === 0) {
-    return { insights: [] };
-  }
-  
-  // Sort components by average render time (slowest first)
-  const sortedByTime = [...metrics].sort((a, b) => b.averageRenderTime - a.averageRenderTime);
-  
-  // Sort components by render count (most renders first)
-  const sortedByCount = [...metrics].sort((a, b) => b.renderCount - a.renderCount);
-  
-  // Find components with potential issues
-  const slowComponents = sortedByTime.filter(m => m.averageRenderTime > 16.67); // Slower than 60fps
-  const frequentRenders = sortedByCount.filter(m => m.renderCount > 5 && m.averageRenderTime > 5);
-  
-  // Generate insights
-  const insights = [];
-  
-  if (slowComponents.length > 0) {
-    insights.push({
-      type: 'performance',
-      severity: 'warning',
-      message: `${slowComponents.length} component(s) have slow render times (>16.67ms)`,
-      details: slowComponents.slice(0, 3).map(m => 
-        `${m.componentName}: ${m.averageRenderTime.toFixed(1)}ms average (${m.renderCount} renders)`
-      )
-    });
-  }
-  
-  if (frequentRenders.length > 0) {
-    insights.push({
-      type: 'performance',
-      severity: 'info',
-      message: `${frequentRenders.length} component(s) re-render frequently`,
-      details: frequentRenders.slice(0, 3).map(m => 
-        `${m.componentName}: ${m.renderCount} renders (${m.averageRenderTime.toFixed(1)}ms average)`
-      )
-    });
-  }
-  
-  // Overall performance score (0-100)
-  let performanceScore = 100;
-  
-  // Deduct points for each slow component
-  performanceScore -= Math.min(50, slowComponents.length * 5);
-  
-  // Deduct points for frequent renders
-  performanceScore -= Math.min(30, frequentRenders.length * 3);
-  
+  // Enhance with additional context
   return {
-    insights,
-    performanceScore: Math.max(0, Math.min(100, performanceScore)),
-    worstPerformers: sortedByTime.slice(0, 5),
-    frequentRenders: sortedByCount.slice(0, 5)
+    user_id: userId,
+    session_id: rawData.sessionId,
+    timestamp: new Date().toISOString(),
+    device_category: rawData.deviceInfo.deviceCategory || 'unknown',
+    device_info: rawData.deviceInfo,
+    metrics: aggregateMetrics,
+    web_vitals: rawData.webVitals || [],
+    app_version: rawData.appVersion || '1.0.0',
+    sessionId: rawData.sessionId
   };
+}
+
+// Aggregate metrics by component
+function aggregateComponentMetrics(metrics: any[]) {
+  const componentMap = new Map<string, any>();
+  
+  // Group by component
+  for (const metric of metrics) {
+    const componentName = metric.componentName;
+    
+    if (!componentMap.has(componentName)) {
+      componentMap.set(componentName, {
+        componentName,
+        renderCount: 0,
+        totalRenderTime: 0,
+        avgRenderTime: 0,
+        minRenderTime: Infinity,
+        maxRenderTime: -Infinity,
+        lastRenderTime: 0,
+        renderTimes: []
+      });
+    }
+    
+    const component = componentMap.get(componentName);
+    component.renderCount += 1;
+    component.totalRenderTime += metric.renderTime;
+    component.minRenderTime = Math.min(component.minRenderTime, metric.renderTime);
+    component.maxRenderTime = Math.max(component.maxRenderTime, metric.renderTime);
+    component.lastRenderTime = metric.renderTime;
+    component.renderTimes.push(metric.renderTime);
+  }
+  
+  // Calculate averages and remove raw data
+  const result = [];
+  for (const [, component] of componentMap) {
+    component.avgRenderTime = component.totalRenderTime / component.renderCount;
+    
+    // Calculate standard deviation
+    if (component.renderTimes.length > 1) {
+      const mean = component.avgRenderTime;
+      const variance = component.renderTimes.reduce((acc: number, val: number) => 
+        acc + Math.pow(val - mean, 2), 0) / component.renderTimes.length;
+      component.stdDeviation = Math.sqrt(variance);
+    } else {
+      component.stdDeviation = 0;
+    }
+    
+    // Remove raw render times array
+    delete component.renderTimes;
+    
+    result.push(component);
+  }
+  
+  return result;
+}
+
+// Store the processed metrics in Supabase
+export async function storePerformanceMetrics(userId: string, data: any) {
+  try {
+    // Initialize Supabase client
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") || "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+    
+    // Insert metrics
+    const { error } = await supabaseAdmin
+      .from("performance_metrics")
+      .insert({
+        user_id: userId,
+        session_id: data.session_id,
+        device_category: data.device_category,
+        device_info: data.device_info,
+        metrics_data: data.metrics,
+        web_vitals: data.web_vitals,
+        app_version: data.app_version
+      });
+    
+    if (error) {
+      console.error("Error saving performance metrics:", error);
+      return { saved: false, error: error.message };
+    }
+    
+    return { saved: true };
+  } catch (error) {
+    console.error("Error in storePerformanceMetrics:", error);
+    return { saved: false, error: error.message || "Database error" };
+  }
 }

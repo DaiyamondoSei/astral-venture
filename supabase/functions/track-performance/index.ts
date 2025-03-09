@@ -1,107 +1,72 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { validatePerformanceMetrics, calculatePerformanceInsights } from './utils.ts';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
-// Define CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { 
+  corsHeaders,
+  handleCorsRequest
+} from "../shared/responseUtils.ts";
 
-// These are automatically injected when deployed on Supabase
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { withAuth } from "../shared/authUtils.ts";
+import { 
+  validatePerformancePayload, 
+  processMetrics,
+  storePerformanceMetrics
+} from "./utils.ts";
 
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+// Process performance tracking data
+async function handler(user: any, req: Request): Promise<Response> {
   try {
-    // Check if the request has a valid JWT
-    const authHeader = req.headers.get('Authorization');
-    let userId = 'anonymous';
+    // Get performance data from request
+    const performanceData = await req.json();
     
-    if (authHeader) {
-      // Verify the JWT and get the user
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-      
-      if (!userError && user) {
-        userId = user.id;
-      }
-    }
-    
-    // Parse request body
-    const requestBody = await req.json();
-    const { metrics = [], sessionId, deviceInfo } = requestBody;
-    
-    if (!metrics || !Array.isArray(metrics) || metrics.length === 0) {
+    // Validate the payload
+    const validationResult = validatePerformancePayload(performanceData);
+    if (!validationResult.valid) {
       return new Response(
-        JSON.stringify({ message: 'No metrics provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: validationResult.error }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
       );
     }
     
-    // Validate and normalize metrics
-    const validatedMetrics = validatePerformanceMetrics(metrics);
-    if (validatedMetrics.length === 0) {
-      return new Response(
-        JSON.stringify({ message: 'No valid metrics provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Process metrics
+    const processedData = processMetrics(performanceData, user.id);
     
-    // Generate insights from the metrics
-    const insights = calculatePerformanceInsights(validatedMetrics);
+    // Store metrics
+    const result = await storePerformanceMetrics(user.id, processedData);
     
-    // Prepare for database insertion
-    const timestamp = new Date().toISOString();
-    const metricsToInsert = validatedMetrics.map(metric => ({
-      user_id: userId,
-      session_id: sessionId,
-      component_name: metric.componentName,
-      average_render_time: metric.averageRenderTime,
-      total_renders: metric.renderCount,
-      slow_renders: metric.slowRenders,
-      device_info: deviceInfo,
-      created_at: timestamp
-    }));
-    
-    // Insert metrics into database
-    const { error: insertError } = await supabase
-      .from('performance_metrics')
-      .insert(metricsToInsert);
-      
-    if (insertError) {
-      console.error('Error inserting performance metrics:', insertError);
-      
-      return new Response(
-        JSON.stringify({ 
-          message: 'Error inserting performance metrics', 
-          error: insertError.message 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Return success response with insights
+    // Return result
     return new Response(
       JSON.stringify({ 
-        message: 'Performance metrics recorded successfully',
-        metricsCount: metricsToInsert.length,
-        insights
+        status: "success", 
+        saved: result.saved,
+        sessionId: processedData.sessionId 
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error('Error in track-performance function:', error);
+    console.error("Error in track-performance function:", error);
     
     return new Response(
-      JSON.stringify({ message: 'Internal server error', error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: error.message || "Internal server error" }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
     );
   }
+}
+
+// Edge function entry point
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return handleCorsRequest();
+  }
+  
+  // Process with authentication
+  return withAuth(req, handler);
 });

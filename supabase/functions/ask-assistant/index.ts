@@ -10,13 +10,18 @@ import {
 } from "../shared/responseUtils.ts";
 
 import { withAuth } from "../shared/authUtils.ts";
-import { handleAIRequest } from "./handlers/requestHandler.ts";
+import { handleAIRequest, handleClearCache } from "./handlers/requestHandler.ts";
 
 // Entry point for the edge function
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return handleCorsRequest();
+  }
+  
+  // Add route for clearing cache (admin only)
+  if (req.url.includes("/clear-cache")) {
+    return withAuth(req, handleClearCache);
   }
 
   // Process the request with authentication

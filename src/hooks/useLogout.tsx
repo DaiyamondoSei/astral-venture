@@ -42,3 +42,5 @@ export function useLogout() {
 
   return { logout, isLoggingOut };
 }
+
+export default useLogout;

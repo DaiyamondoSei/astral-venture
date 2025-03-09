@@ -1,60 +1,91 @@
 
-import React, { useEffect, useRef } from 'react';
-import { performanceMonitor } from './performanceMonitor';
-
-interface PerformanceTrackingOptions {
-  logSlowRenders?: boolean;
-  slowRenderThreshold?: number;
-  trackProps?: boolean;
-}
+import React, { ComponentType, useEffect, useRef } from 'react';
+import { usePerfMetricsReporter } from '@/hooks/usePerfMetricsReporter';
+import { usePerfConfig } from '@/hooks/usePerfConfig';
+import { PerformanceMonitor } from './performanceMonitor';
 
 /**
- * HOC to track component render performance
- * 
- * @param Component The component to track
- * @param options Performance tracking options
- * @returns The wrapped component with performance tracking
+ * Higher-order component to track component render performance
  */
-export function withPerformanceTracking<P>(
-  Component: React.ComponentType<P>,
-  componentName: string,
-  options: PerformanceTrackingOptions = {}
-): React.FC<P> {
-  // Extract options with defaults
-  const {
-    logSlowRenders = true,
-    slowRenderThreshold = 16, // 16ms is roughly 60fps threshold
-    trackProps = false
-  } = options;
-
-  // Create a wrapped component with performance tracking
-  const WithPerformanceTracking: React.FC<P> = (props) => {
+export function withPerformanceTracking<P extends object>(
+  WrappedComponent: ComponentType<P>,
+  options: {
+    componentName?: string;
+    trackProps?: boolean;
+    trackLifecycle?: boolean;
+  } = {}
+) {
+  // Use the component display name or function name
+  const displayName = options.componentName || 
+    WrappedComponent.displayName || 
+    WrappedComponent.name || 
+    'Component';
+  
+  // Create a wrapped component that tracks performance
+  const WithPerformanceTracking = (props: P) => {
+    const { config } = usePerfConfig();
+    const { addComponentMetric } = usePerfMetricsReporter();
     const renderStartTime = useRef(0);
     
+    // Skip tracking if disabled
+    const shouldTrack = config.enablePerformanceTracking;
+    
+    // Track component mount
     useEffect(() => {
-      // Record render duration
-      const renderDuration = performance.now() - renderStartTime.current;
-      performanceMonitor.recordRender(componentName, renderDuration);
+      if (!shouldTrack) return;
       
-      if (logSlowRenders && renderDuration > slowRenderThreshold) {
-        console.warn(`Slow render detected in ${componentName}: ${renderDuration.toFixed(2)}ms`);
-      }
+      // Record load/mount time
+      const mountTime = performance.now() - renderStartTime.current;
+      addComponentMetric(`${displayName}:mount`, mountTime, 'load');
       
-      // Record unmount
+      const performanceMonitor = PerformanceMonitor.getInstance();
+      
+      // Record unmount on cleanup
       return () => {
-        performanceMonitor.recordUnmount(componentName);
+        if (config.enablePerformanceTracking && options.trackLifecycle) {
+          // Since we can't directly measure unmount time, we just record the event
+          performanceMonitor.recordRender(displayName, 0); // Placeholder
+          addComponentMetric(`${displayName}:unmount`, 0, 'load');
+        }
       };
-    });
+    }, [shouldTrack]);
     
-    // Set render start time before rendering
-    renderStartTime.current = performance.now();
+    // Track component rendering time
+    if (shouldTrack) {
+      renderStartTime.current = performance.now();
+    }
     
-    // Render the original component
-    return <Component {...props} />;
+    // Track props changes if enabled
+    if (shouldTrack && options.trackProps) {
+      // Log current props for debugging
+      console.debug(`[Performance] ${displayName} props:`, props);
+    }
+    
+    // Render the wrapped component
+    const result = <WrappedComponent {...props} />;
+    
+    // Record render time after rendering
+    if (shouldTrack) {
+      const renderEndTime = performance.now();
+      const renderTime = renderEndTime - renderStartTime.current;
+      
+      // Track in both local monitor and reporter
+      PerformanceMonitor.getInstance().recordRender(displayName, renderTime);
+      addComponentMetric(displayName, renderTime);
+      
+      // Log slow renders
+      if (renderTime > 16.67) { // Slow render (exceeds 60fps frame budget)
+        console.debug(`[Performance] Slow render of ${displayName}: ${renderTime.toFixed(2)}ms`);
+      }
+    }
+    
+    return result;
   };
-
-  // Set display name for debugging
-  WithPerformanceTracking.displayName = `WithPerformanceTracking(${componentName})`;
+  
+  // Set display name for better debugging
+  WithPerformanceTracking.displayName = `WithPerformanceTracking(${displayName})`;
   
   return WithPerformanceTracking;
 }
+
+export default withPerformanceTracking;

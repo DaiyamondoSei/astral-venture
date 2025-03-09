@@ -7,50 +7,7 @@ import { generateChatResponse, selectOptimalModel } from "../services/openai/ind
 import { handleStreamingRequest } from "./streamingHandler.ts";
 import { processAIResponse } from "./aiResponseHandler.ts";
 import { handleError } from "./errorHandler.ts";
-
-// Simple in-memory cache with TTL and better type safety
-const responseCache = new Map<string, {
-  response: Response,
-  timestamp: number,
-  expiresAt: number,
-  isStreamingResponse: boolean
-}>();
-
-// Cache management constants
-const DEFAULT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-const MAX_CACHE_SIZE = 100;
-
-/**
- * Clean up expired cache entries and maintain cache size limits
- */
-function cleanupCache() {
-  const now = Date.now();
-  let deletionCount = 0;
-  
-  // Delete expired entries
-  for (const [key, entry] of responseCache.entries()) {
-    if (now > entry.expiresAt) {
-      responseCache.delete(key);
-      deletionCount++;
-    }
-  }
-  
-  // If cache is still too large, remove oldest entries
-  if (responseCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(responseCache.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp);
-    
-    const entriesToDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
-    entriesToDelete.forEach(([key]) => {
-      responseCache.delete(key);
-      deletionCount++;
-    });
-  }
-  
-  if (deletionCount > 0) {
-    console.log(`Cleaned up ${deletionCount} cache entries, ${responseCache.size} remaining`);
-  }
-}
+import { getCachedResponse, cacheResponse, cleanupCache } from "./cacheHandler.ts";
 
 /**
  * Main request handler for AI assistant requests
@@ -83,11 +40,9 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
     
     // Check if we have a cached response
     if (cacheKey) {
-      const cached = responseCache.get(cacheKey);
-      // Only use cache if it matches the request type (streaming vs non-streaming)
-      if (cached && cached.isStreamingResponse === stream && Date.now() <= cached.expiresAt) {
-        console.log("Cache hit:", cacheKey, stream ? "(streaming)" : "(non-streaming)");
-        return cached.response.clone(); // Return a clone of the cached response
+      const cachedResponse = await getCachedResponse(cacheKey, stream);
+      if (cachedResponse) {
+        return cachedResponse;
       }
     }
     
@@ -126,17 +81,7 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
       
       // Cache the streaming response if we have a cache key
       if (cacheKey) {
-        // Clean up cache first
-        cleanupCache();
-        
-        responseCache.set(cacheKey, {
-          response: streamingResponse.clone(), // Store a clone of the response
-          timestamp: Date.now(),
-          expiresAt: Date.now() + DEFAULT_CACHE_TTL,
-          isStreamingResponse: true
-        });
-        
-        console.log(`Added streaming response to cache with key: ${cacheKey}`);
+        await cacheResponse(cacheKey, streamingResponse.clone(), true);
       }
       
       return streamingResponse;
@@ -160,17 +105,7 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
     
     // Cache the response if we have a cache key
     if (cacheKey) {
-      // Clean up cache first
-      cleanupCache();
-      
-      responseCache.set(cacheKey, {
-        response: response.clone(), // Store a clone of the response
-        timestamp: Date.now(),
-        expiresAt: Date.now() + DEFAULT_CACHE_TTL,
-        isStreamingResponse: false
-      });
-      
-      console.log(`Added non-streaming response to cache with key: ${cacheKey}`);
+      await cacheResponse(cacheKey, response.clone(), false);
     }
     
     return response;
@@ -202,11 +137,10 @@ export async function handleClearCache(user: any, req: Request): Promise<Respons
     }
     
     // Clear the cache
-    const oldSize = responseCache.size;
-    responseCache.clear();
+    const clearedCount = await cleanupCache(true);
     
     return createSuccessResponse(
-      { cleared: oldSize, timestamp: new Date().toISOString() },
+      { cleared: clearedCount, timestamp: new Date().toISOString() },
       { operation: "cache_clear" }
     );
   } catch (error) {
