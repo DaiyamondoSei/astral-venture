@@ -6,6 +6,8 @@ import { getCachedResponse, cacheResponse } from "../services/cacheHandler.ts";
 import { corsHeaders } from "../../shared/responseUtils.ts";
 import { createCacheKey } from "../utils/cacheUtils.ts";
 import { trackUsage } from "../services/usageTracker.ts";
+import { fetchContextData, buildRichContext } from "./contextHandler.ts";
+import { callOpenAI } from "./openaiHandler.ts";
 
 /**
  * Process an AI query, with optimized caching and error handling
@@ -152,115 +154,4 @@ export async function processAIQuery(user: any, req: Request): Promise<Response>
       }
     );
   }
-}
-
-/**
- * Fetch context data for the AI request
- */
-async function fetchContextData(supabase: any, userId?: string, reflectionId?: string) {
-  const contextData: Record<string, any> = {};
-  
-  // Get user profile data if userId is provided
-  if (userId) {
-    try {
-      const { data: userProfile } = await supabase
-        .from("user_profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-      
-      if (userProfile) {
-        contextData.userProfile = {
-          userLevel: userProfile.astral_level,
-          energyPoints: userProfile.energy_points
-        };
-      }
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-    }
-  }
-  
-  // Get reflection data if reflectionId is provided
-  if (reflectionId) {
-    try {
-      const { data: reflection } = await supabase
-        .from("energy_reflections")
-        .select("*")
-        .eq("id", reflectionId)
-        .single();
-      
-      if (reflection) {
-        contextData.reflection = {
-          content: reflection.content,
-          dominantEmotion: reflection.dominant_emotion,
-          emotionalDepth: reflection.emotional_depth,
-          chakrasActivated: reflection.chakras_activated
-        };
-      }
-    } catch (error) {
-      console.error("Error fetching reflection:", error);
-    }
-  }
-  
-  return contextData;
-}
-
-/**
- * Build a rich context string for the AI request
- */
-function buildRichContext(baseContext: string = "", contextData: Record<string, any>) {
-  const contextParts = [baseContext];
-  
-  if (contextData.userProfile) {
-    contextParts.push(`User Information: ${JSON.stringify(contextData.userProfile)}`);
-  }
-  
-  if (contextData.reflection) {
-    contextParts.push(`Reflection Information: ${JSON.stringify(contextData.reflection)}`);
-  }
-  
-  return contextParts.filter(Boolean).join("\n\n");
-}
-
-/**
- * Call the OpenAI API
- */
-async function callOpenAI(query: string, context: string, options: any) {
-  // Prepare messages for the AI request
-  const messages = [
-    {
-      role: "system",
-      content: "You are a consciousness expansion assistant. Provide insightful, helpful responses that expand awareness. Be concise yet profound."
-    }
-  ];
-  
-  // Add context if available
-  if (context) {
-    messages.push({
-      role: "system",
-      content: `Additional context: ${context}`
-    });
-  }
-  
-  // Add the user query
-  messages.push({
-    role: "user",
-    content: query
-  });
-  
-  // Make request to OpenAI
-  return fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${options.apiKey}`
-    },
-    body: JSON.stringify({
-      model: options.model,
-      messages,
-      temperature: options.temperature,
-      max_tokens: options.maxTokens,
-      stream: options.stream
-    })
-  });
 }

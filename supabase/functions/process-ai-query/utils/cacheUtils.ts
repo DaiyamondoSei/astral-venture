@@ -22,3 +22,20 @@ export function hashString(str: string): string {
   }
   return Math.abs(hash).toString(16);
 }
+
+/**
+ * Calculate cache expiration time based on content type
+ */
+export function getCacheExpiryTime(isStreaming: boolean): number {
+  // Streaming responses have shorter TTL (10 minutes)
+  return isStreaming ? 10 * 60 * 1000 : 30 * 60 * 1000;
+}
+
+/**
+ * Check if a cache item is expired
+ */
+export function isCacheExpired(timestamp: number, isStreaming: boolean): boolean {
+  const now = Date.now();
+  const expiryTime = getCacheExpiryTime(isStreaming);
+  return now - timestamp > expiryTime;
+}
