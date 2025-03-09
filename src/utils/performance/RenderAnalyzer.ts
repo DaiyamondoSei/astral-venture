@@ -1,185 +1,182 @@
 
+/**
+ * Render Analysis and optimization utilities
+ */
+
 import { performanceMonitor } from './performanceMonitor';
 
-export interface ComponentRenderMetrics {
+export interface RenderMetrics {
   componentName: string;
   renderCount: number;
-  averageRenderTime: number;
   lastRenderTime: number;
-  slowestRenderTime: number;
-  renderFrequency: number; // renders per second
+  averageRenderTime: number;
+  renderFrequency: number;
+  rerenderCauses: string[];
 }
 
-export interface RenderInsight {
-  type: 'info' | 'warning' | 'critical';
-  message: string;
-  component: string;
-  metrics?: Partial<ComponentRenderMetrics>;
-  recommendation?: string;
+export interface RenderAnalysis {
+  problematicComponents: string[];
+  overrenderingComponents: RenderMetrics[];
+  heavyComponents: RenderMetrics[];
+  recommendations: string[];
 }
 
 class RenderAnalyzer {
-  private startTime: number = Date.now();
-  private insights: RenderInsight[] = [];
-  private lastAnalysisTime: number = 0;
-  private isEnabled: boolean = process.env.NODE_ENV === 'development';
+  private renderMetrics: Map<string, RenderMetrics> = new Map();
   
-  constructor() {
-    // Set up interval for periodic analysis
-    if (this.isEnabled) {
-      setInterval(() => this.analyzeRenderMetrics(), 10000); // Every 10 seconds
+  /**
+   * Register a component render
+   */
+  registerRender(
+    componentName: string, 
+    renderTime: number, 
+    props?: Record<string, any>,
+    prevProps?: Record<string, any>
+  ) {
+    const metrics = this.renderMetrics.get(componentName) || {
+      componentName,
+      renderCount: 0,
+      lastRenderTime: 0,
+      averageRenderTime: 0,
+      renderFrequency: 0,
+      rerenderCauses: []
+    };
+    
+    metrics.renderCount++;
+    metrics.lastRenderTime = renderTime;
+    metrics.averageRenderTime = 
+      (metrics.averageRenderTime * (metrics.renderCount - 1) + renderTime) / metrics.renderCount;
+    
+    // Analyze props changes if available
+    if (props && prevProps) {
+      const changeReasons = this.detectPropChanges(props, prevProps);
+      if (changeReasons.length > 0) {
+        metrics.rerenderCauses = [...new Set([...metrics.rerenderCauses, ...changeReasons])];
+      }
     }
+    
+    this.renderMetrics.set(componentName, metrics);
+    
+    // Report to performance monitor
+    performanceMonitor.reportRender(componentName, renderTime);
   }
   
   /**
-   * Analyze component render metrics to generate insights
+   * Find components with performance issues
    */
-  public analyzeRenderMetrics(): RenderInsight[] {
-    if (!this.isEnabled) return [];
+  findComponentsWithPerformanceIssues(): RenderAnalysis {
+    const overrenderingThreshold = 10; // More than 10 renders in a short time
+    const heavyRenderThreshold = 16; // More than 16ms average render time (60fps target)
     
-    // Check if we need to analyze (throttle to avoid too frequent analysis)
-    const now = Date.now();
-    if (now - this.lastAnalysisTime < 5000) { // At least 5s between analysis
-      return this.insights;
-    }
+    const overrenderingComponents: RenderMetrics[] = [];
+    const heavyComponents: RenderMetrics[] = [];
     
-    this.lastAnalysisTime = now;
-    this.insights = [];
-    
-    // Get metrics from performance monitor
-    const metrics = performanceMonitor.getAllMetrics();
-    const totalElapsedSeconds = (now - this.startTime) / 1000;
-    
-    Object.entries(metrics).forEach(([componentName, metric]) => {
-      // Skip if missing key metrics
-      if (!metric.renderTimes || !metric.averageRenderTime) return;
+    this.renderMetrics.forEach(metrics => {
+      if (metrics.renderCount > overrenderingThreshold) {
+        overrenderingComponents.push(metrics);
+      }
       
-      const renderCount = metric.renderTimes.length;
-      const averageRenderTime = metric.averageRenderTime;
-      const lastRenderTime = metric.lastRenderTime || 0;
-      
-      // Calculate render frequency (renders per second)
-      const renderFrequency = renderCount / Math.max(1, totalElapsedSeconds);
-      
-      // Find slowest render time
-      const slowestRenderTime = Math.max(...(metric.renderTimes || [0]));
-      
-      // Collect component metrics
-      const componentMetrics: ComponentRenderMetrics = {
-        componentName,
-        renderCount,
-        averageRenderTime,
-        lastRenderTime,
-        slowestRenderTime,
-        renderFrequency
-      };
-      
-      // Generate insights based on metrics
-      this.generateInsightsForComponent(componentMetrics);
+      if (metrics.averageRenderTime > heavyRenderThreshold) {
+        heavyComponents.push(metrics);
+      }
     });
     
-    return this.insights;
-  }
-  
-  /**
-   * Generate insights for a specific component based on its metrics
-   */
-  private generateInsightsForComponent(metrics: ComponentRenderMetrics): void {
-    const { componentName, renderCount, averageRenderTime, slowestRenderTime, renderFrequency } = metrics;
+    // Generate recommendations
+    const recommendations = this.generateRecommendations(overrenderingComponents, heavyComponents);
     
-    // Check for frequent renders (more than 3 per second is suspicious)
-    if (renderFrequency > 3) {
-      this.insights.push({
-        type: renderFrequency > 10 ? 'critical' : 'warning',
-        message: `High render frequency: ${renderFrequency.toFixed(1)} renders/second`,
-        component: componentName,
-        metrics,
-        recommendation: 'Consider using React.memo() or checking for unnecessary state updates'
-      });
-    }
+    return {
+      problematicComponents: [
+        ...overrenderingComponents.map(m => m.componentName),
+        ...heavyComponents.map(m => m.componentName)
+      ],
+      overrenderingComponents,
+      heavyComponents,
+      recommendations
+    };
+  }
+  
+  /**
+   * Generate optimization recommendations
+   */
+  private generateRecommendations(
+    overrenderingComponents: RenderMetrics[],
+    heavyComponents: RenderMetrics[]
+  ): string[] {
+    const recommendations: string[] = [];
     
-    // Check for slow average render times (more than 16ms is slow - below 60fps)
-    if (averageRenderTime > 16) {
-      this.insights.push({
-        type: averageRenderTime > 50 ? 'critical' : 'warning',
-        message: `Slow average render time: ${averageRenderTime.toFixed(2)}ms`,
-        component: componentName,
-        metrics,
-        recommendation: 'Optimize render function or reduce complexity'
-      });
-    }
+    overrenderingComponents.forEach(component => {
+      recommendations.push(
+        `Consider memoizing ${component.componentName} with React.memo or useMemo to prevent unnecessary rerenders.`
+      );
+      
+      if (component.rerenderCauses.includes('reference')) {
+        recommendations.push(
+          `Use useCallback or useMemo in parent component to stabilize prop references passed to ${component.componentName}.`
+        );
+      }
+    });
     
-    // Check for very slow individual renders (more than 100ms)
-    if (slowestRenderTime > 100) {
-      this.insights.push({
-        type: 'warning',
-        message: `Extremely slow render detected: ${slowestRenderTime.toFixed(2)}ms`,
-        component: componentName,
-        metrics,
-        recommendation: 'Check for expensive operations in render method'
-      });
-    }
+    heavyComponents.forEach(component => {
+      recommendations.push(
+        `Optimize render performance of ${component.componentName} - consider code splitting or reducing complexity.`
+      );
+    });
     
-    // Add custom insights if available from performance monitor
-    const fullMetrics = performanceMonitor.getComponentMetrics(componentName);
+    return recommendations;
+  }
+  
+  /**
+   * Detect which props changed
+   */
+  private detectPropChanges(
+    newProps: Record<string, any>,
+    prevProps: Record<string, any>
+  ): string[] {
+    const changes: string[] = [];
     
-    // Note: customInsights is a new field that would be added to PerformanceMetrics
-    // We need to handle it safely in case it doesn't exist yet
-    const customInsights = (fullMetrics as any).customInsights;
-    if (customInsights && Array.isArray(customInsights)) {
-      customInsights.forEach(insight => {
-        this.insights.push({
-          ...insight,
-          component: componentName
-        });
-      });
-    }
+    Object.keys(newProps).forEach(key => {
+      if (newProps[key] !== prevProps[key]) {
+        if (
+          typeof newProps[key] === 'function' || 
+          typeof newProps[key] === 'object'
+        ) {
+          changes.push('reference');
+        } else {
+          changes.push('value');
+        }
+      }
+    });
+    
+    return [...new Set(changes)];
   }
   
   /**
-   * Get insights for a specific component
+   * Clear metrics
    */
-  public getInsightsForComponent(componentName: string): RenderInsight[] {
-    return this.insights.filter(insight => insight.component === componentName);
+  clearMetrics() {
+    this.renderMetrics.clear();
   }
   
   /**
-   * Get critical insights across all components
+   * Get metrics for a specific component
    */
-  public getCriticalInsights(): RenderInsight[] {
-    return this.insights.filter(insight => insight.type === 'critical');
+  getComponentMetrics(componentName: string): RenderMetrics | undefined {
+    return this.renderMetrics.get(componentName);
   }
   
   /**
-   * Get all insights
+   * Get all metrics
    */
-  public getAllInsights(): RenderInsight[] {
-    return [...this.insights];
-  }
-  
-  /**
-   * Add a custom insight
-   */
-  public addCustomInsight(insight: RenderInsight): void {
-    this.insights.push(insight);
-  }
-  
-  /**
-   * Clear all insights
-   */
-  public clearInsights(): void {
-    this.insights = [];
-  }
-  
-  /**
-   * Enable or disable the analyzer
-   */
-  public setEnabled(enabled: boolean): void {
-    this.isEnabled = enabled && process.env.NODE_ENV === 'development';
+  getAllMetrics(): RenderMetrics[] {
+    return Array.from(this.renderMetrics.values());
   }
 }
 
-// Create singleton instance
+// Export a singleton instance
 export const renderAnalyzer = new RenderAnalyzer();
 
-export default renderAnalyzer;
+// For compatibility with components expecting this interface
+export default RenderAnalyzer;
+
+// Also export the RenderAnalysis type
+export type { RenderAnalysis };

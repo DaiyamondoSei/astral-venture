@@ -1,168 +1,168 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
-// Types for error prevention
-export interface ValidationResult {
+export interface ErrorPreventionOptions {
+  trackRenders?: boolean;
+  validateProps?: boolean;
+  trackPropChanges?: boolean;
+  throttleInterval?: number;
+}
+
+export interface ComponentValidationResult {
   valid: boolean;
-  errors?: string[];
+  issues: string[];
+  componentName: string;
 }
 
 export interface ErrorPreventionContextType {
-  validateComponent: (componentName: string, props: Record<string, any>) => ValidationResult;
-  recordRender: (componentName: string, renderTime: number) => void;
-  registerValidationRules: (componentName: string, rules: ValidationRule[]) => void;
-  trackPropChanges: (componentName: string, prevProps: Record<string, any>, newProps: Record<string, any>) => void;
-  getComponentErrors: (componentName: string) => string[];
-  getCurrentValidationStatus: () => Record<string, ValidationResult>;
-  clearValidationErrors: (componentName: string) => void;
   isEnabled: boolean;
-  enableErrorPrevention: () => void;
-  disableErrorPrevention: () => void;
+  enableErrorPrevention: (enable: boolean) => void;
+  useErrorPrevention: (componentName: string, options?: ErrorPreventionOptions) => void;
+  validateComponent: (componentName: string, props: any) => ComponentValidationResult;
+  validateAllComponents: () => ComponentValidationResult[];
+  trackRender: (componentName: string, renderTime: number) => void;
+  registerComponent: (componentName: string, validationRules: any) => void;
+  reportError: (error: Error, componentName: string) => void;
+  errors: Error[];
+  validationResults: ComponentValidationResult[];
 }
 
-export interface ValidationRule {
-  prop: string;
-  validate: (value: any) => boolean;
-  message: string;
-}
+const ErrorPreventionContext = createContext<ErrorPreventionContextType | undefined>(undefined);
 
-// Create context with default values
-export const ErrorPreventionContext = createContext<ErrorPreventionContextType>({
-  validateComponent: () => ({ valid: true, errors: [] }),
-  recordRender: () => {},
-  registerValidationRules: () => {},
-  trackPropChanges: () => {},
-  getComponentErrors: () => [],
-  getCurrentValidationStatus: () => ({}),
-  clearValidationErrors: () => {},
-  isEnabled: process.env.NODE_ENV === 'development',
-  enableErrorPrevention: () => {},
-  disableErrorPrevention: () => {}
-});
-
-// Provider component
-export const ErrorPreventionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [validationRules, setValidationRules] = useState<Record<string, ValidationRule[]>>({});
-  const [validationStatus, setValidationStatus] = useState<Record<string, ValidationResult>>({});
-  const [isEnabled, setIsEnabled] = useState<boolean>(process.env.NODE_ENV === 'development');
-
-  // Enable/disable error prevention
-  const enableErrorPrevention = () => setIsEnabled(true);
-  const disableErrorPrevention = () => setIsEnabled(false);
-
-  // Update performance monitor when enabled state changes
-  useEffect(() => {
-    if (typeof performanceMonitor.setEnabled === 'function') {
-      performanceMonitor.setEnabled(isEnabled);
+export const ErrorPreventionProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [isEnabled, setIsEnabled] = useState(true);
+  const [errors, setErrors] = useState<Error[]>([]);
+  const [validationResults, setValidationResults] = useState<ComponentValidationResult[]>([]);
+  const [components, setComponents] = useState<Map<string, any>>(new Map());
+  
+  const enableErrorPrevention = useCallback((enable: boolean) => {
+    setIsEnabled(enable);
+  }, []);
+  
+  const useErrorPrevention = useCallback((componentName: string, options?: ErrorPreventionOptions) => {
+    if (!isEnabled) return;
+    
+    // Log component usage
+    if (options?.trackRenders) {
+      performanceMonitor.startTracking(componentName);
     }
   }, [isEnabled]);
-
-  // Register validation rules for a component
-  const registerValidationRules = (componentName: string, rules: ValidationRule[]) => {
-    if (!isEnabled) return;
+  
+  const validateComponent = useCallback((componentName: string, props: any): ComponentValidationResult => {
+    if (!isEnabled) {
+      return { valid: true, issues: [], componentName };
+    }
     
-    setValidationRules(prev => ({
-      ...prev,
-      [componentName]: rules
-    }));
-  };
-
-  // Validate component props against registered rules
-  const validateComponent = (componentName: string, props: Record<string, any>): ValidationResult => {
-    if (!isEnabled) return { valid: true };
+    const validationRules = components.get(componentName);
+    const issues: string[] = [];
     
-    const rules = validationRules[componentName] || [];
-    const errors: string[] = [];
+    if (validationRules) {
+      // Apply validation rules
+      validationRules.requiredProps?.forEach((prop: string) => {
+        if (props[prop] === undefined) {
+          issues.push(`Missing required prop: ${prop}`);
+        }
+      });
+      
+      validationRules.propTypes?.forEach((rule: {prop: string, type: string}) => {
+        if (props[rule.prop] !== undefined && typeof props[rule.prop] !== rule.type) {
+          issues.push(`Prop ${rule.prop} should be of type ${rule.type}`);
+        }
+      });
+    }
     
-    rules.forEach(rule => {
-      if (props.hasOwnProperty(rule.prop) && !rule.validate(props[rule.prop])) {
-        errors.push(rule.message);
+    const result = {
+      valid: issues.length === 0,
+      issues,
+      componentName
+    };
+    
+    setValidationResults(prev => {
+      const index = prev.findIndex(r => r.componentName === componentName);
+      if (index >= 0) {
+        const updated = [...prev];
+        updated[index] = result;
+        return updated;
       }
+      return [...prev, result];
     });
-    
-    const result = { valid: errors.length === 0, errors };
-    
-    // Update validation status
-    setValidationStatus(prev => ({
-      ...prev,
-      [componentName]: result
-    }));
     
     return result;
-  };
-
-  // Record component render time using performance monitor
-  const recordRender = (componentName: string, renderTime: number) => {
-    if (!isEnabled) return;
-    performanceMonitor.recordRender(componentName, renderTime);
-  };
-
-  // Track prop changes between renders
-  const trackPropChanges = (componentName: string, prevProps: Record<string, any>, newProps: Record<string, any>) => {
-    if (!isEnabled) return;
-    
-    const changes: Record<string, { from: any, to: any }> = {};
-    let hasChanges = false;
-    
-    // Find changed props
-    Object.keys(newProps).forEach(key => {
-      if (prevProps[key] !== newProps[key]) {
-        changes[key] = { from: prevProps[key], to: newProps[key] };
-        hasChanges = true;
-      }
-    });
-    
-    // Log changes in development mode
-    if (hasChanges && process.env.NODE_ENV === 'development') {
-      console.debug(`[${componentName}] Props changed:`, changes);
+  }, [isEnabled, components]);
+  
+  const validateAllComponents = useCallback((): ComponentValidationResult[] => {
+    if (!isEnabled) {
+      return [];
     }
-  };
-
-  // Get component validation errors
-  const getComponentErrors = (componentName: string): string[] => {
-    if (!isEnabled) return [];
     
-    const status = validationStatus[componentName];
-    return status && status.errors ? status.errors : [];
-  };
-
-  // Get current validation status for all components
-  const getCurrentValidationStatus = (): Record<string, ValidationResult> => {
-    if (!isEnabled) return {};
-    return validationStatus;
-  };
-
-  // Clear validation errors for a component
-  const clearValidationErrors = (componentName: string) => {
+    const results: ComponentValidationResult[] = [];
+    
+    components.forEach((validationRules, componentName) => {
+      // Simplified validation - in reality we would need actual props
+      const issues: string[] = [];
+      
+      validationRules.requiredProps?.forEach((prop: string) => {
+        issues.push(`Please check required prop: ${prop}`);
+      });
+      
+      results.push({
+        valid: issues.length === 0,
+        issues,
+        componentName
+      });
+    });
+    
+    setValidationResults(results);
+    return results;
+  }, [isEnabled, components]);
+  
+  const trackRender = useCallback((componentName: string, renderTime: number) => {
     if (!isEnabled) return;
     
-    setValidationStatus(prev => {
-      const newStatus = { ...prev };
-      delete newStatus[componentName];
-      return newStatus;
+    performanceMonitor.reportRender(componentName, renderTime);
+  }, [isEnabled]);
+  
+  const registerComponent = useCallback((componentName: string, validationRules: any) => {
+    setComponents(prev => {
+      const updated = new Map(prev);
+      updated.set(componentName, validationRules);
+      return updated;
     });
+  }, []);
+  
+  const reportError = useCallback((error: Error, componentName: string) => {
+    setErrors(prev => [...prev, error]);
+    
+    console.error(`Error in ${componentName}:`, error);
+  }, []);
+  
+  const value = {
+    isEnabled,
+    enableErrorPrevention,
+    useErrorPrevention,
+    validateComponent,
+    validateAllComponents,
+    trackRender,
+    registerComponent,
+    reportError,
+    errors,
+    validationResults
   };
-
+  
   return (
-    <ErrorPreventionContext.Provider
-      value={{
-        validateComponent,
-        recordRender,
-        registerValidationRules,
-        trackPropChanges,
-        getComponentErrors,
-        getCurrentValidationStatus,
-        clearValidationErrors,
-        isEnabled,
-        enableErrorPrevention,
-        disableErrorPrevention
-      }}
-    >
+    <ErrorPreventionContext.Provider value={value}>
       {children}
     </ErrorPreventionContext.Provider>
   );
 };
 
-// Hook to use error prevention context
-export const useErrorPrevention = () => useContext(ErrorPreventionContext);
+export const useErrorPrevention = () => {
+  const context = useContext(ErrorPreventionContext);
+  
+  if (context === undefined) {
+    throw new Error('useErrorPrevention must be used within an ErrorPreventionProvider');
+  }
+  
+  return context;
+};

@@ -4,9 +4,32 @@
  */
 
 export interface AIResponse {
-  text: string;
+  text?: string;          // Original property
+  answer?: string;        // New property used by components
   sources?: string[];
   type?: 'text' | 'error' | 'loading';
+  suggestedPractices?: string[];
+  relatedInsights?: any[];
+  meta?: {
+    model: string;
+    tokenUsage: number;
+    processingTime: number;
+    streaming?: boolean;
+  };
+}
+
+export interface AIQuestion {
+  question: string;
+  reflectionIds?: string[];
+  context?: string;
+  stream?: boolean;
+}
+
+export interface AIModel {
+  id: string;
+  name: string;
+  contextSize: number;
+  costPer1KTokens: number;
 }
 
 export interface AIModelInfo {

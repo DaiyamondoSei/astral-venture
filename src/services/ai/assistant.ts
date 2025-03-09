@@ -1,101 +1,92 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { AIQuestion, AIResponse } from './types';
+import { supabase } from '@/lib/supabaseClient';
+import { AIResponse, AIQuestion } from './types';
 import { getCachedResponse, cacheResponse } from './cache';
-import { createFallbackResponse } from './fallback';
-import { selectOptimalModel } from './models';
+import { getFallbackResponse } from './fallback';
 
 /**
- * Ask the AI assistant a question about experiences or practices
+ * Ask the AI Assistant a question
  * 
- * @param questionData - Question and optional context
- * @param userId - User ID for personalization
- * @returns AI response with answer and related content
+ * @param question Question data including the message text and optional context
+ * @param userId The user ID for personalization
+ * @returns AI response
  */
 export async function askAIAssistant(
-  questionData: AIQuestion,
+  question: AIQuestion,
   userId: string
 ): Promise<AIResponse> {
   try {
-    // Check for offline mode
-    if (!navigator.onLine) {
-      console.log("Device is offline, using fallback response");
-      return createFallbackResponse(questionData.question, true);
-    }
-    
-    // For non-streaming requests, check for cached response first
-    const cachedResponse = getCachedResponse(questionData.question);
-    if (cachedResponse && !questionData.stream) {
-      console.log("Using cached response for question");
+    // First check if there's a cached response
+    const cachedResponse = await getCachedResponse(question.question, userId);
+    if (cachedResponse) {
+      console.log("Using cached response");
       return {
-        answer: cachedResponse.answer,
-        relatedInsights: [],
-        suggestedPractices: cachedResponse.suggestedPractices,
+        ...cachedResponse,
         meta: {
-          model: "cached",
-          tokenUsage: 0,
-          processingTime: 0
+          ...cachedResponse.meta,
+          model: cachedResponse.meta?.model || 'cached'
         }
       };
     }
     
-    // Prepare request data
-    const requestData: any = { 
-      message: questionData.question,
-      context: questionData.context,
-      reflectionIds: questionData.reflectionIds,
-      stream: questionData.stream || false,
-      userId 
-    };
+    // Check if we're in offline mode
+    if (!navigator.onLine) {
+      console.log("Device is offline, using fallback response");
+      return getFallbackResponse(question.question);
+    }
     
-    console.log("Sending request to AI assistant:", requestData);
-    
-    // Determine optimal model
-    const model = selectOptimalModel(questionData.question);
-    requestData.model = model;
-    
-    // Call the Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('ask-assistant', {
-      body: requestData
+    // Call edge function for AI response
+    const { data, error } = await supabase.functions.invoke<any>('ask-assistant', {
+      body: {
+        message: question.question,
+        reflectionId: question.reflectionIds?.[0],
+        reflectionContent: question.context,
+        stream: question.stream
+      }
     });
     
     if (error) {
-      console.error("Error from ask-assistant function:", error);
-      // Handle quota errors specifically
-      if (error.message && error.message.includes("quota")) {
-        throw new Error("AI service quota exceeded. Please try again later.");
-      }
-      throw error;
+      console.error("Error calling AI assistant:", error);
+      return {
+        text: "Sorry, I encountered an error processing your request.",
+        answer: "Sorry, I encountered an error processing your request.",
+        type: 'error'
+      };
     }
     
-    console.log("Received response from AI assistant:", data);
+    if (!data) {
+      return {
+        text: "Sorry, I received an empty response. Please try again.",
+        answer: "Sorry, I received an empty response. Please try again.",
+        type: 'error'
+      };
+    }
     
-    // Extract metadata if available
-    const meta = {
-      model: data.meta?.model || model || "unknown",
-      tokenUsage: data.meta?.tokenUsage || 0,
-      processingTime: data.meta?.processingTime || 0,
-      streaming: Boolean(questionData.stream)
-    };
-    
-    // Structure the response
-    const response = {
-      answer: data.answer || "",
-      relatedInsights: data.insights || [],
+    const response: AIResponse = {
+      text: data.answer,
+      answer: data.answer,
       suggestedPractices: data.suggestedPractices || [],
-      meta
+      relatedInsights: data.relatedInsights || [],
+      meta: {
+        model: data.meta?.model || 'unknown',
+        tokenUsage: data.meta?.tokenUsage || 0,
+        processingTime: data.meta?.processingTime || 0,
+        streaming: question.stream || false
+      }
     };
     
-    // Cache the response for future use (only for non-streaming)
-    if (!questionData.stream) {
-      cacheResponse(questionData.question, response);
-    }
+    // Cache the response for future use
+    await cacheResponse(question.question, userId, response);
     
     return response;
   } catch (error) {
-    console.error('Error asking AI assistant:', error);
+    console.error("Exception in askAIAssistant:", error);
     
-    // Use fallback response in case of error
-    return createFallbackResponse(questionData.question);
+    // Return a graceful error message
+    return {
+      text: "Sorry, something went wrong while processing your request.",
+      answer: "Sorry, something went wrong while processing your request.",
+      type: 'error'
+    };
   }
 }

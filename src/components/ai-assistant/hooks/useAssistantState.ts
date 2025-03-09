@@ -4,17 +4,21 @@ import { AIResponse } from '@/services/ai/types';
 
 export function useAssistantState() {
   const [question, setQuestion] = useState<string>('');
-  const [response, setResponse] = useState<AIResponse | null>({ text: '', type: 'text' });
+  const [response, setResponse] = useState<AIResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [streamingResponse, setStreamingResponse] = useState<string | null>(null);
   const [modelInfo, setModelInfo] = useState<{model: string; tokens: number} | null>(null);
   
   const reset = useCallback(() => {
     setQuestion('');
-    setResponse({ text: '', type: 'text' });
+    setResponse(null);
     setIsSubmitting(false);
     setHasError(false);
+    setError(null);
+    setLoading(false);
     setStreamingResponse(null);
     setModelInfo(null);
   }, []);
@@ -28,6 +32,10 @@ export function useAssistantState() {
     setIsSubmitting,
     hasError,
     setHasError,
+    error,
+    setError,
+    loading,
+    setLoading,
     streamingResponse,
     setStreamingResponse,
     modelInfo,

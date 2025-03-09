@@ -7,7 +7,8 @@ export enum AchievementEventType {
   LOGIN_STREAK = 'login_streak',
   ENERGY_MILESTONE = 'energy_milestone',
   ONBOARDING_COMPLETED = 'onboarding_completed',
-  PROFILE_COMPLETED = 'profile_completed'
+  PROFILE_COMPLETED = 'profile_completed',
+  STREAK_MILESTONE = 'streak_milestone'
 }
 
 export interface StepInteraction {

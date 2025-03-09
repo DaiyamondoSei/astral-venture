@@ -13,6 +13,14 @@ export const getProgressColor = (percentage: number): string => {
   return 'text-muted-foreground';
 };
 
+// Format achievement points for display
+export const formatAchievementPoints = (points: number): string => {
+  if (points >= 1000) {
+    return `${(points / 1000).toFixed(1)}k`;
+  }
+  return points.toString();
+};
+
 export {
   useAchievementTracker,
   useAchievementState,
