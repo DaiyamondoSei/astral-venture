@@ -1,92 +1,85 @@
 
-import { supabase } from '@/lib/supabaseClient';
+/**
+ * AI Assistant Service
+ * Provides AI-powered assistance and insights
+ */
+
 import { AIResponse, AIQuestion } from './types';
-import { getCachedResponse, cacheResponse } from './cache';
-import { getFallbackResponse } from './fallback';
+import { createFallbackResponse } from './fallback';
+
+const EDGE_FUNCTION_URL = '/api/ask-assistant';
 
 /**
- * Ask the AI Assistant a question
- * 
- * @param question Question data including the message text and optional context
- * @param userId The user ID for personalization
- * @returns AI response
+ * Fetch a response from the AI assistant
  */
-export async function askAIAssistant(
-  question: AIQuestion,
-  userId: string
-): Promise<AIResponse> {
+export async function fetchAssistantResponse(question: AIQuestion): Promise<AIResponse> {
   try {
-    // First check if there's a cached response
-    const cachedResponse = await getCachedResponse(question.question, userId);
-    if (cachedResponse) {
-      console.log("Using cached response");
-      return {
-        ...cachedResponse,
-        meta: {
-          ...cachedResponse.meta,
-          model: cachedResponse.meta?.model || 'cached'
-        }
-      };
-    }
-    
-    // Check if we're in offline mode
+    // Check if online before attempting fetch
     if (!navigator.onLine) {
-      console.log("Device is offline, using fallback response");
-      return getFallbackResponse(question.question);
+      console.warn('Offline: Using fallback AI response');
+      return createFallbackResponse(question.question);
     }
     
-    // Call edge function for AI response
-    const { data, error } = await supabase.functions.invoke<any>('ask-assistant', {
-      body: {
-        message: question.question,
-        reflectionId: question.reflectionIds?.[0],
-        reflectionContent: question.context,
-        stream: question.stream
-      }
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(question),
     });
     
-    if (error) {
-      console.error("Error calling AI assistant:", error);
-      return {
-        text: "Sorry, I encountered an error processing your request.",
-        answer: "Sorry, I encountered an error processing your request.",
-        type: 'error'
-      };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('AI Assistant error:', errorText);
+      throw new Error(`AI request failed: ${response.status} ${response.statusText}`);
     }
     
-    if (!data) {
-      return {
-        text: "Sorry, I received an empty response. Please try again.",
-        answer: "Sorry, I received an empty response. Please try again.",
-        type: 'error'
-      };
-    }
+    const data = await response.json();
     
-    const response: AIResponse = {
-      text: data.answer,
-      answer: data.answer,
+    // Format the response to match AIResponse interface
+    const formattedResponse: AIResponse = {
+      answer: data.answer || data.text || '',
       suggestedPractices: data.suggestedPractices || [],
-      relatedInsights: data.relatedInsights || [],
+      sources: data.sources || [],
+      type: 'text',
       meta: {
         model: data.meta?.model || 'unknown',
         tokenUsage: data.meta?.tokenUsage || 0,
         processingTime: data.meta?.processingTime || 0,
-        streaming: question.stream || false
       }
     };
     
-    // Cache the response for future use
-    await cacheResponse(question.question, userId, response);
-    
-    return response;
+    return formattedResponse;
   } catch (error) {
-    console.error("Exception in askAIAssistant:", error);
+    console.error('Error fetching AI response:', error);
     
-    // Return a graceful error message
+    // Return a graceful fallback response
+    return createFallbackResponse(question.question);
+  }
+}
+
+/**
+ * Process the user's question and return an AI response
+ * This is the main entry point for the AI assistant
+ */
+export async function processQuestion(
+  question: string, 
+  context?: string
+): Promise<AIResponse> {
+  try {
+    const aiQuestion: AIQuestion = {
+      question,
+      context,
+      stream: false
+    };
+    
+    return await fetchAssistantResponse(aiQuestion);
+  } catch (error) {
+    console.error('Error processing question:', error);
     return {
-      text: "Sorry, something went wrong while processing your request.",
-      answer: "Sorry, something went wrong while processing your request.",
-      type: 'error'
+      answer: "I'm having trouble processing your question right now. Please try again later.",
+      type: 'error',
+      suggestedPractices: []
     };
   }
 }

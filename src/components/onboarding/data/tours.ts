@@ -1,93 +1,107 @@
 
-import { GuidedTourData } from './types';
+import { GuidedTourData, TourStep } from '../hooks/achievement/types';
 
-// Guided tours available after onboarding
-export const guidedTours: GuidedTourData[] = [
+/**
+ * Guided Tours
+ * Defines interactive tours that walk users through features
+ */
+const guidedTours: GuidedTourData[] = [
   {
-    id: 'sacred-geometry-tour',
-    title: 'Sacred Geometry Explorer',
-    description: 'Discover the profound connections in geometric patterns',
-    requiredStep: 'sacred-geometry',
+    id: 'welcome_tour',
+    title: 'Welcome Tour',
+    description: 'Get started with the basics of the application',
     steps: [
       {
-        id: 'step-1',
-        target: '.metatrons-cube',
-        title: 'Metatron\'s Cube',
-        content: 'The foundational pattern connecting all geometric forms',
-        position: 'bottom'
+        id: 'welcome_step_1',
+        title: 'Welcome to Your Dashboard',
+        content: 'This is your personal dashboard where you can track your progress and access all features.',
+        elementId: 'dashboard-main',
+        position: 'bottom',
+        target: '#dashboard-main'
       },
       {
-        id: 'step-2',
-        target: '.geometry-node-flower-of-life',
-        title: 'Flower of Life',
-        content: 'The pattern of creation containing all geometric forms',
-        position: 'right'
+        id: 'welcome_step_2',
+        title: 'Your Energy Points',
+        content: 'Track your growth with energy points. You earn these through various activities.',
+        elementId: 'energy-display',
+        position: 'bottom',
+        target: '#energy-display'
       },
       {
-        id: 'step-3',
-        target: '.geometry-node-merkaba',
-        title: 'Merkaba',
-        content: 'The light vehicle used for connecting with higher consciousness',
-        position: 'left'
+        id: 'welcome_step_3',
+        title: 'Your Profile',
+        content: 'View and update your profile settings here.',
+        elementId: 'profile-section',
+        position: 'left',
+        target: '#profile-section'
       }
-    ]
+    ],
+    condition: 'isFirstLogin'
   },
   {
-    id: 'chakra-tour',
-    title: 'Chakra System Guide',
-    description: 'Explore your seven primary energy centers',
-    requiredStep: 'chakras',
+    id: 'chakra_tour',
+    title: 'Chakra System Tour',
+    description: 'Learn about the chakra system and how to activate each energy center',
     steps: [
       {
-        id: 'step-1',
-        target: '.chakra-display',
-        title: 'Your Chakra System',
-        content: 'Overview of your active energy centers',
-        position: 'right'
+        id: 'chakra_step_1',
+        title: 'The Chakra System',
+        content: 'Chakras are energy centers in your body that influence your physical and mental wellbeing.',
+        elementId: 'chakra-display',
+        position: 'right',
+        target: '#chakra-display'
       },
       {
-        id: 'step-2',
-        target: '.chakra-display-crown',
-        title: 'Crown Chakra',
-        content: 'Connection to higher consciousness and spiritual awareness',
-        position: 'top'
+        id: 'chakra_step_2',
+        title: 'Chakra Activation',
+        content: 'Click on each chakra to learn more and begin the activation process.',
+        elementId: 'chakra-interactive',
+        position: 'bottom',
+        target: '#chakra-interactive'
       },
       {
-        id: 'step-3',
-        target: '.chakra-display-root',
-        title: 'Root Chakra',
-        content: 'Foundation for stability and groundedness',
-        position: 'bottom'
-      }
-    ]
-  },
-  {
-    id: 'meditation-practice-tour',
-    title: 'Meditation Practices',
-    description: 'Learn about various meditation techniques to enhance your practice',
-    requiredStep: 'meditation',
-    steps: [
-      {
-        id: 'step-1',
-        target: '.meditation-timer',
-        title: 'Meditation Timer',
-        content: 'Set your meditation duration and track your sessions',
-        position: 'bottom'
-      },
-      {
-        id: 'step-2',
-        target: '.meditation-techniques',
-        title: 'Meditation Techniques',
-        content: 'Explore different meditation approaches for various purposes',
-        position: 'right'
-      },
-      {
-        id: 'step-3',
-        target: '.meditation-progress',
+        id: 'chakra_step_3',
         title: 'Track Your Progress',
-        content: 'Monitor your meditation journey and growth over time',
-        position: 'top'
+        content: 'Watch as your activated chakras enhance your overall energy and consciousness.',
+        elementId: 'chakra-progress',
+        position: 'left',
+        target: '#chakra-progress'
       }
-    ]
+    ],
+    condition: 'hasCompletedWelcomeTour'
+  },
+  {
+    id: 'meditation_tour',
+    title: 'Meditation Practices Tour',
+    description: 'Discover the various meditation techniques available',
+    steps: [
+      {
+        id: 'meditation_step_1',
+        title: 'Meditation Practices',
+        content: 'Explore different meditation techniques to calm your mind and raise your consciousness.',
+        elementId: 'meditation-card',
+        position: 'right',
+        target: '#meditation-card'
+      },
+      {
+        id: 'meditation_step_2',
+        title: 'Guided Sessions',
+        content: 'Follow along with guided meditations designed for different purposes and skill levels.',
+        elementId: 'guided-meditation',
+        position: 'bottom',
+        target: '#guided-meditation'
+      },
+      {
+        id: 'meditation_step_3',
+        title: 'Track Your Progress',
+        content: 'Monitor your meditation streak and see how regular practice affects your energy.',
+        elementId: 'meditation-stats',
+        position: 'top',
+        target: '#meditation-stats'
+      }
+    ],
+    condition: 'hasActivatedFirstChakra'
   }
 ];
+
+export default guidedTours;

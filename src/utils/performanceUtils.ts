@@ -1,102 +1,115 @@
 
 /**
- * Performance utilities for monitoring and optimizing application performance
+ * Performance utilities for optimizing application rendering
+ * Provides device capability detection and optimization helpers
  */
 
-export enum DeviceCapability {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high'
-}
+// Device capability types for performance categorization
+export type DeviceCapability = 'low' | 'medium' | 'high';
 
-/**
- * Throttle function to limit the frequency of function calls
- */
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => ReturnType<T> | undefined {
-  let inThrottle: boolean = false;
-  let lastResult: ReturnType<T>;
-
-  return function(this: any, ...args: Parameters<T>): ReturnType<T> | undefined {
-    if (!inThrottle) {
-      lastResult = func.apply(this, args);
-      inThrottle = true;
-
-      setTimeout(() => {
-        inThrottle = false;
-      }, limit);
-
-      return lastResult;
-    }
-  };
-}
-
-/**
- * Monitor performance of the device and application
- */
-export function monitorPerformance() {
-  // Check for device capabilities
-  const deviceCapability = detectDeviceCapability();
+// Check if the device likely has limited capabilities
+const checkIsLowEndDevice = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
   
-  // Monitor FPS
-  const fps = getCurrentFPS();
-  
-  // Monitor memory usage if available
-  const memoryUsage = getMemoryUsage();
-  
-  return {
-    deviceCapability,
-    fps,
-    memoryUsage,
-    timestamp: Date.now()
-  };
-}
-
-/**
- * Detect device capability based on hardware and browser features
- */
-function detectDeviceCapability(): DeviceCapability {
-  // Simple detection based on navigator properties
+  // Check for indicators of low-end devices
+  const memory = (navigator as any).deviceMemory || 4; // Default to medium if not available
+  const cores = navigator.hardwareConcurrency || 4;
   const userAgent = navigator.userAgent.toLowerCase();
   
-  if (
-    userAgent.includes('mobile') || 
-    (navigator as any).deviceMemory < 4 || 
-    (navigator as any).hardwareConcurrency < 4
-  ) {
-    return DeviceCapability.LOW;
-  }
+  // Check for mobile devices with limited capabilities
+  const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+  const isOlderDevice = /android 4|android 5|msie|trident/i.test(userAgent);
   
-  if (
-    (navigator as any).deviceMemory >= 8 && 
-    (navigator as any).hardwareConcurrency >= 8
-  ) {
-    return DeviceCapability.HIGH;
-  }
-  
-  return DeviceCapability.MEDIUM;
-}
+  // Determine if this is likely a low-end device
+  return (memory < 2 || cores < 4 || isOlderDevice) && isMobile;
+};
 
 /**
- * Get current FPS using requestAnimationFrame
+ * Determines the performance category of the current device
+ * Can be used to adjust visual effects and animations
  */
-function getCurrentFPS(): number {
-  // This is a placeholder as actual FPS measurement requires running code over time
-  return 60; // Default to 60fps
-}
+export const getPerformanceCategory = (): DeviceCapability => {
+  // For SSR compatibility
+  if (typeof window === 'undefined') return 'medium';
+  
+  // Check user preference if set
+  const userPreference = localStorage.getItem('performanceMode');
+  if (userPreference) {
+    if (userPreference === 'low' || userPreference === 'medium' || userPreference === 'high') {
+      return userPreference;
+    }
+  }
+  
+  // Auto-detect
+  const isLowEndDevice = checkIsLowEndDevice();
+  
+  if (isLowEndDevice) return 'low';
+  
+  return window.innerWidth < 768 ? 'medium' : 'high';
+};
 
 /**
- * Get memory usage if available in the browser
+ * Starts performance monitoring for the application
+ * Can be called after initial render to avoid blocking critical content
  */
-function getMemoryUsage(): { totalJSHeapSize?: number, usedJSHeapSize?: number } {
-  if ((performance as any).memory) {
-    return {
-      totalJSHeapSize: (performance as any).memory.totalJSHeapSize,
-      usedJSHeapSize: (performance as any).memory.usedJSHeapSize
+export const monitorPerformance = () => {
+  if (typeof window === 'undefined') return;
+  
+  // Only monitor performance in development
+  if (process.env.NODE_ENV !== 'development') return;
+  
+  // Throttle data collection to reduce overhead
+  const throttleDuration = 5000; // 5 seconds
+  let lastReported = 0;
+  
+  // Setup performance observer
+  if ('PerformanceObserver' in window) {
+    try {
+      const observer = new PerformanceObserver((list) => {
+        const now = Date.now();
+        if (now - lastReported < throttleDuration) return;
+        
+        lastReported = now;
+        const entries = list.getEntries();
+        
+        if (entries.length > 0) {
+          console.log('[Performance] Monitoring entries:', entries.length);
+        }
+      });
+      
+      // Start observing various performance metrics
+      observer.observe({ entryTypes: ['longtask', 'paint', 'layout-shift'] });
+      
+      console.log('[Performance] Monitoring started');
+    } catch (e) {
+      console.error('[Performance] Error setting up performance monitoring:', e);
+    }
+  }
+};
+
+// Collection of performance optimization utilities
+export const performanceUtils = {
+  getPerformanceCategory,
+  monitorPerformance,
+  isLowEndDevice: checkIsLowEndDevice,
+  throttle: (fn: Function, delay: number) => {
+    let lastCall = 0;
+    return (...args: any[]) => {
+      const now = Date.now();
+      if (now - lastCall < delay) return;
+      lastCall = now;
+      return fn(...args);
     };
-  }
+  },
   
-  return {};
-}
+  // Helper for conditionally rendering high-performance components
+  shouldRenderHighPerformance: () => getPerformanceCategory() === 'high',
+  
+  // Helper for conditionally rendering medium-performance components
+  shouldRenderMediumPerformance: () => {
+    const category = getPerformanceCategory();
+    return category === 'high' || category === 'medium';
+  }
+};
+
+export default performanceUtils;

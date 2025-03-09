@@ -1,130 +1,153 @@
 
+/**
+ * Adaptive rendering utilities for optimizing performance
+ * Adjusts rendering quality based on device capabilities
+ */
+
 import { getPerformanceCategory } from './performanceUtils';
 
-type FeatureConfig = {
-  low: number | boolean;
-  medium: number | boolean;
-  high: number | boolean;
-};
+/**
+ * Different quality levels for adaptive rendering
+ */
+export type RenderQuality = 'low' | 'medium' | 'high';
 
 /**
- * Adaptive rendering configuration system that automatically 
- * adjusts feature settings based on device capability
+ * Controls for optimized rendering
  */
-export const adaptiveFeatures = {
-  // Visual effects
-  particles: {
-    low: false,
-    medium: true,
-    high: true
-  } as FeatureConfig,
+export interface AdaptiveRenderingControls {
+  // Whether to render particles
+  enableParticles: boolean;
   
-  particleDensity: {
-    low: 0.2,
-    medium: 0.6,
-    high: 1.0
-  } as FeatureConfig,
+  // Maximum number of particles to render
+  maxParticles: number;
   
-  blurEffects: {
-    low: false,
-    medium: true,
-    high: true
-  } as FeatureConfig,
+  // Whether to use blur effects
+  enableBlur: boolean;
   
-  shadows: {
-    low: false,
-    medium: true,
-    high: true
-  } as FeatureConfig,
+  // Blur intensity (0-10)
+  blurIntensity: number;
   
-  complexAnimations: {
-    low: false,
-    medium: true,
-    high: true
-  } as FeatureConfig,
+  // Whether to use shadows
+  enableShadows: boolean;
   
-  // Core functionality
-  backgroundThreading: {
-    low: false,
-    medium: true,
-    high: true
-  } as FeatureConfig,
+  // Shadow quality (0-10)
+  shadowQuality: number;
   
-  throttledUpdates: {
-    low: true,
-    medium: true, 
-    high: false
-  } as FeatureConfig,
+  // Whether to use complex animations
+  enableComplexAnimations: boolean;
   
-  // Asset loading
-  imageQuality: {
-    low: 'low',
-    medium: 'medium',
-    high: 'high'
-  },
+  // Animation frame rate limiter
+  frameRateLimit: number;
   
-  preloadDepth: {
-    low: 1,
-    medium: 2,
-    high: 3
-  } as FeatureConfig
-};
+  // Whether to render non-essential decorative elements
+  renderDecorations: boolean;
+}
 
-// Get appropriate setting based on device capability
-export function getAdaptiveSetting<T>(featureKey: keyof typeof adaptiveFeatures): T {
+/**
+ * Get adaptive rendering controls based on device capabilities
+ */
+export function getAdaptiveRenderingControls(): AdaptiveRenderingControls {
   const deviceCapability = getPerformanceCategory();
-  const feature = adaptiveFeatures[featureKey];
   
-  if (!feature) {
-    console.warn(`Feature ${featureKey} not found in adaptive features config`);
-    return null as unknown as T;
+  switch(deviceCapability) {
+    case 'low':
+      return {
+        enableParticles: false,
+        maxParticles: 10,
+        enableBlur: false,
+        blurIntensity: 0,
+        enableShadows: false,
+        shadowQuality: 0,
+        enableComplexAnimations: false,
+        frameRateLimit: 30,
+        renderDecorations: false
+      };
+      
+    case 'medium':
+      return {
+        enableParticles: true,
+        maxParticles: 50,
+        enableBlur: true,
+        blurIntensity: 3,
+        enableShadows: true,
+        shadowQuality: 3,
+        enableComplexAnimations: false,
+        frameRateLimit: 60,
+        renderDecorations: true
+      };
+      
+    case 'high':
+    default:
+      return {
+        enableParticles: true,
+        maxParticles: 200,
+        enableBlur: true,
+        blurIntensity: 5,
+        enableShadows: true,
+        shadowQuality: 8,
+        enableComplexAnimations: true,
+        frameRateLimit: 60,
+        renderDecorations: true
+      };
   }
-  
-  return feature[deviceCapability] as unknown as T;
 }
 
-// Get numeric value with optional scaling factor
-export function getScaledValue(
-  featureKey: keyof typeof adaptiveFeatures, 
-  baseValue: number
+/**
+ * Get the appropriate number of items to render based on device capability
+ * Useful for limiting lists, grids, etc. on lower-end devices
+ */
+export function getAdaptiveItemCount(
+  lowCount: number, 
+  mediumCount: number, 
+  highCount: number
 ): number {
-  const scaleFactor = getAdaptiveSetting<number>(featureKey);
-  return baseValue * scaleFactor;
-}
-
-// Determine if a feature should be enabled
-export function isFeatureEnabled(featureKey: keyof typeof adaptiveFeatures): boolean {
-  return getAdaptiveSetting<boolean>(featureKey);
-}
-
-// Inject performance data attributes into DOM for CSS optimizations
-export function setupAdaptiveCSS(): void {
-  if (typeof document === 'undefined') return;
-  
   const deviceCapability = getPerformanceCategory();
-  document.documentElement.dataset.performance = deviceCapability;
   
-  // Add specific feature flags as data attributes for CSS use
-  Object.entries(adaptiveFeatures).forEach(([key, config]) => {
-    const value = config[deviceCapability];
-    if (typeof value === 'boolean') {
-      document.documentElement.dataset[`feature${key.charAt(0).toUpperCase() + key.slice(1)}`] = 
-        value ? 'enabled' : 'disabled';
-    }
-  });
+  switch(deviceCapability) {
+    case 'low': return lowCount;
+    case 'medium': return mediumCount;
+    case 'high': return highCount;
+    default: return mediumCount;
+  }
 }
 
-// Automatically configure adaptive rendering on startup
-export function initAdaptiveRendering(): void {
-  setupAdaptiveCSS();
+/**
+ * Get animation duration adjusted for device capability
+ * Can be used to speed up animations on lower-end devices
+ */
+export function getAdaptiveAnimationDuration(
+  baseDuration: number
+): number {
+  const deviceCapability = getPerformanceCategory();
   
-  // Log configuration in development mode
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Adaptive rendering initialized:', {
-      deviceCapability: getPerformanceCategory(),
-      particles: isFeatureEnabled('particles'),
-      animations: isFeatureEnabled('complexAnimations'),
-      threading: isFeatureEnabled('backgroundThreading')
-    });
+  switch(deviceCapability) {
+    case 'low': return baseDuration * 0.5; // Faster animations on low-end devices
+    case 'medium': return baseDuration * 0.8;
+    case 'high': return baseDuration;
+    default: return baseDuration;
+  }
+}
+
+/**
+ * Determine if an optional visual effect should be rendered
+ */
+export function shouldRenderEffect(effectImportance: 'low' | 'medium' | 'high'): boolean {
+  const deviceCapability = getPerformanceCategory();
+  
+  switch(effectImportance) {
+    case 'low':
+      // Only render low-importance effects on high-end devices
+      return deviceCapability === 'high';
+      
+    case 'medium':
+      // Render medium-importance effects on medium and high-end devices
+      return deviceCapability === 'medium' || deviceCapability === 'high';
+      
+    case 'high':
+      // Always render high-importance effects
+      return true;
+      
+    default:
+      return deviceCapability === 'high';
   }
 }
