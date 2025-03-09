@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -6,11 +7,12 @@ import { AdaptivePerformanceProvider } from '@/contexts/AdaptivePerformanceConte
 import { QuantumThemeProvider } from '@/components/visual-foundation';
 
 import LandingPage from '@/pages/LandingPage';
+import HomePage from '@/pages/HomePage';
 import EntryAnimationPage from '@/pages/EntryAnimationPage';
 import DashboardPage from '@/pages/DashboardPage';
 import DesignSystemDemo from '@/pages/DesignSystemDemo';
 import NotFoundPage from '@/pages/NotFoundPage';
-import OnboardingPage from './pages/OnboardingPage';
+import OnboardingPage from '@/pages/OnboardingPage';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +25,7 @@ function App() {
             <Router>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/home" element={<HomePage />} />
                 <Route path="/entry-animation" element={<EntryAnimationPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/design-system" element={<DesignSystemDemo />} />
