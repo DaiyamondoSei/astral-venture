@@ -1,12 +1,11 @@
 
 import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
 
-// Performance configuration type
+// Simplified performance configuration type
 export interface PerfConfig {
   enableVirtualization: boolean;
   enableLazyLoading: boolean;
   enablePerformanceReporting: boolean;
-  enableIntersectionObserver: boolean;
   deviceCapability: 'low' | 'medium' | 'high';
 }
 
@@ -16,12 +15,11 @@ export interface PerfConfigContextType {
   updateConfig: (config: Partial<PerfConfig>) => void;
 }
 
-// Default configuration
+// Default configuration - simplified
 const defaultConfig: PerfConfig = {
   enableVirtualization: true,
   enableLazyLoading: true,
   enablePerformanceReporting: false,
-  enableIntersectionObserver: true,
   deviceCapability: 'medium',
 };
 
@@ -35,17 +33,17 @@ const PerfConfigContext = createContext<PerfConfigContextType>({
 export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [config, setConfig] = useState<PerfConfig>(defaultConfig);
 
-  // Detect device capability on mount
+  // Detect device capability on mount - simplified approach
   useEffect(() => {
     const detectDeviceCapability = () => {
-      // Simple device capability detection based on browser features
-      const memory = (navigator as any).deviceMemory;
-      const cpuCores = navigator.hardwareConcurrency;
+      // Simple device capability detection
+      const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
+      const cpuCores = navigator.hardwareConcurrency || 4;
       
-      // Assess device capability based on available resources
-      if (memory && memory <= 2 || cpuCores && cpuCores <= 2) {
+      // Basic capability assessment
+      if (isMobile || (cpuCores && cpuCores <= 2)) {
         return 'low';
-      } else if (memory && memory >= 8 || cpuCores && cpuCores >= 8) {
+      } else if (cpuCores && cpuCores >= 8) {
         return 'high';
       } else {
         return 'medium';
@@ -57,9 +55,9 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setConfig(prev => ({
       ...prev,
       deviceCapability: capability,
-      // Adjust settings for low-end devices
-      enableVirtualization: capability !== 'low' ? prev.enableVirtualization : true,
-      enableLazyLoading: capability !== 'low' ? prev.enableLazyLoading : true,
+      // Adjust settings for low-end devices to ensure good performance
+      enableVirtualization: capability === 'low' ? true : prev.enableVirtualization,
+      enableLazyLoading: capability === 'low' ? true : prev.enableLazyLoading,
     }));
   }, []);
 

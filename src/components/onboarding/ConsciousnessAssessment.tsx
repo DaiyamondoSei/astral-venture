@@ -1,306 +1,205 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { GlassmorphicContainer } from '@/components/visual-foundation';
-import { Brain, Gauge, Activity, SlidersHorizontal, Heart, Eye, Timeline } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { 
+  ChevronRight, 
+  ChevronLeft, 
+  CheckCircle,
+  ChevronDown
+} from 'lucide-react';
 
-interface AssessmentQuestion {
+type Question = {
   id: string;
-  question: string;
-  description: string;
-  min: string;
-  max: string;
-  icon: React.ReactNode;
-  metric: string;
+  text: string;
+  options: {
+    text: string;
+    value: number;
+  }[];
+};
+
+const questions: Question[] = [
+  {
+    id: 'awareness',
+    text: 'How often do you notice subtle emotional changes in yourself during daily activities?',
+    options: [
+      { text: 'Rarely or never', value: 1 },
+      { text: 'Sometimes, but not consistently', value: 2 },
+      { text: 'Often, especially during significant events', value: 3 },
+      { text: 'Almost always, I\'m frequently aware of my emotional state', value: 4 },
+      { text: 'Continuously, with deep awareness of subtle shifts', value: 5 }
+    ]
+  },
+  {
+    id: 'presence',
+    text: 'When engaged in routine tasks (like washing dishes), how present are you in the moment?',
+    options: [
+      { text: 'My mind is usually elsewhere', value: 1 },
+      { text: 'I notice when my mind wanders but struggle to stay present', value: 2 },
+      { text: 'I can be present for short periods with effort', value: 3 },
+      { text: 'I'm often present but occasionally drift', value: 4 },
+      { text: 'I can maintain consistent presence and awareness', value: 5 }
+    ]
+  },
+  {
+    id: 'connection',
+    text: 'How would you describe your sense of connection to something greater than yourself?',
+    options: [
+      { text: 'I don\'t feel any particular connection', value: 1 },
+      { text: 'I occasionally sense a connection, especially in nature', value: 2 },
+      { text: 'I often feel connected to something larger', value: 3 },
+      { text: 'I regularly experience a sense of unity with life', value: 4 },
+      { text: 'I consistently experience deep interconnectedness', value: 5 }
+    ]
+  },
+  {
+    id: 'purpose',
+    text: 'How clear is your sense of purpose or meaning in life?',
+    options: [
+      { text: 'Unclear, I'm still searching', value: 1 },
+      { text: 'I have glimpses but no consistent sense of purpose', value: 2 },
+      { text: 'I have some direction but it's still developing', value: 3 },
+      { text: 'I have a strong sense of purpose in most areas', value: 4 },
+      { text: 'My purpose feels clear, aligned and integrated in my life', value: 5 }
+    ]
+  },
+  {
+    id: 'meditation',
+    text: 'What is your experience with meditation or mindfulness practices?',
+    options: [
+      { text: 'No experience or very limited', value: 1 },
+      { text: 'I've tried occasionally but don't practice regularly', value: 2 },
+      { text: 'I practice irregularly, a few times per month', value: 3 },
+      { text: 'I have a consistent weekly practice', value: 4 },
+      { text: 'Daily practice is integrated into my life', value: 5 }
+    ]
+  }
+];
+
+interface ConsciousnessAssessmentProps {
+  onComplete: (results: Record<string, number>) => void;
+  onBack: () => void;
 }
 
-export function ConsciousnessAssessment() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { user } = useAuth();
-  
-  const questions: AssessmentQuestion[] = [
-    {
-      id: 'awareness',
-      question: 'How aware are you of your thoughts and emotions?',
-      description: 'Your ability to observe your mental and emotional states without being consumed by them',
-      min: 'Rarely Notice',
-      max: 'Constantly Aware',
-      icon: <Brain size={24} />,
-      metric: 'awareness_score'
-    },
-    {
-      id: 'reflection',
-      question: 'How often do you reflect on your experiences?',
-      description: 'Your tendency to contemplate the meaning of events and extract wisdom from them',
-      min: 'Almost Never',
-      max: 'Very Frequently',
-      icon: <Eye size={24} />,
-      metric: 'reflection_quality'
-    },
-    {
-      id: 'meditation',
-      question: 'How consistent is your meditation practice?',
-      description: 'The regularity with which you engage in meditation or mindfulness practices',
-      min: 'No Practice',
-      max: 'Daily Practice',
-      icon: <Activity size={24} />,
-      metric: 'meditation_consistency'
-    },
-    {
-      id: 'insight',
-      question: 'How deeply do you explore insights that arise?',
-      description: 'Your tendency to investigate revelations about yourself or existence',
-      min: 'Surface Level',
-      max: 'Deep Exploration',
-      icon: <Gauge size={24} />,
-      metric: 'insight_depth'
-    },
-    {
-      id: 'energy',
-      question: 'How attuned are you to subtle energies in yourself and others?',
-      description: 'Your sensitivity to energetic states, moods, and non-verbal information',
-      min: 'Not Sensitive',
-      max: 'Highly Sensitive',
-      icon: <Heart size={24} />,
-      metric: 'energy_clarity'
-    },
-    {
-      id: 'expansion',
-      question: 'How open are you to expanding your consciousness?',
-      description: 'Your willingness to explore new perspectives and states of awareness',
-      min: 'Comfortable As Is',
-      max: 'Eager To Expand',
-      icon: <SlidersHorizontal size={24} />,
-      metric: 'expansion_rate'
-    },
-    {
-      id: 'chakra',
-      question: 'How balanced do you feel your energy centers are?',
-      description: 'The harmony you sense between different aspects of your being',
-      min: 'Very Imbalanced',
-      max: 'Perfectly Balanced',
-      icon: <Timeline size={24} />,
-      metric: 'chakra_balance'
-    }
-  ];
-  
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+const ConsciousnessAssessment: React.FC<ConsciousnessAssessmentProps> = ({ onComplete, onBack }) => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const currentQuestion = questions[currentQuestionIndex];
-  
-  const handleAnswer = (value: number) => {
-    setAnswers(prev => ({
-      ...prev,
-      [currentQuestion.id]: value
-    }));
+  const [expandedExplanation, setExpandedExplanation] = useState<number | null>(null);
+
+  const handleAnswer = (questionId: string, value: number) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
   };
-  
-  const nextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prevIndex => prevIndex + 1);
+
+  const goToNextQuestion = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(prev => prev + 1);
+      setExpandedExplanation(null);
     } else {
-      handleSubmit();
+      onComplete(answers);
     }
   };
-  
-  const prevQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prevIndex => prevIndex - 1);
+
+  const goToPreviousQuestion = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(prev => prev - 1);
+      setExpandedExplanation(null);
+    } else {
+      onBack();
     }
   };
-  
-  const handleSubmit = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to save your assessment.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Convert answers to metrics format for database
-      const metrics: Record<string, number> = {};
-      const historyEntry = {
-        date: new Date().toISOString(),
-        scores: { ...answers }
-      };
-      
-      questions.forEach(q => {
-        const value = answers[q.id] ?? 0;
-        metrics[q.metric] = value * 20; // Scale 0-5 to 0-100
-      });
-      
-      // Determine consciousness level based on average score
-      const scores = Object.values(answers);
-      const average = scores.length > 0 
-        ? scores.reduce((sum, score) => sum + score, 0) / scores.length 
-        : 0;
-      
-      let level = 'awakening';
-      if (average >= 4) level = 'illuminated';
-      else if (average >= 3) level = 'expanded';
-      else if (average >= 2) level = 'aware';
-      else if (average >= 1) level = 'seeking';
-      
-      // Check if user already has consciousness metrics
-      const { data: existingMetrics } = await supabase
-        .from('consciousness_metrics')
-        .select('id, history')
-        .eq('user_id', user.id)
-        .single();
-      
-      let error;
-      
-      if (existingMetrics) {
-        // Update existing metrics
-        const history = Array.isArray(existingMetrics.history) 
-          ? [...existingMetrics.history, historyEntry]
-          : [historyEntry];
-        
-        const { error: updateError } = await supabase
-          .from('consciousness_metrics')
-          .update({
-            ...metrics,
-            level,
-            history,
-            last_assessment: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-          
-        error = updateError;
-      } else {
-        // Insert new metrics
-        const { error: insertError } = await supabase
-          .from('consciousness_metrics')
-          .insert({
-            user_id: user.id,
-            ...metrics,
-            level,
-            history: [historyEntry],
-            last_assessment: new Date().toISOString()
-          });
-          
-        error = insertError;
-      }
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Assessment Complete",
-        description: "Your consciousness profile has been created.",
-      });
-      
-      // Store completion in localStorage
-      localStorage.setItem('initialAssessmentCompleted', 'true');
-      
-      // Navigate to entry animation
-      navigate('/entry-animation');
-      
-    } catch (error) {
-      console.error('Error saving assessment:', error);
-      toast({
-        title: "Error Saving Assessment",
-        description: "There was a problem saving your assessment. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+
+  const currentQuestionData = questions[currentQuestion];
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const isQuestionAnswered = currentQuestionData && answers[currentQuestionData.id];
+
+  const toggleExplanation = (index: number) => {
+    setExpandedExplanation(expandedExplanation === index ? null : index);
   };
-  
-  const questionValue = currentQuestion.id in answers ? answers[currentQuestion.id] : 2.5;
-  
+
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
-      <GlassmorphicContainer 
-        className="p-6" 
-        variant="ethereal" 
-        intensity="medium" 
-        withGlow
-        glowColor="rgba(80, 219, 207, 0.4)"
-      >
-        <div className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-white">Consciousness Assessment</h2>
-            <p className="text-white/80 mt-2">
-              Question {currentQuestionIndex + 1} of {questions.length}
-            </p>
-          </div>
-          
-          <div className="relative pt-2">
-            <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-teal-400 to-teal-500 transition-all duration-300"
-                style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-white/5 border border-white/10">
-            <div className="text-teal-400">
-              {currentQuestion.icon}
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-white">{currentQuestion.question}</h3>
-              <p className="text-sm text-white/70 mt-1">{currentQuestion.description}</p>
-            </div>
-          </div>
-          
-          <div className="pt-6 pb-2">
-            <Slider
-              value={[questionValue]}
-              min={0}
-              max={5}
-              step={0.5}
-              onValueChange={values => handleAnswer(values[0])}
-              className="py-4"
-            />
-            <div className="flex justify-between text-sm text-white/70 mt-2">
-              <div className="max-w-[100px] text-left">{currentQuestion.min}</div>
-              <div className="max-w-[100px] text-right">{currentQuestion.max}</div>
-            </div>
-          </div>
-          
-          <div className="flex justify-between pt-4">
-            <Button 
-              type="button"
-              variant="outline"
-              disabled={currentQuestionIndex === 0}
-              onClick={prevQuestion}
-              className="border-white/30 text-white hover:bg-white/10"
-            >
-              Previous
-            </Button>
-            <Button 
-              type="button"
-              onClick={nextQuestion}
-              disabled={isSubmitting}
-              className="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
-            >
-              {currentQuestionIndex < questions.length - 1 
-                ? 'Next' 
-                : isSubmitting 
-                  ? 'Completing Assessment...' 
-                  : 'Complete Assessment'
-              }
-            </Button>
-          </div>
+    <div className="flex flex-col items-center space-y-6 w-full max-w-2xl mx-auto px-4 py-6">
+      <div className="w-full">
+        <h2 className="text-2xl font-bold text-center text-white mb-2">Consciousness Assessment</h2>
+        <p className="text-center text-white/80 mb-6">
+          This assessment helps us understand your current consciousness level and personalize your journey.
+        </p>
+        
+        <div className="w-full mb-4">
+          <Progress value={progress} className="h-2" />
+          <p className="text-sm text-right mt-1 text-white/70">
+            Question {currentQuestion + 1} of {questions.length}
+          </p>
         </div>
-      </GlassmorphicContainer>
+        
+        <Card className="bg-black/40 backdrop-blur-lg border-purple-800/30 p-6 w-full">
+          <h3 className="text-xl font-semibold text-white mb-4">
+            {currentQuestionData.text}
+          </h3>
+          
+          <div className="space-y-3 mt-6">
+            {currentQuestionData.options.map((option, index) => (
+              <div key={index} className="space-y-2">
+                <div 
+                  className={`p-3 rounded-lg cursor-pointer transition-all flex justify-between items-center
+                    ${answers[currentQuestionData.id] === option.value 
+                      ? 'bg-purple-800/50 border border-purple-500' 
+                      : 'bg-gray-800/40 border border-gray-700/50 hover:bg-gray-700/50'}`}
+                  onClick={() => handleAnswer(currentQuestionData.id, option.value)}
+                >
+                  <div className="flex items-center">
+                    <div className={`w-5 h-5 rounded-full mr-3 flex items-center justify-center
+                      ${answers[currentQuestionData.id] === option.value 
+                        ? 'bg-purple-500 text-white' 
+                        : 'bg-gray-700'}`}
+                    >
+                      {answers[currentQuestionData.id] === option.value && (
+                        <CheckCircle size={14} />
+                      )}
+                    </div>
+                    <span className="text-white">{option.text}</span>
+                  </div>
+                  
+                  <ChevronDown 
+                    size={18} 
+                    className={`text-gray-400 transition-transform ${expandedExplanation === index ? 'transform rotate-180' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleExplanation(index);
+                    }}
+                  />
+                </div>
+                
+                {expandedExplanation === index && (
+                  <div className="text-sm text-white/70 pl-8 pr-4 py-2 bg-gray-800/30 rounded-lg">
+                    <p>This response indicates a {index === 0 ? 'beginning' : index === 4 ? 'highly developed' : 'developing'} level of consciousness in this area.</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+        
+        <div className="flex justify-between mt-6">
+          <Button 
+            onClick={goToPreviousQuestion}
+            variant="outline"
+            className="flex items-center gap-1 border-white/20 text-white hover:bg-white/10"
+          >
+            <ChevronLeft size={16} /> Back
+          </Button>
+          
+          <Button 
+            onClick={goToNextQuestion}
+            disabled={!isQuestionAnswered}
+            className={`flex items-center gap-1 ${isQuestionAnswered ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-600/50 cursor-not-allowed'}`}
+          >
+            {currentQuestion < questions.length - 1 ? 'Next' : 'Complete'} <ChevronRight size={16} />
+          </Button>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default ConsciousnessAssessment;

@@ -1,30 +1,29 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { getPerformanceCategory, DeviceCapability } from '@/utils/performanceUtils';
-import { initAdaptiveRendering, isFeatureEnabled } from '@/utils/adaptiveRendering';
-import { initWebVitals, getWebVitalsMetrics } from '@/utils/webVitalsMonitor';
 
-// Helper type for the manual performance mode
-type PerformanceMode = DeviceCapability | 'auto';
+// Simple enum for device capability
+export enum DeviceCapability {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high'
+}
 
+// Simplified context type
 interface AdaptivePerformanceContextType {
   // Device capability
   deviceCapability: DeviceCapability;
   // Manual override for performance mode
-  manualPerformanceMode: PerformanceMode;
+  manualPerformanceMode: DeviceCapability | 'auto';
   // Feature flags based on device capability
   features: {
     enableParticles: boolean;
     enableComplexAnimations: boolean;
     enableBlur: boolean;
     enableShadows: boolean;
-    enableWebWorkers: boolean;
     enableHighResImages: boolean;
   };
-  // Web vitals metrics
-  webVitals: ReturnType<typeof getWebVitalsMetrics>;
   // Functions
-  setManualPerformanceMode: (mode: PerformanceMode) => void;
+  setManualPerformanceMode: (mode: DeviceCapability | 'auto') => void;
   adaptElementCount: (baseCount: number) => number;
   adaptUpdateInterval: (baseIntervalMs: number) => number;
 }
@@ -45,42 +44,33 @@ interface AdaptivePerformanceProviderProps {
 
 export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderProps> = ({ children }) => {
   // State for manual performance mode
-  const [manualMode, setManualMode] = useState<PerformanceMode>('auto');
+  const [manualMode, setManualMode] = useState<DeviceCapability | 'auto'>('auto');
   // Calculated device capability
   const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(DeviceCapability.MEDIUM);
-  // Web vitals metrics
-  const [webVitals, setWebVitals] = useState(getWebVitalsMetrics());
   
   // Update device capability when manual mode changes
   useEffect(() => {
     if (manualMode === 'auto') {
-      setDeviceCapability(getPerformanceCategory());
+      // Simple detection - no complex calculations needed
+      const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
+      const cpuCores = navigator.hardwareConcurrency || 4;
+      
+      if (isMobile || cpuCores <= 2) {
+        setDeviceCapability(DeviceCapability.LOW);
+      } else if (cpuCores >= 8) {
+        setDeviceCapability(DeviceCapability.HIGH);
+      } else {
+        setDeviceCapability(DeviceCapability.MEDIUM);
+      }
     } else {
       setDeviceCapability(manualMode);
     }
   }, [manualMode]);
   
-  // Initialize adaptive rendering system
-  useEffect(() => {
-    initAdaptiveRendering();
-    initWebVitals();
-    
-    // Listen for web vitals updates
-    const handleWebVitalsUpdate = (event: CustomEvent) => {
-      setWebVitals(getWebVitalsMetrics());
-    };
-    
-    window.addEventListener('webvitals', handleWebVitalsUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('webvitals', handleWebVitalsUpdate as EventListener);
-    };
-  }, []);
-  
   // Load saved preference
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedMode = localStorage.getItem('performanceMode') as PerformanceMode | null;
+      const savedMode = localStorage.getItem('performanceMode') as DeviceCapability | 'auto' | null;
       if (savedMode) {
         setManualMode(savedMode);
       }
@@ -88,7 +78,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   }, []);
   
   // Manual mode setter
-  const setManualPerformanceMode = (mode: PerformanceMode) => {
+  const setManualPerformanceMode = (mode: DeviceCapability | 'auto') => {
     setManualMode(mode);
     
     // Store preference in localStorage for persistence
@@ -128,21 +118,19 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
       enableComplexAnimations: !isLowPerformance,
       enableBlur: !isLowPerformance,
       enableShadows: !isLowPerformance,
-      enableWebWorkers: !isLowPerformance,
       enableHighResImages: isHighPerformance
     };
   }, [deviceCapability]);
   
   // Create context value
-  const contextValue = useMemo(() => ({
+  const contextValue: AdaptivePerformanceContextType = {
     deviceCapability,
     manualPerformanceMode: manualMode,
     features,
-    webVitals,
     setManualPerformanceMode,
     adaptElementCount,
     adaptUpdateInterval
-  }), [deviceCapability, manualMode, features, webVitals]);
+  };
   
   return (
     <AdaptivePerformanceContext.Provider value={contextValue}>
