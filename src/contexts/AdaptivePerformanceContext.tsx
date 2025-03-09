@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Simple enum for device capability
 export enum DeviceCapability {
@@ -18,14 +18,11 @@ interface AdaptivePerformanceContextType {
   features: {
     enableParticles: boolean;
     enableComplexAnimations: boolean;
-    enableBlur: boolean;
-    enableShadows: boolean;
     enableHighResImages: boolean;
   };
   // Functions
   setManualPerformanceMode: (mode: DeviceCapability | 'auto') => void;
   adaptElementCount: (baseCount: number) => number;
-  adaptUpdateInterval: (baseIntervalMs: number) => number;
 }
 
 const AdaptivePerformanceContext = createContext<AdaptivePerformanceContextType | null>(null);
@@ -48,10 +45,9 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
   // Calculated device capability
   const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(DeviceCapability.MEDIUM);
   
-  // Update device capability when manual mode changes
+  // Simple device detection - run only once on mount
   useEffect(() => {
     if (manualMode === 'auto') {
-      // Simple detection - no complex calculations needed
       const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
       const cpuCores = navigator.hardwareConcurrency || 4;
       
@@ -87,7 +83,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
     }
   };
   
-  // Helper functions for adapting rendering based on performance
+  // Helper function for adapting rendering based on performance
   const adaptElementCount = (baseCount: number): number => {
     const factors: Record<DeviceCapability, number> = {
       [DeviceCapability.LOW]: 0.3,
@@ -98,29 +94,12 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
     return Math.max(3, Math.floor(baseCount * factors[deviceCapability]));
   };
   
-  const adaptUpdateInterval = (baseIntervalMs: number): number => {
-    const factors: Record<DeviceCapability, number> = {
-      [DeviceCapability.LOW]: 3,
-      [DeviceCapability.MEDIUM]: 1.5,
-      [DeviceCapability.HIGH]: 1
-    };
-    
-    return Math.max(16, Math.floor(baseIntervalMs * factors[deviceCapability]));
-  };
-  
   // Compute derived feature flags
-  const features = useMemo(() => {
-    const isLowPerformance = deviceCapability === DeviceCapability.LOW;
-    const isHighPerformance = deviceCapability === DeviceCapability.HIGH;
-    
-    return {
-      enableParticles: !isLowPerformance,
-      enableComplexAnimations: !isLowPerformance,
-      enableBlur: !isLowPerformance,
-      enableShadows: !isLowPerformance,
-      enableHighResImages: isHighPerformance
-    };
-  }, [deviceCapability]);
+  const features = {
+    enableParticles: deviceCapability !== DeviceCapability.LOW,
+    enableComplexAnimations: deviceCapability !== DeviceCapability.LOW,
+    enableHighResImages: deviceCapability === DeviceCapability.HIGH
+  };
   
   // Create context value
   const contextValue: AdaptivePerformanceContextType = {
@@ -128,8 +107,7 @@ export const AdaptivePerformanceProvider: React.FC<AdaptivePerformanceProviderPr
     manualPerformanceMode: manualMode,
     features,
     setManualPerformanceMode,
-    adaptElementCount,
-    adaptUpdateInterval
+    adaptElementCount
   };
   
   return (

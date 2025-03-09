@@ -5,7 +5,6 @@ import React, { createContext, useState, useCallback, useContext, useEffect } fr
 export interface PerfConfig {
   enableVirtualization: boolean;
   enableLazyLoading: boolean;
-  enablePerformanceReporting: boolean;
   deviceCapability: 'low' | 'medium' | 'high';
 }
 
@@ -19,7 +18,6 @@ export interface PerfConfigContextType {
 const defaultConfig: PerfConfig = {
   enableVirtualization: true,
   enableLazyLoading: true,
-  enablePerformanceReporting: false,
   deviceCapability: 'medium',
 };
 
@@ -29,37 +27,28 @@ const PerfConfigContext = createContext<PerfConfigContextType>({
   updateConfig: () => {},
 });
 
+// Simple device capability detection
+const detectDeviceCapability = (): 'low' | 'medium' | 'high' => {
+  if (typeof window === 'undefined') return 'medium';
+  
+  const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
+  const cpuCores = navigator.hardwareConcurrency || 4;
+  
+  if (isMobile || (cpuCores && cpuCores <= 2)) {
+    return 'low';
+  } else if (cpuCores && cpuCores >= 8) {
+    return 'high';
+  } else {
+    return 'medium';
+  }
+};
+
 // Provider component
 export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [config, setConfig] = useState<PerfConfig>(defaultConfig);
-
-  // Detect device capability on mount - simplified approach
-  useEffect(() => {
-    const detectDeviceCapability = () => {
-      // Simple device capability detection
-      const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
-      const cpuCores = navigator.hardwareConcurrency || 4;
-      
-      // Basic capability assessment
-      if (isMobile || (cpuCores && cpuCores <= 2)) {
-        return 'low';
-      } else if (cpuCores && cpuCores >= 8) {
-        return 'high';
-      } else {
-        return 'medium';
-      }
-    };
-
-    // Update config with detected capability
-    const capability = detectDeviceCapability();
-    setConfig(prev => ({
-      ...prev,
-      deviceCapability: capability,
-      // Adjust settings for low-end devices to ensure good performance
-      enableVirtualization: capability === 'low' ? true : prev.enableVirtualization,
-      enableLazyLoading: capability === 'low' ? true : prev.enableLazyLoading,
-    }));
-  }, []);
+  const [config, setConfig] = useState<PerfConfig>({
+    ...defaultConfig,
+    deviceCapability: detectDeviceCapability()
+  });
 
   // Update configuration
   const updateConfig = useCallback((newConfig: Partial<PerfConfig>) => {

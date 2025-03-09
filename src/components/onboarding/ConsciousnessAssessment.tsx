@@ -69,7 +69,7 @@ const questions: Question[] = [
     text: 'What is your experience with meditation or mindfulness practices?',
     options: [
       { text: 'No experience or very limited', value: 1 },
-      { text: 'I've tried occasionally but don't practice regularly', value: 2 },
+      { text: 'I\'ve tried occasionally but don\'t practice regularly', value: 2 },
       { text: 'I practice irregularly, a few times per month', value: 3 },
       { text: 'I have a consistent weekly practice', value: 4 },
       { text: 'Daily practice is integrated into my life', value: 5 }
