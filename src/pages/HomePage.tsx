@@ -13,11 +13,16 @@ import SwipeIndicator from '@/components/panels/SwipeIndicator';
 import SwipeablePanelController from '@/components/panels/SwipeablePanelController';
 import { preloadPanelData } from '@/utils/panelDataPreloader';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const HomePage: React.FC = () => {
   const { cosmicIntensity } = useQuantumTheme();
   const { config } = usePerfConfig();
   const { togglePanel } = usePanel();
+  const { user } = useAuth();
+  
+  // Get user level from authentication context
+  const userLevel = user?.user_metadata?.astral_level || 1;
 
   // Preload panel data for smoother experience
   React.useEffect(() => {
@@ -84,7 +89,7 @@ const HomePage: React.FC = () => {
         {/* Central Seed of Life Portal */}
         <div className="mb-8">
           <SeedOfLifePortal
-            userLevel={1}
+            userLevel={userLevel}
             onActivate={handlePortalActivate}
           />
         </div>

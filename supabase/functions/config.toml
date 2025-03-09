@@ -1,5 +1,3 @@
 
+# A string used as a secret for authorization header
 project_id = "wkmyvthtyjcdzhzvfyji"
-
-[global.env]
-API_URL = "https://wkmyvthtyjcdzhzvfyji.functions.supabase.co"

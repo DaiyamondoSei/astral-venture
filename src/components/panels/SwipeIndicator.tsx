@@ -1,51 +1,49 @@
 
-import React from 'react'
-import { motion } from 'framer-motion'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import React from 'react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+
+type SwipePosition = "top" | "bottom";
 
 interface SwipeIndicatorProps {
-  position: 'top' | 'bottom'
-  className?: string
+  position: SwipePosition;
+  className?: string;
 }
 
+/**
+ * A visual indicator showing users that they can swipe to reveal panels
+ */
 const SwipeIndicator: React.FC<SwipeIndicatorProps> = ({ position, className }) => {
   const variants = {
     hidden: { opacity: 0 },
     visible: { 
-      opacity: [0, 1, 0],
-      transition: {
-        repeat: Infinity,
+      opacity: [0.2, 0.6, 0.2], 
+      transition: { 
+        repeat: Infinity, 
         duration: 2,
-        repeatType: 'loop'
-      }
+        repeatType: "mirror" as const
+      } 
     }
-  }
-  
+  };
+
   return (
-    <motion.div 
+    <div 
       className={cn(
-        "fixed left-1/2 -translate-x-1/2 z-30 flex flex-col items-center",
-        position === 'top' ? "top-2" : "bottom-2",
+        "fixed z-40 left-0 right-0 flex justify-center items-center pointer-events-none",
+        position === "top" ? "top-1" : "bottom-1",
         className
       )}
-      variants={variants}
-      initial="hidden"
-      animate="visible"
     >
-      {position === 'top' ? (
-        <>
-          <ChevronDown className="text-white/80" size={20} />
-          <div className="text-white/80 text-xs">Profile</div>
-        </>
-      ) : (
-        <>
-          <div className="text-white/80 text-xs">Achievements</div>
-          <ChevronUp className="text-white/80" size={20} />
-        </>
-      )}
-    </motion.div>
-  )
-}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={variants}
+        className={cn(
+          "w-12 h-1 rounded-full bg-white/40 backdrop-blur-sm",
+        )}
+      />
+    </div>
+  );
+};
 
-export default SwipeIndicator
+export default SwipeIndicator;
