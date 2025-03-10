@@ -2,7 +2,7 @@
 import type { User } from '@supabase/supabase-js';
 
 /**
- * User profile information
+ * User profile interface
  */
 export interface IUserProfile {
   id: string;
@@ -13,7 +13,7 @@ export interface IUserProfile {
 }
 
 /**
- * User streak information
+ * User streak tracking interface
  */
 export interface IUserStreak {
   current: number;
@@ -22,7 +22,7 @@ export interface IUserStreak {
 }
 
 /**
- * Authentication context interface
+ * Auth context interface
  */
 export interface IAuthContext {
   user: User | null;

@@ -3,6 +3,7 @@
  * Chat service for OpenAI integration
  */
 
+import { logEvent } from "../../../shared/responseUtils.ts";
 import { AIModel, ChatMetrics, ChatOptions } from "./types.ts";
 
 /**
@@ -55,11 +56,18 @@ export async function generateChatResponse(
     
     if (!response.ok) {
       const error = await response.json();
-      console.error('OpenAI API error:', error);
+      logEvent("error", "OpenAI API error", { error });
       throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
     }
     
     const data = await response.json();
+    
+    // Log the success
+    logEvent("info", "Chat response generated", {
+      model: data.model || model,
+      tokensUsed: data.usage?.total_tokens || 0,
+      latencyMs: latency
+    });
     
     return {
       content: data.choices[0]?.message?.content || "Sorry, I couldn't generate a response.",
@@ -72,7 +80,10 @@ export async function generateChatResponse(
       }
     };
   } catch (error) {
-    console.error('Error generating chat response:', error);
+    logEvent("error", 'Error generating chat response', {
+      error: error instanceof Error ? error.message : String(error),
+      model
+    });
     throw error;
   }
 }

@@ -1,72 +1,62 @@
 
 /**
- * Shared caching utilities for edge functions
+ * In-memory cache for edge functions
+ * Provides a simple way to cache responses and reduce API calls
  */
 
-// In-memory cache for edge functions
-const MEMORY_CACHE = new Map<string, any>();
+// In-memory cache storage
+const MEMORY_CACHE = new Map<string, {
+  data: any;
+  expiresAt: number;
+  timestamp: number;
+}>();
 
 /**
- * Creates a consistent cache key from input parameters
- */
-export function createCacheKey(
-  mainInput: string,
-  context?: string | null,
-  model?: string
-): string {
-  const normalizedInput = mainInput.trim().toLowerCase();
-  const contextHash = context ? hashString(context) : "no-context";
-  const modelStr = model || "default-model";
-  
-  return `${normalizedInput.substring(0, 50)}-${contextHash}-${modelStr}`;
-}
-
-/**
- * Simple string hashing function
- */
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return hash.toString(36);
-}
-
-/**
- * Get a value from the memory cache
- */
-export function getMemoryCacheValue<T>(key: string): T | undefined {
-  const item = MEMORY_CACHE.get(key);
-  
-  if (!item) return undefined;
-  
-  // Check if expired
-  if (item.expiresAt && item.expiresAt < Date.now()) {
-    MEMORY_CACHE.delete(key);
-    return undefined;
-  }
-  
-  return item as T;
-}
-
-/**
- * Set a value in the memory cache with optional TTL
+ * Set a value in the memory cache
+ * 
+ * @param key Cache key
+ * @param value Value to cache
+ * @param ttl Time to live in milliseconds
  */
 export function setMemoryCacheValue<T>(
   key: string,
   value: T,
-  ttlMs: number = 30 * 60 * 1000 // 30 minutes default
+  ttl: number = 5 * 60 * 1000 // 5 minutes default
 ): void {
   MEMORY_CACHE.set(key, {
-    ...value,
-    expiresAt: Date.now() + ttlMs
+    data: value,
+    expiresAt: Date.now() + ttl,
+    timestamp: Date.now()
   });
 }
 
 /**
- * Delete a specific cache entry
+ * Get a value from the memory cache
+ * 
+ * @param key Cache key
+ * @returns Cached value or undefined if not found or expired
+ */
+export function getMemoryCacheValue<T>(key: string): T | undefined {
+  const cached = MEMORY_CACHE.get(key);
+  
+  if (!cached) {
+    return undefined;
+  }
+  
+  // Check if the cache entry has expired
+  if (cached.expiresAt < Date.now()) {
+    MEMORY_CACHE.delete(key);
+    return undefined;
+  }
+  
+  return cached.data as T;
+}
+
+/**
+ * Delete a value from the memory cache
+ * 
+ * @param key Cache key
+ * @returns True if the value was deleted, false if it wasn't found
  */
 export function deleteMemoryCacheValue(key: string): boolean {
   return MEMORY_CACHE.delete(key);
@@ -74,26 +64,69 @@ export function deleteMemoryCacheValue(key: string): boolean {
 
 /**
  * Clear all expired items from the cache
+ * 
+ * @returns Number of items cleared
  */
 export function clearExpiredCache(): number {
-  let deletedCount = 0;
   const now = Date.now();
+  let cleared = 0;
   
   for (const [key, value] of MEMORY_CACHE.entries()) {
-    if (value.expiresAt && value.expiresAt < now) {
+    if (value.expiresAt < now) {
       MEMORY_CACHE.delete(key);
-      deletedCount++;
+      cleared++;
     }
   }
   
-  return deletedCount;
+  return cleared;
 }
 
 /**
- * Clear the entire cache
+ * Clear all items from the cache
+ * 
+ * @returns Number of items cleared
  */
 export function clearAllCache(): number {
   const size = MEMORY_CACHE.size;
   MEMORY_CACHE.clear();
   return size;
+}
+
+/**
+ * Get the current cache size
+ * 
+ * @returns Number of items in the cache
+ */
+export function getCacheSize(): number {
+  return MEMORY_CACHE.size;
+}
+
+/**
+ * Get cache stats
+ * 
+ * @returns Cache statistics
+ */
+export function getCacheStats(): { 
+  size: number; 
+  oldestEntry: number | null;
+  newestEntry: number | null;
+} {
+  let oldestTimestamp: number | null = null;
+  let newestTimestamp: number | null = null;
+  
+  for (const value of MEMORY_CACHE.values()) {
+    if (oldestTimestamp === null || value.timestamp < oldestTimestamp) {
+      oldestTimestamp = value.timestamp;
+    }
+    
+    if (newestTimestamp === null || value.timestamp > newestTimestamp) {
+      newestTimestamp = value.timestamp;
+    }
+  }
+  
+  return {
+    size: MEMORY_CACHE.size,
+    oldestEntry: oldestTimestamp,
+    newestEntry: newestTimestamp
+  };
 }

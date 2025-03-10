@@ -1,146 +1,106 @@
 
 /**
- * Supported OpenAI models
+ * Types for OpenAI API integration
  */
+
+// Supported AI models
 export type AIModel = 
-  | "gpt-3.5-turbo"
+  | "gpt-4o" 
   | "gpt-4o-mini"
-  | "gpt-4o";
+  | "gpt-4-turbo"
+  | "gpt-4-1106-preview"
+  | "gpt-4-vision-preview" 
+  | "gpt-3.5-turbo";
 
-/**
- * Content moderation categories from OpenAI
- */
-export type ContentModerationType = 
-  | "hate"
-  | "hate/threatening"
-  | "harassment"
-  | "harassment/threatening"
-  | "self-harm"
-  | "self-harm/intent"
-  | "self-harm/instructions"
-  | "sexual"
-  | "sexual/minors"
-  | "violence"
-  | "violence/graphic";
-
-/**
- * Response format configuration
- */
-export type ResponseFormat = 
-  | { type: "text" }
-  | { type: "json_object" };
-
-/**
- * AI request options with better types
- */
-export interface AIRequestOptions {
-  model?: AIModel;
-  temperature?: number;
-  maxTokens?: number;
-  stream?: boolean;
-  user?: string;
-  responseFormat?: ResponseFormat;
-  functions?: Array<ChatFunction>;
-  functionCall?: string | { name: string };
-}
-
-/**
- * Chat function for function calling
- */
-export interface ChatFunction {
-  name: string;
-  description?: string;
-  parameters: {
-    type: "object";
-    properties: Record<string, FunctionParameter>;
-    required?: string[];
-  };
-}
-
-/**
- * Function parameter definition
- */
-export type FunctionParameter = {
-  type: "string" | "number" | "integer" | "boolean" | "array" | "object";
-  description?: string;
-  enum?: string[];
-  items?: {
-    type: string;
-    enum?: string[];
-  };
-  properties?: Record<string, FunctionParameter>;
-  required?: string[];
-};
-
-/**
- * AI completion metrics for tracking
- */
-export interface ChatMetrics {
-  model: string;
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens: number;
-  latency?: number;
-}
-
-/**
- * AI chat message
- */
-export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "function";
-  content: string | null;
-  name?: string;
-  function_call?: {
-    name: string;
-    arguments: string;
-  };
-}
-
-/**
- * AI chat options
- */
+// Options for generating chat responses
 export interface ChatOptions {
   model?: AIModel;
   temperature?: number;
   max_tokens?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-  user?: string;
-  functions?: Array<ChatFunction>;
-  function_call?: string | { name: string };
+  function_call?: 'auto' | 'none' | { name: string };
+  functions?: Array<{
+    name: string;
+    description: string;
+    parameters: Record<string, any>;
+  }>;
 }
 
-/**
- * AI completion response structure from OpenAI
- */
+// Chat response metrics
+export interface ChatMetrics {
+  model: string;
+  totalTokens: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  latency?: number;
+}
+
+// Content moderation types
+export type ContentModerationType = 
+  | "hate" 
+  | "hate/threatening" 
+  | "self-harm" 
+  | "sexual" 
+  | "sexual/minors" 
+  | "violence" 
+  | "violence/graphic";
+
+// Content moderation result
+export interface ModerationResult {
+  allowed: boolean;
+  flags: ContentModerationType[];
+  flaggedCategories: Record<ContentModerationType, boolean>;
+  categoryScores: Record<ContentModerationType, number>;
+}
+
+// Streaming chat message
+export interface StreamingMessage {
+  content: string;
+  role: "assistant" | "user" | "system";
+  finished: boolean;
+}
+
+// Function call type
+export interface FunctionCall {
+  name: string;
+  arguments: string;
+}
+
+// OpenAI function calling result
+export interface FunctionCallResult {
+  function_call: FunctionCall;
+  role: "assistant";
+  content: null;
+}
+
+// OpenAI API error 
+export interface OpenAIError {
+  message: string;
+  type: string;
+  param?: string;
+  code?: string;
+}
+
+// Chat completion choice
+export interface ChatCompletionChoice {
+  index: number;
+  message: {
+    role: "assistant";
+    content: string | null;
+    function_call?: FunctionCall;
+  };
+  finish_reason: "stop" | "length" | "function_call";
+}
+
+// Chat completion response
 export interface ChatCompletionResponse {
   id: string;
-  object: string;
+  object: "chat.completion";
   created: number;
   model: string;
-  choices: {
-    index: number;
-    message: ChatMessage;
-    finish_reason: "stop" | "length" | "content_filter" | "function_call";
-  }[];
+  choices: ChatCompletionChoice[];
   usage: {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
   };
-}
-
-/**
- * Streaming response chunk from OpenAI
- */
-export interface StreamingResponseChunk {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: {
-    index: number;
-    delta: Partial<ChatMessage>;
-    finish_reason: null | "stop" | "length" | "content_filter" | "function_call";
-  }[];
 }

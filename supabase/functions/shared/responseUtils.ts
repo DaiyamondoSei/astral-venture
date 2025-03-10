@@ -1,49 +1,77 @@
 
 /**
- * Shared utilities for standardized response handling across edge functions
+ * Shared response utilities for edge functions
  */
 
-// Standard CORS headers for all edge functions
+// CORS headers for all responses
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Error codes for consistent error reporting
+// Error codes for standardized error responses
 export enum ErrorCode {
-  VALIDATION_FAILED = "validation_failed",
-  AUTHENTICATION_REQUIRED = "authentication_required",
-  UNAUTHORIZED = "unauthorized",
-  NOT_FOUND = "not_found",
-  RATE_LIMITED = "rate_limited",
-  EXTERNAL_API_ERROR = "external_api_error",
-  DATABASE_ERROR = "database_error",
-  INTERNAL_ERROR = "internal_error",
-  MISSING_PARAMETERS = "missing_parameters",
-  TIMEOUT = "timeout"
+  MISSING_PARAMETERS = "MISSING_PARAMETERS",
+  VALIDATION_FAILED = "VALIDATION_FAILED",
+  AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED",
+  UNAUTHORIZED = "UNAUTHORIZED",
+  NOT_FOUND = "NOT_FOUND",
+  RATE_LIMITED = "RATE_LIMITED",
+  EXTERNAL_API_ERROR = "EXTERNAL_API_ERROR",
+  TIMEOUT = "TIMEOUT",
+  INTERNAL_ERROR = "INTERNAL_ERROR"
 }
 
-// Create a standardized success response
+/**
+ * Handle CORS preflight request
+ */
+export function handleCorsRequest(): Response {
+  return new Response(null, { 
+    headers: corsHeaders
+  });
+}
+
+/**
+ * Create a standardized successful response
+ * 
+ * @param data Response data
+ * @param metadata Optional metadata
+ * @param status HTTP status code
+ * @returns Formatted Response object
+ */
 export function createSuccessResponse(
-  data: any,
-  metadata: Record<string, any> = {}
+  data: any, 
+  metadata: Record<string, any> = {},
+  status: number = 200
 ): Response {
   return new Response(
     JSON.stringify({
       success: true,
       data,
-      ...metadata
+      metadata,
+      timestamp: new Date().toISOString()
     }),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200
+    { 
+      status,
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "application/json" 
+      } 
     }
   );
 }
 
-// Create a standardized error response
+/**
+ * Create a standardized error response
+ * 
+ * @param code Error code
+ * @param message Error message
+ * @param details Optional error details
+ * @param status HTTP status code
+ * @returns Formatted Response object
+ */
 export function createErrorResponse(
-  code: ErrorCode | string,
+  code: ErrorCode,
   message: string,
   details: any = null,
   status: number = 400
@@ -55,24 +83,40 @@ export function createErrorResponse(
         code,
         message,
         details,
-        timestamp: new Date().toISOString()
-      }
+      },
+      timestamp: new Date().toISOString()
     }),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status
+    { 
+      status,
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "application/json" 
+      } 
     }
   );
 }
 
-// Validate required parameters
+/**
+ * Validate required parameters in a request
+ * 
+ * @param params Object containing parameters
+ * @param requiredParams Array of required parameter names
+ * @returns Validation result
+ */
 export function validateRequiredParameters(
   params: Record<string, any>,
   requiredParams: string[]
-): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredParams.filter(
-    param => params[param] === undefined || params[param] === null || params[param] === ""
-  );
+): { 
+  isValid: boolean;
+  missingParams: string[];
+} {
+  const missingParams: string[] = [];
+  
+  for (const param of requiredParams) {
+    if (params[param] === undefined || params[param] === null || params[param] === '') {
+      missingParams.push(param);
+    }
+  }
   
   return {
     isValid: missingParams.length === 0,
@@ -80,24 +124,37 @@ export function validateRequiredParameters(
   };
 }
 
-// Log events for monitoring and debugging
+/**
+ * Log an event for debugging and monitoring
+ * 
+ * @param level Log level
+ * @param message Event message
+ * @param data Additional data
+ */
 export function logEvent(
-  level: "info" | "warn" | "error" | "debug",
+  level: 'debug' | 'info' | 'warn' | 'error',
   message: string,
-  metadata: Record<string, any> = {}
+  data: Record<string, any> = {}
 ): void {
-  console[level](`[${level.toUpperCase()}] ${message}`, metadata);
-}
-
-// Basic request handler interface shared across functions
-export interface RequestHandler {
-  (user: any, req: Request, options?: any): Promise<Response>;
-}
-
-// Error handling options for request handlers
-export interface ErrorHandlingOptions {
-  logToConsole?: boolean;
-  logToServer?: boolean;
-  includeDetails?: boolean;
-  defaultErrorMessage?: string;
+  const logData = {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    ...data
+  };
+  
+  switch (level) {
+    case 'debug':
+      console.debug(message, logData);
+      break;
+    case 'info':
+      console.info(message, logData);
+      break;
+    case 'warn':
+      console.warn(message, logData);
+      break;
+    case 'error':
+      console.error(message, logData);
+      break;
+  }
 }

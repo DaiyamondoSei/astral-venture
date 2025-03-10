@@ -1,35 +1,30 @@
 
 /**
- * Content moderation service using OpenAI's Moderation API
+ * Content moderation service using OpenAI's moderation API
  */
 
-import { ContentModerationType } from "./types.ts";
+import { logEvent } from "../../../shared/responseUtils.ts";
+import type { ModerationResult, ContentModerationType } from "./types.ts";
 
 /**
- * Check content using OpenAI's moderation API
+ * Check if content violates content policies using OpenAI's moderation API
  * 
  * @param content Content to moderate
- * @returns Moderation result with flags
+ * @returns Moderation result
  */
-export async function moderateContent(
-  content: string
-): Promise<{
-  allowed: boolean;
-  flags: ContentModerationType[];
-  score: number;
-}> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  
-  if (!apiKey) {
-    throw new Error("Missing OPENAI_API_KEY environment variable");
-  }
-  
+export async function moderateContent(content: string): Promise<ModerationResult> {
   try {
-    const response = await fetch('https://api.openai.com/v1/moderations', {
-      method: 'POST',
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not set in environment variables");
+    }
+    
+    const response = await fetch("https://api.openai.com/v1/moderations", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         input: content
@@ -38,39 +33,40 @@ export async function moderateContent(
     
     if (!response.ok) {
       const error = await response.json();
-      console.error('OpenAI Moderation API error:', error);
-      throw new Error(`OpenAI Moderation API error: ${error.error?.message || 'Unknown error'}`);
+      throw new Error(`OpenAI Moderation API error: ${error.error?.message || "Unknown error"}`);
     }
     
     const data = await response.json();
     const result = data.results[0];
     
     // Extract flagged categories
-    const flaggedCategories: ContentModerationType[] = [];
-    Object.entries(result.categories).forEach(([category, flagged]) => {
-      if (flagged) {
-        flaggedCategories.push(category as ContentModerationType);
-      }
-    });
+    const flaggedCategories: Record<ContentModerationType, boolean> = result.categories;
     
-    // Get the highest score across all categories
-    const highestScore = Math.max(
-      ...Object.values(result.category_scores).map(score => Number(score))
-    );
+    // Create list of flags that were triggered
+    const flags: ContentModerationType[] = Object.entries(flaggedCategories)
+      .filter(([_, value]) => value === true)
+      .map(([key, _]) => key as ContentModerationType);
     
     return {
       allowed: !result.flagged,
-      flags: flaggedCategories,
-      score: highestScore
+      flags,
+      flaggedCategories,
+      categoryScores: result.category_scores
     };
   } catch (error) {
-    console.error('Error during content moderation:', error);
+    // Log the error
+    logEvent("error", "Content moderation error", { 
+      error: error instanceof Error ? error.message : String(error),
+      contentLength: content.length
+    });
     
-    // Default to allowing in case of API error, with appropriate logging
+    // Default to allowing content in case of API failure
+    // This can be adjusted based on your risk tolerance
     return {
       allowed: true,
       flags: [],
-      score: 0
+      flaggedCategories: {} as Record<ContentModerationType, boolean>,
+      categoryScores: {} as Record<ContentModerationType, number>
     };
   }
 }
