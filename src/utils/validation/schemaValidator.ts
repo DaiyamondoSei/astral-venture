@@ -1,148 +1,118 @@
 
 import { ValidationError } from './ValidationError';
+import { z } from 'zod';
 
 /**
- * Result of schema validation
+ * Results of a validation operation
  */
 export interface ValidationResult<T> {
-  /**
-   * Whether the validation succeeded
-   */
   isValid: boolean;
-  
-  /**
-   * The validated data (only present if validation succeeded)
-   */
   data?: T;
-  
-  /**
-   * The error that occurred (only present if validation failed)
-   */
-  error?: ValidationError;
-  
-  /**
-   * Additional validation issues
-   */
-  issues?: ValidationIssue[];
+  error?: string;
 }
 
 /**
- * Represents a specific validation issue
+ * Creates an API validator function using a Zod schema
+ * 
+ * @param schema - Zod schema to validate against
+ * @param options - Optional configuration
+ * @returns Validator function for API data
  */
-export interface ValidationIssue {
-  code: string;
-  path: string[];
-  message: string;
-}
-
-/**
- * A schema validator for runtime type checking
- */
-export interface SchemaValidator<T> {
-  /**
-   * Validate data against the schema
-   * @param data The data to validate
-   * @returns A validation result object
-   */
-  validate(data: unknown): ValidationResult<T>;
+export function createApiValidator<T>(
+  schema: z.ZodType<T>,
+  options: {
+    name?: string;
+    strictMode?: boolean;
+  } = {}
+) {
+  const { name = 'data', strictMode = true } = options;
   
-  /**
-   * Parse data against the schema, throws on validation failure
-   * @param data The data to parse
-   * @returns The validated data
-   * @throws ValidationError if validation fails
-   */
-  parse(data: unknown): T;
-  
-  /**
-   * Check if data matches the schema
-   * @param data The data to check
-   * @returns Whether the data is valid
-   */
-  check(data: unknown): boolean;
-}
-
-/**
- * Create a basic schema validator for an object type
- * @param schema Object describing the expected shape of the data
- * @returns A schema validator
- */
-export function createObjectSchema<T extends Record<string, any>>(
-  schema: Record<keyof T, (value: unknown) => boolean>
-): SchemaValidator<T> {
-  return {
-    validate(data: unknown): ValidationResult<T> {
-      // Check if data is an object
-      if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        return {
-          isValid: false,
-          error: ValidationError.invalidType('schema', data, 'object')
-        };
-      }
+  return function validate(data: unknown): ValidationResult<T> {
+    try {
+      const result = schema.parse(data);
+      return {
+        isValid: true,
+        data: result
+      };
+    } catch (error) {
+      let errorMessage = 'Invalid data format';
       
-      const inputData = data as Record<string, unknown>;
-      const issues: ValidationIssue[] = [];
-      
-      // Check each property in the schema
-      for (const [key, validator] of Object.entries(schema)) {
-        const value = inputData[key];
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        errorMessage = `${firstError.path.join('.')} ${firstError.message}`;
         
-        // Skip undefined optional properties
-        if (value === undefined) continue;
-        
-        // Validate the property
-        if (!validator(value)) {
-          issues.push({
-            code: 'invalid_property',
-            path: [key],
-            message: `Invalid value for property '${key}'`
-          });
+        // In strict mode, throw a ValidationError with detailed info
+        if (strictMode) {
+          throw new ValidationError(
+            errorMessage,
+            firstError.path.join('.') || name,
+            firstError.code,
+            'SCHEMA_VALIDATION_ERROR',
+            { zodErrors: error.errors }
+          );
         }
       }
       
-      if (issues.length > 0) {
-        return {
-          isValid: false,
-          error: ValidationError.schemaValidation(
-            'object',
-            data,
-            `${issues.length} validation issues found`
-          ),
-          issues
-        };
-      }
-      
       return {
-        isValid: true,
-        data: inputData as unknown as T
+        isValid: false,
+        error: errorMessage
       };
-    },
-    
-    parse(data: unknown): T {
-      const result = this.validate(data);
-      
-      if (!result.isValid || !result.data) {
-        throw result.error || new ValidationError('Schema validation failed');
-      }
-      
-      return result.data;
-    },
-    
-    check(data: unknown): boolean {
-      return this.validate(data).isValid;
     }
   };
 }
 
 /**
- * Validate that the object matches the schema
- * @param data The data to validate
- * @param schema The schema to validate against
- * @returns The validated data
- * @throws ValidationError if validation fails
+ * Provides runtime schema validation utilities
+ * for API requests and responses
  */
-export function validateSchema<T>(data: unknown, schema: SchemaValidator<T>): T {
-  return schema.parse(data);
+export function createValidationSchema<T>(
+  schema: z.ZodType<T>,
+  name?: string
+) {
+  return {
+    /**
+     * Validates the input against the schema
+     */
+    validate: (data: unknown): ValidationResult<T> => {
+      try {
+        const result = schema.parse(data);
+        return { isValid: true, data: result };
+      } catch (error) {
+        let errorMessage = 'Validation failed';
+        
+        if (error instanceof z.ZodError) {
+          const issues = error.errors.map(err => 
+            `${err.path.join('.')}: ${err.message}`
+          ).join('; ');
+          
+          errorMessage = issues;
+        }
+        
+        return {
+          isValid: false,
+          error: errorMessage
+        };
+      }
+    },
+    
+    /**
+     * Parses the input with the schema, throwing on error
+     */
+    parse: (data: unknown): T => {
+      return schema.parse(data);
+    },
+
+    /**
+     * Attempts to parse and returns null on error
+     */
+    safeParse: (data: unknown): T | null => {
+      try {
+        return schema.parse(data);
+      } catch (error) {
+        return null;
+      }
+    },
+  };
 }
 
-export default validateSchema;
+export default createApiValidator;

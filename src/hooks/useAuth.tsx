@@ -1,163 +1,312 @@
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import type { User, Session } from '@supabase/supabase-js';
-import { toast } from 'sonner';
+import { validateDefined } from '@/utils/validation/runtimeValidation';
 
-interface AuthContextProps {
-  session: Session | null;
-  user: User | null;
+interface AuthContextType {
+  user: any;
+  isAuthenticated: boolean;
   isLoading: boolean;
-  authError: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  updateSession: (newSession: Session) => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  isLoggingOut: boolean;
+  // Extended auth properties
+  hasCompletedLoading: boolean;
+  userProfile: any;
+  todayChallenge: any;
+  userStreak: any;
+  activatedChakras: any[];
+  profileLoading: boolean;
+  handleLogout: (redirectPath?: string) => Promise<void>;
+  updateStreak: (streak: any) => void;
+  updateActivatedChakras: (chakras: any[]) => void;
+  updateUserProfile: (profile: any) => void;
 }
 
-const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
-
-  // Add the updateSession method implementation
-  const updateSession = (newSession: Session) => {
-    setSession(newSession);
-    setUser(newSession?.user || null);
-  };
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [hasCompletedLoading, setHasCompletedLoading] = useState(false);
+  
+  // Additional user data
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userStreak, setUserStreak] = useState<any>({ current: 0, longest: 0 });
+  const [todayChallenge, setTodayChallenge] = useState<any>(null);
+  const [activatedChakras, setActivatedChakras] = useState<any[]>([]);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [loadAttempts, setLoadAttempts] = useState(0);
 
   useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setIsLoading(true);
         
-        if (error) {
-          console.error('Error fetching session:', error);
-          return;
+        if (session?.user) {
+          setUser(session.user);
+          setIsAuthenticated(true);
+          await loadUserProfile(session.user.id);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+          setUserProfile(null);
         }
         
-        setSession(session);
-        setUser(session?.user || null);
-      } catch (error) {
-        console.error('Unexpected error:', error);
-      } finally {
         setIsLoading(false);
-      }
-    };
-
-    fetchSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
-        console.log('Auth state changed:', event);
-        setSession(newSession);
-        setUser(newSession?.user || null);
-        setIsLoading(false);
+        setHasCompletedLoading(true);
       }
     );
-
+    
+    // Initial session check
+    checkCurrentSession();
+    
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    setIsLoading(true);
-    setAuthError(null);
+  const checkCurrentSession = async () => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (error) {
-        setAuthError(error.message);
-        toast.error("Login failed", {
-          description: error.message,
-        });
-        throw error;
+      if (session?.user) {
+        setUser(session.user);
+        setIsAuthenticated(true);
+        await loadUserProfile(session.user.id);
       }
-      
-      toast.success("Welcome back", {
-        description: "You've successfully signed in.",
-      });
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('Error checking auth session:', error);
     } finally {
       setIsLoading(false);
+      setHasCompletedLoading(true);
     }
   };
 
-  const signUp = async (email: string, password: string) => {
-    setIsLoading(true);
-    setAuthError(null);
+  const loadUserProfile = async (userId: string) => {
+    if (!userId) return;
+    
+    setProfileLoading(true);
+    setLoadAttempts(prev => prev + 1);
+    
     try {
-      const { error } = await supabase.auth.signUp({ 
-        email, 
+      // Fetch user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (profileError) {
+        console.error('Error loading user profile:', profileError);
+      } else if (profile) {
+        setUserProfile(profile);
+      }
+      
+      // Fetch user streak
+      const { data: streak, error: streakError } = await supabase
+        .from('user_streaks')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      if (streakError) {
+        console.error('Error loading user streak:', streakError);
+      } else if (streak) {
+        setUserStreak(streak);
+      }
+      
+      // Fetch activated chakras
+      const { data: chakras, error: chakraError } = await supabase
+        .from('chakra_systems')
+        .select('chakras')
+        .eq('user_id', userId)
+        .single();
+      
+      if (chakraError) {
+        console.error('Error loading chakra system:', chakraError);
+      } else if (chakras && chakras.chakras) {
+        // Extract activated chakras (those with value > 0)
+        const activated = Object.entries(chakras.chakras)
+          .filter(([_, value]: [string, any]) => value > 0)
+          .map(([key]: [string, any]) => key);
+        
+        setActivatedChakras(activated);
+      }
+      
+      // Fetch today's challenge
+      const { data: challenge, error: challengeError } = await supabase
+        .from('challenges')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (challengeError) {
+        console.error('Error loading today\'s challenge:', challengeError);
+      } else if (challenge) {
+        setTodayChallenge(challenge);
+      }
+    } catch (error) {
+      console.error('Error in profile loading process:', error);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      validateDefined(email, 'email');
+      validateDefined(password, 'password');
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
         password,
       });
       
       if (error) {
-        setAuthError(error.message);
-        toast.error("Sign up failed", {
-          description: error.message,
-        });
-        throw error;
+        console.error('Login error:', error.message);
+        return false;
       }
       
-      toast.success("Welcome", {
-        description: "Your journey is about to begin. Please check your email to confirm your account.",
-      });
+      if (data?.user) {
+        setUser(data.user);
+        setIsAuthenticated(true);
+        await loadUserProfile(data.user.id);
+        return true;
+      }
+      
+      return false;
     } catch (error) {
-      console.error('Error signing up:', error);
+      console.error('Login process error:', error);
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const signOut = async () => {
-    setIsLoading(true);
+  const logout = async (): Promise<void> => {
     try {
+      setIsLoggingOut(true);
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        toast.error("Sign out failed", {
-          description: error.message,
-        });
-        throw error;
+        console.error('Logout error:', error.message);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+        setUserProfile(null);
+        setUserStreak({ current: 0, longest: 0 });
+        setActivatedChakras([]);
+      }
+    } catch (error) {
+      console.error('Logout process error:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleLogout = async (redirectPath?: string): Promise<void> => {
+    await logout();
+    // No navigate calls here - should be handled by the component
+  };
+
+  const register = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true);
+      
+      validateDefined(email, 'email');
+      validateDefined(password, 'password');
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      
+      if (error) {
+        return { success: false, error: error.message };
       }
       
-      toast.success("Signed out", {
-        description: "You've been successfully signed out.",
-      });
+      if (data?.user) {
+        // Create initial user profile
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert([
+            { 
+              id: data.user.id,
+              email: data.user.email,
+              created_at: new Date().toISOString(),
+              energy_points: 0,
+              level: 1
+            }
+          ]);
+        
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+        }
+        
+        return { success: true };
+      }
+      
+      return { success: false, error: 'Failed to create account' };
     } catch (error) {
-      console.error('Error signing out:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error during registration';
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
   };
 
+  const updateStreak = (streak: any) => {
+    setUserStreak(streak);
+  };
+
+  const updateActivatedChakras = (chakras: any[]) => {
+    setActivatedChakras(chakras);
+  };
+
+  const updateUserProfile = (profile: any) => {
+    setUserProfile(profile);
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      session, 
-      user, 
-      isLoading, 
-      authError, 
-      signIn, 
-      signUp, 
-      signOut,
-      updateSession 
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated,
+      isLoading,
+      login,
+      logout,
+      register,
+      isLoggingOut,
+      hasCompletedLoading,
+      userProfile,
+      todayChallenge,
+      userStreak,
+      activatedChakras,
+      profileLoading,
+      handleLogout,
+      updateStreak,
+      updateActivatedChakras,
+      updateUserProfile
     }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
 };
 

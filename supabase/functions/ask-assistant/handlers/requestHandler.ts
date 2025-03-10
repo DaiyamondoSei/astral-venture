@@ -1,14 +1,17 @@
 
-import { createSuccessResponse, createErrorResponse, ErrorCode, validateRequiredParameters } from "../../shared/responseUtils.ts";
+import { createSuccessResponse, createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
+import { validateRequiredParameters } from "../../shared/responseUtils.ts";
 import { checkMessageModeration } from "../services/moderationService.ts";
 import { fetchUserContext } from "../services/userContextService.ts";
-import { createPersonalizedSystemPrompt, buildContextualizedPrompt } from "../services/promptBuilder.ts";
+import { createPersonalizedSystemPrompt } from "../services/promptBuilder.ts";
+import { buildContextualizedPrompt } from "../services/promptBuilder.ts";
 import { generateChatResponse, selectOptimalModel } from "../services/openai/index.ts";
 import { handleStreamingRequest } from "./streamingHandler.ts";
 import { processAIResponse } from "./aiResponseHandler.ts";
 import { handleError } from "./errorHandler.ts";
 import { getCachedResponse, cacheResponse, cleanupCache } from "./cacheHandler.ts";
 import { logEvent } from "../../shared/responseUtils.ts";
+import { ErrorHandlingOptions } from "../../shared/requestHandler.ts";
 
 // Define improved interface for request parameters
 interface AIRequestParams {
@@ -23,7 +26,11 @@ interface AIRequestParams {
  * Main request handler for AI assistant requests
  * Optimized for better error handling and caching
  */
-export async function handleAIRequest(user: any, req: Request): Promise<Response> {
+export async function handleAIRequest(
+  user: any, 
+  req: Request,
+  options: ErrorHandlingOptions = {}
+): Promise<Response> {
   try {
     // Parse request body
     const params = await req.json() as AIRequestParams;
@@ -129,7 +136,7 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
     
     return response;
   } catch (error) {
-    return handleError(error);
+    return handleError(error, options);
   }
 }
 
@@ -137,7 +144,11 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
  * Route handler for clearing cache (admin only)
  * Improved security and validation
  */
-export async function handleClearCache(user: any, req: Request): Promise<Response> {
+export async function handleClearCache(
+  user: any, 
+  req: Request,
+  options: ErrorHandlingOptions = {}
+): Promise<Response> {
   try {
     // Extract auth header correctly
     const authHeader = req.headers.get("authorization") || "";
@@ -169,6 +180,6 @@ export async function handleClearCache(user: any, req: Request): Promise<Respons
       { operation: "cache_clear" }
     );
   } catch (error) {
-    return handleError(error);
+    return handleError(error, options);
   }
 }

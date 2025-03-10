@@ -2,8 +2,47 @@
 import { useContext } from 'react';
 import PerfConfigContext, { PerfConfigContextType } from '@/contexts/PerfConfigContext';
 
+// Define type for performance configuration
+export interface PerfConfig {
+  // Resource management
+  maxParticles: number;
+  effectsQuality: 'low' | 'medium' | 'high';
+  animationFrameRate: number;
+  
+  // Animation settings
+  useLightweightAnimations: boolean;
+  disableParallaxEffects: boolean;
+  
+  // DOM optimization
+  batchDomUpdates: boolean;
+  virtualizeLists: boolean;
+  
+  // Performance features
+  enableHighPerformanceMode?: boolean;
+  enableAdaptiveRendering?: boolean;
+  enableMetricsCollection?: boolean;
+  
+  // Animation controls
+  animations?: {
+    reduceMotion?: boolean;
+    enableFancyTransitions?: boolean;
+  };
+  
+  // Resource loading
+  lazyLoading?: {
+    enabled?: boolean;
+    threshold?: number;
+  };
+  
+  // Monitoring
+  monitoring?: {
+    enabled?: boolean;
+    sampleRate?: number;
+  };
+}
+
 // Define default configurations for different device capabilities
-export const defaultConfigs = {
+export const defaultConfigs: Record<'low' | 'medium' | 'high', PerfConfig> = {
   low: {
     maxParticles: 50,
     effectsQuality: 'low',
@@ -12,6 +51,21 @@ export const defaultConfigs = {
     disableParallaxEffects: true,
     batchDomUpdates: true,
     virtualizeLists: true,
+    enableHighPerformanceMode: false,
+    enableAdaptiveRendering: true,
+    enableMetricsCollection: false,
+    animations: {
+      reduceMotion: true,
+      enableFancyTransitions: false
+    },
+    lazyLoading: {
+      enabled: true,
+      threshold: 0.3
+    },
+    monitoring: {
+      enabled: false,
+      sampleRate: 0.1
+    }
   },
   medium: {
     maxParticles: 100,
@@ -21,6 +75,21 @@ export const defaultConfigs = {
     disableParallaxEffects: false,
     batchDomUpdates: true,
     virtualizeLists: true,
+    enableHighPerformanceMode: false,
+    enableAdaptiveRendering: true,
+    enableMetricsCollection: true,
+    animations: {
+      reduceMotion: false,
+      enableFancyTransitions: false
+    },
+    lazyLoading: {
+      enabled: true,
+      threshold: 0.2
+    },
+    monitoring: {
+      enabled: true,
+      sampleRate: 0.5
+    }
   },
   high: {
     maxParticles: 200,
@@ -30,6 +99,21 @@ export const defaultConfigs = {
     disableParallaxEffects: false,
     batchDomUpdates: false,
     virtualizeLists: false,
+    enableHighPerformanceMode: true,
+    enableAdaptiveRendering: false,
+    enableMetricsCollection: true,
+    animations: {
+      reduceMotion: false,
+      enableFancyTransitions: true
+    },
+    lazyLoading: {
+      enabled: false,
+      threshold: 0
+    },
+    monitoring: {
+      enabled: true,
+      sampleRate: 1.0
+    }
   }
 };
 
@@ -57,7 +141,7 @@ export const usePerfConfig = (): PerfConfigContextType => {
  */
 export const getPerfConfigForCapability = (
   deviceCapability: 'low' | 'medium' | 'high'
-): PerfConfigContextType['config'] => {
+): PerfConfig => {
   return defaultConfigs[deviceCapability];
 };
 
@@ -67,7 +151,7 @@ export const getPerfConfigForCapability = (
  * 
  * @returns Performance configuration safe for all device capabilities
  */
-export const getSafeConfig = (): PerfConfigContextType['config'] => {
+export const getSafeConfig = (): PerfConfig => {
   return defaultConfigs.low;
 };
 

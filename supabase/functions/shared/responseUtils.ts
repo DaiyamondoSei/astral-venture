@@ -1,136 +1,151 @@
 
 /**
- * Shared Edge Function Response Utilities
- * This file contains utilities for creating standardized responses from edge functions
+ * Error codes for API responses
  */
-
-// Standardized CORS headers
-export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-// Standardized response interface
-export interface EdgeFunctionResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: {
-    code: string;
-    message: string;
-    details?: any;
-  };
-  timestamp: string;
-  metadata?: Record<string, any>;
-}
-
-// Error codes
 export enum ErrorCode {
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  MISSING_PARAMETERS = 'MISSING_PARAMETERS',
-  AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
-  AUTHORIZATION_ERROR = 'AUTHORIZATION_ERROR',
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  NOT_FOUND = 'NOT_FOUND',
-  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
-  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
-  DATABASE_ERROR = 'DATABASE_ERROR',
-  EXTERNAL_API_ERROR = 'EXTERNAL_API_ERROR',
-  CACHE_ERROR = 'CACHE_ERROR',
-  VALIDATION_FAILED = 'VALIDATION_FAILED'
+  INTERNAL_ERROR = 'internal_error',
+  NOT_FOUND = 'not_found',
+  UNAUTHORIZED = 'unauthorized',
+  VALIDATION_FAILED = 'validation_failed',
+  MISSING_PARAMETERS = 'missing_parameters',
+  RATE_LIMITED = 'rate_limited',
+  SERVICE_UNAVAILABLE = 'service_unavailable',
+  FORBIDDEN = 'forbidden',
 }
 
 /**
- * Handle CORS preflight requests
- */
-export function handleCorsRequest(): Response {
-  return new Response(null, { headers: corsHeaders });
-}
-
-/**
- * Create a success response with standardized format
- */
-export function createSuccessResponse<T>(
-  data: T,
-  metadata?: Record<string, any>
-): Response {
-  return new Response(
-    JSON.stringify({
-      success: true,
-      data,
-      timestamp: new Date().toISOString(),
-      ...(metadata ? { metadata } : {})
-    }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    }
-  );
-}
-
-/**
- * Create an error response with standardized format
+ * Creates a standardized error response
+ * 
+ * @param code - Error code
+ * @param message - Error message
+ * @param data - Additional error data
+ * @param status - HTTP status code
+ * @param headers - Optional response headers
+ * @returns Response object with error details
  */
 export function createErrorResponse(
-  code: string | ErrorCode,
+  code: ErrorCode,
   message: string,
-  details?: any,
-  status: number = 400
+  data: Record<string, unknown> | null = null,
+  status: number = 400,
+  headers: Record<string, string> = {}
 ): Response {
+  const body = {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(data ? { details: data } : {})
+    }
+  };
+  
   return new Response(
-    JSON.stringify({
-      success: false,
-      error: {
-        code,
-        message,
-        ...(details ? { details } : {})
-      },
-      timestamp: new Date().toISOString()
-    }),
+    JSON.stringify(body),
     {
       status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      }
     }
   );
 }
 
 /**
- * Validate that required parameters are present
+ * Creates a standardized success response
+ * 
+ * @param data - Response data
+ * @param metadata - Optional metadata
+ * @param status - HTTP status code
+ * @param headers - Optional response headers
+ * @returns Response object with success result
  */
-export function validateRequiredParameters<T extends Record<string, any>>(
-  params: T,
-  requiredParams: (keyof T)[]
-): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredParams.filter(param => params[param] === undefined);
+export function createSuccessResponse(
+  data: Record<string, unknown> | Array<unknown>,
+  metadata: Record<string, unknown> = {},
+  status: number = 200,
+  headers: Record<string, string> = {}
+): Response {
+  const body = {
+    success: true,
+    data,
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {})
+  };
+  
+  return new Response(
+    JSON.stringify(body),
+    {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      }
+    }
+  );
+}
+
+/**
+ * Result of parameter validation
+ */
+export interface ValidationResult {
+  isValid: boolean;
+  missingParams?: string[];
+}
+
+/**
+ * Validates that required parameters are present in a request body
+ * 
+ * @param body - Request body object
+ * @param requiredParams - Array of required parameter names
+ * @returns Validation result
+ */
+export function validateRequiredParameters(
+  body: Record<string, unknown>,
+  requiredParams: string[]
+): ValidationResult {
+  const missingParams: string[] = [];
+  
+  for (const param of requiredParams) {
+    if (body[param] === undefined) {
+      missingParams.push(param);
+    }
+  }
   
   return {
     isValid: missingParams.length === 0,
-    missingParams: missingParams as string[]
+    missingParams: missingParams.length > 0 ? missingParams : undefined
   };
 }
 
 /**
- * Structured logging helper
+ * Log events for monitoring and debugging
+ * 
+ * @param level - Log level
+ * @param message - Log message
+ * @param data - Additional log data
  */
 export function logEvent(
-  type: 'info' | 'error' | 'warn' | 'debug',
+  level: 'info' | 'warn' | 'error',
   message: string,
-  data?: Record<string, any>
+  data?: Record<string, unknown>
 ): void {
-  const logData = {
-    timestamp: new Date().toISOString(),
-    type,
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    level,
     message,
-    ...(data || {})
+    ...(data ? { data } : {})
   };
   
-  if (type === 'error') {
-    console.error(JSON.stringify(logData));
-  } else if (type === 'warn') {
-    console.warn(JSON.stringify(logData));
-  } else if (type === 'debug') {
-    console.debug(JSON.stringify(logData));
-  } else {
-    console.info(JSON.stringify(logData));
+  switch (level) {
+    case 'info':
+      console.log(JSON.stringify(logEntry));
+      break;
+    case 'warn':
+      console.warn(JSON.stringify(logEntry));
+      break;
+    case 'error':
+      console.error(JSON.stringify(logEntry));
+      break;
   }
 }

@@ -2,222 +2,218 @@
 import { ValidationError } from './ValidationError';
 
 /**
- * Interface for API validation results
+ * Result of API validation
  */
 export interface ApiValidationResult<T> {
   isValid: boolean;
   data?: T;
-  errors?: Array<{
-    field: string;
-    message: string;
-  }>;
+  errors?: string[];
 }
 
 /**
- * Validate API request or response data
+ * Options for API parameter validation
  */
-export function validateApiData<T>(
-  data: unknown,
-  validators: Record<string, (value: unknown) => boolean>,
-  options: {
-    strictExtraFields?: boolean;
-    requiredFields?: string[];
-  } = {}
+export interface ApiValidationOptions {
+  allowExtraParams?: boolean;
+  throwOnError?: boolean;
+}
+
+/**
+ * Validate required parameters in an API request body
+ * 
+ * @param body - Request body to validate
+ * @param requiredParams - Array of required parameter names
+ * @param options - Validation options
+ * @returns Validation result
+ * @throws ValidationError if throwOnError is true and validation fails
+ */
+export function validateRequiredParameters<T extends Record<string, unknown>>(
+  body: unknown,
+  requiredParams: string[],
+  options: ApiValidationOptions = {}
 ): ApiValidationResult<T> {
-  const { strictExtraFields = false, requiredFields = [] } = options;
-  const errors: Array<{ field: string; message: string }> = [];
+  const { allowExtraParams = false, throwOnError = false } = options;
   
-  // Check if data is an object
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return {
-      isValid: false,
-      errors: [{ field: '$root', message: 'Data must be an object' }]
+  // Ensure body is an object
+  if (typeof body !== 'object' || body === null) {
+    const error = `Request body must be an object, got ${body === null ? 'null' : typeof body}`;
+    
+    if (throwOnError) {
+      throw new ValidationError(
+        error,
+        'body',
+        body,
+        'INVALID_REQUEST_BODY'
+      );
+    }
+    
+    return { isValid: false, errors: [error] };
+  }
+  
+  // Check for missing required parameters
+  const requestBody = body as Record<string, unknown>;
+  const missingParams: string[] = [];
+  
+  for (const param of requiredParams) {
+    if (requestBody[param] === undefined) {
+      missingParams.push(param);
+    }
+  }
+  
+  if (missingParams.length > 0) {
+    const error = `Missing required parameters: ${missingParams.join(', ')}`;
+    
+    if (throwOnError) {
+      throw new ValidationError(
+        error,
+        'body',
+        missingParams,
+        'MISSING_PARAMETERS'
+      );
+    }
+    
+    return { 
+      isValid: false, 
+      errors: [error],
+      data: requestBody as T
     };
   }
   
-  const inputData = data as Record<string, unknown>;
-  
-  // Check for required fields
-  for (const field of requiredFields) {
-    if (inputData[field] === undefined) {
-      errors.push({
-        field,
-        message: `${field} is required`
-      });
-    }
-  }
-  
-  // Validate all fields
-  for (const [field, validator] of Object.entries(validators)) {
-    const value = inputData[field];
+  // Check for extra parameters if not allowed
+  if (!allowExtraParams) {
+    const extraParams = Object.keys(requestBody).filter(
+      key => !requiredParams.includes(key)
+    );
     
-    // Skip validation for undefined fields that aren't required
-    if (value === undefined) {
-      if (requiredFields.includes(field)) {
-        errors.push({
-          field,
-          message: `${field} is required`
-        });
+    if (extraParams.length > 0) {
+      const error = `Unexpected parameters: ${extraParams.join(', ')}`;
+      
+      if (throwOnError) {
+        throw new ValidationError(
+          error,
+          'body',
+          extraParams,
+          'EXTRA_PARAMETERS'
+        );
       }
-      continue;
+      
+      return { 
+        isValid: false, 
+        errors: [error],
+        data: requestBody as T
+      };
     }
-    
-    // Validate the field
-    try {
-      const isValid = validator(value);
-      if (!isValid) {
-        errors.push({
-          field,
-          message: `Invalid value for ${field}`
-        });
-      }
-    } catch (error) {
-      errors.push({
-        field,
-        message: error instanceof Error ? error.message : `Invalid value for ${field}`
-      });
-    }
-  }
-  
-  // Check for extra fields if in strict mode
-  if (strictExtraFields) {
-    const validFields = new Set([...Object.keys(validators)]);
-    
-    for (const field of Object.keys(inputData)) {
-      if (!validFields.has(field)) {
-        errors.push({
-          field,
-          message: `Unexpected field: ${field}`
-        });
-      }
-    }
-  }
-  
-  // Return validation result
-  if (errors.length > 0) {
-    return {
-      isValid: false,
-      errors
-    };
   }
   
   return {
     isValid: true,
-    data: inputData as unknown as T
+    data: requestBody as T
   };
 }
 
 /**
- * Validate that required fields are present in an object
+ * Validate that a JWT token is present and properly formatted
+ * 
+ * @param token - JWT token to validate
+ * @param options - Validation options
+ * @returns Validation result
+ * @throws ValidationError if throwOnError is true and validation fails
  */
-export function validateRequiredParameters(
-  data: Record<string, unknown>,
-  requiredParams: string[]
-): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredParams.filter(param => {
-    return data[param] === undefined || data[param] === null;
-  });
+export function validateJwtToken(
+  token: string | undefined | null,
+  options: ApiValidationOptions = {}
+): ApiValidationResult<string> {
+  const { throwOnError = false } = options;
+  
+  // Check if token exists
+  if (!token) {
+    const error = 'Missing JWT token';
+    
+    if (throwOnError) {
+      throw new ValidationError(
+        error,
+        'token',
+        token,
+        'MISSING_TOKEN'
+      );
+    }
+    
+    return { isValid: false, errors: [error] };
+  }
+  
+  // Check token format (basic format check, not verification)
+  const jwtRegex = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/;
+  
+  if (!jwtRegex.test(token)) {
+    const error = 'Invalid JWT token format';
+    
+    if (throwOnError) {
+      throw new ValidationError(
+        error,
+        'token',
+        token,
+        'INVALID_TOKEN_FORMAT'
+      );
+    }
+    
+    return { isValid: false, errors: [error] };
+  }
   
   return {
-    isValid: missingParams.length === 0,
-    missingParams
+    isValid: true,
+    data: token
   };
 }
 
 /**
- * API validation utility
+ * Extracts the JWT token from an Authorization header
+ * 
+ * @param authorization - Authorization header value
+ * @param options - Validation options
+ * @returns Validation result with the extracted token
+ * @throws ValidationError if throwOnError is true and validation fails
  */
-export const apiValidator = {
-  string(value: unknown): boolean {
-    if (typeof value !== 'string') {
-      throw new ValidationError(`Expected string, got ${typeof value}`, 'value', value);
-    }
-    return true;
-  },
+export function extractJwtFromHeader(
+  authorization: string | undefined | null,
+  options: ApiValidationOptions = {}
+): ApiValidationResult<string> {
+  const { throwOnError = false } = options;
   
-  number(value: unknown): boolean {
-    if (typeof value !== 'number' || isNaN(value)) {
-      throw new ValidationError(`Expected number, got ${typeof value}`, 'value', value);
-    }
-    return true;
-  },
-  
-  boolean(value: unknown): boolean {
-    if (typeof value !== 'boolean') {
-      throw new ValidationError(`Expected boolean, got ${typeof value}`, 'value', value);
-    }
-    return true;
-  },
-  
-  object(value: unknown): boolean {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      throw new ValidationError(`Expected object, got ${Array.isArray(value) ? 'array' : typeof value}`, 'value', value);
-    }
-    return true;
-  },
-  
-  array(value: unknown): boolean {
-    if (!Array.isArray(value)) {
-      throw new ValidationError(`Expected array, got ${typeof value}`, 'value', value);
-    }
-    return true;
-  },
-  
-  email(value: unknown): boolean {
-    if (typeof value !== 'string') {
-      throw new ValidationError(`Expected string for email, got ${typeof value}`, 'email', value);
+  // Check if authorization header exists
+  if (!authorization) {
+    const error = 'Missing Authorization header';
+    
+    if (throwOnError) {
+      throw new ValidationError(
+        error,
+        'authorization',
+        authorization,
+        'MISSING_AUTHORIZATION'
+      );
     }
     
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(value)) {
-      throw new ValidationError('Invalid email format', 'email', value);
-    }
-    
-    return true;
-  },
-  
-  uuid(value: unknown): boolean {
-    if (typeof value !== 'string') {
-      throw new ValidationError(`Expected string for UUID, got ${typeof value}`, 'uuid', value);
-    }
-    
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(value)) {
-      throw new ValidationError('Invalid UUID format', 'uuid', value);
-    }
-    
-    return true;
-  },
-  
-  date(value: unknown): boolean {
-    if (value instanceof Date) return true;
-    
-    if (typeof value !== 'string') {
-      throw new ValidationError(`Expected string or Date for date, got ${typeof value}`, 'date', value);
-    }
-    
-    const date = new Date(value);
-    if (isNaN(date.getTime())) {
-      throw new ValidationError('Invalid date format', 'date', value);
-    }
-    
-    return true;
-  },
-  
-  // Create validators for specific formats
-  oneOf<T extends readonly unknown[]>(allowedValues: T) {
-    return (value: unknown): boolean => {
-      if (!allowedValues.includes(value as T[number])) {
-        throw new ValidationError(
-          `Value must be one of: ${allowedValues.join(', ')}`,
-          'value',
-          value,
-          `oneOf:${allowedValues.join(',')}`
-        );
-      }
-      return true;
-    };
+    return { isValid: false, errors: [error] };
   }
-};
-
-export default apiValidator;
+  
+  // Check if it's a Bearer token
+  if (!authorization.startsWith('Bearer ')) {
+    const error = 'Authorization header must use Bearer scheme';
+    
+    if (throwOnError) {
+      throw new ValidationError(
+        error,
+        'authorization',
+        authorization,
+        'INVALID_AUTHORIZATION_FORMAT'
+      );
+    }
+    
+    return { isValid: false, errors: [error] };
+  }
+  
+  // Extract the token
+  const token = authorization.replace('Bearer ', '');
+  
+  // Validate the token
+  return validateJwtToken(token, options);
+}

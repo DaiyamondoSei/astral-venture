@@ -1,101 +1,68 @@
 
 /**
- * Custom error class for validation errors
- * Provides standardized structure for validation failures
+ * Custom error class for validation failures
+ * Provides detailed information about validation failures
  */
 export class ValidationError extends Error {
-  public readonly field: string;
+  public readonly path: string;
   public readonly value: unknown;
-  public readonly constraint: string;
+  public readonly context?: Record<string, unknown>;
   public readonly code: string;
 
+  /**
+   * Create a new ValidationError
+   * 
+   * @param message - Error message
+   * @param path - Path to the invalid property (e.g., 'user.email')
+   * @param value - The invalid value
+   * @param code - Error code for categorization
+   * @param context - Additional context for the error
+   */
   constructor(
-    message: string, 
-    field: string = '', 
-    value: unknown = undefined, 
-    constraint: string = '', 
-    code: string = 'VALIDATION_FAILED'
+    message: string,
+    path: string,
+    value: unknown,
+    code: string = 'VALIDATION_ERROR',
+    context?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'ValidationError';
-    this.field = field;
+    this.path = path;
     this.value = value;
-    this.constraint = constraint;
     this.code = code;
-
-    // Ensures proper prototypal inheritance in transpiled JS
-    // Necessary for instanceof checks to work properly
+    this.context = context;
+    
+    // Ensures proper instanceof checks work in ES6
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
 
   /**
-   * Create a validation error for a required field that's missing
+   * Creates a formatted string representation of the error
    */
-  static required(field: string): ValidationError {
-    return new ValidationError(
-      `${field} is required`,
-      field,
-      undefined,
-      'required',
-      'REQUIRED_FIELD'
-    );
+  public toString(): string {
+    return `ValidationError: ${this.message} (at ${this.path}, received: ${JSON.stringify(this.value)})`;
   }
 
   /**
-   * Create a validation error for a field with invalid type
+   * Converts the error to a plain object for serialization
    */
-  static invalidType(field: string, value: unknown, expectedType: string): ValidationError {
-    return new ValidationError(
-      `${field} should be a ${expectedType}`,
-      field,
-      value,
-      `type:${expectedType}`,
-      'INVALID_TYPE'
-    );
+  public toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      path: this.path,
+      value: this.value,
+      code: this.code,
+      context: this.context,
+    };
   }
+}
 
-  /**
-   * Create a validation error for a field that has an invalid value
-   */
-  static invalidValue(field: string, value: unknown, constraint: string): ValidationError {
-    return new ValidationError(
-      `${field} is invalid: ${constraint}`,
-      field,
-      value,
-      constraint,
-      'INVALID_VALUE'
-    );
-  }
-
-  /**
-   * Create a validation error for a field that fails enumeration validation
-   */
-  static invalidEnum(field: string, value: unknown, allowedValues: readonly unknown[]): ValidationError {
-    const allowedValuesStr = Array.isArray(allowedValues) 
-      ? allowedValues.map(v => `'${v}'`).join(', ')
-      : String(allowedValues);
-    
-    return new ValidationError(
-      `${field} must be one of: ${allowedValuesStr}`,
-      field,
-      value,
-      `enum:${allowedValuesStr}`,
-      'INVALID_ENUM'
-    );
-  }
-
-  /**
-   * Create a validation error for a general schema validation failure
-   */
-  static schemaValidation(field: string, value: unknown, details: string): ValidationError {
-    return new ValidationError(
-      `Schema validation failed for ${field}: ${details}`,
-      field,
-      value,
-      details,
-      'SCHEMA_VALIDATION'
-    );
-  }
+/**
+ * Type guard to check if an error is a ValidationError
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  return error instanceof ValidationError;
 }
 
 export default ValidationError;
