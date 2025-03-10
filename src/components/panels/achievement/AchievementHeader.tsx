@@ -4,12 +4,21 @@ import { Trophy } from 'lucide-react';
 import { useQuantumTheme } from '@/components/visual-foundation';
 import GlassmorphicContainer from '@/components/visual-foundation/GlassmorphicContainer';
 
+/**
+ * Props for the AchievementHeader component
+ */
 interface AchievementHeaderProps {
   unlockedCount: number;
   totalCount: number;
 }
 
-const AchievementHeader: React.FC<AchievementHeaderProps> = ({ unlockedCount, totalCount }) => {
+/**
+ * Header component for the achievements panel, showing progress stats
+ */
+const AchievementHeader: React.FC<AchievementHeaderProps> = ({ 
+  unlockedCount, 
+  totalCount 
+}) => {
   const { theme } = useQuantumTheme();
   
   return (

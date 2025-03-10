@@ -8,16 +8,16 @@ import AchievementFilter from './achievement/AchievementFilter';
 import EmptyAchievementList from './achievement/EmptyAchievementList';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { Achievement, AchievementCategory } from '@/types/achievement';
+import type { Achievement, AchievementCategory } from '@/types/achievement';
 
 /**
  * Panel that displays user achievements and allows filtering
  */
 const AchievementsPanel: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showAwarded, setShowAwarded] = useState(true);
-  const [showUnawarded, setShowUnawarded] = useState(true);
-  const [detailsShown, setDetailsShown] = useState(false);
+  const [showAwarded, setShowAwarded] = useState<boolean>(true);
+  const [showUnawarded, setShowUnawarded] = useState<boolean>(true);
+  const [detailsShown, setDetailsShown] = useState<boolean>(false);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
 
   // Fetch achievements from Supabase
@@ -55,21 +55,25 @@ const AchievementsPanel: React.FC = () => {
   }) || [];
 
   // Show achievement details
-  const showDetails = (achievement: Achievement) => {
+  const showDetails = (achievement: Achievement): void => {
     setSelectedAchievement(achievement);
     setDetailsShown(true);
   };
 
   // Hide achievement details
-  const hideDetails = () => {
+  const hideDetails = (): void => {
     setDetailsShown(false);
   };
+
+  // Calculate counts for the header
+  const totalCount = achievements?.length || 0;
+  const unlockedCount = achievements?.filter(a => a.awarded).length || 0;
 
   return (
     <div className="h-full flex flex-col">
       <AchievementHeader 
-        totalAchievements={achievements?.length || 0}
-        awardedCount={achievements?.filter(a => a.awarded).length || 0}
+        unlockedCount={unlockedCount}
+        totalCount={totalCount}
       />
       
       <AchievementFilter
@@ -87,7 +91,7 @@ const AchievementsPanel: React.FC = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
           </div>
         ) : filteredAchievements.length === 0 ? (
-          <EmptyAchievementList selectedCategory={selectedCategory as AchievementCategory} />
+          <EmptyAchievementList selectedCategory={selectedCategory as AchievementCategory | null} />
         ) : (
           <motion.div
             initial={{ opacity: 0 }}

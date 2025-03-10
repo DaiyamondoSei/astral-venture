@@ -1,43 +1,42 @@
 
-import { useState, useCallback } from 'react'
+import { useContext } from 'react';
+import PanelContext from '@/contexts/PanelContext';
 
-export type PanelType = 'profile' | 'achievements' | null
+/**
+ * Panel types supported by the application
+ */
+export type PanelType = 'achievements' | 'profile' | 'settings' | null;
 
-interface PanelState {
-  activePanel: PanelType
-  isProfileOpen: boolean
-  isAchievementsOpen: boolean
-  openPanel: (panel: PanelType) => void
-  closePanel: (panel?: PanelType) => void
-  togglePanel: (panel: PanelType) => void
+/**
+ * Panel position options
+ */
+export type PanelPosition = 'bottom' | 'right';
+
+/**
+ * Panel state interface
+ */
+export interface PanelState {
+  isPanelOpen: boolean;
+  activePanelType: PanelType;
+  activePanelPosition: PanelPosition;
+  setIsPanelOpen: (isOpen: boolean) => void;
+  openPanel: (panelType: Exclude<PanelType, null>, position?: PanelPosition) => void;
+  closePanel: () => void;
+  togglePanel: (panelType: Exclude<PanelType, null>, position?: PanelPosition) => void;
 }
 
-export function usePanelState(): PanelState {
-  const [activePanel, setActivePanel] = useState<PanelType>(null)
+/**
+ * Custom hook to access panel state
+ * Provides methods to open, close, and toggle panels
+ */
+export const usePanelState = (): PanelState => {
+  const context = useContext(PanelContext);
   
-  const isProfileOpen = activePanel === 'profile'
-  const isAchievementsOpen = activePanel === 'achievements'
-  
-  const openPanel = useCallback((panel: PanelType) => {
-    setActivePanel(panel)
-  }, [])
-  
-  const closePanel = useCallback((panel?: PanelType) => {
-    if (!panel || panel === activePanel) {
-      setActivePanel(null)
-    }
-  }, [activePanel])
-  
-  const togglePanel = useCallback((panel: PanelType) => {
-    setActivePanel(prev => prev === panel ? null : panel)
-  }, [])
-  
-  return {
-    activePanel,
-    isProfileOpen,
-    isAchievementsOpen,
-    openPanel,
-    closePanel,
-    togglePanel
+  if (!context) {
+    throw new Error('usePanelState must be used within a PanelProvider');
   }
-}
+  
+  return context;
+};
+
+export default usePanelState;

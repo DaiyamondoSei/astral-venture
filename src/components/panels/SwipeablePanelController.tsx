@@ -7,6 +7,7 @@ import { usePanelState } from '@/hooks/usePanelState';
 
 /**
  * Manages the swipeable panels throughout the application
+ * Controls which panel is displayed and its position
  */
 const SwipeablePanelController: React.FC = () => {
   const { 
@@ -17,11 +18,12 @@ const SwipeablePanelController: React.FC = () => {
   } = usePanelState();
 
   // Handle panel open/close state changes
-  const handlePanelStateChange = (open: boolean) => {
+  const handlePanelStateChange = (open: boolean): void => {
     setIsPanelOpen(open);
   };
 
-  const renderPanelContent = () => {
+  // Render the appropriate panel content based on activePanelType
+  const renderPanelContent = (): React.ReactNode => {
     switch (activePanelType) {
       case 'achievements':
         return <AchievementsPanel />;
@@ -32,7 +34,12 @@ const SwipeablePanelController: React.FC = () => {
     }
   };
 
-  const getPanelSettings = () => {
+  // Calculate panel settings based on panel type and position
+  const getPanelSettings = (): {
+    height: string;
+    initialState: 'open' | 'closed';
+    position: 'bottom' | 'right';
+  } => {
     // Default settings
     let height = '80vh';
     let initialState: 'open' | 'closed' = 'closed';
@@ -46,12 +53,9 @@ const SwipeablePanelController: React.FC = () => {
     }
 
     // Apply position from context
-    if (activePanelPosition === 'right') {
-      position = 'right';
-    } else {
-      position = 'bottom';
-    }
+    position = activePanelPosition;
 
+    // Set initial state based on isPanelOpen
     if (isPanelOpen) {
       initialState = 'open';
     }
@@ -61,6 +65,7 @@ const SwipeablePanelController: React.FC = () => {
 
   const { height, initialState, position } = getPanelSettings();
 
+  // Don't render anything if no panel is active
   if (!activePanelType) return null;
 
   return (

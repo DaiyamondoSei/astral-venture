@@ -1,44 +1,57 @@
 
-// Export all validation utilities from a single entry point
+import ValidationError, { isValidationError } from './ValidationError';
+import * as runtimeValidation from './runtimeValidation';
+import * as schemaValidator from './schemaValidator';
 
-// Export ValidationError
-export { ValidationError } from './ValidationError';
-
-// Export runtime validation utilities
+/**
+ * Re-export all validation utilities
+ */
 export {
+  // Runtime validation
+  runtimeValidation,
+  
+  // Schema validation
+  schemaValidator,
+  
+  // Validation error handling
+  ValidationError,
+  isValidationError,
+  
+  // Common runtime validators
+  runtimeValidation as validators
+};
+
+// Individual runtime validators
+export const {
   validateDefined,
   validateString,
+  validateNonEmptyString,
   validateNumber,
   validateBoolean,
-  validateArray,
   validateObject,
+  validateArray,
   validateOneOf,
-  validateFormat,
+  validatePattern,
   validateRange,
-  validateEmail,
-  validateUrl,
-  validateDateString
-} from './runtimeValidation';
+  validateDate,
+  validateUUID,
+  validateEmail
+} = runtimeValidation;
 
-// Export schema validator
-export { validateWithSchema } from './schemaValidator';
+// Schema validators
+export const {
+  createSchemaValidator,
+  validateSchema
+} = schemaValidator;
 
-// Export API validator
-export {
-  validateApiResponse,
-  validateApiRequest,
-  createRequestValidator,
-  createResponseValidator
-} from './apiValidator';
-
-// Export type validation utilities
-export {
-  stringWithDefault,
-  numberWithDefault,
-  booleanWithDefault,
-  arrayWithDefault,
-  objectWithDefault,
-  oneOfWithDefault,
-  getPropertySafe,
-  createConfigSchema
-} from '../typeValidation';
+export default {
+  // Runtime validation
+  ...runtimeValidation,
+  
+  // Schema validation
+  ...schemaValidator,
+  
+  // Error handling
+  ValidationError,
+  isValidationError
+};
