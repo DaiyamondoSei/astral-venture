@@ -26,7 +26,8 @@ serve(async (req: Request) => {
       return createErrorResponse(
         ErrorCode.UNAUTHORIZED,
         "Invalid authentication credentials",
-        { details: error }
+        { details: error },
+        401
       );
     }
     
@@ -37,7 +38,8 @@ serve(async (req: Request) => {
       return createErrorResponse(
         ErrorCode.UNAUTHORIZED,
         "No active session found",
-        { details: sessionError?.message }
+        { details: sessionError?.message },
+        401
       );
     }
     
@@ -56,7 +58,8 @@ serve(async (req: Request) => {
         return createErrorResponse(
           ErrorCode.UNAUTHORIZED,
           "Failed to refresh session",
-          { details: refreshError.message }
+          { details: refreshError.message },
+          401
         );
       }
       
@@ -98,7 +101,8 @@ serve(async (req: Request) => {
     return createErrorResponse(
       ErrorCode.INTERNAL_ERROR,
       "Failed to process session refresh",
-      { errorMessage: error.message }
+      { errorMessage: error.message },
+      500
     );
   }
 });

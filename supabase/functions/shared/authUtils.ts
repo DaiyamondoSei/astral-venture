@@ -1,16 +1,25 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
-import { corsHeaders, createErrorResponse } from "./responseUtils.ts";
+import { createErrorResponse, ErrorCode } from "./responseUtils.ts";
 
 /**
- * Authorization middleware for Edge Functions
+ * Authentication middleware for Edge Functions
+ * Verifies the auth token and passes the authenticated user to the handler
+ * 
+ * @param req The incoming request
+ * @param handler Function to handle the authenticated request
  */
 export async function withAuth(req: Request, handler: Function): Promise<Response> {
   try {
     // Get JWT token from request
     const authorization = req.headers.get('Authorization') || '';
     if (!authorization.startsWith('Bearer ')) {
-      return createErrorResponse('Unauthorized: Missing or invalid token format', null, 401);
+      return createErrorResponse(
+        ErrorCode.UNAUTHORIZED,
+        'Missing or invalid token format',
+        { header: authorization.slice(0, 10) + '...' },
+        401
+      );
     }
     
     const token = authorization.replace('Bearer ', '');
@@ -26,20 +35,32 @@ export async function withAuth(req: Request, handler: Function): Promise<Respons
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
     if (authError || !user) {
-      return createErrorResponse('Unauthorized: Invalid token', authError?.message, 401);
+      return createErrorResponse(
+        ErrorCode.UNAUTHORIZED,
+        'Invalid authentication token',
+        { error: authError?.message },
+        401
+      );
     }
     
     // Call the handler with the authenticated user
     return await handler(user, req);
   } catch (error) {
-    console.error("Auth error:", error);
-    return createErrorResponse('Internal server error during authentication', error.message, 500);
+    console.error("Authentication error:", error);
+    return createErrorResponse(
+      ErrorCode.INTERNAL_ERROR,
+      'Internal server error during authentication',
+      { error: error.message },
+      500
+    );
   }
 }
 
 /**
  * Helper to create Supabase client from request
  * This approach allows more flexible access to Supabase client
+ * 
+ * @param req The incoming request
  */
 export function createClientFromRequest(req: Request): { 
   client: any; 

@@ -2,12 +2,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
-
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { 
+  corsHeaders, 
+  createSuccessResponse, 
+  createErrorResponse, 
+  ErrorCode,
+  handleCorsRequest,
+  validateRequiredParameters
+} from "../shared/responseUtils.ts";
 
 // Create Supabase client
 function createSupabaseClient() {
@@ -24,30 +26,35 @@ function createSupabaseClient() {
 }
 
 // Main handler for tracking performance metrics
-async function handler(req: Request): Promise<Response> {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders, status: 204 });
+    return handleCorsRequest();
   }
 
   try {
     // Parse the request body
-    const { metrics, userId } = await req.json();
+    const requestData = await req.json();
     
-    if (!metrics) {
-      return new Response(
-        JSON.stringify({ error: "Performance metrics are required" }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
+    // Validate required fields
+    const { metrics } = requestData;
+    const validation = validateRequiredParameters({ metrics }, ["metrics"]);
+    
+    if (!validation.isValid) {
+      return createErrorResponse(
+        ErrorCode.MISSING_PARAMETERS,
+        "Missing required performance metrics",
+        { missingParams: validation.missingParams },
+        400
       );
     }
 
-    // Get the authorization header if present
-    const authHeader = req.headers.get('Authorization');
+    // Extract user information if available
+    const { userId } = requestData;
     let tokenUserId = null;
     
+    // Get the authorization header if present
+    const authHeader = req.headers.get('Authorization');
     if (authHeader) {
       // Extract the token
       const token = authHeader.replace('Bearer ', '');
@@ -68,7 +75,7 @@ async function handler(req: Request): Promise<Response> {
     const supabase = createSupabaseClient();
     
     // Insert the performance metrics
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('performance_metrics')
       .insert(metrics.map((metric: any) => ({
         ...metric,
@@ -77,40 +84,32 @@ async function handler(req: Request): Promise<Response> {
     
     if (error) {
       console.error("Error inserting performance metrics:", error);
-      return new Response(
-        JSON.stringify({ error: "Failed to store performance metrics" }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
+      return createErrorResponse(
+        ErrorCode.INTERNAL_ERROR,
+        "Failed to store performance metrics",
+        { dbError: error.message },
+        500
       );
     }
     
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Tracked ${metrics.length} performance metrics`,
-        timestamp: new Date().toISOString()
-      }),
+    return createSuccessResponse(
       { 
-        status: 200, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        count: metrics.length,
+        message: `Tracked ${metrics.length} performance metrics`
+      },
+      { 
+        userId: effectiveUserId,
+        timestamp: new Date().toISOString()
       }
     );
   } catch (error) {
     console.error("Error in track-performance function:", error);
     
-    return new Response(
-      JSON.stringify({ 
-        error: error.message || "An error occurred while tracking performance",
-        timestamp: new Date().toISOString()
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+    return createErrorResponse(
+      ErrorCode.INTERNAL_ERROR,
+      "An error occurred while tracking performance",
+      { error: error.message },
+      500
     );
   }
-}
-
-serve(handler);
+});
