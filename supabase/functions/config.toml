@@ -1,5 +1,38 @@
 
-# project_id = "wkmyvthtyjcdzhzvfyji"
-
-[global.env_variables]
-# Don't commit any secrets in this file.
+# project_id is required.
+project_id = "wkmyvthtyjcdzhzvfyji"
+# This is a list of functions that will be deployed.
+[functions.ask-assistant]
+verify_jwt = true
+[functions.generate-insights]
+verify_jwt = true
+[functions.get-navigation-nodes]
+verify_jwt = true
+[functions.get-practice-progress]
+verify_jwt = true
+[functions.get-recommendations]
+verify_jwt = true
+[functions.handle-portal-interaction]
+verify_jwt = true
+[functions.increment-energy-points]
+verify_jwt = true
+[functions.process-ai-query]
+verify_jwt = true
+[functions.refresh-session]
+verify_jwt = true
+[functions.sync-user-data]
+verify_jwt = true
+[functions.track-achievement]
+verify_jwt = true
+[functions.track-performance]
+verify_jwt = true
+[functions.track-practice-completion]
+verify_jwt = true
+[functions.update-chakra-system]
+verify_jwt = true
+[functions.update-portal-interaction]
+verify_jwt = true
+[functions.process-divine-intelligence]
+verify_jwt = true
+[functions.track-activity]
+verify_jwt = true

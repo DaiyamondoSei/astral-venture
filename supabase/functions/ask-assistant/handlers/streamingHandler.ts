@@ -28,7 +28,7 @@ export async function handleStreamingRequest(
       statusText: response.statusText,
       headers
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in streaming request:", error);
     return createErrorResponse(
       ErrorCode.INTERNAL_ERROR,
