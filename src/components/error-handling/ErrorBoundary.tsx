@@ -1,7 +1,6 @@
-
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { handleError } from '../../utils/errorHandling/handleError';
-import { ErrorSeverity, ErrorCategory } from '../../utils/errorHandling/AppError';
+import { handleError } from '@/utils/errorHandling/handleError';
+import { ErrorSeverity, ErrorCategory } from '@/utils/errorHandling/AppError';
 
 interface ErrorBoundaryProps {
   fallback: ReactNode;
@@ -51,9 +50,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         componentName: this.props.componentName || 'unknown',
         componentStack: errorInfo.componentStack,
         recoveryPossible: true
-      },
-      severity: ErrorSeverity.ERROR,
-      category: ErrorCategory.RENDERING
+      }
     });
     
     // Call onError callback if provided

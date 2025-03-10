@@ -84,6 +84,6 @@ export class ValidationError extends BaseValidationError {
   }
 }
 
-export { ValidationErrorOptions } from './errors/BaseValidationError';
+export type { ValidationErrorOptions } from './errors/BaseValidationError';
 export default ValidationError;
 export const isValidationError = ValidationError.isValidationError;

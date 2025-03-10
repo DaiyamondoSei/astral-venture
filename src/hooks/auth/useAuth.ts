@@ -4,6 +4,7 @@ import { AuthContext, IAuthContext } from '@/contexts/AuthContext';
 
 /**
  * Hook for accessing authentication context
+ * This is the recommended way to access authentication state and methods.
  */
 export function useAuth(): IAuthContext {
   const authContext = useContext(AuthContext);
