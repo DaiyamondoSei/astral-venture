@@ -1,4 +1,12 @@
 
+/**
+ * Centralized Supabase client
+ * 
+ * This provides a single source of truth for the Supabase client instance
+ * throughout the application. It ensures consistent access patterns and
+ * error handling.
+ */
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -21,3 +29,14 @@ export const supabase = supabaseInstance;
 
 // Add alias for backward compatibility
 export const supabaseClient = supabase;
+
+/**
+ * Legacy compatability note:
+ * 
+ * The application currently uses two separate Supabase client imports:
+ * 1. From '@/lib/supabaseClient' (this file)
+ * 2. From '@/integrations/supabase/client'
+ * 
+ * In the future, we should consolidate to a single import path.
+ * This file is the recommended path moving forward.
+ */

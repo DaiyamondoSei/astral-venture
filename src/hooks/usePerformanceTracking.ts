@@ -1,19 +1,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-import type { ComponentMetrics } from '@/types/performance';
-
-/**
- * Options for performance tracking
- */
-interface PerformanceTrackingOptions {
-  /** Whether to automatically start tracking */
-  autoStart?: boolean;
-  /** Custom threshold for slow renders (ms) */
-  slowRenderThreshold?: number;
-  /** Whether to log slow renders to console */
-  logSlowRenders?: boolean;
-}
+import type { PerformanceTrackingOptions } from '@/types/performance';
 
 /**
  * Hook for tracking component performance
@@ -65,7 +53,7 @@ export function usePerformanceTracking(
   }, [componentName, options.autoStart]);
 
   const recordInteraction = useCallback((interactionName: string, duration: number) => {
-    performanceMonitor.recordRender(`${componentName}:${interactionName}`, duration);
+    performanceMonitor.recordEvent('interaction', `${componentName}:${interactionName}`, duration);
   }, [componentName]);
 
   return {
