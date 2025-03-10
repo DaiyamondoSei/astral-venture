@@ -1,152 +1,148 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseClient } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
+// Define achievement types
 export interface Achievement {
   id: string;
-  title: string;
-  description: string;
-  category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special' | 'portal' | 'chakra';
-  progress?: number;
-  awarded?: boolean;
-  icon?: 'star' | 'trophy' | 'award' | 'check' | 'zap' | 'sparkles';
+  user_id: string;
+  achievement_id: string;
+  progress: number;
+  awarded: boolean;
+  awarded_at: string | null;
+  updated_at: string;
+  created_at: string;
+  achievement_data: {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    icon: string;
+  };
+  category: string;
 }
 
-/**
- * Calculate percentage of progress for an achievement
- */
-export const calculateProgressPercentage = (progress: number): number => {
-  // For achievements that don't track progress, show 100% if progress > 0
-  if (progress >= 1 && progress < 10) return 100;
-  // Cap progress at 100%
-  if (progress >= 100) return 100;
-  // Round to the nearest integer
-  return Math.round(progress);
-};
-
-/**
- * Get category color gradient for achievements
- */
-export const getCategoryColor = (category: string): string => {
-  switch (category) {
-    case 'meditation':
-      return 'from-blue-400 to-blue-600';
-    case 'practice':
-      return 'from-green-400 to-green-600';
-    case 'reflection':
-      return 'from-purple-400 to-purple-600';
-    case 'wisdom':
-      return 'from-amber-400 to-amber-600';
-    case 'portal':
-      return 'from-cyan-400 to-cyan-600';
-    case 'chakra':
-      return 'from-rose-400 to-rose-600';
-    case 'special':
-    default:
-      return 'from-indigo-400 to-indigo-600';
-  }
-};
-
-/**
- * Get placeholder achievements for loading/empty states
- */
-export const getPlaceholderAchievements = (): Achievement[] => [
-  {
-    id: 'first_meditation',
-    title: 'Meditation Beginner',
-    description: 'Complete your first meditation session',
-    category: 'meditation',
-    progress: 0,
-    awarded: false,
-    icon: 'star'
-  },
-  {
-    id: 'first_reflection',
-    title: 'Self-Reflection',
-    description: 'Complete your first reflection entry',
-    category: 'reflection',
-    progress: 0,
-    awarded: false,
-    icon: 'check'
-  },
-  {
-    id: 'energy_milestone_100',
-    title: 'Energy Novice',
-    description: 'Reach 100 energy points',
-    category: 'special',
-    progress: 0,
-    awarded: false,
-    icon: 'trophy'
-  }
-];
-
-/**
- * Track achievement progress in Supabase
- */
-export const trackAchievementProgress = async (
-  achievementId: string,
-  progress: number = 1,
-  autoAward: boolean = true
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    const { data, error } = await supabase.functions.invoke('track-achievement', {
-      body: {
-        achievementId,
-        progress,
-        autoAward
-      }
-    });
-
-    if (error) {
-      console.error('Error tracking achievement:', error);
-      return { success: false, error: error.message };
-    }
-
-    // If the achievement was awarded, show a toast notification
-    if (data?.awarded) {
-      toast.success(`Achievement unlocked: ${data.title || achievementId}`, {
-        description: data.description || 'You\'ve unlocked a new achievement!',
-        duration: 5000
-      });
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error in trackAchievementProgress:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Get user achievements from Supabase
- */
+// Fetch user achievements from Supabase
 export const getUserAchievements = async (): Promise<Achievement[]> => {
+  const { data, error } = await supabaseClient.rpc('get_user_achievements');
+  
+  if (error) {
+    console.error('Error fetching achievements:', error);
+    return [];
+  }
+  
+  return data || [];
+};
+
+// Track achievement progress
+export const trackAchievementProgress = async (
+  achievementId: string, 
+  progress: number,
+  autoAward = true
+): Promise<{ success: boolean; awarded: boolean; data?: any }> => {
   try {
-    const { data: userAchievements, error } = await supabase
-      .rpc('get_user_achievements', { 
-        user_id_param: (await supabase.auth.getUser()).data.user?.id 
-      });
+    const { data, error } = await supabaseClient.rpc(
+      'update_achievement_progress',
+      {
+        user_id_param: (await supabaseClient.auth.getUser()).data.user?.id,
+        achievement_id_param: achievementId,
+        progress_value: progress,
+        auto_award: autoAward
+      }
+    );
     
     if (error) throw error;
     
-    // If we don't have actual achievements yet, return placeholder data
-    if (!userAchievements || userAchievements.length === 0) {
-      return getPlaceholderAchievements();
+    const awarded = data?.awarded || false;
+    
+    // Show toast notification if achievement was awarded
+    if (awarded) {
+      toast.success(`Achievement Unlocked: ${data?.achievement_data?.title || achievementId}`, {
+        description: data?.achievement_data?.description || 'You\'ve earned a new achievement!',
+        duration: 5000,
+      });
     }
     
-    // Transform data to match our Achievement interface
-    return userAchievements.map((a: any) => ({
-      id: a.achievement_id,
-      title: a.achievement_data?.title || 'Unknown Achievement',
-      description: a.achievement_data?.description || 'Description not available',
-      category: a.achievement_data?.category || 'special',
-      progress: a.progress,
-      awarded: a.awarded,
-      icon: a.achievement_data?.icon || 'award'
-    })) as Achievement[];
+    return { success: true, awarded, data };
   } catch (error) {
-    console.error('Error fetching achievements:', error);
-    // Return placeholder data if there's an error
-    return getPlaceholderAchievements();
+    console.error('Error tracking achievement progress:', error);
+    return { success: false, awarded: false };
   }
+};
+
+// Award achievement directly
+export const awardAchievement = async (achievementId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      'award_achievement',
+      {
+        user_id_param: (await supabaseClient.auth.getUser()).data.user?.id,
+        achievement_id_param: achievementId
+      }
+    );
+    
+    if (error) throw error;
+    
+    // Show toast notification
+    toast.success(`Achievement Unlocked!`, {
+      description: 'You\'ve earned a new achievement!',
+      duration: 5000,
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error awarding achievement:', error);
+    return false;
+  }
+};
+
+// Check achievement thresholds
+export const checkAchievementThresholds = async (): Promise<boolean> => {
+  try {
+    const userId = (await supabaseClient.auth.getUser()).data.user?.id;
+    
+    const response = await fetch(`${supabaseClient.supabaseUrl}/functions/v1/check-achievement-thresholds`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${(await supabaseClient.auth.getSession()).data.session?.access_token}`
+      },
+      body: JSON.stringify({ userId })
+    });
+    
+    if (!response.ok) throw new Error('Failed to check achievement thresholds');
+    
+    const result = await response.json();
+    return result.success;
+  } catch (error) {
+    console.error('Error checking achievement thresholds:', error);
+    return false;
+  }
+};
+
+// Get category color for achievement
+export const getAchievementCategoryColor = (category: string): string => {
+  switch (category) {
+    case 'meditation':
+      return 'bg-blue-500';
+    case 'practice':
+      return 'bg-green-500';
+    case 'reflection':
+      return 'bg-purple-500';
+    case 'wisdom':
+      return 'bg-yellow-500';
+    case 'chakra':
+      return 'bg-pink-500';
+    case 'portal':
+      return 'bg-cyan-500';
+    case 'special':
+      return 'bg-red-500';
+    default:
+      return 'bg-gray-500';
+  }
+};
+
+// Calculate percentage for progress bar
+export const calculateProgressPercentage = (progress: number): number => {
+  return Math.min(Math.max(progress, 0), 100);
 };

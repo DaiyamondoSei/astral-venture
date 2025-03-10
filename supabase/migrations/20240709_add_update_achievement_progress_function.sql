@@ -14,6 +14,7 @@ DECLARE
   achievement_record public.user_achievements;
   achievement_data public.achievements;
   new_progress FLOAT;
+  was_newly_awarded BOOLEAN := FALSE;
   award_achievement BOOLEAN;
   result JSONB;
 BEGIN
@@ -37,11 +38,12 @@ BEGIN
       new_progress := achievement_record.progress;
       award_achievement := FALSE;
     ELSE
-      -- Update existing progress
-      new_progress := GREATEST(achievement_record.progress + progress_value, 0);
+      -- Update existing progress - use the higher of the two values
+      new_progress := GREATEST(achievement_record.progress, progress_value);
       
       -- Determine if achievement should be awarded
       award_achievement := auto_award AND new_progress >= 100 AND NOT achievement_record.awarded;
+      was_newly_awarded := award_achievement;
       
       -- Update the record
       UPDATE public.user_achievements
@@ -59,6 +61,7 @@ BEGIN
     
     -- Determine if achievement should be awarded immediately
     award_achievement := auto_award AND new_progress >= 100;
+    was_newly_awarded := award_achievement;
     
     -- Insert new record
     INSERT INTO public.user_achievements (
@@ -78,6 +81,19 @@ BEGIN
     RETURNING * INTO achievement_record;
   END IF;
   
+  -- Add energy points if newly awarded
+  IF was_newly_awarded THEN
+    -- Default to 25 points if points not specified
+    DECLARE points_to_add INT := COALESCE((achievement_data.requirements->>'points')::INT, 25);
+    BEGIN
+      -- Add energy points
+      PERFORM public.add_energy_points(user_id_param, points_to_add);
+    EXCEPTION WHEN OTHERS THEN
+      -- Log error but continue
+      RAISE NOTICE 'Error adding points: %', SQLERRM;
+    END;
+  END IF;
+  
   -- Construct the result
   result := jsonb_build_object(
     'id', achievement_record.id,
@@ -86,6 +102,7 @@ BEGIN
     'progress', achievement_record.progress,
     'awarded', achievement_record.awarded,
     'awarded_at', achievement_record.awarded_at,
+    'newly_awarded', was_newly_awarded,
     'achievement_data', to_jsonb(achievement_data)
   );
   

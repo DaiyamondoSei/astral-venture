@@ -10,7 +10,8 @@ RETURNS TABLE (
   awarded_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ,
-  achievement_data JSONB
+  achievement_data JSONB,
+  category TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -26,7 +27,8 @@ BEGIN
     ua.awarded_at,
     ua.updated_at,
     ua.created_at,
-    to_jsonb(a) AS achievement_data
+    to_jsonb(a) AS achievement_data,
+    a.category
   FROM 
     public.user_achievements ua
   LEFT JOIN 

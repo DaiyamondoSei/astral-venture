@@ -1,120 +1,104 @@
 
-import { CubeNode, CubeLine } from './types';
+import { CubeSize, CubeTheme, GlowIntensity, MetatronsNode, MetatronsConnection } from './types';
 
-/**
- * Generates a centered grid of nodes for Metatron's Cube
- * @param count Number of nodes to generate
- * @param radius Radius of the circle on which nodes are placed
- * @returns Array of node objects
- */
-export const generateMetatronsNodes = (count: number = 7, radius: number = 150): CubeNode[] => {
-  const nodes: CubeNode[] = [];
-  
-  // Always add center node
-  nodes.push({
-    id: "node-0",
-    x: 200,
-    y: 200,
-    radius: 5
-  });
-  
-  if (count <= 1) return nodes;
-  
-  // Add nodes in a circular pattern
-  const angleIncrement = (2 * Math.PI) / (count - 1);
-  for (let i = 1; i < count; i++) {
-    const angle = i * angleIncrement;
-    nodes.push({
-      id: `node-${i}`,
-      x: 200 + radius * Math.cos(angle),
-      y: 200 + radius * Math.sin(angle),
-      radius: 5
-    });
+// Helper function to get theme color based on variant
+export const getCubeThemeColors = (variant: CubeTheme = 'default') => {
+  switch (variant) {
+    case 'cosmic':
+      return {
+        primary: '#9f7aea',
+        secondary: '#805ad5',
+        glow: '#d6bcfa'
+      };
+    case 'ethereal':
+      return {
+        primary: '#4fd1c5',
+        secondary: '#38b2ac',
+        glow: '#b2f5ea'
+      };
+    case 'quantum':
+      return {
+        primary: '#f687b3',
+        secondary: '#d53f8c',
+        glow: '#fbb6ce'
+      };
+    default:
+      return {
+        primary: '#63b3ed',
+        secondary: '#4299e1',
+        glow: '#bee3f8'
+      };
   }
-  
-  return nodes;
 };
 
-/**
- * Generate connections between nodes with optimized generation based on node count
- * @param nodes Array of cube nodes to connect
- * @returns Array of connections between nodes
- */
-export const generateMetatronsConnections = (nodes: CubeNode[]): CubeLine[] => {
-  const connections: CubeLine[] = [];
-  
-  // For small node counts, create a fully connected graph
-  if (nodes.length <= 9) {
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        connections.push({
-          id: `connection-${i}-${j}`,
-          from: nodes[i].id,
-          to: nodes[j].id
-        });
-      }
-    }
-  } else {
-    // For larger counts, use a more selective connection pattern
-    // to avoid visual clutter and improve performance
-    
-    // Connect center to all outer nodes
-    for (let i = 1; i < nodes.length; i++) {
-      connections.push({
-        id: `connection-0-${i}`,
-        from: nodes[0].id,
-        to: nodes[i].id
-      });
-    }
-    
-    // Connect adjacent nodes in outer circle
-    for (let i = 1; i < nodes.length; i++) {
-      const nextIndex = i === nodes.length - 1 ? 1 : i + 1;
-      connections.push({
-        id: `connection-${i}-${nextIndex}`,
-        from: nodes[i].id,
-        to: nodes[nextIndex].id
-      });
-      
-      // Add some cross-connections for visual interest
-      // but skip some to avoid excessive density
-      if (i % 2 === 0 && i + 2 < nodes.length) {
-        connections.push({
-          id: `connection-${i}-${i+2}`,
-          from: nodes[i].id,
-          to: nodes[i+2].id
-        });
-      }
-    }
+// Helper function to get size dimensions
+export const getCubeSizeDimensions = (size: CubeSize = 'md') => {
+  switch (size) {
+    case 'sm':
+      return { width: 180, height: 180 };
+    case 'md':
+      return { width: 240, height: 240 };
+    case 'lg':
+      return { width: 320, height: 320 };
+    case 'xl':
+      return { width: 400, height: 400 };
+    case 'full':
+      return { width: '100%', height: '100%' };
+    default:
+      return { width: 240, height: 240 };
   }
-  
-  return connections;
 };
 
-/**
- * Generate sample data for demonstration and testing
- * @param nodeCount Number of nodes to generate
- * @returns Object with nodes and connections
- */
-export const generateSampleMetatronsData = (nodeCount: number = 7) => {
-  const nodes = generateMetatronsNodes(nodeCount);
-  const connections = generateMetatronsConnections(nodes);
-  
-  return { nodes, connections };
+// Helper function to get glow intensity
+export const getGlowIntensity = (intensity?: number): GlowIntensity => {
+  if (intensity === undefined) return 'medium';
+  if (intensity <= 0.25) return 'none';
+  if (intensity <= 0.5) return 'low';
+  if (intensity <= 0.75) return 'medium';
+  return 'high';
 };
 
-/**
- * Predefined node configurations for common use cases
- */
-export const nodeConfigurations = {
-  basic: generateMetatronsNodes(7, 150),
-  expanded: generateMetatronsNodes(9, 170),
-  complex: generateMetatronsNodes(12, 180)
+// Create default Metatron's Cube nodes
+export const createDefaultNodes = (): MetatronsNode[] => {
+  return [
+    { id: 'center', x: 120, y: 120, radius: 10 },
+    { id: 'node1', x: 60, y: 60, radius: 6 },
+    { id: 'node2', x: 180, y: 60, radius: 6 },
+    { id: 'node3', x: 180, y: 180, radius: 6 },
+    { id: 'node4', x: 60, y: 180, radius: 6 },
+    { id: 'node5', x: 120, y: 40, radius: 6 },
+    { id: 'node6', x: 200, y: 120, radius: 6 },
+    { id: 'node7', x: 120, y: 200, radius: 6 },
+    { id: 'node8', x: 40, y: 120, radius: 6 },
+    { id: 'node9', x: 60, y: 120, radius: 4 },
+    { id: 'node10', x: 120, y: 60, radius: 4 },
+    { id: 'node11', x: 180, y: 120, radius: 4 },
+    { id: 'node12', x: 120, y: 180, radius: 4 },
+  ];
 };
 
-export default {
-  generateMetatronsNodes,
-  generateMetatronsConnections,
-  generateSampleMetatronsData,
-  nodeConfigurations
+// Create default connections between nodes
+export const createDefaultConnections = (): MetatronsConnection[] => {
+  return [
+    { from: 'center', to: 'node1' },
+    { from: 'center', to: 'node2' },
+    { from: 'center', to: 'node3' },
+    { from: 'center', to: 'node4' },
+    { from: 'center', to: 'node5' },
+    { from: 'center', to: 'node6' },
+    { from: 'center', to: 'node7' },
+    { from: 'center', to: 'node8' },
+    { from: 'node1', to: 'node5' },
+    { from: 'node5', to: 'node2' },
+    { from: 'node2', to: 'node6' },
+    { from: 'node6', to: 'node3' },
+    { from: 'node3', to: 'node7' },
+    { from: 'node7', to: 'node4' },
+    { from: 'node4', to: 'node8' },
+    { from: 'node8', to: 'node1' },
+    { from: 'node9', to: 'node10' },
+    { from: 'node10', to: 'node11' },
+    { from: 'node11', to: 'node12' },
+    { from: 'node12', to: 'node9' },
+  ];
 };

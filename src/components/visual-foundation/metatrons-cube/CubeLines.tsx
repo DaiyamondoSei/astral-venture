@@ -1,10 +1,8 @@
 
 import React from 'react';
-import { CubeLinesProps } from './types';
+import { motion } from 'framer-motion';
+import { CubeLinesProps, MetatronsConnection } from './types';
 
-/**
- * CubeLines renders the connections between nodes in the cube
- */
 const CubeLines: React.FC<CubeLinesProps> = ({
   connections,
   nodes,
@@ -12,53 +10,81 @@ const CubeLines: React.FC<CubeLinesProps> = ({
   secondaryColor,
   activeNodeId,
   glowIntensity,
-  isSimplified
+  isSimplified,
 }) => {
-  // Set filter intensity based on the glowIntensity prop
-  const getFilterDeviation = () => {
-    switch (glowIntensity) {
-      case 'low': return '1.5';
-      case 'medium': return '2.5';
-      case 'high': return '4';
-      default: return '2.5';
-    }
+  // Set stroke opacity based on glow intensity
+  let strokeOpacity = 0.6;
+  let activeStrokeOpacity = 0.9;
+  let strokeWidth = 1;
+  let activeStrokeWidth = 2;
+
+  switch (glowIntensity) {
+    case 'high':
+      strokeOpacity = 0.7;
+      activeStrokeOpacity = 1;
+      strokeWidth = 1.5;
+      activeStrokeWidth = 3;
+      break;
+    case 'medium':
+      strokeOpacity = 0.6;
+      activeStrokeOpacity = 0.9;
+      strokeWidth = 1.2;
+      activeStrokeWidth = 2.5;
+      break;
+    case 'low':
+      strokeOpacity = 0.5;
+      activeStrokeOpacity = 0.8;
+      strokeWidth = 1;
+      activeStrokeWidth = 2;
+      break;
+    case 'none':
+      strokeOpacity = 0.4;
+      activeStrokeOpacity = 0.7;
+      strokeWidth = 0.8;
+      activeStrokeWidth = 1.5;
+      break;
+  }
+
+  const normalizeLinkId = (connection: MetatronsConnection) => {
+    // Support both from/to and source/target naming formats
+    const sourceId = connection.from || connection.source || '';
+    const targetId = connection.to || connection.target || '';
+    return `${sourceId}-${targetId}`;
   };
 
   return (
-    <>
-      <defs>
-        <filter id="glow-line" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation={getFilterDeviation()} result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-      </defs>
-      
-      {/* Draw connections between nodes */}
-      {connections.map((connection, index) => {
-        const source = nodes[connection.source];
-        const target = nodes[connection.target];
-        
-        if (!source || !target) return null;
-        
-        const isActive = connection.active || 
-                         connection.source === activeNodeId || 
-                         connection.target === activeNodeId;
-        
+    <g className="metatrons-cube-lines">
+      {connections.map((connection) => {
+        const sourceId = connection.from || connection.source || '';
+        const targetId = connection.to || connection.target || '';
+        const sourceNode = nodes[sourceId];
+        const targetNode = nodes[targetId];
+
+        if (!sourceNode || !targetNode) return null;
+
+        const isActive = activeNodeId === sourceId || activeNodeId === targetId;
+        const linkId = normalizeLinkId(connection);
+
         return (
-          <line
-            key={`${connection.source}-${connection.target}-${index}`}
-            x1={source.x}
-            y1={source.y}
-            x2={target.x}
-            y2={target.y}
-            stroke={isActive ? secondaryColor : primaryColor}
-            strokeWidth={isActive ? 1.5 : 0.8}
-            strokeOpacity={isActive ? 0.8 : 0.5}
-            filter={isSimplified ? undefined : 'url(#glow-line)'}
+          <motion.line
+            key={linkId}
+            x1={sourceNode.x}
+            y1={sourceNode.y}
+            x2={targetNode.x}
+            y2={targetNode.y}
+            stroke={isActive ? primaryColor : secondaryColor}
+            strokeWidth={isActive ? activeStrokeWidth : strokeWidth}
+            strokeOpacity={isActive ? activeStrokeOpacity : strokeOpacity}
+            initial={{ pathLength: 0 }}
+            animate={connection.animated ? { pathLength: 1 } : {}}
+            transition={{
+              duration: 1.5,
+              ease: "easeInOut"
+            }}
           />
         );
       })}
-    </>
+    </g>
   );
 };
 

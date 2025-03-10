@@ -10,7 +10,7 @@ interface AchievementFilterProps {
 const AchievementFilter: React.FC<AchievementFilterProps> = ({ activeTab, onTabChange }) => {
   return (
     <Tabs defaultValue="all" value={activeTab} onValueChange={onTabChange} className="mb-4">
-      <TabsList className="grid grid-cols-8 bg-white/10 backdrop-blur border-white/10">
+      <TabsList className="grid grid-cols-4 md:grid-cols-8 bg-white/10 backdrop-blur border-white/10">
         <TabsTrigger value="all" className="text-white">All</TabsTrigger>
         <TabsTrigger value="meditation" className="text-white">Meditation</TabsTrigger>
         <TabsTrigger value="practice" className="text-white">Practice</TabsTrigger>

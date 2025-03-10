@@ -13,11 +13,16 @@ export interface MetatronsNode {
   active?: boolean;
   label?: string;
   type?: 'default' | 'chakra' | 'achievement' | 'portal';
+  size?: number;
+  tooltip?: string;
+  pulsing?: boolean;
 }
 
 export interface MetatronsConnection {
   from: string;
   to: string;
+  source?: string; // Adding for backward compatibility
+  target?: string; // Adding for backward compatibility
   animated?: boolean;
   active?: boolean;
   intensity?: number;
@@ -33,6 +38,7 @@ export interface MetatronsCubeProps {
   onNodeClick?: (nodeId: string) => void;
   withAnimation?: boolean;
   intensity?: number;
+  children?: React.ReactNode;
 }
 
 export interface CubeRendererProps {
@@ -65,3 +71,8 @@ export interface CubeLinesProps {
   glowIntensity: GlowIntensity;
   isSimplified: boolean;
 }
+
+// For backward compatibility
+export type CubeNode = MetatronsNode;
+export type CubeLine = MetatronsConnection;
+export type CubeConnection = MetatronsConnection;
