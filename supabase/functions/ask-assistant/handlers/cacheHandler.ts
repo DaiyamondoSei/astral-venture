@@ -1,92 +1,102 @@
 
-// Simple in-memory cache with TTL and better type safety
-const responseCache = new Map<string, {
-  response: Response,
-  timestamp: number,
-  expiresAt: number,
-  isStreamingResponse: boolean
-}>();
+/**
+ * Cache handler for AI responses
+ */
 
-// Cache management constants
-const DEFAULT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-const MAX_CACHE_SIZE = 100;
+import { corsHeaders } from "../../shared/responseUtils.ts";
+import { 
+  getMemoryCacheValue, 
+  setMemoryCacheValue,
+  clearAllCache,
+  clearExpiredCache
+} from "../../shared/cacheUtils.ts";
+
+interface CachedResponse {
+  body: Uint8Array;
+  isStream: boolean;
+  timestamp: number;
+}
 
 /**
  * Get a cached response if available
+ * 
+ * @param cacheKey The cache key
+ * @param isStream Whether the response is a stream
+ * @returns Cached response or null
  */
 export async function getCachedResponse(
   cacheKey: string, 
-  isStreamingRequest: boolean
+  isStream: boolean
 ): Promise<Response | null> {
-  const cached = responseCache.get(cacheKey);
+  const cached = getMemoryCacheValue<CachedResponse>(cacheKey);
   
-  // Only use cache if it matches the request type (streaming vs non-streaming)
-  if (cached && cached.isStreamingResponse === isStreamingRequest && Date.now() <= cached.expiresAt) {
-    console.log("Cache hit:", cacheKey, isStreamingRequest ? "(streaming)" : "(non-streaming)");
-    return cached.response.clone(); // Return a clone of the cached response
+  if (!cached) {
+    return null;
   }
   
-  return null;
+  console.log(`Retrieved cached response for key: ${cacheKey}`);
+  
+  // Create appropriate headers based on response type
+  const headers = {
+    ...corsHeaders,
+    "Content-Type": isStream ? "text/event-stream" : "application/json",
+    "Cache-Control": "no-cache",
+    "X-Cache": "HIT",
+    "X-Cache-Timestamp": new Date(cached.timestamp).toISOString()
+  };
+  
+  // Return cached response
+  return new Response(cached.body, { headers });
 }
 
 /**
  * Cache a response for future use
+ * 
+ * @param cacheKey The cache key
+ * @param response The response to cache
+ * @param isStream Whether the response is a stream
+ * @param ttlMs Optional TTL in milliseconds
  */
 export async function cacheResponse(
   cacheKey: string, 
-  response: Response, 
-  isStreamingResponse: boolean,
-  ttl: number = DEFAULT_CACHE_TTL
+  response: Response,
+  isStream: boolean,
+  ttlMs: number = 30 * 60 * 1000 // 30 minutes default
 ): Promise<void> {
-  // Clean up cache first
-  await cleanupCache();
-  
-  responseCache.set(cacheKey, {
-    response: response.clone(), // Store a clone of the response
-    timestamp: Date.now(),
-    expiresAt: Date.now() + ttl,
-    isStreamingResponse
-  });
-  
-  console.log(`Added ${isStreamingResponse ? "streaming" : "non-streaming"} response to cache with key: ${cacheKey}`);
+  try {
+    // Clone the response to avoid consuming it
+    const clonedResponse = response.clone();
+    
+    // Get the response body as a Uint8Array
+    const body = new Uint8Array(await clonedResponse.arrayBuffer());
+    
+    // Store in cache
+    setMemoryCacheValue<CachedResponse>(
+      cacheKey,
+      {
+        body,
+        isStream,
+        timestamp: Date.now()
+      },
+      ttlMs
+    );
+    
+    console.log(`Cached response for key: ${cacheKey}`);
+  } catch (error) {
+    console.error(`Error caching response:`, error);
+  }
 }
 
 /**
- * Clean up expired cache entries and maintain cache size limits
+ * Clean up the cache
+ * 
+ * @param clearAll Whether to clear all cache or just expired items
+ * @returns Number of items cleared
  */
-export async function cleanupCache(forceCleanAll = false): Promise<number> {
-  const now = Date.now();
-  let deletionCount = 0;
-  
-  if (forceCleanAll) {
-    const size = responseCache.size;
-    responseCache.clear();
-    return size;
+export async function cleanupCache(clearAll: boolean = false): Promise<number> {
+  if (clearAll) {
+    return clearAllCache();
   }
   
-  // Delete expired entries
-  for (const [key, entry] of responseCache.entries()) {
-    if (now > entry.expiresAt) {
-      responseCache.delete(key);
-      deletionCount++;
-    }
-  }
-  
-  // If cache is still too large, remove oldest entries
-  if (responseCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(responseCache.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp);
-    
-    const entriesToDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
-    entriesToDelete.forEach(([key]) => {
-      responseCache.delete(key);
-      deletionCount++;
-    });
-  }
-  
-  if (deletionCount > 0) {
-    console.log(`Cleaned up ${deletionCount} cache entries, ${responseCache.size} remaining`);
-  }
-  
-  return deletionCount;
+  return clearExpiredCache();
 }

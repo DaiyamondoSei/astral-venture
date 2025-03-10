@@ -1,89 +1,90 @@
 
-import { BaseValidationError, ValidationErrorOptions } from './errors/BaseValidationError';
-import {
-  RequiredFieldError,
-  TypeValidationError,
-  RangeValidationError,
-  FormatValidationError,
-  ConstraintValidationError,
-  SchemaValidationError,
-  WrappedValidationError,
-  ApiValidationError
-} from './errors/ValidationErrors';
-
 /**
- * Main validation error class with factory methods for creating specific error types
+ * Specialized error for validation failures
  */
-export class ValidationError extends BaseValidationError {
-  constructor(message: string, options: ValidationErrorOptions) {
-    super(message, options);
-    Object.setPrototypeOf(this, ValidationError.prototype);
-  }
 
-  /**
-   * Create an error for a required field that's missing
-   */
-  static requiredError(field: string): ValidationError {
-    return new RequiredFieldError(field);
-  }
-
-  /**
-   * Create an error for an incorrect type
-   */
-  static typeError(value: unknown, expectedType: string, field: string): ValidationError {
-    return new TypeValidationError(value, expectedType, field);
-  }
-
-  /**
-   * Create an error for a value outside of allowed range
-   */
-  static rangeError(field: string, min?: number, max?: number, actual?: number): ValidationError {
-    return new RangeValidationError(field, min, max, actual);
-  }
-
-  /**
-   * Create an error for an incorrect format
-   */
-  static formatError(field: string, format: string, value: string): ValidationError {
-    return new FormatValidationError(field, format, value);
-  }
-
-  /**
-   * Create an error for a failed constraint
-   */
-  static constraintError(field: string, constraint: string, message: string): ValidationError {
-    return new ConstraintValidationError(field, constraint, message);
-  }
-
-  /**
-   * Wrap an error from another source
-   */
-  static wrapError(error: unknown, field: string): ValidationError {
-    return new WrappedValidationError(error, field);
-  }
-
-  /**
-   * Create an error from API response
-   */
-  static fromApiError(error: unknown, field?: string): ValidationError {
-    return new ApiValidationError(error, field);
-  }
-
-  /**
-   * Create a schema validation error
-   */
-  static schemaError(errors: string[], field: string): ValidationError {
-    return new SchemaValidationError(errors, field);
-  }
-
-  /**
-   * Utility to check if an error is a ValidationError
-   */
-  static isValidationError(error: unknown): error is ValidationError {
-    return error instanceof BaseValidationError;
-  }
+export enum ValidationSeverity {
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
 }
 
-export type { ValidationErrorOptions } from './errors/BaseValidationError';
-export default ValidationError;
-export const isValidationError = ValidationError.isValidationError;
+export interface ValidationErrorOptions {
+  field?: string;
+  value?: unknown;
+  severity?: ValidationSeverity;
+  code?: string;
+  suggestedFix?: string;
+  extraDetails?: Record<string, unknown>;
+}
+
+export class ValidationError extends Error {
+  public readonly field?: string;
+  public readonly value?: unknown;
+  public readonly severity: ValidationSeverity;
+  public readonly code?: string;
+  public readonly suggestedFix?: string;
+  public readonly extraDetails?: Record<string, unknown>;
+  
+  constructor(message: string, options: ValidationErrorOptions = {}) {
+    super(message);
+    
+    this.name = 'ValidationError';
+    this.field = options.field;
+    this.value = options.value;
+    this.severity = options.severity || ValidationSeverity.ERROR;
+    this.code = options.code;
+    this.suggestedFix = options.suggestedFix;
+    this.extraDetails = options.extraDetails;
+    
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, ValidationError.prototype);
+  }
+  
+  /**
+   * Convert to a user-friendly message
+   */
+  toUserMessage(): string {
+    const fieldPrefix = this.field ? `${this.field}: ` : '';
+    const suggestion = this.suggestedFix ? ` ${this.suggestedFix}` : '';
+    
+    return `${fieldPrefix}${this.message}${suggestion}`;
+  }
+  
+  /**
+   * Create a serializable object for logging or API responses
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      field: this.field,
+      severity: this.severity,
+      code: this.code,
+      suggestedFix: this.suggestedFix,
+      extraDetails: this.extraDetails
+    };
+  }
+  
+  /**
+   * Factory method for creating field-specific validation errors
+   */
+  static forField(
+    field: string,
+    message: string,
+    options: Omit<ValidationErrorOptions, 'field'> = {}
+  ): ValidationError {
+    return new ValidationError(message, { ...options, field });
+  }
+  
+  /**
+   * Factory method for creating value-specific validation errors
+   */
+  static forValue(
+    value: unknown,
+    message: string,
+    options: Omit<ValidationErrorOptions, 'value'> = {}
+  ): ValidationError {
+    return new ValidationError(message, { ...options, value });
+  }
+}

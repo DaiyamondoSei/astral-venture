@@ -1,7 +1,18 @@
 
+/**
+ * Chat service for OpenAI integration
+ */
+
 import { AIModel, ChatMetrics, ChatOptions } from "./types.ts";
 
-// Generate chat response
+/**
+ * Generate chat response from OpenAI
+ * 
+ * @param prompt User prompt
+ * @param systemPrompt System instructions
+ * @param options Configuration options
+ * @returns Generated response and usage metrics
+ */
 export async function generateChatResponse(
   prompt: string,
   systemPrompt: string,
@@ -17,6 +28,8 @@ export async function generateChatResponse(
   }
   
   try {
+    const startTime = Date.now();
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -31,9 +44,14 @@ export async function generateChatResponse(
         ],
         temperature,
         max_tokens: maxTokens,
-        stream: false
+        stream: false,
+        function_call: options.function_call,
+        functions: options.functions
       })
     });
+    
+    const endTime = Date.now();
+    const latency = endTime - startTime;
     
     if (!response.ok) {
       const error = await response.json();
@@ -49,7 +67,8 @@ export async function generateChatResponse(
         model: data.model || model,
         totalTokens: data.usage?.total_tokens || 0,
         promptTokens: data.usage?.prompt_tokens,
-        completionTokens: data.usage?.completion_tokens
+        completionTokens: data.usage?.completion_tokens,
+        latency
       }
     };
   } catch (error) {

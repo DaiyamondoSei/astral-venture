@@ -1,230 +1,103 @@
 
 /**
- * Shared utilities for API responses in edge functions
+ * Shared utilities for standardized response handling across edge functions
  */
 
-import { ApiResponse, ErrorDetails, ErrorCode } from "./types.ts";
-
-// Standard CORS headers
+// Standard CORS headers for all edge functions
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/**
- * Create a standardized success response
- */
-export function createSuccessResponse<T>(
-  data: T,
-  metadata?: Record<string, unknown>
+// Error codes for consistent error reporting
+export enum ErrorCode {
+  VALIDATION_FAILED = "validation_failed",
+  AUTHENTICATION_REQUIRED = "authentication_required",
+  UNAUTHORIZED = "unauthorized",
+  NOT_FOUND = "not_found",
+  RATE_LIMITED = "rate_limited",
+  EXTERNAL_API_ERROR = "external_api_error",
+  DATABASE_ERROR = "database_error",
+  INTERNAL_ERROR = "internal_error",
+  MISSING_PARAMETERS = "missing_parameters",
+  TIMEOUT = "timeout"
+}
+
+// Create a standardized success response
+export function createSuccessResponse(
+  data: any,
+  metadata: Record<string, any> = {}
 ): Response {
-  const response: ApiResponse<T> = {
-    success: true,
-    data,
-    metadata
-  };
-  
   return new Response(
-    JSON.stringify(response),
-    { 
-      headers: { 
-        ...corsHeaders, 
-        "Content-Type": "application/json" 
-      } 
+    JSON.stringify({
+      success: true,
+      data,
+      ...metadata
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200
     }
   );
 }
 
-/**
- * Create a standardized error response
- */
+// Create a standardized error response
 export function createErrorResponse(
-  code: string,
+  code: ErrorCode | string,
   message: string,
-  details?: unknown,
+  details: any = null,
   status: number = 400
 ): Response {
-  const response: ApiResponse<null> = {
-    success: false,
-    error: {
-      code,
-      message,
-      details
-    }
-  };
-  
   return new Response(
-    JSON.stringify(response),
-    { 
-      status, 
-      headers: { 
-        ...corsHeaders, 
-        "Content-Type": "application/json" 
-      } 
+    JSON.stringify({
+      success: false,
+      error: {
+        code,
+        message,
+        details,
+        timestamp: new Date().toISOString()
+      }
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status
     }
   );
 }
 
-/**
- * Handle CORS preflight requests
- */
-export function handleCorsRequest(): Response {
-  return new Response(null, { headers: corsHeaders });
-}
-
-/**
- * Log events with structured information
- */
-export function logEvent(
-  level: "info" | "warn" | "error",
-  message: string,
-  data?: Record<string, unknown>
-): void {
-  const logData = {
-    timestamp: new Date().toISOString(),
-    level,
-    message,
-    ...data
-  };
-  
-  if (level === "error") {
-    console.error(JSON.stringify(logData));
-  } else if (level === "warn") {
-    console.warn(JSON.stringify(logData));
-  } else {
-    console.log(JSON.stringify(logData));
-  }
-}
-
-/**
- * Parse an API error into a standardized format
- */
-export function parseApiError(error: unknown): {
-  message: string;
-  status?: number;
-  code?: string;
-  details?: unknown;
-} {
-  if (error instanceof Error) {
-    const anyError = error as any;
-    if (anyError.status && anyError.statusText) {
-      return {
-        message: anyError.statusText || error.message,
-        status: anyError.status,
-        details: anyError.data
-      };
-    }
-    
-    // Check for specific error types
-    if (anyError.code) {
-      return {
-        message: error.message,
-        code: anyError.code,
-        details: anyError.details
-      };
-    }
-    
-    return { message: error.message };
-  }
-  
-  return { message: String(error) };
-}
-
-/**
- * Build a standard API error object
- */
-export function buildErrorDetails(
-  code: ErrorCode, 
-  message: string, 
-  details?: unknown
-): ErrorDetails {
-  return {
-    code,
-    message,
-    details
-  };
-}
-
-/**
- * Create JSON response with proper headers
- */
-export function createJsonResponse(
-  data: unknown,
-  status: number = 200
-): Response {
-  return new Response(
-    JSON.stringify(data),
-    { 
-      status, 
-      headers: { 
-        ...corsHeaders, 
-        "Content-Type": "application/json" 
-      } 
-    }
-  );
-}
-
-/**
- * Create a streaming response
- */
-export function createStreamingResponse(
-  stream: ReadableStream,
-  contentType: string = "text/event-stream"
-): Response {
-  return new Response(
-    stream,
-    { 
-      headers: { 
-        ...corsHeaders, 
-        "Content-Type": contentType,
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive"
-      } 
-    }
-  );
-}
-
-/**
- * Validate required parameters in a request
- */
+// Validate required parameters
 export function validateRequiredParameters(
-  params: Record<string, unknown>,
+  params: Record<string, any>,
   requiredParams: string[]
 ): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredParams.filter(param => params[param] === undefined);
+  const missingParams = requiredParams.filter(
+    param => params[param] === undefined || params[param] === null || params[param] === ""
+  );
+  
   return {
     isValid: missingParams.length === 0,
     missingParams
   };
 }
 
-/**
- * Helper to create a response
- */
-export function createResponse(data: unknown, status: number = 200): Response {
-  return new Response(
-    JSON.stringify(data),
-    {
-      status,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json"
-      }
-    }
-  );
+// Log events for monitoring and debugging
+export function logEvent(
+  level: "info" | "warn" | "error" | "debug",
+  message: string,
+  metadata: Record<string, any> = {}
+): void {
+  console[level](`[${level.toUpperCase()}] ${message}`, metadata);
 }
 
-export {
-  createSuccessResponse,
-  createErrorResponse,
-  handleCorsRequest,
-  logEvent,
-  parseApiError,
-  buildErrorDetails,
-  createJsonResponse,
-  createStreamingResponse,
-  validateRequiredParameters,
-  createResponse,
-  corsHeaders,
-  ErrorCode
-};
+// Basic request handler interface shared across functions
+export interface RequestHandler {
+  (user: any, req: Request, options?: any): Promise<Response>;
+}
+
+// Error handling options for request handlers
+export interface ErrorHandlingOptions {
+  logToConsole?: boolean;
+  logToServer?: boolean;
+  includeDetails?: boolean;
+  defaultErrorMessage?: string;
+}

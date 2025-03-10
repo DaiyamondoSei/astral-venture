@@ -1,142 +1,93 @@
 
 /**
- * Extracts key insights from an AI response
- * 
- * @param response - Raw response from the AI
- * @returns Array of extracted key insights
+ * Utilities for extracting insights and key points from AI responses
  */
-export function extractKeyInsights(response: string): string[] {
-  const insights: string[] = [];
+
+/**
+ * Extract key insights from an AI response
+ * 
+ * @param text The AI response text
+ * @returns Array of extracted insights
+ */
+export function extractKeyInsights(text: string): string[] {
+  // Extract paragraphs as insights
+  const paragraphs = text
+    .split(/\n\n+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 30 && !p.startsWith('*') && !p.startsWith('#'));
   
-  // Try to find explicit insights sections
-  const insightsRegex = /key insights?:?\s*(?:\n|:)([\s\S]*?)(?:\n\n|$)/i;
-  const insightsMatch = response.match(insightsRegex);
+  // Extract explicit insights if there are any
+  const explicitInsightsMatch = text.match(
+    /(?:key insights?|key takeaways?|important points?):?\s*(?:\n|$)((?:.+\n?)+)/i
+  );
   
-  if (insightsMatch && insightsMatch[1]) {
-    // Extract bullet points or numbered insights
-    const bulletPoints = insightsMatch[1]
-      .split(/\n\s*[-•*]\s*/)
-      .filter(point => point.trim().length > 0);
+  if (explicitInsightsMatch) {
+    const explicitInsightSection = explicitInsightsMatch[1];
+    const bulletPoints = explicitInsightSection
+      .split(/\n+/)
+      .map(line => line.replace(/^[-•*]\s*/, '').trim())
+      .filter(line => line.length > 10);
     
-    if (bulletPoints.length > 0) {
-      return bulletPoints.map(point => point.trim());
-    }
-    
-    // Try splitting by numbered points
-    const numberedPoints = insightsMatch[1]
-      .split(/\n\s*\d+\.\s*/)
-      .filter(point => point.trim().length > 0);
-    
-    if (numberedPoints.length > 0) {
-      return numberedPoints.map(point => point.trim());
-    }
-    
-    // If no bullet points or numbers, add the whole section
-    insights.push(insightsMatch[1].trim());
-  }
-  
-  // If no explicit insights section, extract key sentences
-  if (insights.length === 0) {
-    // Split into paragraphs
-    const paragraphs = response.split(/\n\n+/);
-    
-    // Look for important sentences (ones that contain key phrases)
-    const keyPhrases = [
-      'important', 'key', 'essential', 'fundamental', 'crucial',
-      'remember', 'note that', 'keep in mind', 'focus on'
-    ];
-    
-    for (const paragraph of paragraphs) {
-      // Split paragraph into sentences
-      const sentences = paragraph.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      
-      for (const sentence of sentences) {
-        const lowerSentence = sentence.toLowerCase();
-        if (keyPhrases.some(phrase => lowerSentence.includes(phrase))) {
-          insights.push(sentence.trim());
-        }
-      }
-    }
-    
-    // If we still have no insights, take the first sentence of each of the first 3 paragraphs
-    if (insights.length === 0 && paragraphs.length > 0) {
-      for (let i = 0; i < Math.min(3, paragraphs.length); i++) {
-        const firstSentence = paragraphs[i].split(/[.!?]+/)[0].trim();
-        if (firstSentence.length > 20) { // Avoid very short sentences
-          insights.push(firstSentence);
-        }
-      }
+    if (bulletPoints.length >= 2) {
+      return bulletPoints.slice(0, 5); // Limit to 5 insights
     }
   }
   
-  return insights;
+  // Fall back to paragraphs if no explicit insights found
+  if (paragraphs.length > 0) {
+    // Use first few paragraphs as insights
+    return paragraphs
+      .slice(0, 3)
+      .map(p => {
+        // Trim to a reasonable length for an insight
+        if (p.length > 150) {
+          return p.substring(0, 147) + '...';
+        }
+        return p;
+      });
+  }
+  
+  // If no insights could be extracted, return empty array
+  return [];
 }
 
 /**
- * Extracts suggested practices from an AI response
+ * Extract suggested practices from an AI response
  * 
- * @param response - Raw response from the AI
- * @returns Array of extracted practice suggestions
+ * @param text The AI response text
+ * @returns Array of suggested practices
  */
-export function extractSuggestedPractices(response: string): string[] {
-  const practices: string[] = [];
+export function extractSuggestedPractices(text: string): string[] {
+  // Look for explicit practice suggestions
+  const practiceMatch = text.match(
+    /(?:suggested practices?|recommended practices?|try these practices?|practices? to try|exercises?|techniques?):?\s*(?:\n|$)((?:.+\n?)+)/i
+  );
   
-  // Try to find practices section
-  const practicesRegex = /(?:recommended practices|suggested practices|practices to try|exercises|try these|here are some practices):?\s*(?:\n|:)([\s\S]*?)(?:\n\n|$)/i;
-  const practicesMatch = response.match(practicesRegex);
-  
-  if (practicesMatch && practicesMatch[1]) {
-    // Extract bullet points or numbered practices
-    const bulletPoints = practicesMatch[1]
-      .split(/\n\s*[-•*]\s*/)
-      .filter(point => point.trim().length > 0);
-    
-    if (bulletPoints.length > 0) {
-      return bulletPoints.map(point => point.trim());
-    }
-    
-    // Try splitting by numbered points
-    const numberedPoints = practicesMatch[1]
-      .split(/\n\s*\d+\.\s*/)
-      .filter(point => point.trim().length > 0);
-    
-    if (numberedPoints.length > 0) {
-      return numberedPoints.map(point => point.trim());
-    }
-    
-    // If no bullet points or numbers, add the whole section
-    practices.push(practicesMatch[1].trim());
+  if (practiceMatch) {
+    const practiceSection = practiceMatch[1];
+    return practiceSection
+      .split(/\n+/)
+      .map(line => line.replace(/^[-•*]\s*|^\d+\.\s*/, '').trim())
+      .filter(line => line.length > 10 && line.length < 100)
+      .slice(0, 3); // Limit to 3 practices
   }
   
-  // Look for practice keywords throughout the text if no explicit section
-  if (practices.length === 0) {
-    const practiceKeywords = [
-      'try this', 'practice', 'exercise', 'technique', 'meditation',
-      'breathing', 'visualization', 'affirm', 'journal'
-    ];
-    
-    // Split into paragraphs
-    const paragraphs = response.split(/\n\n+/);
-    
-    for (const paragraph of paragraphs) {
-      const lowerParagraph = paragraph.toLowerCase();
-      if (practiceKeywords.some(keyword => lowerParagraph.includes(keyword))) {
-        // Check if the paragraph is not too long
-        if (paragraph.length < 200) {
-          practices.push(paragraph.trim());
-        } else {
-          // Try to extract just the part with the practice
-          const sentences = paragraph.split(/[.!?]+/).filter(s => s.trim().length > 0);
-          for (const sentence of sentences) {
-            const lowerSentence = sentence.toLowerCase();
-            if (practiceKeywords.some(keyword => lowerSentence.includes(keyword))) {
-              practices.push(sentence.trim());
-            }
-          }
-        }
-      }
+  // Look for numbered or bulleted practices throughout the text
+  const bulletedPractices = [];
+  const bulletRegex = /^[-•*]\s*(.+)$|^\d+\.\s*(.+)$/gm;
+  let match;
+  
+  while ((match = bulletRegex.exec(text)) !== null) {
+    const practice = (match[1] || match[2]).trim();
+    if (practice.length > 10 && practice.length < 100) {
+      bulletedPractices.push(practice);
     }
   }
   
-  return practices;
+  if (bulletedPractices.length > 0) {
+    return bulletedPractices.slice(0, 3); // Limit to 3 practices
+  }
+  
+  // If no practices could be extracted, return empty array
+  return [];
 }

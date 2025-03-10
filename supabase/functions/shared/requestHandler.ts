@@ -1,225 +1,182 @@
 
-import { createErrorResponse, ErrorCode } from "./responseUtils.ts";
-
 /**
- * CORS headers for Edge Functions
+ * Shared request handler for edge functions
  */
-export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-};
 
-/**
- * Options for error handling
- */
-export interface ErrorHandlingOptions {
-  errorPrefix?: string;
-  logErrorDetails?: boolean;
-  includeStackTrace?: boolean;
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
+import { 
+  corsHeaders, 
+  createErrorResponse, 
+  ErrorCode,
+  ErrorHandlingOptions 
+} from "./responseUtils.ts";
+
+// Initialize Supabase client
+function initSupabaseClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase environment variables");
+  }
+  
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false }
+  });
 }
 
 /**
- * Function types for request handlers
+ * Handle authentication for edge functions
  */
-export type RequestHandler = (req: Request, ctx: Record<string, any>) => Promise<Response>;
-export type AuthenticatedRequestHandler = (user: any, req: Request, ctx: Record<string, any>) => Promise<Response>;
+export async function handleAuth(req: Request): Promise<{ user: any; error: string | null }> {
+  try {
+    const authHeader = req.headers.get("authorization");
+    
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return {
+        user: null,
+        error: "Missing or invalid authorization header"
+      };
+    }
+    
+    const token = authHeader.replace("Bearer ", "");
+    const supabase = initSupabaseClient();
+    
+    const { data, error } = await supabase.auth.getUser(token);
+    
+    if (error) {
+      return {
+        user: null,
+        error: error.message
+      };
+    }
+    
+    return {
+      user: data.user,
+      error: null
+    };
+  } catch (error) {
+    console.error("Authentication error:", error);
+    return {
+      user: null,
+      error: error.message || "Authentication failed"
+    };
+  }
+}
 
 /**
- * Create a standard error handler with improved type safety
+ * Standard error handler for edge functions
  */
-export function handleRequestError(
-  error: unknown, 
+export function handleError(
+  error: any,
   options: ErrorHandlingOptions = {}
 ): Response {
-  const { 
-    errorPrefix = "Function error",
-    logErrorDetails = true,
-    includeStackTrace = false
+  const {
+    logToConsole = true,
+    includeDetails = process.env.NODE_ENV !== "production",
+    defaultErrorMessage = "An unexpected error occurred"
   } = options;
   
-  if (logErrorDetails) {
-    console.error(`${errorPrefix}:`, error);
+  // Log error if enabled
+  if (logToConsole) {
+    console.error("Edge function error:", error);
   }
   
-  // Determine error code and message
+  // Determine error type and code
   let errorCode = ErrorCode.INTERNAL_ERROR;
-  let errorMessage = "An unexpected error occurred";
-  let status = 500;
-  let additionalData: Record<string, unknown> = {
-    timestamp: new Date().toISOString()
-  };
+  let statusCode = 500;
+  let errorMessage = defaultErrorMessage;
   
-  if (error instanceof Error) {
+  // Extract message from error
+  if (error.message) {
     errorMessage = error.message;
-    
-    if (includeStackTrace && error.stack) {
-      additionalData.stack = error.stack;
-    }
-    
-    // Check for common error patterns
-    if (errorMessage.includes("not found") || errorMessage.includes("does not exist")) {
-      errorCode = ErrorCode.NOT_FOUND;
-      status = 404;
-    } else if (
-      errorMessage.includes("permission") || 
-      errorMessage.includes("unauthorized") || 
-      errorMessage.includes("forbidden")
-    ) {
-      errorCode = ErrorCode.UNAUTHORIZED;
-      status = 401;
-    } else if (
-      errorMessage.includes("invalid") || 
-      errorMessage.includes("validation") ||
-      errorMessage.includes("missing parameter")
-    ) {
-      errorCode = ErrorCode.VALIDATION_FAILED;
-      status = 400;
-    } else if (
-      errorMessage.includes("rate limit") ||
-      errorMessage.includes("too many requests")
-    ) {
-      errorCode = ErrorCode.RATE_LIMITED;
-      status = 429;
-    }
   }
   
+  // Try to determine more specific error type
+  if (error.code) {
+    // Use existing error code if available
+    errorCode = error.code;
+  } else if (errorMessage.includes("auth") || errorMessage.includes("authentication")) {
+    errorCode = ErrorCode.AUTHENTICATION_REQUIRED;
+    statusCode = 401;
+  } else if (errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
+    errorCode = ErrorCode.UNAUTHORIZED;
+    statusCode = 403;
+  } else if (errorMessage.includes("not found") || errorMessage.includes("doesn't exist")) {
+    errorCode = ErrorCode.NOT_FOUND;
+    statusCode = 404;
+  } else if (errorMessage.includes("rate limit") || errorMessage.includes("too many requests")) {
+    errorCode = ErrorCode.RATE_LIMITED;
+    statusCode = 429;
+  } else if (errorMessage.includes("timeout") || errorMessage.includes("timed out")) {
+    errorCode = ErrorCode.TIMEOUT;
+    statusCode = 408;
+  }
+  
+  // Create error details
+  const errorDetails = includeDetails
+    ? {
+        stack: error.stack,
+        name: error.name,
+        code: error.code,
+        detailed: error.detailed || error.details
+      }
+    : null;
+  
+  // Return standardized error response
   return createErrorResponse(
     errorCode,
     errorMessage,
-    additionalData,
-    status,
-    corsHeaders
+    errorDetails,
+    statusCode
   );
 }
 
 /**
- * Create middleware for handling CORS with better type safety
+ * Handle CORS preflight requests
  */
-export function withCors(handler: RequestHandler): RequestHandler {
-  return async (req: Request, ctx: Record<string, any>) => {
-    // Handle CORS preflight requests
-    if (req.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders
-      });
-    }
-    
-    // Call the handler
-    const response = await handler(req, ctx);
-    
-    // Add CORS headers to the response
-    const responseHeaders = new Headers(response.headers);
-    
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      responseHeaders.set(key, value);
-    });
-    
-    // Return response with CORS headers
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders
-    });
-  };
+export function handleCorsPreflightRequest(req: Request): Response | null {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+  return null;
 }
 
 /**
- * Create middleware for error handling with enhanced type safety
+ * Secure request wrapper for edge functions
+ * Handles authentication, CORS, and error handling
  */
-export function withErrorHandling(
-  handler: RequestHandler, 
-  options: ErrorHandlingOptions = {}
-): RequestHandler {
-  return async (req: Request, ctx: Record<string, any>) => {
+export function secureEndpoint(
+  handler: (user: any, req: Request) => Promise<Response>,
+  requireAuth: boolean = true
+) {
+  return async (req: Request): Promise<Response> => {
     try {
-      return await handler(req, ctx);
+      // Handle CORS preflight
+      const corsResponse = handleCorsPreflightRequest(req);
+      if (corsResponse) return corsResponse;
+      
+      // Handle authentication if required
+      if (requireAuth) {
+        const { user, error } = await handleAuth(req);
+        
+        if (error || !user) {
+          return createErrorResponse(
+            ErrorCode.AUTHENTICATION_REQUIRED,
+            "Authentication required",
+            { message: error || "No user found" },
+            401
+          );
+        }
+        
+        // Execute handler with authenticated user
+        return await handler(user, req);
+      }
+      
+      // Execute handler without requiring authentication
+      return await handler(null, req);
     } catch (error) {
-      return handleRequestError(error, options);
+      return handleError(error);
     }
   };
-}
-
-/**
- * Create middleware for authentication with improved error messages
- */
-export function withAuth(
-  handler: AuthenticatedRequestHandler,
-  options: ErrorHandlingOptions = {}
-): RequestHandler {
-  return async (req: Request, ctx: Record<string, any>) => {
-    try {
-      // Check for authorization header
-      const authHeader = req.headers.get("authorization");
-      
-      if (!authHeader) {
-        return createErrorResponse(
-          ErrorCode.UNAUTHORIZED,
-          "Missing authorization header",
-          null,
-          401,
-          corsHeaders
-        );
-      }
-      
-      // Parse JWT and get user
-      const token = authHeader.replace("Bearer ", "");
-      
-      // Create Supabase client
-      const supabaseClient = ctx.supabaseClient;
-      
-      if (!supabaseClient) {
-        return createErrorResponse(
-          ErrorCode.INTERNAL_ERROR,
-          "Supabase client not available",
-          null,
-          500,
-          corsHeaders
-        );
-      }
-      
-      // Verify the token
-      const { data, error } = await supabaseClient.auth.getUser(token);
-      const user = data?.user;
-      
-      if (error || !user) {
-        return createErrorResponse(
-          ErrorCode.UNAUTHORIZED,
-          "Invalid or expired token",
-          { error: error?.message },
-          401,
-          corsHeaders
-        );
-      }
-      
-      // Call handler with authenticated user
-      return await handler(user, req, ctx);
-    } catch (error) {
-      return handleRequestError(error, {
-        ...options,
-        errorPrefix: "Authentication error"
-      });
-    }
-  };
-}
-
-/**
- * Create a complete request handler with CORS, error handling, and authentication
- */
-export function createRequestHandler(
-  handler: AuthenticatedRequestHandler,
-  options: ErrorHandlingOptions = {}
-): RequestHandler {
-  return withCors(withErrorHandling(withAuth(handler, options), options));
-}
-
-/**
- * Create a public request handler with CORS and error handling
- */
-export function createPublicRequestHandler(
-  handler: RequestHandler,
-  options: ErrorHandlingOptions = {}
-): RequestHandler {
-  return withCors(withErrorHandling(handler, options));
 }

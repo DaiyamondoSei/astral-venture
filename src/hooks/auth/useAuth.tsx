@@ -1,366 +1,339 @@
 
-import { useState, useEffect, useContext, createContext } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { toast } from '@/components/ui/use-toast';
-import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
+import { Session, User } from '@supabase/supabase-js';
+import { toast } from 'sonner';
+import { handleError } from '@/utils/errorHandling/handleError';
 
+// Define interface for auth context
 export interface IAuthContext {
-  user: any;
-  isAuthenticated: boolean;
+  session: Session | null;
+  user: User | null;
+  profile: any | null;
   isLoading: boolean;
-  hasCompletedLoading: boolean;
-  profileLoading: boolean;
-  userProfile: any;
-  userStreak: any;
-  todayChallenge: any;
-  activatedChakras: string[];
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
-  register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  isLoggingOut: boolean;
-  handleLogout: (e?: React.MouseEvent) => void;
-  updateStreak: () => Promise<void>;
-  updateUserProfile: () => Promise<void>;
-  updateActivatedChakras: () => Promise<void>;
+  error: Error | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, metadata?: object) => Promise<void>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  sendMagicLink: (email: string) => Promise<void>;
+  refreshSession: () => Promise<void>;
+  isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<IAuthContext | null>(null);
+// Create auth context
+const AuthContext = createContext<IAuthContext | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { recordInteraction } = usePerformanceTracking('AuthProvider', {
-    categories: ['auth', 'core'],
-    trackRenders: true
-  });
+// Auth provider props
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-  const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasCompletedLoading, setHasCompletedLoading] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [userStreak, setUserStreak] = useState<any>(null);
-  const [todayChallenge, setTodayChallenge] = useState<any>(null);
-  const [activatedChakras, setActivatedChakras] = useState<string[]>([]);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [loadAttempts, setLoadAttempts] = useState(0);
-
-  // Initialize auth state
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        recordInteraction('auth-state-change', {
-          event,
-          hasSession: !!session
-        });
-        
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          setUser(session?.user || null);
-          setIsAuthenticated(!!session?.user);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setIsAuthenticated(false);
-          setUserProfile(null);
-          setUserStreak(null);
-          setTodayChallenge(null);
-          setActivatedChakras([]);
-        }
-        
-        setIsLoading(false);
-        setHasCompletedLoading(true);
-      }
-    );
-
-    // Get initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user || null);
-        setIsAuthenticated(!!session?.user);
-        setIsLoading(false);
-        setHasCompletedLoading(true);
-        
-        if (session?.user) {
-          await fetchUserProfile(session.user.id);
-          await fetchUserStreak(session.user.id);
-          await fetchActivatedChakras(session.user.id);
-          await fetchTodayChallenge(session.user.id);
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-        setIsLoading(false);
-        setHasCompletedLoading(true);
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
+// Auth provider component
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<Error | null>(null);
+  
+  // Computed property for authentication status
+  const isAuthenticated = !!session && !!user;
+  
   // Fetch user profile data
   const fetchUserProfile = async (userId: string) => {
     try {
-      setProfileLoading(true);
-      // Check for user_profiles table first
-      const { data: profileData, error: profileError } = await supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
-
-      if (profileError) {
-        if (profileError.code !== 'PGRST116') { // Not found error
-          console.error('Error fetching profile:', profileError);
+      
+      if (error) throw error;
+      setProfile(data);
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      // Don't set error state here as it's not critical
+    }
+  };
+  
+  // Initialize auth state
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Check for existing session
+        const { data: { session: initialSession }, error: sessionError } = 
+          await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+        
+        if (initialSession) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          
+          // Fetch user profile if we have a user
+          if (initialSession.user) {
+            await fetchUserProfile(initialSession.user.id);
+          }
         }
-        setUserProfile(null);
-      } else {
-        setUserProfile(profileData);
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        setError(err instanceof Error ? err : new Error('Failed to initialize authentication'));
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
-  // Fetch user streak data
-  const fetchUserStreak = async (userId: string) => {
-    try {
-      const { data: streakData, error: streakError } = await supabase
-        .from('user_streaks')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (streakError) {
-        if (streakError.code !== 'PGRST116') {
-          console.error('Error fetching user streak:', streakError);
-        }
-        setUserStreak(null);
-      } else {
-        setUserStreak(streakData);
-      }
-    } catch (error) {
-      console.error('Error fetching user streak:', error);
-    }
-  };
-
-  // Fetch activated chakras
-  const fetchActivatedChakras = async (userId: string) => {
-    try {
-      const { data: chakrasData, error: chakrasError } = await supabase
-        .from('activated_chakras')
-        .select('chakra_id')
-        .eq('user_id', userId);
-
-      if (chakrasError) {
-        console.error('Error fetching activated chakras:', chakrasError);
-        setActivatedChakras([]);
-      } else {
-        const chakraIds = chakrasData?.map(item => item.chakra_id) || [];
-        setActivatedChakras(chakraIds);
-      }
-    } catch (error) {
-      console.error('Error fetching activated chakras:', error);
-    }
-  };
-
-  // Fetch today's challenge
-  const fetchTodayChallenge = async (userId: string) => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const { data: challengeData, error: challengeError } = await supabase
-        .from('daily_challenges')
-        .select('*')
-        .eq('date', today)
-        .eq('user_id', userId)
-        .single();
-
-      if (challengeError) {
-        if (challengeError.code !== 'PGRST116') {
-          console.error('Error fetching today\'s challenge:', challengeError);
-        }
-        setTodayChallenge(null);
-      } else {
-        setTodayChallenge(challengeData);
-      }
-    } catch (error) {
-      console.error('Error fetching today\'s challenge:', error);
-    }
-  };
-
-  // Login function
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast({
-          title: "Login failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      if (data?.user) {
-        setUser(data.user);
-        setIsAuthenticated(true);
-        await fetchUserProfile(data.user.id);
-        await fetchUserStreak(data.user.id);
-        await fetchActivatedChakras(data.user.id);
-        await fetchTodayChallenge(data.user.id);
-        return true;
-      }
-      return false;
-    } catch (error: any) {
-      toast({
-        title: "Login failed",
-        description: error.message || "An error occurred during login",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Logout handler with additional cleanup
-  const handleLogout = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-    }
+    };
     
+    initializeAuth();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        
+        // Fetch user profile on auth change if we have a user
+        if (newSession?.user) {
+          await fetchUserProfile(newSession.user.id);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+    
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+  
+  // Sign in with email and password
+  const signIn = async (email: string, password: string) => {
     try {
-      setIsLoggingOut(true);
-      await logout();
-    } catch (error) {
-      console.error('Error during logout:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
-  // Logout function
-  const logout = async (): Promise<void> => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setIsAuthenticated(false);
-      setUserProfile(null);
-      setUserStreak(null);
-      setTodayChallenge(null);
-      setActivatedChakras([]);
+      setIsLoading(true);
+      setError(null);
       
-      // Clear local cache
-      localStorage.removeItem('userPreferences');
-      
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Logout failed",
-        description: error.message || "An error occurred during logout",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Register function
-  const register = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password
       });
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message,
-        };
-      }
-
-      if (data?.user) {
-        setUser(data.user);
-        setIsAuthenticated(true);
-        return { success: true };
-      }
       
-      return {
-        success: false,
-        error: "Registration failed",
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.message || "An error occurred during registration",
-      };
+      if (signInError) throw signInError;
+      
+      toast.success('Signed in successfully!');
+      
+      // Profile will be set by the auth state change listener
+    } catch (err) {
+      handleError(err, {
+        showToast: true,
+        context: { action: 'sign_in', email }
+      });
+      setError(err instanceof Error ? err : new Error('Failed to sign in'));
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Update functions for refresh data
-  const updateUserProfile = async () => {
-    if (user?.id) {
-      await fetchUserProfile(user.id);
+  
+  // Sign up with email and password
+  const signUp = async (email: string, password: string, metadata?: object) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata
+        }
+      });
+      
+      if (signUpError) throw signUpError;
+      
+      toast.success('Account created successfully!');
+      
+      // Profile will be created via database trigger
+    } catch (err) {
+      handleError(err, {
+        showToast: true,
+        context: { action: 'sign_up', email }
+      });
+      setError(err instanceof Error ? err : new Error('Failed to sign up'));
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const updateStreak = async () => {
-    if (user?.id) {
-      await fetchUserStreak(user.id);
+  
+  // Sign out
+  const signOut = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { error: signOutError } = await supabase.auth.signOut();
+      
+      if (signOutError) throw signOutError;
+      
+      toast.success('Signed out successfully!');
+      
+      // Auth state change listener will clear session and user
+    } catch (err) {
+      handleError(err, {
+        showToast: true,
+        context: { action: 'sign_out' }
+      });
+      setError(err instanceof Error ? err : new Error('Failed to sign out'));
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const updateActivatedChakras = async () => {
-    if (user?.id) {
-      await fetchActivatedChakras(user.id);
+  
+  // Reset password
+  const resetPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      
+      if (resetError) throw resetError;
+      
+      toast.success('Password reset link sent to your email!');
+    } catch (err) {
+      handleError(err, {
+        showToast: true,
+        context: { action: 'reset_password', email }
+      });
+      setError(err instanceof Error ? err : new Error('Failed to reset password'));
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  // Provided context value
+  
+  // Update password
+  const updatePassword = async (password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { error: updateError } = await supabase.auth.updateUser({
+        password
+      });
+      
+      if (updateError) throw updateError;
+      
+      toast.success('Password updated successfully!');
+    } catch (err) {
+      handleError(err, {
+        showToast: true,
+        context: { action: 'update_password' }
+      });
+      setError(err instanceof Error ? err : new Error('Failed to update password'));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Send magic link
+  const sendMagicLink = async (email: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (magicLinkError) throw magicLinkError;
+      
+      toast.success('Magic link sent to your email!');
+    } catch (err) {
+      handleError(err, {
+        showToast: true,
+        context: { action: 'send_magic_link', email }
+      });
+      setError(err instanceof Error ? err : new Error('Failed to send magic link'));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Refresh session
+  const refreshSession = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { data, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) throw refreshError;
+      
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        
+        // Refresh user profile
+        if (data.session.user) {
+          await fetchUserProfile(data.session.user.id);
+        }
+      }
+    } catch (err) {
+      handleError(err, {
+        showToast: false, // Don't show toast for refresh failures
+        context: { action: 'refresh_session' }
+      });
+      setError(err instanceof Error ? err : new Error('Failed to refresh session'));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Auth context value
   const value: IAuthContext = {
+    session,
     user,
-    isAuthenticated,
+    profile,
     isLoading,
-    hasCompletedLoading,
-    profileLoading,
-    userProfile,
-    userStreak,
-    todayChallenge,
-    activatedChakras,
-    login,
-    logout,
-    register,
-    isLoggingOut,
-    handleLogout,
-    updateStreak,
-    updateActivatedChakras,
-    updateUserProfile,
+    error,
+    signIn,
+    signUp,
+    signOut,
+    resetPassword,
+    updatePassword,
+    sendMagicLink,
+    refreshSession,
+    isAuthenticated
   };
+  
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = (): IAuthContext => {
+// Auth hook
+export function useAuth(): IAuthContext {
   const context = useContext(AuthContext);
-  if (!context) {
+  
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
-};
-
-export default useAuth;
+}
