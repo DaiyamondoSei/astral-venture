@@ -1,129 +1,94 @@
 
 /**
- * Error Handling Types
+ * Error Handling Type Definitions
  * 
- * This module defines the types used for standardized error handling
- * throughout the application.
+ * Common type definitions for the error handling system
  */
 
-/**
- * Error severity levels
- */
-export enum ErrorSeverity {
-  INFO = 'info',
-  WARNING = 'warning',
-  ERROR = 'error',
-  CRITICAL = 'critical',
-  FATAL = 'fatal'
-}
-
-/**
- * Error categories for better organization and filtering
- */
-export enum ErrorCategory {
-  VALIDATION = 'validation',
-  NETWORK = 'network',
-  AUTHENTICATION = 'authentication',
-  AUTHORIZATION = 'authorization',
-  DATA = 'data',
-  RENDERING = 'rendering',
-  PERFORMANCE = 'performance',
-  UNEXPECTED = 'unexpected',
-  USER_INPUT = 'user_input',
-  RESOURCE = 'resource',
-  INTEGRATION = 'integration',
-  CONFIGURATION = 'configuration'
-}
+import { ErrorCategory, ErrorSeverity } from './AppError';
 
 /**
  * Options for error handling
  */
 export interface ErrorHandlingOptions {
-  /**
-   * Whether to show a toast notification to the user
-   */
+  /** User context where the error occurred */
+  context?: string;
+  
+  /** Additional metadata for error tracking */
+  metadata?: Record<string, unknown>;
+  
+  /** Whether to display a toast notification */
   showToast?: boolean;
   
-  /**
-   * Custom message to show in the toast notification
-   */
-  toastMessage?: string;
+  /** Custom message to show in toast */
+  customMessage?: string;
   
-  /**
-   * Whether to report the error to monitoring systems
-   */
-  reportError?: boolean;
+  /** Whether to log the error to the console */
+  logToConsole?: boolean;
   
-  /**
-   * Custom context data to include with the error report
-   */
-  context?: Record<string, unknown>;
+  /** Whether to log the error to the server */
+  logToServer?: boolean;
   
-  /**
-   * Whether to throw the error (for propagation)
-   */
+  /** Whether to rethrow the error after handling */
   rethrow?: boolean;
   
-  /**
-   * Whether to include stack trace in logs
-   */
-  includeStack?: boolean;
+  /** Whether to track the user when reporting the error */
+  captureUser?: boolean;
   
-  /**
-   * Custom severity override
-   */
+  /** Custom callback to run when the error occurs */
+  onError?: (error: any) => void;
+  
+  /** Error severity level */
   severity?: ErrorSeverity;
   
-  /**
-   * Custom category override
-   */
+  /** Error category */
   category?: ErrorCategory;
-}
-
-/**
- * Interface for error handlers that process specific error types
- */
-export interface ErrorHandler {
-  /**
-   * Check if this handler can process the given error
-   */
-  canHandle(error: unknown): boolean;
   
-  /**
-   * Process the error and return a standardized AppError
-   */
-  handle(error: unknown, options?: ErrorHandlingOptions): Promise<any>;
+  /** Whether it's a validation error */
+  isValidation?: boolean;
+  
+  /** Whether to include validation details */
+  includeValidationDetails?: boolean;
 }
 
 /**
- * Error with HTTP status code
+ * Represents a structured error log entry
  */
-export interface HttpError extends Error {
-  status?: number;
-  statusCode?: number;
-}
-
-/**
- * Result of a validation operation
- */
-export interface ValidationResult {
-  valid: boolean;
-  errors: string[] | null;
-}
-
-/**
- * Structured error response from API
- */
-export interface ApiErrorResponse {
-  error?: string;
-  message?: string;
-  details?: Record<string, unknown>;
-  code?: string;
-  status?: number;
-  validation?: {
-    errors?: Array<{
-      field: string;
-      message: string;
-    }>;
+export interface ErrorLogEntry {
+  /** Timestamp when the error occurred */
+  timestamp: string;
+  
+  /** Error severity level */
+  severity: ErrorSeverity;
+  
+  /** Error category */
+  category: ErrorCategory;
+  
+  /** Error message */
+  message: string;
+  
+  /** User-friendly error message */
+  userMessage?: string;
+  
+  /** Location where the error occurred */
+  location?: string;
+  
+  /** Additional context for the error */
+  context?: Record<string, unknown>;
+  
+  /** Error stack trace */
+  stackTrace?: string;
+  
+  /** User ID or session ID if available */
+  userId?: string;
+  
+  /** Browser and device information */
+  clientInfo?: {
+    userAgent?: string;
+    locale?: string;
+    viewport?: {
+      width: number;
+      height: number;
+    };
   };
 }

@@ -5,7 +5,29 @@
  * Provides a standardized error structure for the application.
  */
 
-import { ErrorSeverity, ErrorCategory } from './types';
+import { ValidationError } from '../validation/ValidationError';
+
+export enum ErrorSeverity {
+  DEBUG = 'debug',
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
+}
+
+export enum ErrorCategory {
+  VALIDATION = 'validation',
+  NETWORK = 'network',
+  API = 'api',
+  AUTHENTICATION = 'authentication',
+  AUTHORIZATION = 'authorization',
+  DATABASE = 'database',
+  UNEXPECTED = 'unexpected',
+  BUSINESS_LOGIC = 'business_logic',
+  UI = 'ui',
+  DATA_PROCESSING = 'data_processing',
+  EXTERNAL_SERVICE = 'external_service'
+}
 
 export interface AppErrorOptions {
   severity?: ErrorSeverity;
@@ -101,8 +123,12 @@ export function createAppError(
   
   // Extract message from different error types
   let message: string;
+  let category = options.category;
   
-  if (error instanceof Error) {
+  if (error instanceof ValidationError) {
+    message = error.message;
+    category = ErrorCategory.VALIDATION;
+  } else if (error instanceof Error) {
     message = error.message;
   } else if (typeof error === 'string') {
     message = error;
@@ -112,7 +138,7 @@ export function createAppError(
     message = String(error);
   }
   
-  return new AppError(message, options, error);
+  return new AppError(message, { ...options, category }, error);
 }
 
 export default AppError;

@@ -2,57 +2,110 @@
 /**
  * Error Classification Utilities
  * 
- * Utilities for classifying and categorizing errors.
+ * Utilities for categorizing and extracting information from errors
  */
 
-import { ErrorCategory, ErrorSeverity } from './types';
-import ValidationError, { isValidationError } from '../validation/ValidationError';
+import { ValidationError, isValidationError } from '../validation/ValidationError';
+import { ErrorCategory, ErrorSeverity } from './AppError';
 
 /**
- * Determine the category of an error based on its properties or message
+ * Extract a readable message from any error type
  */
-export function determineErrorCategory(error: unknown): ErrorCategory {
-  // Check if it's already a categorized AppError
-  if (error && typeof error === 'object' && 'category' in error) {
-    return error.category as ErrorCategory;
+export function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
   }
   
+  if (typeof error === 'string') {
+    return error;
+  }
+  
+  if (error && typeof error === 'object') {
+    if ('message' in error && typeof error.message === 'string') {
+      return error.message;
+    }
+    
+    if ('error' in error && typeof error.error === 'string') {
+      return error.error;
+    }
+    
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return '[Object]';
+    }
+  }
+  
+  return String(error);
+}
+
+/**
+ * Determine the category of an error based on its type
+ */
+export function determineErrorCategory(error: unknown): ErrorCategory {
   // Check for validation errors
   if (isValidationError(error)) {
     return ErrorCategory.VALIDATION;
   }
   
-  // Check for network errors
+  // Check for network/fetch errors
   if (
-    error instanceof Error && (
-      error.name === 'NetworkError' ||
-      error.name === 'FetchError' ||
-      error.message.includes('network') ||
-      error.message.includes('fetch') ||
-      error.message.includes('connection') ||
-      error.message.includes('timeout')
-    )
+    error instanceof TypeError && 
+    error.message.includes('fetch')
   ) {
     return ErrorCategory.NETWORK;
   }
   
-  // Check for auth errors
+  // Check for authentication errors
   if (
     error instanceof Error && (
-      error.name === 'AuthError' ||
       error.message.includes('auth') ||
+      error.message.includes('login') ||
+      error.message.includes('password') ||
       error.message.includes('token') ||
-      error.message.includes('permission') ||
-      error.message.includes('unauthorized') ||
-      error.message.includes('forbidden')
+      error.message.includes('credential')
     )
   ) {
-    return ErrorCategory.AUTHORIZATION;
+    return ErrorCategory.AUTHENTICATION;
   }
   
-  // Check for type errors
-  if (error instanceof TypeError) {
-    return ErrorCategory.TYPE_ERROR;
+  // Check for database errors
+  if (
+    error instanceof Error && (
+      error.message.includes('database') ||
+      error.message.includes('query') ||
+      error.message.includes('sql') ||
+      error.message.includes('table')
+    )
+  ) {
+    return ErrorCategory.DATABASE;
+  }
+  
+  // Check for UI errors
+  if (
+    error instanceof Error && (
+      error.message.includes('render') ||
+      error.message.includes('component') ||
+      error.message.includes('prop') ||
+      error.message.includes('ref')
+    )
+  ) {
+    return ErrorCategory.UI;
+  }
+  
+  // Check if it's an Error object with name
+  if (error instanceof Error) {
+    switch (error.name) {
+      case 'SyntaxError':
+      case 'TypeError':
+      case 'ReferenceError':
+        return ErrorCategory.DATA_PROCESSING;
+      case 'NetworkError':
+      case 'AbortError':
+        return ErrorCategory.NETWORK;
+      case 'SecurityError':
+        return ErrorCategory.AUTHORIZATION;
+    }
   }
   
   // Default to unexpected
@@ -64,73 +117,32 @@ export function determineErrorCategory(error: unknown): ErrorCategory {
  */
 export function determineErrorSeverity(category: ErrorCategory): ErrorSeverity {
   switch (category) {
-    case ErrorCategory.NETWORK:
-    case ErrorCategory.AUTHORIZATION:
-    case ErrorCategory.AUTHENTICATION:
-      return ErrorSeverity.ERROR;
-      
     case ErrorCategory.VALIDATION:
-    case ErrorCategory.USER_INPUT:
       return ErrorSeverity.WARNING;
       
-    case ErrorCategory.TYPE_ERROR:
-    case ErrorCategory.CONSTRAINT_ERROR:
-    case ErrorCategory.UNEXPECTED:
+    case ErrorCategory.UI:
+      return ErrorSeverity.ERROR;
+      
+    case ErrorCategory.NETWORK:
+    case ErrorCategory.API:
+      return ErrorSeverity.ERROR;
+      
+    case ErrorCategory.AUTHENTICATION:
+    case ErrorCategory.AUTHORIZATION:
+    case ErrorCategory.DATABASE:
       return ErrorSeverity.CRITICAL;
       
+    case ErrorCategory.UNEXPECTED:
+    case ErrorCategory.BUSINESS_LOGIC:
+    case ErrorCategory.DATA_PROCESSING:
+    case ErrorCategory.EXTERNAL_SERVICE:
     default:
       return ErrorSeverity.ERROR;
   }
 }
 
-/**
- * Extract a user-friendly message from an error object
- */
-export function extractErrorMessage(error: unknown): string {
-  // Check if it already has a user message
-  if (error && typeof error === 'object' && 'userMessage' in error && typeof error.userMessage === 'string') {
-    return error.userMessage;
-  }
-  
-  // Check if it's a validation error
-  if (isValidationError(error)) {
-    return error.message;
-  }
-  
-  // Check if it's a standard error
-  if (error instanceof Error) {
-    return sanitizeErrorMessage(error.message);
-  }
-  
-  // Handle string errors
-  if (typeof error === 'string') {
-    return sanitizeErrorMessage(error);
-  }
-  
-  // Default message
-  return 'An unexpected error occurred';
-}
-
-/**
- * Clean up error messages to make them more user-friendly
- */
-function sanitizeErrorMessage(message: string): string {
-  // Remove technical details
-  message = message.replace(/Error:\s*/i, '');
-  
-  // Capitalize first letter
-  message = message.charAt(0).toUpperCase() + message.slice(1);
-  
-  // Add period if needed
-  if (!message.endsWith('.') && !message.endsWith('!') && !message.endsWith('?')) {
-    message += '.';
-  }
-  
-  return message;
-}
-
 export default {
+  extractErrorMessage,
   determineErrorCategory,
-  determineErrorSeverity,
-  extractErrorMessage
+  determineErrorSeverity
 };

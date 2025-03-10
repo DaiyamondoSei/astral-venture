@@ -1,271 +1,176 @@
 
 /**
- * Runtime Validation Utilities
+ * Runtime Type Validation
  * 
- * Type validation functions that run at runtime
+ * Provides utilities for validating data types at runtime
  */
 
 import { ValidationError } from './ValidationError';
 
 /**
- * Check if a value is a ValidationError
+ * Check if a value is present and not undefined or null
  */
-export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
-
-/**
- * Validate that a value is defined (not null or undefined)
- */
-export function validateDefined<T>(value: T | null | undefined, name = 'value'): T {
-  if (value === null || value === undefined) {
-    throw new ValidationError({
-      message: `${name} is required, but got ${value}`,
-      field: name,
-      rule: 'required',
-      value
-    });
+export function validateRequired<T>(value: T | undefined | null, name = 'Value'): T {
+  if (value === undefined || value === null) {
+    throw ValidationError.requiredError(name);
   }
   return value;
 }
 
 /**
- * Validate that a value is a string
+ * Check if a value is a string
  */
-export function validateString(value: unknown, name = 'value'): string {
+export function validateString(value: unknown, name = 'Value'): string {
   if (typeof value !== 'string') {
-    throw new ValidationError({
-      message: `${name} must be a string, but got ${typeof value}`,
-      field: name,
-      expectedType: 'string',
-      rule: 'type',
-      value
-    });
+    throw ValidationError.typeError(name, 'string', value);
   }
   return value;
 }
 
 /**
- * Validate that a value is a number
+ * Check if a value is a number
  */
-export function validateNumber(value: unknown, name = 'value'): number {
+export function validateNumber(value: unknown, name = 'Value'): number {
   if (typeof value !== 'number' || isNaN(value)) {
-    throw new ValidationError({
-      message: `${name} must be a number, but got ${typeof value}`,
-      field: name,
-      expectedType: 'number',
-      rule: 'type',
-      value
-    });
+    throw ValidationError.typeError(name, 'number', value);
   }
   return value;
 }
 
 /**
- * Validate that a value is a boolean
+ * Check if a value is a boolean
  */
-export function validateBoolean(value: unknown, name = 'value'): boolean {
+export function validateBoolean(value: unknown, name = 'Value'): boolean {
   if (typeof value !== 'boolean') {
-    throw new ValidationError({
-      message: `${name} must be a boolean, but got ${typeof value}`,
-      field: name,
-      expectedType: 'boolean',
-      rule: 'type',
-      value
-    });
+    throw ValidationError.typeError(name, 'boolean', value);
   }
   return value;
 }
 
 /**
- * Validate that a value is a valid date
+ * Check if a value is an object
  */
-export function validateDate(value: unknown, name = 'value'): Date {
-  if (!(value instanceof Date) || isNaN(value.getTime())) {
-    throw new ValidationError({
-      message: `${name} must be a valid Date, but got ${value}`,
-      field: name,
-      expectedType: 'Date',
-      rule: 'type',
-      value
-    });
-  }
-  return value;
-}
-
-/**
- * Validate that a value is an object
- */
-export function validateObject(value: unknown, name = 'value'): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new ValidationError({
-      message: `${name} must be an object, but got ${typeof value}`,
-      field: name,
-      expectedType: 'object',
-      rule: 'type',
-      value
-    });
+export function validateObject(value: unknown, name = 'Value'): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw ValidationError.typeError(name, 'object', value);
   }
   return value as Record<string, unknown>;
 }
 
 /**
- * Validate that a value is an array
+ * Check if a value is an array
  */
-export function validateArray<T = unknown>(value: unknown, itemValidator?: (item: unknown, index: number) => T, name = 'value'): T[] {
+export function validateArray<T = unknown>(value: unknown, name = 'Value'): T[] {
   if (!Array.isArray(value)) {
-    throw new ValidationError({
-      message: `${name} must be an array, but got ${typeof value}`,
-      field: name,
-      expectedType: 'array',
-      rule: 'type',
-      value
-    });
+    throw ValidationError.typeError(name, 'array', value);
   }
-  
-  // Apply item validator if provided
-  if (itemValidator) {
-    return value.map((item, index) => {
-      try {
-        return itemValidator(item, index);
-      } catch (error) {
-        if (error instanceof ValidationError) {
-          throw new ValidationError({
-            message: `${name}[${index}]: ${error.message}`,
-            field: `${name}[${index}]`,
-            rule: error.rule,
-            value: item,
-            originalError: error
-          });
-        }
-        throw error;
-      }
-    });
-  }
-
-  return value as unknown[];
+  return value as T[];
 }
 
 /**
- * Validate that a value is one of the allowed values
+ * Check if a value is a date
  */
-export function validateOneOf<T extends string | number>(
-  value: unknown,
-  allowedValues: readonly T[],
-  name = 'value'
-): T {
-  // First ensure it's the right type
-  const valueType = typeof allowedValues[0];
-  if (typeof value !== valueType) {
-    throw new ValidationError({
-      message: `${name} must be a ${valueType}, but got ${typeof value}`,
-      field: name,
-      expectedType: valueType,
-      rule: 'type',
-      value
-    });
+export function validateDate(value: unknown, name = 'Value'): Date {
+  if (!(value instanceof Date) || isNaN(value.getTime())) {
+    throw ValidationError.typeError(name, 'date', value);
   }
-  
-  // Then validate it's one of the allowed values
+  return value;
+}
+
+/**
+ * Check if a value is one of the allowed values
+ */
+export function isOneOf<T>(value: unknown, allowedValues: T[], name = 'Value'): T {
   if (!allowedValues.includes(value as T)) {
-    throw new ValidationError({
-      message: `${name} must be one of [${allowedValues.join(', ')}], but got ${value}`,
-      field: name,
-      rule: 'oneOf',
+    throw ValidationError.formatError(
+      name,
+      `one of [${allowedValues.join(', ')}]`,
       value
-    });
+    );
   }
-  
   return value as T;
 }
 
 /**
- * Validate an email address
+ * Alias for compatibility with other code that uses validateOneOf
  */
-export function validateEmail(value: unknown, name = 'email'): string {
-  const email = validateString(value, name);
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
-  if (!emailRegex.test(email)) {
-    throw new ValidationError({
-      message: `${name} must be a valid email address`,
-      field: name,
-      rule: 'format',
-      value
-    });
+export const validateOneOf = isOneOf;
+
+/**
+ * Check if a string matches a regex pattern
+ */
+export function validatePattern(value: string, pattern: RegExp, name = 'Value'): string {
+  if (!pattern.test(value)) {
+    throw ValidationError.formatError(name, pattern.toString(), value);
   }
-  
-  return email;
+  return value;
 }
 
 /**
- * Validate a URL
+ * Check if a number is in a range
  */
-export function validateUrl(value: unknown, name = 'url'): string {
-  const url = validateString(value, name);
-  
-  try {
-    new URL(url);
-    return url;
-  } catch {
-    throw new ValidationError({
-      message: `${name} must be a valid URL`,
-      field: name,
-      rule: 'format',
-      value
-    });
+export function validateRange(value: number, min: number, max: number, name = 'Value'): number {
+  if (value < min || value > max) {
+    throw ValidationError.rangeError(name, min, max, value);
   }
+  return value;
 }
 
 /**
- * Validate a UUID
+ * Check if a string has a minimum length
  */
-export function validateUuid(value: unknown, name = 'id'): string {
-  const id = validateString(value, name);
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  
-  if (!uuidRegex.test(id)) {
+export function validateMinLength(value: string, minLength: number, name = 'Value'): string {
+  if (value.length < minLength) {
     throw new ValidationError({
-      message: `${name} must be a valid UUID`,
+      message: `${name} must be at least ${minLength} characters`,
       field: name,
-      rule: 'format',
-      value
-    });
-  }
-  
-  return id;
-}
-
-/**
- * Validate a non-empty string
- */
-export function validateNonEmptyString(value: unknown, name = 'value'): string {
-  const str = validateString(value, name);
-  
-  if (str.trim() === '') {
-    throw new ValidationError({
-      message: `${name} cannot be empty`,
-      field: name,
+      value,
       rule: 'minLength',
-      value
+      code: 'MIN_LENGTH_ERROR',
+      details: { minLength }
     });
   }
-  
-  return str;
+  return value;
+}
+
+/**
+ * Check if a string has a maximum length
+ */
+export function validateMaxLength(value: string, maxLength: number, name = 'Value'): string {
+  if (value.length > maxLength) {
+    throw new ValidationError({
+      message: `${name} must be at most ${maxLength} characters`,
+      field: name,
+      value,
+      rule: 'maxLength',
+      code: 'MAX_LENGTH_ERROR',
+      details: { maxLength }
+    });
+  }
+  return value;
+}
+
+/**
+ * Validate a value as an email
+ */
+export function validateEmail(value: string, name = 'Email'): string {
+  const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return validatePattern(value, emailPattern, name);
 }
 
 export default {
-  validateDefined,
+  validateRequired,
   validateString,
   validateNumber,
   validateBoolean,
-  validateDate,
   validateObject,
   validateArray,
+  validateDate,
   validateOneOf,
-  validateEmail,
-  validateUrl,
-  validateUuid,
-  validateNonEmptyString,
-  isValidationError
+  isOneOf,
+  validatePattern,
+  validateRange,
+  validateMinLength,
+  validateMaxLength,
+  validateEmail
 };

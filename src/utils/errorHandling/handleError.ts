@@ -25,10 +25,10 @@ const defaultOptions: ErrorHandlingOptions = {
 /**
  * Centralized error handler for consistent error handling across the app
  */
-export async function handleError(
+export function handleError(
   error: unknown,
   options: ErrorHandlingOptions | string = {}
-): Promise<AppError> {
+): AppError {
   // Convert string context to options object
   const opts: ErrorHandlingOptions = typeof options === 'string' 
     ? { ...defaultOptions, context: options }
@@ -46,11 +46,7 @@ export async function handleError(
   
   // Convert to AppError for consistent processing
   const appError = createAppError(error, { 
-    context: { 
-      ...opts.metadata,
-      context: opts.context,
-      timestamp: new Date().toISOString() 
-    },
+    context: opts.context,
     severity: opts.severity,
     category: opts.category
   });
@@ -61,7 +57,7 @@ export async function handleError(
       error,
       appError.severity,
       appError.category,
-      opts.context,
+      typeof opts.context === 'string' ? opts.context : undefined,
       opts.metadata
     );
   }
@@ -71,7 +67,7 @@ export async function handleError(
     const message = opts.customMessage || appError.userMessage;
     const details = opts.isValidation && opts.includeValidationDetails && isValidationError(error)
       ? formatValidationDetails(error)
-      : opts.context 
+      : typeof opts.context === 'string' 
         ? `Error in ${opts.context}` 
         : undefined;
     
@@ -81,7 +77,7 @@ export async function handleError(
   // Log to server if enabled
   if (opts.logToServer) {
     try {
-      await logErrorToServer(appError);
+      logErrorToServer(appError);
     } catch (loggingError) {
       // Don't let logging errors cause more problems
       console.error('Error while logging error to server:', loggingError);
@@ -150,7 +146,7 @@ export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
     try {
       return await fn(...args);
     } catch (error) {
-      await handleError(error, options);
+      handleError(error, options);
       throw error;
     }
   };
@@ -162,6 +158,7 @@ export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
  */
 async function logErrorToServer(appError: AppError): Promise<void> {
   // In a real implementation, this would send the error to your backend
+  // Just logging to console for now
   console.log('Would log to server:', appError);
 }
 

@@ -5,7 +5,7 @@
  * Records and reports Core Web Vitals metrics for performance monitoring
  */
 
-import { validateOneOf } from './validation/runtimeValidation';
+import { isOneOf } from './validation/runtimeValidation';
 import performanceMonitor from './performance/performanceMonitor';
 
 // Web Vitals metrics types
@@ -60,7 +60,7 @@ function getMetricRating(name: WebVitalName, value: number): 'good' | 'needs-imp
  */
 export function recordWebVital(name: WebVitalName, value: number, navigationType = 'navigate'): void {
   // Validate inputs
-  const validName = validateOneOf(name, Object.keys(WEB_VITAL_CATEGORIES) as WebVitalName[], 'Web Vital name');
+  const validName = isOneOf(name, Object.keys(WEB_VITAL_CATEGORIES) as WebVitalName[], 'Web Vital name');
   
   // Get category for this metric
   const category = WEB_VITAL_CATEGORIES[validName];
@@ -147,6 +147,28 @@ export function initWebVitals(): void {
       });
       
       observer.observe({ type: 'paint', buffered: true });
+      
+      // Set up LCP listener
+      const lcpObserver = new PerformanceObserver((entryList) => {
+        const entries = entryList.getEntries();
+        const lastEntry = entries[entries.length - 1];
+        recordWebVital('LCP', lastEntry.startTime);
+      });
+      
+      lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+      
+      // Set up CLS listener
+      let clsValue = 0;
+      const clsObserver = new PerformanceObserver((entryList) => {
+        for (const entry of entryList.getEntries()) {
+          if (!(entry as any).hadRecentInput) {
+            clsValue += (entry as any).value;
+            recordWebVital('CLS', clsValue);
+          }
+        }
+      });
+      
+      clsObserver.observe({ type: 'layout-shift', buffered: true });
       
       // Set up input delay listeners for FID approximation
       let firstInputDelay = 0;

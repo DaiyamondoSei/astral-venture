@@ -125,6 +125,68 @@ export class ValidationError extends Error {
   }
 
   /**
+   * Check if an error is a ValidationError
+   */
+  public static isValidationError(error: unknown): error is ValidationError {
+    return error instanceof ValidationError || 
+           (error instanceof Error && error.name === 'ValidationError');
+  }
+
+  /**
+   * Create specific validation errors
+   */
+  public static requiredError(field: string): ValidationError {
+    return new ValidationError({
+      message: `${field} is required`,
+      field,
+      rule: 'required',
+      code: 'REQUIRED_ERROR'
+    });
+  }
+
+  public static typeError(field: string, expectedType: string, value: any): ValidationError {
+    return new ValidationError({
+      message: `${field} should be a ${expectedType}`,
+      field,
+      expectedType,
+      value,
+      rule: 'type',
+      code: 'TYPE_ERROR'
+    });
+  }
+
+  public static formatError(field: string, format: string, value: any): ValidationError {
+    return new ValidationError({
+      message: `${field} should match format: ${format}`,
+      field,
+      value,
+      rule: 'format',
+      code: 'FORMAT_ERROR'
+    });
+  }
+
+  public static rangeError(field: string, min: number, max: number, value: any): ValidationError {
+    return new ValidationError({
+      message: `${field} should be between ${min} and ${max}`,
+      field,
+      value,
+      rule: 'range',
+      code: 'RANGE_ERROR',
+      details: { min, max }
+    });
+  }
+
+  public static schemaError(field: string, errors: string[]): ValidationError {
+    return new ValidationError({
+      message: `${field} has schema validation errors: ${errors.join(', ')}`,
+      field,
+      rule: 'schema',
+      code: 'SCHEMA_ERROR',
+      details: { errors }
+    });
+  }
+
+  /**
    * Convert to a plain object for serialization
    */
   public toJSON(): Record<string, unknown> {
@@ -169,5 +231,8 @@ export class ValidationError extends Error {
     return 'Validation failed. Please check your input and try again.';
   }
 }
+
+// Export the utility function directly 
+export const isValidationError = ValidationError.isValidationError;
 
 export default ValidationError;

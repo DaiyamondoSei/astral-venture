@@ -1,32 +1,39 @@
 
 /**
- * Centralized validation system exports
+ * Validation Utilities
+ * 
+ * Re-exports validation utilities for easy access
  */
 
-// Core validation error class
-export { 
+import ValidationError, { isValidationError } from './ValidationError';
+import * as runtimeValidation from './runtimeValidation';
+
+export {
   ValidationError,
   isValidationError,
-  type ValidationErrorOptions 
-} from './ValidationError';
+  runtimeValidation
+};
 
-// Runtime validation utilities
-export {
+// Re-export common validation functions for convenient access
+export const {
+  validateRequired,
   validateString,
   validateNumber,
   validateBoolean,
   validateObject,
   validateArray,
-  validateEmail,
-  validateUrl,
   validateDate,
-  validateEnum,
-  validateRegex
-} from './runtimeValidator';
+  validateOneOf,
+  isOneOf,
+  validatePattern,
+  validateRange,
+  validateMinLength,
+  validateMaxLength,
+  validateEmail
+} = runtimeValidation;
 
-// For forms and complex validation
-export { 
-  useRuntimeValidation,
-  type ValidationResult,
-  type ValidationOptions
-} from '../../hooks/useRuntimeValidation';
+export default {
+  ValidationError,
+  isValidationError,
+  ...runtimeValidation
+};
