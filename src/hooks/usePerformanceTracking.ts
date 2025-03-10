@@ -1,4 +1,3 @@
-
 import { useEffect, useRef } from 'react';
 import { performanceMetrics } from '@/utils/performance/performanceMonitor';
 
@@ -34,7 +33,11 @@ export function usePerformanceTracking(options: UsePerformanceTrackingOptions = 
     
     // Calculate render time on mount
     const renderTime = performance.now() - renderStartTime.current;
-    performanceMetrics.recordRender(componentNameRef.current, renderTime);
+    
+    // Only record if time is valid
+    if (renderTime > 0 && renderTime < 10000) { // Sanity check for unrealistic times
+      performanceMetrics.recordRender(componentNameRef.current, renderTime);
+    }
     
     // Track subsequent renders
     return () => {
@@ -47,12 +50,9 @@ export function usePerformanceTracking(options: UsePerformanceTrackingOptions = 
     renderStartTime.current = performance.now();
   }
   
-  /**
-   * Create a function to track interaction times
-   */
   const trackInteraction = (interactionName: string) => {
     return (metadata?: Record<string, unknown>) => {
-      if (!enabled || !trackInteractions) return;
+      if (!enabled || !trackInteractions) return () => {};
       
       const startTime = performance.now();
       
