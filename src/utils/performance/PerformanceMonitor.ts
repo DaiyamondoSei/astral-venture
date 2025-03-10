@@ -5,12 +5,20 @@ import type { ComponentMetrics } from '@/services/ai/types';
  * Interface for component performance metrics
  */
 export interface IComponentMetrics {
+  /** Component name */
   componentName: string;
+  /** Number of times the component has rendered */
   renderCount: number;
+  /** Total time spent rendering the component (ms) */
   totalRenderTime: number;
+  /** Average render time (ms) */
   averageRenderTime: number;
+  /** Time taken for the last render (ms) */
   lastRenderTime: number;
+  /** Number of renders that exceeded threshold */
   slowRenderCount: number;
+  /** Time taken for first render (ms) */
+  firstRenderTime?: number;
 }
 
 /**
@@ -78,6 +86,11 @@ export class PerformanceMonitor {
       lastRenderTime: 0,
       slowRenderCount: 0
     };
+
+    // Set first render time on first render
+    if (metric.renderCount === 0) {
+      metric.firstRenderTime = renderTime;
+    }
 
     metric.renderCount++;
     metric.totalRenderTime += renderTime;

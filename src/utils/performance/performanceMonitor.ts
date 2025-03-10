@@ -4,12 +4,13 @@
  * This helps avoid case sensitivity issues across different operating systems
  */
 
-import { PerformanceMonitor, performanceMonitor, IComponentMetrics } from './PerformanceMonitor';
+import { PerformanceMonitor, performanceMonitor } from './PerformanceMonitor';
+import type { IComponentMetrics } from './PerformanceMonitor';
 import type { ComponentMetrics } from '@/services/ai/types';
 
 // Re-export the singleton instance, class and types
-export { performanceMonitor, PerformanceMonitor, IComponentMetrics };
-export type { ComponentMetrics };
+export { performanceMonitor, PerformanceMonitor };
+export type { IComponentMetrics, ComponentMetrics };
 
 // Type assertion to ensure compatibility between interfaces
 const _typeCheck: ComponentMetrics = {} as IComponentMetrics;
