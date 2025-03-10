@@ -5,19 +5,20 @@ import InfoPanel from '@/components/home/navigation/InfoPanel';
 import NodeDetailPanel from '@/components/home/NodeDetailPanel';
 import DownloadableMaterialsPanel from '@/components/home/DownloadableMaterialsPanel';
 import SwipeablePanel from '@/components/panels/SwipeablePanelController';
-
-/**
- * Interface for SacredHomePage component props
- */
-interface SacredHomePageProps {
-  // No required props for now
-}
+import { ISacredHomePageProps } from '@/components/ui/types';
 
 /**
  * SacredHomePage component that displays the sacred geometry navigation
  * and related panels
  */
-const SacredHomePage: React.FC<SacredHomePageProps> = () => {
+const SacredHomePage: React.FC<ISacredHomePageProps> = ({ 
+  user,
+  userProfile,
+  userStreak,
+  activatedChakras,
+  onLogout,
+  onNodeSelect
+}) => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isDynamicPanelOpen, setIsDynamicPanelOpen] = useState(false);
@@ -25,6 +26,10 @@ const SacredHomePage: React.FC<SacredHomePageProps> = () => {
   const handleNodeSelect = (nodeId: string) => {
     setSelectedNode(nodeId);
     setIsPanelOpen(true);
+    // Call the parent handler if provided
+    if (onNodeSelect) {
+      onNodeSelect(nodeId);
+    }
   };
 
   const handlePanelClose = () => {
@@ -45,7 +50,11 @@ const SacredHomePage: React.FC<SacredHomePageProps> = () => {
 
       {/* Info panel */}
       <div className="mt-4">
-        <InfoPanel />
+        <InfoPanel 
+          node={selectedNode} 
+          onClose={handlePanelClose}
+          theme="default"
+        />
       </div>
 
       {/* Node detail panel */}
@@ -57,6 +66,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = () => {
         >
           <NodeDetailPanel
             nodeId={selectedNode}
+            energyPoints={[]}
           />
         </SwipeablePanel>
       )}
@@ -68,7 +78,10 @@ const SacredHomePage: React.FC<SacredHomePageProps> = () => {
           title="Materials"
           height="50vh"
         >
-          <DownloadableMaterialsPanel />
+          <DownloadableMaterialsPanel 
+            materials={[]}
+            nodeName={selectedNode || 'Unknown'}
+          />
         </SwipeablePanel>
       )}
     </div>

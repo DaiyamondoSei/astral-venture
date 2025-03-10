@@ -46,7 +46,12 @@ function App() {
             <AuthProvider>
               <PanelProvider>
                 {/* Swipeable panels controller */}
-                <SwipeablePanel position="bottom" initialState={false}>
+                <SwipeablePanel 
+                  position="bottom" 
+                  initialState={false}
+                  title="Default Panel"
+                  height="50vh"
+                >
                   <div>Default panel content</div>
                 </SwipeablePanel>
                 

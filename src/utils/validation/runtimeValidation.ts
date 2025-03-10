@@ -167,9 +167,7 @@ export function validateOneOf<T>(
 /**
  * Type guard to check if an error is a ValidationError
  */
-export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
+export { isValidationError } from './ValidationError';
 
 export default {
   validateDefined,
