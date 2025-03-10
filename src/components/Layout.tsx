@@ -23,7 +23,8 @@ const Layout: React.FC<LayoutProps> = ({
   removeBackground = false
 }: LayoutProps) => {
   // Use enhanced performance tracking
-  const { recordInteraction } = usePerformanceTracking('Layout', { 
+  const { trackInteraction } = usePerformanceTracking({
+    componentName: 'Layout',
     logSlowRenders: true,
     categories: ['layout', 'core']
   });
@@ -48,7 +49,7 @@ const Layout: React.FC<LayoutProps> = ({
     <div 
       className="min-h-screen relative overflow-hidden bg-white text-gray-800" 
       role="main"
-      onClick={() => recordInteraction('layout-click', 0)}
+      onClick={trackInteraction('layout-click')}
     >
       {/* Always show simple fallback */}
       <SimpleFallbackBackground />

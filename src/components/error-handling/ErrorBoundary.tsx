@@ -1,3 +1,4 @@
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { handleError } from '@/utils/errorHandling/handleError';
 import { ErrorSeverity, ErrorCategory } from '@/utils/errorHandling/AppError';
@@ -11,11 +12,15 @@ interface ErrorBoundaryProps {
   suppressConsoleErrors?: boolean;
   onReset?: () => void;
   retryRender?: boolean;
+  captureAnalytics?: boolean;
+  errorContext?: Record<string, unknown>;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
+  errorCount: number;
 }
 
 /**
@@ -27,11 +32,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     super(props);
     this.state = { 
       hasError: false,
-      error: null
+      error: null,
+      errorInfo: null,
+      errorCount: 0
     };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     // Update state so the next render will show the fallback UI
     return { 
       hasError: true,
@@ -40,6 +47,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    // Update state with error info
+    this.setState(prevState => ({
+      errorInfo,
+      errorCount: prevState.errorCount + 1
+    }));
+    
     // Process error through central error handling system
     handleError(error, {
       showToast: true,
@@ -49,7 +62,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       context: {
         componentName: this.props.componentName || 'unknown',
         componentStack: errorInfo.componentStack,
-        recoveryPossible: true
+        recoveryPossible: true,
+        errorCount: this.state.errorCount + 1,
+        ...this.props.errorContext
       }
     });
     
@@ -62,7 +77,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   resetError = (): void => {
     this.setState({
       hasError: false,
-      error: null
+      error: null,
+      errorInfo: null
     });
     
     // Call custom reset handler if provided
