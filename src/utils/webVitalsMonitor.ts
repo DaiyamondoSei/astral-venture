@@ -1,7 +1,12 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { handleError, ErrorCategory, ErrorSeverity, createSafeAsyncFunction } from './errorHandling';
-import { validateDefined, validateString, validateOneOf, validateNumber } from './typeValidation';
+import { 
+  validateDefined, 
+  validateString, 
+  validateOneOf, 
+  validateNumber 
+} from './validation/runtimeValidation';
 
 // Web vitals metrics
 export type WebVitalMetric = {
@@ -207,12 +212,21 @@ const sendToAnalytics = async (rawMetric: unknown): Promise<void> => {
       return;
     }
     
+    // Get session
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+    
+    if (!accessToken) {
+      console.warn('No access token available for tracking performance metrics');
+      return;
+    }
+    
     // Track performance metric
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/track-performance`, {
+    const response = await fetch(`${supabase.getUrl()}/functions/v1/track-performance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         componentName: 'WebVitals',

@@ -1,6 +1,7 @@
 
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { initWebVitals, trackWebVital, trackComponentRender, reportMetricsToServer } from '../utils/webVitalsMonitor';
+import { validateDefined, validateOneOf } from '../utils/validation/runtimeValidation';
 
 // Define device capability levels
 export type DeviceCapability = 'low' | 'medium' | 'high';
@@ -170,7 +171,19 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   
   // Set the device capability and update config accordingly
   const setDeviceCapability = useCallback((capability: DeviceCapability) => {
-    setConfig(defaultConfigs[capability]);
+    // Validate capability using our validation utilities
+    try {
+      const validatedCapability = validateOneOf(
+        capability, 
+        ['low', 'medium', 'high'] as DeviceCapability[], 
+        'deviceCapability'
+      );
+      setConfig(defaultConfigs[validatedCapability]);
+    } catch (error) {
+      console.error('Invalid device capability:', error);
+      // Fall back to medium if invalid
+      setConfig(defaultConfigs.medium);
+    }
   }, []);
   
   // Reset to default based on device capability
@@ -183,6 +196,10 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const metricsCollector: PerformanceMetricsCollector = {
     addComponentMetric: (componentName, renderTime, type = 'render') => {
       try {
+        // Validate inputs
+        validateDefined(componentName, 'componentName');
+        validateDefined(renderTime, 'renderTime');
+        
         // Use the trackComponentRender function directly
         trackComponentRender(
           componentName, 
@@ -196,6 +213,11 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     addWebVital: (name, value, category) => {
       try {
+        // Validate inputs
+        validateDefined(name, 'name');
+        validateDefined(value, 'value');
+        validateOneOf(category, ['loading', 'interaction', 'visual_stability'], 'category');
+        
         // Use the trackWebVital function directly
         trackWebVital(name, value, category);
       } catch (error) {
