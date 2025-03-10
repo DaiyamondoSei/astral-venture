@@ -1,7 +1,13 @@
-import { ValidationError } from './validation/runtimeValidation';
 
-// Re-export ValidationError from our runtime validation
-export { ValidationError };
+/**
+ * Error thrown when validation fails
+ */
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
 
 /**
  * Validates that a value is defined (not null or undefined)
@@ -44,6 +50,21 @@ export function validateString(value: unknown, name: string): string {
 export function validateNumber(value: unknown, name: string): number {
   if (typeof value !== 'number' || isNaN(value)) {
     throw new ValidationError(`${name} must be a number`);
+  }
+  return value;
+}
+
+/**
+ * Validates that a value is a boolean
+ * 
+ * @param value - The value to check
+ * @param name - Name of the field for error messages
+ * @returns The validated boolean
+ * @throws ValidationError if validation fails
+ */
+export function validateBoolean(value: unknown, name: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new ValidationError(`${name} must be a boolean`);
   }
   return value;
 }

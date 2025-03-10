@@ -1,196 +1,141 @@
 
-/**
- * RenderCostAnalyzer - A utility for tracking and analyzing component render costs
- * Helps identify and prevent performance issues
- */
-
-// Interface for component render metrics
-interface RenderMetrics {
-  componentName: string;
-  renderCount: number;
-  totalRenderTime: number;
-  averageRenderTime: number;
-  lastRenderTime: number;
-  firstRenderTime: number;
-  props: Record<string, unknown>;
-  warnings: string[];
-}
-
-// Global metrics storage
-const renderMetrics: Record<string, RenderMetrics> = {};
-
-// Thresholds for warnings
-const RENDER_TIME_WARNING_THRESHOLD = 16; // ms (60fps)
-const RENDER_COUNT_WARNING_THRESHOLD = 10; // in 5 seconds
-const RENDER_INTERVAL_WARNING_THRESHOLD = 100; // ms
-
-// Last warning time to prevent spam
-let lastWarningTime = 0;
-const WARNING_THROTTLE = 5000; // ms
+import { ErrorCategory, ErrorSeverity, handleError } from '../errorHandling';
 
 /**
- * Track a component render and measure its performance
- * @param componentName The name of the component
- * @param props The props passed to the component
- * @returns A cleanup function to call when the render is complete
+ * Analyzes the render cost of components to prevent performance issues
+ * 
+ * This utility helps identify components with potentially expensive render costs
+ * to prevent performance degradation and improve user experience.
  */
-export function trackComponentRender(
-  componentName: string,
-  props: Record<string, unknown> = {}
-): () => void {
-  // Skip in production
-  if (process.env.NODE_ENV === 'production') {
-    return () => {};
-  }
+export class RenderCostAnalyzer {
+  private costThresholds: {
+    warning: number;
+    error: number;
+  };
   
-  const startTime = performance.now();
-  const now = Date.now();
+  private renderTimes: Map<string, number> = new Map();
   
-  // Initialize metrics for new component
-  if (!renderMetrics[componentName]) {
-    renderMetrics[componentName] = {
-      componentName,
-      renderCount: 0,
-      totalRenderTime: 0,
-      averageRenderTime: 0,
-      lastRenderTime: 0,
-      firstRenderTime: startTime,
-      props: {},
-      warnings: []
+  /**
+   * Creates a new RenderCostAnalyzer with configurable thresholds
+   * 
+   * @param warningThreshold - Time in ms that triggers a warning (default: 16ms - one frame)
+   * @param errorThreshold - Time in ms that triggers an error report (default: 50ms)
+   */
+  constructor(warningThreshold = 16, errorThreshold = 50) {
+    this.costThresholds = {
+      warning: warningThreshold,
+      error: errorThreshold
     };
   }
   
-  const metrics = renderMetrics[componentName];
+  /**
+   * Records the render time for a component
+   * 
+   * @param componentName - Name of the component being measured
+   * @param renderTimeMs - Time in milliseconds the render took
+   */
+  public recordRenderTime(componentName: string, renderTimeMs: number): void {
+    this.renderTimes.set(componentName, renderTimeMs);
+    this.evaluateRenderCost(componentName, renderTimeMs);
+  }
   
-  // Check for rapid re-renders
-  if (metrics.lastRenderTime > 0) {
-    const timeSinceLastRender = now - metrics.lastRenderTime;
-    if (timeSinceLastRender < RENDER_INTERVAL_WARNING_THRESHOLD) {
-      addWarning(metrics, `Rapid re-render detected (${timeSinceLastRender}ms since last render)`);
+  /**
+   * Evaluates the render cost against thresholds and reports issues
+   * 
+   * @param componentName - Name of the component being evaluated
+   * @param renderTimeMs - Render time in milliseconds
+   */
+  private evaluateRenderCost(componentName: string, renderTimeMs: number): void {
+    if (renderTimeMs >= this.costThresholds.error) {
+      handleError(
+        new Error(`Component ${componentName} has excessive render time: ${renderTimeMs.toFixed(2)}ms`),
+        {
+          category: ErrorCategory.PERFORMANCE,
+          severity: ErrorSeverity.WARNING,
+          context: 'RenderCostAnalyzer',
+          customMessage: `High render time detected in ${componentName}`,
+          showToast: false
+        }
+      );
+    } else if (renderTimeMs >= this.costThresholds.warning) {
+      console.warn(
+        `Component ${componentName} has high render time: ${renderTimeMs.toFixed(2)}ms. ` +
+        `Consider optimizing with useMemo, useCallback or component splitting.`
+      );
     }
   }
   
-  // Update render count
-  metrics.renderCount++;
-  
-  // Store props for debugging
-  metrics.props = { ...props };
-  
-  // Store last render timestamp
-  metrics.lastRenderTime = now;
-  
-  // Return cleanup function that records render time
-  return () => {
-    const endTime = performance.now();
-    const renderTime = endTime - startTime;
-    
-    // Update metrics
-    metrics.totalRenderTime += renderTime;
-    metrics.averageRenderTime = metrics.totalRenderTime / metrics.renderCount;
-    
-    // Check for slow renders
-    if (renderTime > RENDER_TIME_WARNING_THRESHOLD) {
-      addWarning(metrics, `Slow render detected (${renderTime.toFixed(2)}ms)`);
-    }
-    
-    // Check for excessive renders
-    if (metrics.renderCount > RENDER_COUNT_WARNING_THRESHOLD) {
-      const timeWindow = now - (metrics.firstRenderTime || 0);
-      if (timeWindow < 5000) { // 5 seconds
-        addWarning(metrics, `Excessive renders detected (${metrics.renderCount} renders in ${(timeWindow / 1000).toFixed(1)}s)`);
-      }
-    }
-  };
-}
-
-/**
- * Add a warning to the component metrics
- * @param metrics The component metrics
- * @param message The warning message
- */
-function addWarning(metrics: RenderMetrics, message: string): void {
-  // Throttle warnings to prevent console spam
-  const now = Date.now();
-  if (now - lastWarningTime < WARNING_THROTTLE) {
-    return;
+  /**
+   * Gets the average render time for a component
+   * 
+   * @param componentName - Name of the component to check
+   * @returns The average render time or null if no data
+   */
+  public getAverageRenderTime(componentName: string): number | null {
+    return this.renderTimes.has(componentName) 
+      ? this.renderTimes.get(componentName) || null 
+      : null;
   }
   
-  lastWarningTime = now;
-  
-  // Add warning to metrics
-  metrics.warnings.push(message);
-  
-  // Log warning to console
-  console.warn(
-    `[RenderCostAnalyzer] ${message} in ${metrics.componentName}:`,
-    {
-      component: metrics.componentName,
-      renderCount: metrics.renderCount,
-      averageRenderTime: `${metrics.averageRenderTime.toFixed(2)}ms`,
-      props: metrics.props
-    }
-  );
-}
-
-/**
- * Get all component render metrics
- * @returns A record of all component render metrics
- */
-export function getAllRenderMetrics(): Record<string, RenderMetrics> {
-  return { ...renderMetrics };
-}
-
-/**
- * Get render metrics for a specific component
- * @param componentName The name of the component
- * @returns The component's render metrics or null if not found
- */
-export function getComponentRenderMetrics(componentName: string): RenderMetrics | null {
-  return renderMetrics[componentName] || null;
-}
-
-/**
- * Reset all render metrics
- */
-export function resetRenderMetrics(): void {
-  Object.keys(renderMetrics).forEach(key => {
-    delete renderMetrics[key];
-  });
-}
-
-/**
- * Reset render metrics for a specific component
- * @param componentName The name of the component
- */
-export function resetComponentRenderMetrics(componentName: string): void {
-  if (renderMetrics[componentName]) {
-    delete renderMetrics[componentName];
-  }
-}
-
-/**
- * Create a React HOC that tracks render performance
- * @param Component The component to wrap
- * @param componentName Optional custom name for the component
- * @returns A wrapped component with render tracking
- */
-export function withRenderTracking<P extends object>(
-  Component: React.ComponentType<P>,
-  componentName?: string
-): React.FC<P> {
-  const displayName = componentName || Component.displayName || Component.name || 'UnknownComponent';
-  
-  const WrappedComponent: React.FC<P> = (props) => {
-    const endTracking = trackComponentRender(displayName, props as Record<string, unknown>);
+  /**
+   * Creates a performance report for all measured components
+   * 
+   * @returns A sorted array of components and their render times
+   */
+  public generateRenderReport(): Array<{component: string; renderTime: number}> {
+    const report: Array<{component: string; renderTime: number}> = [];
     
-    React.useEffect(() => {
-      return endTracking;
+    this.renderTimes.forEach((time, component) => {
+      report.push({component, renderTime: time});
     });
     
-    return <Component {...props} />;
-  };
+    // Sort by render time (highest first)
+    return report.sort((a, b) => b.renderTime - a.renderTime);
+  }
   
-  WrappedComponent.displayName = `WithRenderTracking(${displayName})`;
+  /**
+   * Identifies potential optimization targets based on render times
+   * 
+   * @returns Array of components that could benefit from optimization
+   */
+  public getOptimizationTargets(): string[] {
+    const targets: string[] = [];
+    
+    this.renderTimes.forEach((time, component) => {
+      if (time >= this.costThresholds.warning) {
+        targets.push(component);
+      }
+    });
+    
+    return targets;
+  }
   
-  return WrappedComponent;
+  /**
+   * Resets all collected render time data
+   */
+  public reset(): void {
+    this.renderTimes.clear();
+  }
+  
+  /**
+   * Creates a hook wrapper for measuring render times
+   * 
+   * @returns A hook that can be used to measure component render times
+   */
+  public createRenderTimeHook() {
+    const analyzer = this;
+    
+    return function useRenderTime(componentName: string) {
+      return {
+        measureRender(callback: () => void): void {
+          const startTime = performance.now();
+          callback();
+          const endTime = performance.now();
+          analyzer.recordRenderTime(componentName, endTime - startTime);
+        }
+      };
+    };
+  }
 }
+
+export default RenderCostAnalyzer;

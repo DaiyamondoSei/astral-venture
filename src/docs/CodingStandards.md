@@ -247,4 +247,71 @@ serve(async (req) => {
 });
 ```
 
+## 10. Defensive Programming Strategies
+
+### Nullable Values
+- Always check for null/undefined before accessing properties
+- Use optional chaining (`?.`) and nullish coalescing (`??`) operators
+- Provide meaningful defaults for nullable values
+
+```typescript
+// Good example
+const userName = user?.profile?.name ?? 'Anonymous';
+
+// Bad example
+const userName = user.profile.name || 'Anonymous';
+```
+
+### Validation Utilities
+
+Use our validation utilities to verify data structure:
+
+```typescript
+// Import validation utilities
+import { validateString, validateObject } from '@/utils/validation/runtimeValidation';
+
+// Validate required data
+const processUserData = (data: unknown) => {
+  // Validate the data is an object
+  const userData = validateObject(data, 'userData');
+  
+  // Validate required fields
+  const name = validateString(userData.name, 'userData.name');
+  
+  // Process with validated data
+  return transformUserData(name, userData);
+};
+```
+
+### Error Recovery Strategies
+
+Implement graceful degradation when errors occur:
+
+```typescript
+const UserProfile = ({ userId }: { userId: string }) => {
+  const { data, error, isLoading } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUserProfile(userId),
+  });
+  
+  // Loading state
+  if (isLoading) return <ProfileSkeleton />;
+  
+  // Error state with retry option
+  if (error) {
+    return (
+      <ErrorDisplay 
+        message="Could not load profile"
+        error={error}
+        retry={() => refetch()}
+        fallback={<BasicProfileInfo userId={userId} />}
+      />
+    );
+  }
+  
+  // Success state
+  return <FullUserProfile data={data} />;
+};
+```
+
 By following these standards, we can ensure a high-quality, maintainable, and type-safe codebase.
