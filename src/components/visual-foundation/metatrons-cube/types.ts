@@ -21,8 +21,8 @@ export interface MetatronsNode {
 export interface MetatronsConnection {
   from: string;
   to: string;
-  source?: string; // Adding for backward compatibility
-  target?: string; // Adding for backward compatibility
+  source?: string; // For backward compatibility
+  target?: string; // For backward compatibility
   animated?: boolean;
   active?: boolean;
   intensity?: number;

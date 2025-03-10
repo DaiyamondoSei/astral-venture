@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import MetatronsCube from './metatrons-cube/MetatronsCube';
-import { MetatronsNode, CubeConnection, CubeSize, CubeTheme } from './metatrons-cube/types';
+import { MetatronsNode, MetatronsConnection, CubeSize, CubeTheme } from './metatrons-cube/types';
 import { usePerfConfig } from '@/hooks/usePerfConfig';
 
 interface VisualSystemProps {
@@ -78,23 +78,23 @@ const VisualSystem: React.FC<VisualSystemProps> = ({
   }, [variant, activeNode]);
   
   // Generate connections based on variant
-  const connections: CubeConnection[] = useMemo(() => {
-    const baseConnections: CubeConnection[] = [
+  const connections: MetatronsConnection[] = useMemo(() => {
+    const baseConnections: MetatronsConnection[] = [
       // Connect center to inner hexagon
-      { source: 'center', target: 'inner1' },
-      { source: 'center', target: 'inner2' },
-      { source: 'center', target: 'inner3' },
-      { source: 'center', target: 'inner4' },
-      { source: 'center', target: 'inner5' },
-      { source: 'center', target: 'inner6' },
+      { from: 'center', to: 'inner1' },
+      { from: 'center', to: 'inner2' },
+      { from: 'center', to: 'inner3' },
+      { from: 'center', to: 'inner4' },
+      { from: 'center', to: 'inner5' },
+      { from: 'center', to: 'inner6' },
       
       // Connect inner hexagon
-      { source: 'inner1', target: 'inner2' },
-      { source: 'inner2', target: 'inner3' },
-      { source: 'inner3', target: 'inner4' },
-      { source: 'inner4', target: 'inner5' },
-      { source: 'inner5', target: 'inner6' },
-      { source: 'inner6', target: 'inner1' },
+      { from: 'inner1', to: 'inner2' },
+      { from: 'inner2', to: 'inner3' },
+      { from: 'inner3', to: 'inner4' },
+      { from: 'inner4', to: 'inner5' },
+      { from: 'inner5', to: 'inner6' },
+      { from: 'inner6', to: 'inner1' },
     ];
     
     // Only add outer connections for complex/interactive variants
@@ -102,22 +102,22 @@ const VisualSystem: React.FC<VisualSystemProps> = ({
       return baseConnections;
     }
     
-    const outerConnections: CubeConnection[] = [
+    const outerConnections: MetatronsConnection[] = [
       // Connect inner to outer
-      { source: 'inner1', target: 'outer1' },
-      { source: 'inner2', target: 'outer2' },
-      { source: 'inner3', target: 'outer3' },
-      { source: 'inner4', target: 'outer4' },
-      { source: 'inner5', target: 'outer5' },
-      { source: 'inner6', target: 'outer6' },
+      { from: 'inner1', to: 'outer1' },
+      { from: 'inner2', to: 'outer2' },
+      { from: 'inner3', to: 'outer3' },
+      { from: 'inner4', to: 'outer4' },
+      { from: 'inner5', to: 'outer5' },
+      { from: 'inner6', to: 'outer6' },
       
       // Connect outer hexagon
-      { source: 'outer1', target: 'outer2' },
-      { source: 'outer2', target: 'outer3' },
-      { source: 'outer3', target: 'outer4' },
-      { source: 'outer4', target: 'outer5' },
-      { source: 'outer5', target: 'outer6' },
-      { source: 'outer6', target: 'outer1' },
+      { from: 'outer1', to: 'outer2' },
+      { from: 'outer2', to: 'outer3' },
+      { from: 'outer3', to: 'outer4' },
+      { from: 'outer4', to: 'outer5' },
+      { from: 'outer5', to: 'outer6' },
+      { from: 'outer6', to: 'outer1' },
     ];
     
     // Add active state for interactive variant
@@ -125,11 +125,11 @@ const VisualSystem: React.FC<VisualSystemProps> = ({
       return [
         ...baseConnections.map(conn => ({
           ...conn,
-          active: conn.source === activeNode || conn.target === activeNode
+          active: conn.from === activeNode || conn.to === activeNode
         })),
         ...outerConnections.map(conn => ({
           ...conn,
-          active: conn.source === activeNode || conn.target === activeNode
+          active: conn.from === activeNode || conn.to === activeNode
         }))
       ];
     }

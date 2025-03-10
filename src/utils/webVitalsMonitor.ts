@@ -1,5 +1,5 @@
 
-import { supabaseClient } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 
 // Web vitals metrics
 export type WebVitalMetric = {
@@ -51,16 +51,16 @@ const sendToAnalytics = async (metric: WebVitalMetric) => {
   }
   
   // Only send if user is authenticated
-  const { data } = await supabaseClient.auth.getUser();
+  const { data } = await supabase.auth.getUser();
   if (!data.user) return;
   
   try {
     // Track performance metric
-    await fetch(`${supabaseClient.supabaseUrl}/functions/v1/track-performance`, {
+    await fetch(`${supabase.supabaseUrl}/functions/v1/track-performance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${(await supabaseClient.auth.getSession()).data.session?.access_token}`
+        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
       },
       body: JSON.stringify({
         componentName: 'WebVitals',
