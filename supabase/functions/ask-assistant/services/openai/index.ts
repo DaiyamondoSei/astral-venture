@@ -1,35 +1,21 @@
 
 /**
- * OpenAI service exports
+ * OpenAI service index
+ * Exports all OpenAI-related functionality
  */
 
 // Export types
-export type { 
+export type {
   AIModel,
   ChatOptions,
   ChatMetrics,
-  ContentModerationType,
+  StreamConfig,
   ModerationResult,
-  StreamingMessage,
-  FunctionCall,
-  FunctionCallResult
+  ContentModerationType
 } from "./types.ts";
 
-// Export services
-export { 
-  generateChatResponse 
-} from "./chatService.ts";
-
-export { 
-  generateStreamingResponse 
-} from "./streamingService.ts";
-
-export { 
-  moderateContent 
-} from "./moderationService.ts";
-
-export { 
-  selectOptimalModel,
-  analyzeMessageComplexity,
-  estimateTokenCount 
-} from "./modelSelector.ts";
+// Export core services
+export { generateChatResponse } from "./chatService.ts";
+export { generateStreamingResponse } from "./streamingService.ts";
+export { moderateContent } from "./moderationService.ts";
+export { selectOptimalModel } from "./modelSelector.ts";

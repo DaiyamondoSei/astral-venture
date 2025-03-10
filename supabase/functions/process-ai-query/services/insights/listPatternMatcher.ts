@@ -1,197 +1,99 @@
 
 /**
- * Extract list items from AI responses
+ * List-based pattern matching for insight extraction
  */
-import type { Insight } from './patternMatcher.ts';
-
-/**
- * List item with metadata
- */
-interface ListItem {
-  text: string;
-  type: 'bullet' | 'numbered';
-  index?: number; // For numbered lists
-  depth: number; // Nesting level
-}
+import { Insight } from './patternMatcher.ts';
 
 /**
  * Extract list items from text
+ * 
+ * @param text The AI-generated text to extract from
+ * @returns Array of insights from list items
  */
-export function extractListItems(text: string): ListItem[] {
-  const items: ListItem[] = [];
-  
-  // Extract bulleted list items
-  const bulletedItems = extractBulletedItems(text);
-  items.push(...bulletedItems);
-  
-  // Extract numbered list items
-  const numberedItems = extractNumberedItems(text);
-  items.push(...numberedItems);
-  
-  // Sort by position in text
-  return items.sort((a, b) => {
-    const aIndex = text.indexOf(a.text);
-    const bIndex = text.indexOf(b.text);
-    return aIndex - bIndex;
-  });
-}
-
-/**
- * Extract bulleted list items from text
- */
-function extractBulletedItems(text: string): ListItem[] {
-  const items: ListItem[] = [];
-  
-  // Match bulleted lists (* , - , •)
-  // Also handle various levels of indentation
-  const bulletPattern = /^(\s*)([*\-•])\s+(.+)$/gm;
-  let match: RegExpExecArray | null;
-  
-  while ((match = bulletPattern.exec(text)) !== null) {
-    const indentation = match[1].length;
-    const depth = Math.floor(indentation / 2); // Every 2 spaces increases nesting level
-    const content = match[3].trim();
-    
-    items.push({
-      text: content,
-      type: 'bullet',
-      depth
-    });
+export function extractListItems(text: string): Insight[] {
+  if (!text || typeof text !== 'string') {
+    return [];
   }
-  
-  return items;
-}
 
-/**
- * Extract numbered list items from text
- */
-function extractNumberedItems(text: string): ListItem[] {
-  const items: ListItem[] = [];
+  const insights: Insight[] = [];
   
-  // Match numbered lists (1., 2., etc.) with possible indentation
-  const numberedPattern = /^(\s*)(\d+)\.?\s+(.+)$/gm;
-  let match: RegExpExecArray | null;
+  // Split text into paragraphs
+  const paragraphs = text.split(/\n\s*\n/);
   
-  while ((match = numberedPattern.exec(text)) !== null) {
-    const indentation = match[1].length;
-    const depth = Math.floor(indentation / 2); // Every 2 spaces increases nesting level
-    const index = parseInt(match[2], 10);
-    const content = match[3].trim();
-    
-    items.push({
-      text: content,
-      type: 'numbered',
-      index,
-      depth
-    });
-  }
-  
-  return items;
-}
-
-/**
- * Convert list items to insights
- */
-export function convertListItemsToInsights(
-  items: ListItem[], 
-  parentType?: string
-): Insight[] {
-  return items.map(item => {
-    // Determine insight type based on content
-    const type = determineInsightType(item.text, parentType);
-    
-    return {
-      type,
-      content: item.text,
-      category: determineCategoryFromContent(item.text, type)
-    };
-  });
-}
-
-/**
- * Determine insight type from content
- */
-function determineInsightType(
-  content: string, 
-  parentType?: string
-): Insight['type'] {
-  // Use parent type if available as a hint
-  if (parentType) {
-    switch (parentType.toLowerCase()) {
-      case 'practice':
-      case 'practices':
-      case 'exercises':
-      case 'techniques':
-        return 'practice';
-      case 'reflection':
-      case 'reflections':
-      case 'questions':
-      case 'prompts':
-        return 'reflection';
-      case 'chakra':
-      case 'chakras':
-      case 'energy centers':
-        return 'chakra';
-      case 'emotion':
-      case 'emotions':
-      case 'feelings':
-        return 'emotional';
+  // Process each paragraph for list detection
+  for (const paragraph of paragraphs) {
+    // Check if paragraph contains a list
+    if (isListParagraph(paragraph)) {
+      const extractedItems = extractItemsFromList(paragraph);
+      insights.push(...extractedItems);
     }
   }
   
-  // Look for type indicators in content
-  if (/\b(?:try|practice|do|perform|exercise)\b/i.test(content)) {
-    return 'practice';
-  }
-  
-  if (/\b(?:reflect|consider|contemplate|journal)\b/i.test(content)) {
-    return 'reflection';
-  }
-  
-  if (/\b(?:chakra|energy|center|muladhara|svadhisthana|manipura|anahata|vishuddha|ajna|sahasrara)\b/i.test(content)) {
-    return 'chakra';
-  }
-  
-  if (/\b(?:feel|emotion|mood|anxiety|joy|sadness|anger|peace)\b/i.test(content)) {
-    return 'emotional';
-  }
-  
-  // Default
-  return 'wisdom';
+  return insights;
 }
 
 /**
- * Determine category from content
+ * Check if a paragraph contains a list structure
  */
-function determineCategoryFromContent(
-  content: string, 
-  type: Insight['type']
-): string {
-  // Content-based categories
-  if (/\b(?:meditat|breath|mindful)\b/i.test(content)) {
-    return 'meditation';
+function isListParagraph(paragraph: string): boolean {
+  // Check for common list markers
+  const listMarkerPattern = /(?:^|\n)(?:\s*(?:\d+\.|[•\-\*]|\([a-z\d]+\))\s+)/;
+  return listMarkerPattern.test(paragraph);
+}
+
+/**
+ * Extract individual items from a list paragraph
+ */
+function extractItemsFromList(paragraph: string): Insight[] {
+  const insights: Insight[] = [];
+  
+  // Different list formats
+  const patterns = [
+    // Numbered lists: "1. Item text"
+    /(?:^|\n)\s*(\d+)\.\s+(.+?)(?=(?:\n\s*\d+\.\s+|\n\n|$))/gs,
+    
+    // Bullet lists: "• Item text" or "- Item text" or "* Item text"
+    /(?:^|\n)\s*[•\-\*]\s+(.+?)(?=(?:\n\s*[•\-\*]\s+|\n\n|$))/gs,
+    
+    // Lettered lists: "(a) Item text" or "(1) Item text"
+    /(?:^|\n)\s*\(([a-z\d]+)\)\s+(.+?)(?=(?:\n\s*\([a-z\d]+\)\s+|\n\n|$))/gs
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = [...paragraph.matchAll(pattern)];
+    
+    if (matches.length > 0) {
+      // For each match, create an insight
+      matches.forEach((match, index) => {
+        // Handle different capturing group patterns
+        let text = '';
+        if (match.length === 3) {
+          // For numbered and lettered lists, the text is in the second capturing group
+          text = match[2].trim();
+        } else if (match.length === 2) {
+          // For bullet lists, the text is in the first capturing group
+          text = match[1].trim();
+        }
+        
+        if (text) {
+          insights.push({
+            text,
+            type: 'list_item',
+            confidence: 0.75 + (0.05 * Math.min(index, 5)), // Higher confidence for earlier items
+            metadata: {
+              position: index,
+              listType: pattern.source.includes('\\d+') ? 'numbered' : 
+                       pattern.source.includes('[•\\-\\*]') ? 'bullet' : 'lettered',
+              originalMatch: match[0]
+            }
+          });
+        }
+      });
+      
+      // If we found matches with this pattern, don't try other patterns
+      break;
+    }
   }
   
-  if (/\b(?:yoga|pose|asana|stretch)\b/i.test(content)) {
-    return 'yoga';
-  }
-  
-  if (/\b(?:journal|write|record)\b/i.test(content)) {
-    return 'journaling';
-  }
-  
-  if (/\b(?:affirm|mantra|repeat)\b/i.test(content)) {
-    return 'affirmation';
-  }
-  
-  // Type-based default categories
-  const defaultCategories: Record<Insight['type'], string> = {
-    practice: 'general practice',
-    reflection: 'self-reflection',
-    chakra: 'energy work',
-    emotional: 'emotional wellness',
-    wisdom: 'insight'
-  };
-  
-  return defaultCategories[type];
+  return insights;
 }
