@@ -1,5 +1,6 @@
 
 import React, { createContext, useEffect, useState, useCallback } from 'react';
+import { initWebVitals } from '../utils/webVitalsMonitor';
 
 // Define device capability levels
 export type DeviceCapability = 'low' | 'medium' | 'high';
@@ -116,6 +117,9 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Initialize with medium settings by default until we detect device capabilities
   const [config, setConfig] = useState<PerfConfig>(defaultConfigs.medium);
   
+  // Reference to cleanup function for web vitals
+  const [webVitalsCleanup, setWebVitalsCleanup] = useState<(() => void) | null>(null);
+  
   // Function to detect device capabilities
   const detectDeviceCapability = useCallback((): DeviceCapability => {
     try {
@@ -186,6 +190,8 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             renderTime, 
             type === 'load' ? 'initial' : (type === 'interaction' ? 'effect' : 'update')
           );
+        }).catch(error => {
+          console.error('Error importing webVitalsMonitor:', error);
         });
       } catch (error) {
         console.error('Error recording component metric:', error);
@@ -197,6 +203,8 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         // Import dynamically to avoid SSR issues
         import('../utils/webVitalsMonitor').then(({ trackWebVital }) => {
           trackWebVital(name, value, category);
+        }).catch(error => {
+          console.error('Error importing webVitalsMonitor:', error);
         });
       } catch (error) {
         console.error('Error recording web vital:', error);
@@ -214,6 +222,34 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
   
+  // Initialize web vitals monitoring when enabled
+  useEffect(() => {
+    if (config.enableMetricsCollection) {
+      // Clean up previous instance if any
+      if (webVitalsCleanup) {
+        webVitalsCleanup();
+      }
+      
+      // Only initialize in production to avoid development overhead
+      if (import.meta.env.PROD) {
+        import('../utils/webVitalsMonitor').then(({ initWebVitals }) => {
+          const cleanup = initWebVitals();
+          setWebVitalsCleanup(() => cleanup);
+        }).catch(error => {
+          console.error('Error initializing web vitals:', error);
+        });
+      }
+    }
+    
+    return () => {
+      // Clean up when unmounting or config changes
+      if (webVitalsCleanup) {
+        webVitalsCleanup();
+        setWebVitalsCleanup(null);
+      }
+    };
+  }, [config.enableMetricsCollection]);
+  
   // Detect device capability on mount
   useEffect(() => {
     // Start with medium settings
@@ -224,12 +260,14 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       initialCapability = detectDeviceCapability();
       
       // Override with URL parameters if present (for testing)
-      const urlParams = new URLSearchParams(window.location.search);
-      const forceCapability = urlParams.get('deviceCap') as DeviceCapability | null;
-      
-      if (forceCapability && ['low', 'medium', 'high'].includes(forceCapability)) {
-        initialCapability = forceCapability as DeviceCapability;
-        console.log(`Forced device capability via URL: ${forceCapability}`);
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceCapability = urlParams.get('deviceCap') as DeviceCapability | null;
+        
+        if (forceCapability && ['low', 'medium', 'high'].includes(forceCapability)) {
+          initialCapability = forceCapability as DeviceCapability;
+          console.log(`Forced device capability via URL: ${forceCapability}`);
+        }
       }
     } catch (error) {
       console.warn('Error during initial capability detection:', error);

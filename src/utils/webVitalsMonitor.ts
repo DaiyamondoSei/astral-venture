@@ -3,17 +3,19 @@
  * Web Vitals Monitoring System
  * Enhanced monitoring system for collecting, analyzing and reporting web vitals metrics
  */
+import { callEdgeFunction } from './edgeFunctionClient';
+import type { 
+  ComponentMetric, 
+  WebVitalMetric, 
+  PerformanceMetricPayload,
+  DeviceInfo
+} from '@/types/edge-functions';
 
 // Performance marks storage
 const performanceMarks: Record<string, { start?: number; end?: number; duration?: number }> = {};
 
 // Web vitals storage
-interface WebVitalMetric {
-  name: string;
-  value: number;
-  category: 'loading' | 'interaction' | 'visual_stability';
-  timestamp: number;
-}
+const webVitalsMetrics: WebVitalMetric[] = [];
 
 // Components render time tracking
 interface ComponentRenderTiming {
@@ -25,7 +27,6 @@ interface ComponentRenderTiming {
 
 // Component metrics storage
 const componentMetrics: Record<string, ComponentRenderTiming[]> = {};
-const webVitalsMetrics: WebVitalMetric[] = [];
 
 // Session identifier
 const sessionId = generateSessionId();
@@ -33,14 +34,23 @@ const sessionId = generateSessionId();
 // Device information
 const deviceInfo = getDeviceInfo();
 
+// Reporting interval reference
+let reportingInterval: number | null = null;
+
 /**
  * Initialize web vitals monitoring
  * Sets up reporting intervals and listeners for web vitals
  */
-export function initWebVitals(): void {
+export function initWebVitals(): () => void {
   try {
+    // Check if already initialized
+    if (reportingInterval) {
+      console.warn('Web vitals monitoring already initialized');
+      return () => {};
+    }
+
     // Set up regular reporting interval
-    const reportingInterval = setInterval(() => {
+    reportingInterval = window.setInterval(() => {
       if (webVitalsMetrics.length > 0 || Object.keys(componentMetrics).length > 0) {
         reportMetricsToServer().catch(err => {
           console.error('Failed to report metrics:', err);
@@ -48,11 +58,6 @@ export function initWebVitals(): void {
       }
     }, 60000); // Report every minute
 
-    // Clean up function to clear the interval when needed
-    const cleanup = () => {
-      clearInterval(reportingInterval);
-    };
-    
     // Setup listeners for browser visibility changes
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
@@ -92,7 +97,14 @@ export function initWebVitals(): void {
       });
     }
     
-    return cleanup;
+    // Return cleanup function
+    return () => {
+      if (reportingInterval) {
+        window.clearInterval(reportingInterval);
+        reportingInterval = null;
+      }
+      document.removeEventListener('visibilitychange', () => {});
+    };
   } catch (error) {
     console.error('Error initializing web vitals:', error);
     return () => {};
@@ -237,20 +249,20 @@ export function clearMetrics(): void {
 }
 
 /**
- * Send metrics to the server
+ * Send metrics to the server using edge function
  * @returns Promise that resolves when metrics are sent
  */
 export async function reportMetricsToServer(): Promise<boolean> {
   try {
-    // Get only the latest metrics since last report
-    const metrics = Object.entries(componentMetrics).flatMap(([componentName, timings]) => {
-      return timings.map(timing => ({
+    // Extract component metrics for reporting
+    const metrics = Object.entries(componentMetrics).flatMap(([_, timings]) => 
+      timings.map(timing => ({
         componentName: timing.componentName,
         renderTime: timing.renderTime,
         renderType: timing.renderType,
         timestamp: timing.timestamp
-      }));
-    });
+      }))
+    );
     
     // Skip if no metrics to report
     if (metrics.length === 0 && webVitalsMetrics.length === 0) {
@@ -258,7 +270,7 @@ export async function reportMetricsToServer(): Promise<boolean> {
     }
     
     // Prepare payload
-    const payload = {
+    const payload: PerformanceMetricPayload = {
       sessionId,
       deviceInfo,
       appVersion: '1.0.0', // Should be dynamically derived in a real app
@@ -267,21 +279,18 @@ export async function reportMetricsToServer(): Promise<boolean> {
       timestamp: Date.now()
     };
     
-    // Send metrics to the server endpoint
-    const response = await fetch('/api/track-performance', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
+    // Use our generic edge function client
+    const response = await callEdgeFunction('track-performance', payload, {
+      handleError: true,
+      showErrorToast: false,
     });
     
-    if (response.ok) {
+    if (response.success) {
       // Clear reported metrics
       clearMetrics();
       return true;
     } else {
-      console.error('Failed to report metrics:', await response.text());
+      console.error('Failed to report metrics:', response.error);
       return false;
     }
   } catch (error) {
@@ -302,7 +311,7 @@ function generateSessionId(): string {
 /**
  * Get device information
  */
-function getDeviceInfo() {
+function getDeviceInfo(): DeviceInfo {
   try {
     const navigatorInfo = navigator as any;
     const isLowEndDevice = 
