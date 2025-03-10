@@ -6,10 +6,17 @@ import NodeDetailPanel from '@/components/home/NodeDetailPanel';
 import DownloadableMaterialsPanel from '@/components/home/DownloadableMaterialsPanel';
 import SwipeablePanel from '@/components/panels/SwipeablePanelController';
 
+/**
+ * Interface for SacredHomePage component props
+ */
 interface SacredHomePageProps {
-  // No props required
+  // No required props for now
 }
 
+/**
+ * SacredHomePage component that displays the sacred geometry navigation
+ * and related panels
+ */
 const SacredHomePage: React.FC<SacredHomePageProps> = () => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -32,7 +39,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = () => {
           {/* Sacred geometry navigation */}
           <MetatronsCubeNavigation 
             onNodeSelect={handleNodeSelect}
-            activeNodeId={selectedNode}
           />
         </div>
       </div>
@@ -51,7 +57,6 @@ const SacredHomePage: React.FC<SacredHomePageProps> = () => {
         >
           <NodeDetailPanel
             nodeId={selectedNode}
-            onClose={handlePanelClose}
           />
         </SwipeablePanel>
       )}
@@ -63,7 +68,7 @@ const SacredHomePage: React.FC<SacredHomePageProps> = () => {
           title="Materials"
           height="50vh"
         >
-          <DownloadableMaterialsPanel onClose={() => setIsDynamicPanelOpen(false)} />
+          <DownloadableMaterialsPanel />
         </SwipeablePanel>
       )}
     </div>

@@ -6,7 +6,7 @@ import { PerfConfigProvider } from '@/contexts/PerfConfigContext';
 import { AdaptivePerformanceProvider } from '@/contexts/AdaptivePerformanceContext';
 import { QuantumThemeProvider } from '@/components/visual-foundation';
 import { PanelProvider } from '@/contexts/PanelContext';
-import SwipeablePanelController from '@/components/panels/SwipeablePanelController';
+import SwipeablePanel from '@/components/panels/SwipeablePanelController';
 import SwipeIndicator from '@/components/panels/SwipeIndicator';
 import { AuthProvider } from '@/contexts/AuthContext';
 
@@ -45,7 +45,7 @@ function App() {
           <QuantumThemeProvider>
             <AuthProvider>
               <PanelProvider>
-                {/* Swipeable panels controller - pass required props */}
+                {/* Swipeable panels controller */}
                 <SwipeablePanel position="bottom" initialState={false}>
                   <div>Default panel content</div>
                 </SwipeablePanel>

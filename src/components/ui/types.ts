@@ -7,6 +7,6 @@ export interface ISwipeablePanelProps {
   height?: string;
 }
 
-export interface SwipeIndicatorProps {
+export interface ISwipeIndicatorProps {
   position: 'top' | 'bottom' | 'left' | 'right';
 }
