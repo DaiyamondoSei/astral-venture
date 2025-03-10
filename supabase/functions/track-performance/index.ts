@@ -7,138 +7,107 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
-// Type definitions
-type PerformanceMetric = {
-  componentName: string;
-  renderCount: number;
-  totalRenderTime: number;
-  averageRenderTime: number;
-  lastRenderTime: number;
-  slowRenderCount: number;
-  firstRenderTime?: number;
-};
-
-type TrackPerformanceRequest = {
-  userId?: string;
-  sessionId: string;
-  metrics: PerformanceMetric[];
-  deviceInfo?: {
-    userAgent: string;
-    deviceCategory: 'low' | 'medium' | 'high';
-    deviceMemory?: number;
-    hardwareConcurrency?: number;
-    connectionType?: string;
-    viewport?: {
-      width: number;
-      height: number;
-    };
-    screenSize?: {
-      width: number;
-      height: number;
-    };
-    pixelRatio?: number;
-  };
-  route?: string;
-  timestamp: string;
-};
-
+// Handle requests to the edge function
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Parse the request body
+    const { metrics, vitals, timestamp } = await req.json();
+    
+    // Validate the payload
+    if (!metrics || !Array.isArray(metrics)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid metrics data: expected an array" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Extract authentication
+    const authorization = req.headers.get("Authorization") || "";
+    let userId = null;
+    
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Parse request data
-    const requestData: TrackPerformanceRequest = await req.json();
-    const { userId, sessionId, metrics, deviceInfo, route, timestamp } = requestData;
-
-    if (!sessionId || !metrics || !Array.isArray(metrics)) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid request data. Required: sessionId and metrics array" 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
+    
+    // Verify authentication if provided
+    if (authorization.startsWith("Bearer ")) {
+      const token = authorization.replace("Bearer ", "");
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (user && !authError) {
+        userId = user.id;
+      }
     }
-
-    // Store performance metrics in database
+    
+    // Create the performance_metrics table if it doesn't exist
+    const { error: schemaError } = await supabase.rpc("ensure_performance_metrics_table");
+    
+    if (schemaError) {
+      console.error("Error ensuring performance metrics table:", schemaError);
+    }
+    
+    // Store the metrics
     const { error: insertError } = await supabase
       .from("performance_metrics")
-      .insert({
-        user_id: userId || null,
-        session_id: sessionId,
-        metrics: metrics,
-        device_info: deviceInfo || null,
-        route: route || null,
-        timestamp: timestamp || new Date().toISOString()
-      });
-
+      .insert(
+        metrics.map((metric: any) => ({
+          ...metric,
+          user_id: userId,
+          client_timestamp: timestamp,
+          server_timestamp: new Date().toISOString()
+        }))
+      );
+    
     if (insertError) {
-      console.error("Error inserting performance metrics:", insertError);
+      console.error("Error inserting metrics:", insertError);
       return new Response(
-        JSON.stringify({ error: "Failed to store performance metrics" }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
+        JSON.stringify({ error: insertError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Analyze metrics for actionable insights
-    const slowComponents = metrics
-      .filter(m => m.slowRenderCount > 0)
-      .sort((a, b) => b.slowRenderCount - a.slowRenderCount);
     
-    // Get top 3 slow components for immediate attention
-    const topSlowComponents = slowComponents.slice(0, 3).map(c => ({
-      name: c.componentName,
-      avgRenderTime: c.averageRenderTime,
-      slowRenderCount: c.slowRenderCount
-    }));
-
-    // Calculate overall performance score (simplistic version)
-    // Lower score is better, score of 1.0 means all renders are within threshold
-    let performanceScore = 1.0;
-    if (metrics.length > 0) {
-      const totalSlowRenders = metrics.reduce((sum, m) => sum + m.slowRenderCount, 0);
-      const totalRenders = metrics.reduce((sum, m) => sum + m.renderCount, 0);
-      if (totalRenders > 0) {
-        performanceScore = 1 + (totalSlowRenders / totalRenders);
+    // Store web vitals if provided
+    if (vitals && Array.isArray(vitals) && vitals.length > 0) {
+      const { error: vitalsError } = await supabase
+        .from("web_vitals")
+        .insert(
+          vitals.map((vital: any) => ({
+            ...vital,
+            user_id: userId,
+            client_timestamp: vital.timestamp ? new Date(vital.timestamp).toISOString() : timestamp,
+            server_timestamp: new Date().toISOString()
+          }))
+        );
+      
+      if (vitalsError) {
+        console.error("Error inserting web vitals:", vitalsError);
       }
     }
-
+    
+    // Return successful response
     return new Response(
       JSON.stringify({ 
-        success: true,
-        performanceScore,
-        topSlowComponents: topSlowComponents.length > 0 ? topSlowComponents : null,
-        metricCount: metrics.length
+        success: true, 
+        message: "Performance metrics recorded successfully",
+        count: metrics.length
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Function error:", error);
+    
+    // Return error response
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

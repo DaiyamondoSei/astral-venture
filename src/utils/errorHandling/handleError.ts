@@ -1,7 +1,7 @@
 
 import { toast } from 'sonner';
 import { AppError, ErrorSeverity, createAppError } from './AppError';
-import { ValidationError } from '../validation/ValidationError';
+import { ValidationError, isValidationError } from '../validation/ValidationError';
 
 /**
  * Error handling configuration options
@@ -12,8 +12,10 @@ export interface ErrorHandlingOptions {
   logToServer?: boolean;               // Whether to log to server
   throwError?: boolean;                // Whether to rethrow the error
   context?: Record<string, unknown>;   // Additional context information
+  severity?: ErrorSeverity;            // Error severity
   captureUser?: boolean;               // Whether to capture user info in logs
   onError?: (error: AppError) => void; // Custom error handler callback
+  customMessage?: string;              // Custom message to display
 }
 
 /**
@@ -22,7 +24,7 @@ export interface ErrorHandlingOptions {
 const defaultOptions: ErrorHandlingOptions = {
   showToast: true,
   logToConsole: true,
-  logToServer: true,
+  logToServer: false,
   throwError: false,
   captureUser: true
 };
@@ -42,7 +44,8 @@ export async function handleError(
     context: { 
       ...opts.context,
       timestamp: new Date().toISOString() 
-    } 
+    },
+    severity: opts.severity
   });
   
   // Log to console if enabled
@@ -62,17 +65,15 @@ export async function handleError(
   
   // Show toast notification if enabled
   if (opts.showToast) {
-    const { severity, message, suggestedAction } = appError;
-    const toastMessage = suggestedAction 
-      ? `${message} ${suggestedAction}`
-      : message;
+    const { severity } = appError;
+    const message = opts.customMessage || appError.userMessage;
     
     if (severity === ErrorSeverity.CRITICAL || severity === ErrorSeverity.ERROR) {
-      toast.error(toastMessage);
+      toast.error(message);
     } else if (severity === ErrorSeverity.WARNING) {
-      toast.warning(toastMessage);
+      toast.warning(message);
     } else {
-      toast.info(toastMessage);
+      toast.info(message);
     }
   }
   
@@ -99,7 +100,7 @@ export async function handleError(
   
   // Rethrow if requested
   if (opts.throwError) {
-    throw appError;
+    throw error;
   }
   
   return appError;
@@ -156,7 +157,7 @@ export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
     try {
       return await fn(...args);
     } catch (error) {
-      handleError(error, options);
+      await handleError(error, options);
       throw error;
     }
   };

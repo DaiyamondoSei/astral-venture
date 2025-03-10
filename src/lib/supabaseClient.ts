@@ -9,6 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
 
 // Initialize the Supabase client with environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://wkmyvthtyjcdzhzvfyji.supabase.co';
@@ -54,6 +55,40 @@ export const supabase = SupabaseClientSingleton.getInstance();
 
 // Add alias for backward compatibility
 export const supabaseClient = supabase;
+
+/**
+ * Safe RPC wrapper
+ * Calls a Supabase RPC function with safe error handling
+ */
+export async function callRpcSafely<T>(
+  functionName: 'increment_points' | 'get_user_achievements' | 'get_total_points',
+  params: Record<string, any> = {},
+  options: { showToast?: boolean; errorMessage?: string } = {}
+): Promise<T | null> {
+  try {
+    const { data, error } = await supabase.rpc(functionName, params);
+    
+    if (error) {
+      console.error(`Error calling ${functionName}:`, error);
+      
+      if (options.showToast !== false) {
+        toast.error(options.errorMessage || `Error: ${error.message}`);
+      }
+      
+      return null;
+    }
+    
+    return data as T;
+  } catch (err) {
+    console.error(`Unexpected error calling ${functionName}:`, err);
+    
+    if (options.showToast !== false) {
+      toast.error(options.errorMessage || 'An unexpected error occurred');
+    }
+    
+    return null;
+  }
+}
 
 // Export utility functions that use the singleton client
 export const incrementEnergyPoints = async (userId: string, pointsToAdd: number) => {

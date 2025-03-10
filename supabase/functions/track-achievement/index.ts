@@ -3,88 +3,85 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
-import { 
-  corsHeaders, 
-  createSuccessResponse, 
-  createErrorResponse, 
-  ErrorCode,
-  handleCorsRequest,
-  validateRequiredParameters
-} from "../shared/responseUtils.ts";
+// Define CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-import { withAuth, createAdminClient } from "../shared/authUtils.ts";
-
-// Main entry point for edge function
-serve(async (req: Request) => {
+// Handle requests to the edge function
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return handleCorsRequest();
+    return new Response(null, { headers: corsHeaders });
   }
 
-  return withAuth(req, handleRequest);
-});
-
-// Handle achievement tracking request (after authentication)
-async function handleRequest(user: any, req: Request): Promise<Response> {
   try {
-    // Parse request body
-    const requestData = await req.json();
+    // Parse the request body
+    const { userId, achievementId, progress, autoAward = true } = await req.json();
     
     // Validate required parameters
-    const { achievementId, progress } = requestData;
-    const paramValidation = validateRequiredParameters(
-      { achievementId, progress },
-      ["achievementId", "progress"]
-    );
-    
-    if (!paramValidation.isValid) {
-      return createErrorResponse(
-        ErrorCode.MISSING_PARAMETERS,
-        "Missing required parameters",
-        { missingParams: paramValidation.missingParams },
-        400
+    if (!userId || !achievementId) {
+      return new Response(
+        JSON.stringify({ error: "Missing required parameters: userId and achievementId are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    // Extract optional parameters
-    const { autoAward = true } = requestData;
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get Supabase admin client
-    const supabase = createAdminClient();
-    
-    // Update achievement progress using the database function
+    // Call the update_achievement_progress RPC function
     const { data, error } = await supabase.rpc(
       "update_achievement_progress",
       {
-        user_id_param: user.id,
+        user_id_param: userId,
         achievement_id_param: achievementId,
-        progress_value: progress,
+        progress_value: progress ?? 0,
         auto_award: autoAward
       }
     );
     
     if (error) {
       console.error("Error updating achievement progress:", error);
-      return createErrorResponse(
-        ErrorCode.DATABASE_ERROR,
-        "Failed to update achievement progress",
-        { supabaseError: error.message },
-        500
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    return createSuccessResponse({
-      achievementId,
-      progress,
-      updated: data
-    });
-  } catch (error) {
-    console.error("Error in track-achievement:", error);
+    // Check if achievement was newly awarded to send notification
+    let notification = null;
+    if (data && data.newly_awarded) {
+      // Add notification data
+      notification = {
+        achievement: data.achievement_data,
+        awarded_at: data.awarded_at,
+        points: data.achievement_data?.requirements?.points || 25
+      };
+      
+      // Log achievement
+      console.log(`Achievement awarded to user ${userId}: ${achievementId}`);
+    }
     
-    return createErrorResponse(
-      ErrorCode.INTERNAL_ERROR,
-      "An error occurred while tracking achievement",
-      { errorMessage: error.message }
+    // Return successful response
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        data,
+        notification
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Function error:", error);
+    
+    // Return error response
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-}
+});

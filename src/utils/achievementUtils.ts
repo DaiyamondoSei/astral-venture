@@ -1,101 +1,241 @@
 
-import { validateDefined, validateNumber } from './validation/runtimeValidation';
+import { supabase } from '@/lib/supabaseClient';
+import { ValidationError } from './validation/ValidationError';
+import { handleError } from './errorHandling';
 
 /**
- * Calculate progress percentage for an achievement
- * 
- * @param current Current progress value
- * @param target Target progress value
- * @returns Progress percentage (0-100)
+ * Achievement categories
  */
-export function calculateProgressPercentage(current: number, target: number): number {
-  // Validate inputs
-  const validatedCurrent = validateNumber(current, 'current');
-  const validatedTarget = validateNumber(target, 'target');
-  
-  // Prevent division by zero
-  if (validatedTarget === 0) return 100;
-  
-  // Calculate percentage and ensure it's within 0-100 range
-  const percentage = Math.min(100, Math.max(0, (validatedCurrent / validatedTarget) * 100));
-  
-  return Math.round(percentage);
+export enum AchievementCategory {
+  MEDITATION = 'meditation',
+  PRACTICE = 'practice',
+  REFLECTION = 'reflection',
+  WISDOM = 'wisdom',
+  SPECIAL = 'special'
 }
 
 /**
- * Get icon name for an achievement category
- * 
- * @param category Achievement category
- * @returns Icon name for the category
+ * Achievement type
  */
-export function getCategoryIcon(category: string): string {
-  switch (category) {
-    case 'meditation':
-      return 'zen';
-    case 'chakra':
-      return 'energy';
-    case 'reflection':
-      return 'book';
-    case 'practice':
-      return 'flame';
-    case 'portal':
-      return 'portal';
-    case 'wisdom':
-      return 'brain';
-    case 'consciousness':
-      return 'eye';
-    case 'special':
-      return 'star';
-    default:
-      return 'award';
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  category: AchievementCategory;
+  icon?: string;
+  requirements?: Record<string, any>;
+}
+
+/**
+ * User achievement type
+ */
+export interface UserAchievement {
+  id: string;
+  user_id: string;
+  achievement_id: string;
+  progress: number;
+  awarded: boolean;
+  awarded_at?: string;
+  created_at: string;
+  updated_at: string;
+  achievement_data?: Achievement;
+}
+
+/**
+ * Get all available achievements
+ */
+export async function getAchievements(): Promise<Achievement[]> {
+  try {
+    const { data, error } = await supabase
+      .from('achievements')
+      .select('*');
+      
+    if (error) {
+      throw new ValidationError(`Failed to fetch achievements: ${error.message}`, {
+        code: 'fetch_achievements_error'
+      });
+    }
+    
+    return data as Achievement[];
+  } catch (error) {
+    handleError(error, {
+      context: 'getAchievements',
+      showToast: true,
+      customMessage: 'Unable to load achievements'
+    });
+    return [];
   }
 }
 
 /**
- * Format time elapsed since achievement was awarded
- * 
- * @param timestamp Timestamp when achievement was awarded
- * @returns Formatted time string
+ * Get user achievements
  */
-export function formatAchievementTime(timestamp: string | Date): string {
-  if (!timestamp) return 'Just now';
-  
-  const awardedAt = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-  const now = new Date();
-  const diffMs = now.getTime() - awardedAt.getTime();
-  
-  // Convert to minutes, hours, days
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-  if (diffDays < 30) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-  
-  // Format date for older achievements
-  return awardedAt.toLocaleDateString();
+export async function getUserAchievements(userId: string): Promise<UserAchievement[]> {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_user_achievements', { user_id_param: userId });
+      
+    if (error) {
+      throw new ValidationError(`Failed to fetch user achievements: ${error.message}`, {
+        code: 'fetch_user_achievements_error'
+      });
+    }
+    
+    return data as UserAchievement[];
+  } catch (error) {
+    handleError(error, {
+      context: 'getUserAchievements',
+      showToast: true,
+      customMessage: 'Unable to load your achievements'
+    });
+    return [];
+  }
 }
 
 /**
- * Safely get achievement progress or return zero
- * 
- * @param achievement Achievement object
- * @returns Current progress value or 0 if not found
+ * Track achievement progress
  */
-export function getAchievementProgress(achievement: any): number {
-  if (!achievement) return 0;
-  return typeof achievement.progress === 'number' ? achievement.progress : 0;
+export async function trackAchievementProgress(
+  userId: string,
+  achievementId: string,
+  progress: number,
+  autoAward = true
+): Promise<UserAchievement | null> {
+  try {
+    if (!userId) {
+      throw new ValidationError('User ID is required', { code: 'missing_user_id' });
+    }
+    
+    if (!achievementId) {
+      throw new ValidationError('Achievement ID is required', { code: 'missing_achievement_id' });
+    }
+    
+    const { data, error } = await supabase
+      .rpc('update_achievement_progress', {
+        user_id_param: userId,
+        achievement_id_param: achievementId,
+        progress_value: progress,
+        auto_award: autoAward
+      });
+      
+    if (error) {
+      throw new ValidationError(`Failed to update achievement progress: ${error.message}`, {
+        code: 'update_achievement_progress_error'
+      });
+    }
+    
+    return data as unknown as UserAchievement;
+  } catch (error) {
+    handleError(error, {
+      context: 'trackAchievementProgress',
+      showToast: true,
+      customMessage: 'Unable to update achievement progress'
+    });
+    return null;
+  }
 }
 
 /**
- * Safely get achievement target or default to 1
- * 
- * @param achievement Achievement object
- * @returns Target progress value or 1 if not found
+ * Check if user has unlocked a specific achievement
  */
-export function getAchievementTarget(achievement: any): number {
-  if (!achievement?.target && achievement?.target !== 0) return 1;
-  return typeof achievement.target === 'number' ? achievement.target : 1;
+export async function hasAchievement(userId: string, achievementId: string): Promise<boolean> {
+  try {
+    if (!userId || !achievementId) return false;
+    
+    const { data, error } = await supabase
+      .rpc('has_achievement', {
+        user_id_param: userId,
+        achievement_id_param: achievementId
+      });
+      
+    if (error) {
+      throw new ValidationError(`Failed to check achievement: ${error.message}`, {
+        code: 'check_achievement_error'
+      });
+    }
+    
+    return data as boolean;
+  } catch (error) {
+    handleError(error, {
+      context: 'hasAchievement',
+      showToast: false
+    });
+    return false;
+  }
+}
+
+/**
+ * Award an achievement directly
+ */
+export async function awardAchievement(
+  userId: string,
+  achievementId: string
+): Promise<boolean> {
+  try {
+    if (!userId) {
+      throw new ValidationError('User ID is required', { code: 'missing_user_id' });
+    }
+    
+    if (!achievementId) {
+      throw new ValidationError('Achievement ID is required', { code: 'missing_achievement_id' });
+    }
+    
+    const { data, error } = await supabase
+      .rpc('award_achievement', {
+        user_id_param: userId,
+        achievement_id_param: achievementId
+      });
+      
+    if (error) {
+      throw new ValidationError(`Failed to award achievement: ${error.message}`, {
+        code: 'award_achievement_error'
+      });
+    }
+    
+    return data as boolean;
+  } catch (error) {
+    handleError(error, {
+      context: 'awardAchievement',
+      showToast: true,
+      customMessage: 'Unable to award achievement'
+    });
+    return false;
+  }
+}
+
+/**
+ * Get achievement progress
+ */
+export async function getAchievementProgress(
+  userId: string,
+  achievementId: string
+): Promise<number> {
+  try {
+    if (!userId || !achievementId) return 0;
+    
+    const { data, error } = await supabase
+      .from('user_achievements')
+      .select('progress')
+      .eq('user_id', userId)
+      .eq('achievement_id', achievementId)
+      .single();
+      
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No data found
+        return 0;
+      }
+      throw new ValidationError(`Failed to get achievement progress: ${error.message}`, {
+        code: 'get_achievement_progress_error'
+      });
+    }
+    
+    return data?.progress || 0;
+  } catch (error) {
+    handleError(error, {
+      context: 'getAchievementProgress',
+      showToast: false
+    });
+    return 0;
+  }
 }
