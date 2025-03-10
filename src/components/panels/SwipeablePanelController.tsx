@@ -1,89 +1,79 @@
 
-import React, { useEffect, useRef } from 'react'
-import { usePanel } from '@/contexts/PanelContext'
-import SwipeablePanel from '@/components/ui/swipeable-panel'
-import UserProfilePanel from './UserProfilePanel'
-import AchievementsPanel from './AchievementsPanel'
+import React from 'react';
+import SwipeablePanel from '@/components/ui/swipeable-panel';
+import AchievementsPanel from './AchievementsPanel';
+import UserProfilePanel from './UserProfilePanel';
+import { usePanelState } from '@/hooks/usePanelState';
 
-const SWIPE_THRESHOLD = 50
-
+/**
+ * Manages the swipeable panels throughout the application
+ */
 const SwipeablePanelController: React.FC = () => {
   const { 
-    isProfileOpen, 
-    isAchievementsOpen, 
-    openPanel, 
-    closePanel 
-  } = usePanel()
-  
-  const touchStartY = useRef<number | null>(null)
-  
-  // Handle touch swipe gestures to open panels
-  useEffect(() => {
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartY.current = e.touches[0].clientY
-    }
-    
-    const handleTouchMove = (e: TouchEvent) => {
-      if (touchStartY.current === null) return
-      
-      const touchY = e.touches[0].clientY
-      const diff = touchY - touchStartY.current
-      
-      // Top edge swipe down to open profile panel
-      if (touchStartY.current < 20 && diff > SWIPE_THRESHOLD && !isProfileOpen && !isAchievementsOpen) {
-        openPanel('profile')
-        touchStartY.current = null
-      }
-      
-      // Bottom edge swipe up to open achievements panel
-      const viewportHeight = window.innerHeight
-      if (touchStartY.current > viewportHeight - 20 && diff < -SWIPE_THRESHOLD && !isProfileOpen && !isAchievementsOpen) {
-        openPanel('achievements')
-        touchStartY.current = null
-      }
-    }
-    
-    const handleTouchEnd = () => {
-      touchStartY.current = null
-    }
-    
-    // Add touch event listeners
-    document.addEventListener('touchstart', handleTouchStart)
-    document.addEventListener('touchmove', handleTouchMove)
-    document.addEventListener('touchend', handleTouchEnd)
-    
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart)
-      document.removeEventListener('touchmove', handleTouchMove)
-      document.removeEventListener('touchend', handleTouchEnd)
-    }
-  }, [isProfileOpen, isAchievementsOpen, openPanel])
-  
-  return (
-    <>
-      {/* Top Profile Panel */}
-      <SwipeablePanel
-        isOpen={isProfileOpen}
-        onOpenChange={(open) => !open && closePanel('profile')}
-        position="top"
-        height="50%"
-        initialState="half"
-      >
-        <UserProfilePanel />
-      </SwipeablePanel>
-      
-      {/* Bottom Achievements Panel */}
-      <SwipeablePanel
-        isOpen={isAchievementsOpen}
-        onOpenChange={(open) => !open && closePanel('achievements')}
-        position="bottom"
-        height="50%"
-        initialState="half"
-      >
-        <AchievementsPanel />
-      </SwipeablePanel>
-    </>
-  )
-}
+    isPanelOpen, 
+    setIsPanelOpen,
+    activePanelType,
+    activePanelPosition
+  } = usePanelState();
 
-export default SwipeablePanelController
+  // Handle panel open/close state changes
+  const handlePanelStateChange = (open: boolean) => {
+    setIsPanelOpen(open);
+  };
+
+  const renderPanelContent = () => {
+    switch (activePanelType) {
+      case 'achievements':
+        return <AchievementsPanel />;
+      case 'profile':
+        return <UserProfilePanel />;
+      default:
+        return null;
+    }
+  };
+
+  const getPanelSettings = () => {
+    // Default settings
+    let height = '80vh';
+    let initialState: 'open' | 'closed' = 'closed';
+    let position: 'bottom' | 'right' = 'bottom';
+
+    // Customize based on panel type
+    if (activePanelType === 'profile') {
+      height = '90vh';
+    } else if (activePanelType === 'achievements') {
+      height = '85vh';
+    }
+
+    // Apply position from context
+    if (activePanelPosition === 'right') {
+      position = 'right';
+    } else {
+      position = 'bottom';
+    }
+
+    if (isPanelOpen) {
+      initialState = 'open';
+    }
+
+    return { height, initialState, position };
+  };
+
+  const { height, initialState, position } = getPanelSettings();
+
+  if (!activePanelType) return null;
+
+  return (
+    <SwipeablePanel
+      isOpen={isPanelOpen}
+      onClose={() => handlePanelStateChange(false)}
+      position={position}
+      height={height}
+      initialState={initialState}
+    >
+      {renderPanelContent()}
+    </SwipeablePanel>
+  );
+};
+
+export default SwipeablePanelController;

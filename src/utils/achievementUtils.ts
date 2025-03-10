@@ -1,216 +1,101 @@
 
-import { validateDefined } from './typeValidation';
+import { validateDefined, validateNumber } from './validation/runtimeValidation';
 
 /**
- * Achievement status types
- */
-export type AchievementStatus = 'locked' | 'in-progress' | 'completed';
-
-/**
- * Achievement category types
- */
-export type AchievementCategory = 
-  | 'meditation'
-  | 'practice'
-  | 'reflection'
-  | 'chakra'
-  | 'consciousness'
-  | 'portal'
-  | 'learning'
-  | 'community';
-
-/**
- * Calculate the percentage of progress towards an achievement
+ * Calculate progress percentage for an achievement
  * 
- * @param current - Current progress value
- * @param target - Target value for completion
+ * @param current Current progress value
+ * @param target Target progress value
  * @returns Progress percentage (0-100)
  */
 export function calculateProgressPercentage(current: number, target: number): number {
   // Validate inputs
-  validateDefined(current, 'current');
-  validateDefined(target, 'target');
+  const validatedCurrent = validateNumber(current, 'current');
+  const validatedTarget = validateNumber(target, 'target');
   
-  if (target <= 0) {
-    throw new Error('Target value must be greater than zero');
-  }
+  // Prevent division by zero
+  if (validatedTarget === 0) return 100;
   
-  // Calculate percentage, clamped between 0-100
-  const percentage = Math.min(100, Math.max(0, (current / target) * 100));
+  // Calculate percentage and ensure it's within 0-100 range
+  const percentage = Math.min(100, Math.max(0, (validatedCurrent / validatedTarget) * 100));
   
-  // Return rounded percentage
   return Math.round(percentage);
 }
 
 /**
- * Determine achievement status based on progress
+ * Get icon name for an achievement category
  * 
- * @param current - Current progress value
- * @param target - Target value for completion
- * @returns Achievement status
+ * @param category Achievement category
+ * @returns Icon name for the category
  */
-export function getAchievementStatus(current: number, target: number): AchievementStatus {
-  // Validate inputs
-  validateDefined(current, 'current');
-  validateDefined(target, 'target');
-  
-  if (current >= target) {
-    return 'completed';
-  }
-  
-  return current > 0 ? 'in-progress' : 'locked';
-}
-
-/**
- * Format achievement progress message
- * 
- * @param current - Current progress value
- * @param target - Target value for completion
- * @param format - Format string (optional)
- * @returns Formatted progress message
- */
-export function formatProgressMessage(
-  current: number, 
-  target: number,
-  format = '{current}/{target}'
-): string {
-  // Validate inputs
-  validateDefined(current, 'current');
-  validateDefined(target, 'target');
-  
-  // Replace placeholders with values
-  return format
-    .replace('{current}', String(current))
-    .replace('{target}', String(target))
-    .replace('{percentage}', `${calculateProgressPercentage(current, target)}%`);
-}
-
-/**
- * Check if an achievement is newly completed
- * 
- * @param previousValue - Previous progress value
- * @param currentValue - Current progress value
- * @param targetValue - Target value for completion
- * @returns True if achievement was just completed
- */
-export function isNewlyCompleted(
-  previousValue: number, 
-  currentValue: number, 
-  targetValue: number
-): boolean {
-  return previousValue < targetValue && currentValue >= targetValue;
-}
-
-/**
- * Get color for achievement category
- * 
- * @param category - Achievement category
- * @returns CSS color string for the category
- */
-export function getCategoryColor(category: AchievementCategory): string {
+export function getCategoryIcon(category: string): string {
   switch (category) {
     case 'meditation':
-      return 'hsl(250, 95%, 70%)'; // Purple
-    case 'practice':
-      return 'hsl(200, 95%, 50%)'; // Blue
-    case 'reflection':
-      return 'hsl(170, 80%, 40%)'; // Teal
+      return 'zen';
     case 'chakra':
-      return 'hsl(40, 100%, 50%)'; // Gold
-    case 'consciousness':
-      return 'hsl(280, 90%, 60%)'; // Violet
+      return 'energy';
+    case 'reflection':
+      return 'book';
+    case 'practice':
+      return 'flame';
     case 'portal':
-      return 'hsl(320, 80%, 55%)'; // Magenta
-    case 'learning':
-      return 'hsl(140, 70%, 45%)'; // Green
-    case 'community':
-      return 'hsl(20, 90%, 55%)'; // Orange
+      return 'portal';
+    case 'wisdom':
+      return 'brain';
+    case 'consciousness':
+      return 'eye';
+    case 'special':
+      return 'star';
     default:
-      return 'hsl(220, 15%, 50%)'; // Neutral slate
+      return 'award';
   }
 }
 
 /**
- * Track achievement progress for a user
+ * Format time elapsed since achievement was awarded
  * 
- * @param achievementId - The ID of the achievement to track
- * @param progress - The progress value to add
- * @returns Promise resolving to updated progress percentage
+ * @param timestamp Timestamp when achievement was awarded
+ * @returns Formatted time string
  */
-export async function trackAchievementProgress(
-  achievementId: string, 
-  progress: number
-): Promise<number> {
-  try {
-    // In a real implementation, this would call a Supabase edge function
-    // For now, we'll just simulate the behavior
-    console.info(`Tracking achievement progress: ${achievementId}, +${progress}`);
-    return Math.min(100, Math.round(Math.random() * 100)); // Simulated progress
-  } catch (error) {
-    console.error("Failed to track achievement progress:", error);
-    throw error;
-  }
+export function formatAchievementTime(timestamp: string | Date): string {
+  if (!timestamp) return 'Just now';
+  
+  const awardedAt = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  const now = new Date();
+  const diffMs = now.getTime() - awardedAt.getTime();
+  
+  // Convert to minutes, hours, days
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+  if (diffDays < 30) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+  
+  // Format date for older achievements
+  return awardedAt.toLocaleDateString();
 }
 
 /**
- * Get user achievements list
+ * Safely get achievement progress or return zero
  * 
- * @returns Promise resolving to achievement array
+ * @param achievement Achievement object
+ * @returns Current progress value or 0 if not found
  */
-export async function getUserAchievements(): Promise<Achievement[]> {
-  try {
-    // In a real implementation, this would fetch from Supabase
-    // For now, return sample data
-    return [
-      {
-        id: 'first-meditation',
-        title: 'First Meditation',
-        description: 'Complete your first meditation session',
-        category: 'meditation',
-        progress: 100,
-        target: 1,
-        awarded: true,
-        awardedAt: new Date().toISOString(),
-        icon: 'lotus'
-      },
-      {
-        id: 'reflection-streak',
-        title: 'Reflection Streak',
-        description: 'Complete 7 consecutive days of reflection',
-        category: 'reflection',
-        progress: 5,
-        target: 7,
-        awarded: false,
-        icon: 'thinking'
-      }
-    ];
-  } catch (error) {
-    console.error("Failed to fetch user achievements:", error);
-    return [];
-  }
+export function getAchievementProgress(achievement: any): number {
+  if (!achievement) return 0;
+  return typeof achievement.progress === 'number' ? achievement.progress : 0;
 }
 
 /**
- * Achievement data interface
+ * Safely get achievement target or default to 1
+ * 
+ * @param achievement Achievement object
+ * @returns Target progress value or 1 if not found
  */
-export interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  category: AchievementCategory;
-  progress: number;
-  target: number;
-  awarded: boolean;
-  awardedAt?: string;
-  icon?: string;
+export function getAchievementTarget(achievement: any): number {
+  if (!achievement?.target && achievement?.target !== 0) return 1;
+  return typeof achievement.target === 'number' ? achievement.target : 1;
 }
-
-export default {
-  calculateProgressPercentage,
-  getAchievementStatus,
-  formatProgressMessage,
-  isNewlyCompleted,
-  getCategoryColor,
-  trackAchievementProgress,
-  getUserAchievements
-};

@@ -57,6 +57,9 @@ export interface PerfConfig {
   intelligentProfiling?: boolean;
   inactiveTabThrottling?: boolean;
   batchUpdates?: boolean;
+  
+  // Device capability (for components that need to access this directly)
+  deviceCapability?: 'low' | 'medium' | 'high';
 }
 
 // Define default configurations for different device capabilities
@@ -86,6 +89,7 @@ export const defaultConfigs: Record<'low' | 'medium' | 'high', PerfConfig> = {
     intelligentProfiling: false,
     inactiveTabThrottling: true,
     batchUpdates: true,
+    deviceCapability: 'low',
     animations: {
       reduceMotion: true,
       enableFancyTransitions: false
@@ -124,6 +128,7 @@ export const defaultConfigs: Record<'low' | 'medium' | 'high', PerfConfig> = {
     intelligentProfiling: true,
     inactiveTabThrottling: true,
     batchUpdates: true,
+    deviceCapability: 'medium',
     animations: {
       reduceMotion: false,
       enableFancyTransitions: false
@@ -162,6 +167,7 @@ export const defaultConfigs: Record<'low' | 'medium' | 'high', PerfConfig> = {
     intelligentProfiling: true,
     inactiveTabThrottling: false,
     batchUpdates: false,
+    deviceCapability: 'high',
     animations: {
       reduceMotion: false,
       enableFancyTransitions: true

@@ -1,69 +1,82 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Award, Check, Star, Trophy, Zap, Sparkles } from 'lucide-react';
-import { calculateProgressPercentage, getCategoryColor } from '@/utils/achievementUtils';
+import { Award, Star, Brain, Flame, BookOpen, Zap, Sparkles } from 'lucide-react';
+import { Achievement, AchievementCategory } from '@/types/achievement';
+import { calculateProgressPercentage, getAchievementTarget } from '@/utils/achievementUtils';
 
-interface AchievementProps {
-  achievement: {
-    id: string;
-    title: string;
-    description: string;
-    category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special' | 'portal' | 'chakra';
-    progress?: number;
-    awarded?: boolean;
-    icon?: 'star' | 'trophy' | 'award' | 'check' | 'zap' | 'sparkles';
-  };
+interface AchievementItemProps {
+  achievement: Achievement;
+  onClick: () => void;
 }
 
-const AchievementItem: React.FC<AchievementProps> = ({ achievement }) => {
-  const progressPercentage = calculateProgressPercentage(achievement.progress || 0);
-  const categoryColorClass = getCategoryColor(achievement.category);
-  
-  const iconMap = {
-    star: <Star className="h-5 w-5" />,
-    trophy: <Trophy className="h-5 w-5" />,
-    award: <Award className="h-5 w-5" />,
-    check: <Check className="h-5 w-5" />,
-    zap: <Zap className="h-5 w-5" />,
-    sparkles: <Sparkles className="h-5 w-5" />
+const AchievementItem: React.FC<AchievementItemProps> = ({ achievement, onClick }) => {
+  const progressPercentage = achievement.progress !== undefined && achievement.target !== undefined
+    ? calculateProgressPercentage(achievement.progress, achievement.target)
+    : calculateProgressPercentage(achievement.progress || 0, getAchievementTarget(achievement));
+
+  const getIconComponent = (category: AchievementCategory) => {
+    switch (category) {
+      case 'meditation':
+        return <Zap className="text-purple-400" />;
+      case 'chakra':
+        return <Flame className="text-orange-400" />;
+      case 'reflection':
+        return <BookOpen className="text-blue-400" />;
+      case 'practice':
+        return <Flame className="text-red-400" />;
+      case 'portal':
+        return <Zap className="text-cyan-400" />;
+      case 'wisdom':
+        return <Brain className="text-emerald-400" />;
+      case 'consciousness':
+        return <Star className="text-yellow-400" />;
+      case 'special':
+        return <Sparkles className="text-pink-400" />;
+      default:
+        return <Award className="text-gray-400" />;
+    }
   };
-  
-  const icon = achievement.icon ? iconMap[achievement.icon] : <Award className="h-5 w-5" />;
-  
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="bg-white/5 backdrop-blur-md rounded-lg p-4 hover:bg-white/10 transition-colors"
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="bg-gray-800/60 backdrop-blur-md rounded-lg p-4 cursor-pointer mb-3 border border-gray-700/50 hover:border-gray-600/70 transition-colors"
     >
-      <div className="flex justify-between items-start">
-        <div className="flex items-start space-x-3">
-          <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${categoryColorClass} flex items-center justify-center text-white`}>
-            {icon}
-          </div>
-          <div>
-            <h3 className="font-medium text-white text-base">{achievement.title}</h3>
-            <p className="text-white/70 text-sm">{achievement.description}</p>
-          </div>
+      <div className="flex items-center space-x-3">
+        <div className="p-2 bg-gray-700/50 rounded-full">
+          {getIconComponent(achievement.category)}
+        </div>
+        <div className="flex-1">
+          <h3 className="text-white font-medium">{achievement.title}</h3>
+          <p className="text-gray-400 text-sm truncate">{achievement.description}</p>
         </div>
         {achievement.awarded && (
-          <div className="bg-green-500/20 rounded-full p-1">
-            <Check className="h-4 w-4 text-green-500" />
+          <div className="flex-shrink-0">
+            <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded-full">
+              Awarded
+            </span>
           </div>
         )}
       </div>
       
+      {/* Progress bar */}
       {!achievement.awarded && (
         <div className="mt-3">
-          <div className="w-full bg-white/10 rounded-full h-2 mt-1">
+          <div className="bg-gray-700/50 h-2 rounded-full overflow-hidden">
             <div 
-              className={`h-2 rounded-full bg-gradient-to-r ${categoryColorClass}`}
+              className="bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full" 
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
-          <p className="text-white/60 text-xs mt-1">{progressPercentage}% complete</p>
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-gray-400">
+              {achievement.progress || 0} / {achievement.target || getAchievementTarget(achievement)}
+            </span>
+            <span className="text-xs text-gray-400">{progressPercentage}%</span>
+          </div>
         </div>
       )}
     </motion.div>

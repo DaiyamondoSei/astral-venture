@@ -1,19 +1,15 @@
 
-import React, { ReactNode, useEffect, useRef, useState } from 'react';
-import { motion, PanInfo, useAnimation } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
 
 export interface SwipeablePanelProps {
-  children: ReactNode;
+  children: React.ReactNode;
   isOpen: boolean;
   onClose: () => void;
-  position?: 'bottom' | 'right';
-  height?: string;
-  width?: string; 
-  className?: string;
-  showHandle?: boolean;
-  allowClose?: boolean;
-  backdrop?: boolean;
+  position: 'bottom' | 'right';
+  height: string;
+  initialState: 'open' | 'closed';
 }
 
 const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
@@ -21,121 +17,79 @@ const SwipeablePanel: React.FC<SwipeablePanelProps> = ({
   isOpen,
   onClose,
   position = 'bottom',
-  height = '50%',
-  width = '100%',
-  className,
-  showHandle = true,
-  allowClose = true,
-  backdrop = true
+  height = '70vh',
+  initialState = 'closed'
 }) => {
-  const controls = useAnimation();
-  const [dragging, setDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Panel dimensions
-  const isBottomPanel = position === 'bottom';
-  const panelStyle = isBottomPanel 
-    ? { height, width: '100%' }
-    : { width, height: '100%' };
-  
-  // Initial position
-  const initialPosition = isBottomPanel 
-    ? { y: '100%' } 
-    : { x: '100%' };
-  
-  // Open position 
-  const openPosition = { x: 0, y: 0 };
-  
-  useEffect(() => {
-    if (isOpen) {
-      controls.start(openPosition);
-    } else {
-      controls.start(initialPosition);
-    }
-  }, [isOpen, controls, initialPosition, openPosition]);
-  
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    setDragging(false);
-    
-    if (!allowClose) {
-      controls.start(openPosition);
-      return;
-    }
-    
-    const threshold = 100; // Pixels to trigger close
-    const velocity = isBottomPanel ? info.velocity.y : info.velocity.x;
-    const offset = isBottomPanel ? info.offset.y : info.offset.x;
-    
-    if (offset > threshold || velocity > 500) {
-      onClose();
-    } else {
-      controls.start(openPosition);
-    }
-  };
-  
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (!allowClose) return;
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-  
-  const dragConstraints = useRef<any>(null);
-  
+  // Animation variants based on panel position
+  const variants = position === 'bottom' 
+    ? {
+        open: { y: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } },
+        closed: { y: '100%', transition: { type: 'spring', stiffness: 300, damping: 30 } }
+      }
+    : {
+        open: { x: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } },
+        closed: { x: '100%', transition: { type: 'spring', stiffness: 300, damping: 30 } }
+      };
+
+  // Style based on position
+  const panelStyle = position === 'bottom'
+    ? {
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height,
+        zIndex: 50,
+        borderTopLeftRadius: '12px',
+        borderTopRightRadius: '12px',
+        background: 'rgba(7, 10, 25, 0.85)',
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.15)',
+        overflow: 'hidden'
+      }
+    : {
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: '90vw',
+        maxWidth: '450px',
+        zIndex: 50,
+        borderTopLeftRadius: '12px',
+        borderBottomLeftRadius: '12px',
+        background: 'rgba(7, 10, 25, 0.85)',
+        backdropFilter: 'blur(10px)',
+        boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
+        overflow: 'hidden'
+      };
+
+  // Render panel conditionally based on isOpen state
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isOpen ? 1 : 0 }}
-      exit={{ opacity: 0 }}
-      className={cn(
-        'fixed inset-0 z-50 overflow-hidden',
-        backdrop ? 'bg-black/50' : 'pointer-events-none'
-      )}
-      style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
-      onClick={handleBackdropClick}
-    >
-      <motion.div
-        ref={containerRef}
-        initial={initialPosition}
-        animate={controls}
-        exit={initialPosition}
-        drag={isBottomPanel ? 'y' : 'x'}
-        dragConstraints={dragConstraints}
-        dragElastic={0.1}
-        dragMomentum={false}
-        onDragStart={() => setDragging(true)}
-        onDragEnd={handleDragEnd}
-        className={cn(
-          'absolute bg-background rounded-t-xl shadow-lg',
-          isBottomPanel ? 'bottom-0 left-0 right-0' : 'top-0 bottom-0 right-0',
-          isBottomPanel ? 'rounded-t-xl' : 'rounded-l-xl',
-          'pointer-events-auto',
-          className
-        )}
-        style={panelStyle}
-      >
-        {showHandle && isBottomPanel && (
-          <div className="flex justify-center p-2">
-            <div className="w-12 h-1.5 bg-muted-foreground/20 rounded-full" />
-          </div>
-        )}
-        
-        {showHandle && !isBottomPanel && (
-          <div className="absolute top-1/2 left-2 -translate-y-1/2">
-            <div className="h-12 w-1.5 bg-muted-foreground/20 rounded-full" />
-          </div>
-        )}
-        
-        <div 
-          className={cn(
-            'overflow-y-auto',
-            isBottomPanel ? 'h-full' : 'h-full w-full'
-          )}
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="panel-container"
+          initial="closed"
+          animate="open"
+          exit="closed"
+          variants={variants}
+          style={panelStyle as any}
         >
-          {children}
-        </div>
-      </motion.div>
-    </motion.div>
+          <div className="panel-header flex justify-between items-center p-4 border-b border-gray-800">
+            <button
+              onClick={onClose}
+              className="close-button p-1 rounded-full hover:bg-gray-800 transition-colors"
+              aria-label="Close panel"
+            >
+              <X size={20} className="text-gray-400" />
+            </button>
+          </div>
+          <div className="panel-content p-4 overflow-y-auto" style={{ height: 'calc(100% - 60px)' }}>
+            {children}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 

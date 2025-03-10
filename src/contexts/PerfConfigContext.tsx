@@ -32,7 +32,7 @@ export interface PerfConfigContextType {
 const PerfConfigContext = createContext<PerfConfigContextType | undefined>(undefined);
 
 export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Detect the device capability (in a real app, we would do more sophisticated detection)
+  // Detect the device capability
   const [deviceCapability, setDeviceCapability] = useState<'low' | 'medium' | 'high'>('medium');
   const [manualPerformanceMode, setManualPerformanceMode] = useState(false);
   const [config, setConfig] = useState<PerfConfig>(defaultConfigs[deviceCapability]);

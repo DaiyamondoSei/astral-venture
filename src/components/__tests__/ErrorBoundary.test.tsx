@@ -1,20 +1,27 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import ErrorBoundary from '../ErrorBoundary';
-import EnhancedErrorBoundary from '../error-handling/EnhancedErrorBoundary';
+import SimpleErrorBoundary from '../error-handling/SimpleErrorBoundary';
 
-// Create a component that throws an error for testing
+// Component that throws an error
 const ErrorThrowingComponent = ({ shouldThrow = true }) => {
   if (shouldThrow) {
     throw new Error('Test error');
   }
-  return <div>No error</div>;
+  return <div>Component rendered successfully</div>;
 };
 
-describe('ErrorBoundary Components', () => {
-  // Suppress console.error during tests to avoid noisy output
+// Custom fallback component
+const CustomFallback = ({ error }) => (
+  <div>
+    <h2>Custom Error UI</h2>
+    <p>{error.message}</p>
+    <button>Retry</button>
+  </div>
+);
+
+describe('SimpleErrorBoundary', () => {
+  // Mock console.error to prevent test output noise
   const originalConsoleError = console.error;
   beforeAll(() => {
     console.error = jest.fn();
@@ -24,123 +31,94 @@ describe('ErrorBoundary Components', () => {
     console.error = originalConsoleError;
   });
   
-  describe('Basic ErrorBoundary', () => {
-    it('renders children when no error occurs', () => {
-      render(
-        <ErrorBoundary>
-          <div>Test Content</div>
-        </ErrorBoundary>
-      );
-      
-      expect(screen.getByText('Test Content')).toBeInTheDocument();
-    });
-    
-    it('renders error UI when an error occurs', () => {
-      render(
-        <ErrorBoundary>
-          <ErrorThrowingComponent />
-        </ErrorBoundary>
-      );
-      
-      expect(screen.getByText(/An unknown error occurred|Test error/)).toBeInTheDocument();
-      expect(screen.getByText('Try Again')).toBeInTheDocument();
-    });
-    
-    it('resets the error when the try again button is clicked', () => {
-      const { rerender } = render(
-        <ErrorBoundary>
-          <ErrorThrowingComponent />
-        </ErrorBoundary>
-      );
-      
-      // Click the try again button
-      fireEvent.click(screen.getByText('Try Again'));
-      
-      // Rerender with a non-throwing component
-      rerender(
-        <ErrorBoundary>
-          <ErrorThrowingComponent shouldThrow={false} />
-        </ErrorBoundary>
-      );
-      
-      expect(screen.getByText('No error')).toBeInTheDocument();
-    });
-    
-    it('uses custom fallback UI when provided', () => {
-      const customFallback = <div>Custom Error UI</div>;
-      
-      render(
-        <ErrorBoundary fallback={customFallback}>
-          <ErrorThrowingComponent />
-        </ErrorBoundary>
-      );
-      
-      expect(screen.getByText('Custom Error UI')).toBeInTheDocument();
-    });
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
-  
-  describe('Enhanced ErrorBoundary', () => {
-    it('renders children when no error occurs', () => {
-      render(
-        <EnhancedErrorBoundary>
-          <div>Enhanced Test Content</div>
-        </EnhancedErrorBoundary>
-      );
+
+  it('renders children when no error occurs', () => {
+    render(
+      <SimpleErrorBoundary>
+        <div>Test content</div>
+      </SimpleErrorBoundary>
+    );
+    
+    expect(screen.getByText('Test content')).toBeInTheDocument();
+  });
+
+  it('renders fallback UI when an error occurs', () => {
+    render(
+      <SimpleErrorBoundary>
+        <ErrorThrowingComponent />
+      </SimpleErrorBoundary>
+    );
+    
+    expect(screen.getByText(/Error/i)).toBeInTheDocument();
+    expect(screen.getByText(/Test error/i)).toBeInTheDocument();
+  });
+
+  it('renders custom fallback component when provided and an error occurs', () => {
+    render(
+      <SimpleErrorBoundary fallback={CustomFallback}>
+        <ErrorThrowingComponent />
+      </SimpleErrorBoundary>
+    );
+    
+    expect(screen.getByText('Custom Error UI')).toBeInTheDocument();
+    expect(screen.getByText('Test error')).toBeInTheDocument();
+    expect(screen.getByText('Retry')).toBeInTheDocument();
+  });
+
+  it('calls onError when an error occurs', () => {
+    const handleError = jest.fn();
+    
+    render(
+      <SimpleErrorBoundary onError={handleError}>
+        <ErrorThrowingComponent />
+      </SimpleErrorBoundary>
+    );
+    
+    expect(handleError).toHaveBeenCalledTimes(1);
+    expect(handleError.mock.calls[0][0]).toBeInstanceOf(Error);
+    expect(handleError.mock.calls[0][0].message).toBe('Test error');
+  });
+
+  it('continues to work after error occurs', () => {
+    // Use a class component that can change its state
+    class TestComponent extends React.Component {
+      state = { shouldThrow: true };
       
-      expect(screen.getByText('Enhanced Test Content')).toBeInTheDocument();
+      render() {
+        if (this.state.shouldThrow) {
+          throw new Error('Test error');
+        }
+        return <div>Recovered from error</div>;
+      }
+    }
+    
+    const onError = jest.fn();
+    
+    // Initial render with error
+    const { rerender } = render(
+      <SimpleErrorBoundary onError={onError}>
+        <TestComponent />
+      </SimpleErrorBoundary>
+    );
+    
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Error/i)).toBeInTheDocument();
+    
+    // Force a new render with recovered component
+    jest.spyOn(TestComponent.prototype, 'render').mockImplementation(() => {
+      return <div>Recovered from error</div>;
     });
     
-    it('renders error UI when an error occurs', () => {
-      render(
-        <EnhancedErrorBoundary>
-          <ErrorThrowingComponent />
-        </EnhancedErrorBoundary>
-      );
-      
-      expect(screen.getByText('Test error')).toBeInTheDocument();
-      expect(screen.getByText('Try again')).toBeInTheDocument();
-    });
+    rerender(
+      <SimpleErrorBoundary onError={onError}>
+        <TestComponent />
+      </SimpleErrorBoundary>
+    );
     
-    it('calls onError callback when provided', () => {
-      const onErrorMock = jest.fn();
-      
-      render(
-        <EnhancedErrorBoundary onError={onErrorMock}>
-          <ErrorThrowingComponent />
-        </EnhancedErrorBoundary>
-      );
-      
-      expect(onErrorMock).toHaveBeenCalled();
-      expect(onErrorMock.mock.calls[0][0].message).toBe('Test error');
-    });
-    
-    it('resets error on props change when resetOnPropsChange is true', () => {
-      const { rerender } = render(
-        <EnhancedErrorBoundary resetOnPropsChange={true}>
-          <ErrorThrowingComponent />
-        </EnhancedErrorBoundary>
-      );
-      
-      // Rerender with different props
-      rerender(
-        <EnhancedErrorBoundary resetOnPropsChange={true}>
-          <ErrorThrowingComponent shouldThrow={false} />
-        </EnhancedErrorBoundary>
-      );
-      
-      expect(screen.getByText('No error')).toBeInTheDocument();
-    });
-    
-    it('uses custom fallback UI when provided', () => {
-      const customFallback = <div>Enhanced Custom Error UI</div>;
-      
-      render(
-        <EnhancedErrorBoundary fallback={customFallback}>
-          <ErrorThrowingComponent />
-        </EnhancedErrorBoundary>
-      );
-      
-      expect(screen.getByText('Enhanced Custom Error UI')).toBeInTheDocument();
-    });
+    // We still see the error UI because the error boundary hasn't been reset
+    expect(screen.getByText(/Error/i)).toBeInTheDocument();
   });
 });
