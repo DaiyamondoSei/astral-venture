@@ -38,3 +38,33 @@ export interface ContextData {
     chakrasActivated?: string[] | string;
   };
 }
+
+export interface ChakraInsight {
+  chakra: string;
+  status: 'active' | 'balanced' | 'blocked' | 'overactive' | 'underactive';
+  description: string;
+  recommendations: string[];
+}
+
+export interface AIQuestion {
+  text: string;
+  context?: string;
+  type?: 'general' | 'reflection' | 'chakra' | 'meditation';
+  reflectionId?: string;
+}
+
+export interface AIResponse {
+  response: string;
+  insights: any[];
+  metrics?: {
+    model: string;
+    tokens: number;
+    processingTime: number;
+  };
+}
+
+export interface ChakraInsightsOptions {
+  timeFrame?: 'week' | 'month' | 'all';
+  chakraFilter?: string[];
+  includeRecommendations?: boolean;
+}

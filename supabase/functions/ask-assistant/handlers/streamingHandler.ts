@@ -1,5 +1,5 @@
 
-import { createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
+import { corsHeaders, createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
 import { generateStreamingResponse, AIModel } from "../services/openai/index.ts";
 
 // Handle streaming responses with improved implementation
@@ -16,7 +16,18 @@ export async function handleStreamingRequest(
       { model }
     );
     
-    return response;
+    // Add CORS headers to the streaming response
+    const headers = new Headers(response.headers);
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      headers.set(key, value);
+    });
+    
+    // Return the response with CORS headers
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
   } catch (error) {
     console.error("Error in streaming request:", error);
     return createErrorResponse(

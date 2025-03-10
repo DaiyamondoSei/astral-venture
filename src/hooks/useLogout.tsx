@@ -20,6 +20,8 @@ export function useLogout() {
       
       // Clear any user-specific data from localStorage
       localStorage.removeItem('hasVisitedQuanex');
+      localStorage.removeItem('lastActiveChallengeDay');
+      localStorage.removeItem('userSettings');
       
       // Redirect to login page
       navigate('/login');

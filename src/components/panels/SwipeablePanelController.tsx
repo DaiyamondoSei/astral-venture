@@ -65,9 +65,9 @@ const SwipeablePanelController: React.FC = () => {
       <SwipeablePanel
         isOpen={isProfileOpen}
         onOpenChange={(open) => !open && closePanel('profile')}
-        height={{ peek: '15%', half: '50%', full: '90%' }}
-        initialState="half"
         position="top"
+        height="50%"
+        initialState="half"
       >
         <UserProfilePanel />
       </SwipeablePanel>
@@ -76,9 +76,9 @@ const SwipeablePanelController: React.FC = () => {
       <SwipeablePanel
         isOpen={isAchievementsOpen}
         onOpenChange={(open) => !open && closePanel('achievements')}
-        height={{ peek: '15%', half: '50%', full: '90%' }}
-        initialState="half"
         position="bottom"
+        height="50%"
+        initialState="half"
       >
         <AchievementsPanel />
       </SwipeablePanel>

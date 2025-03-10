@@ -56,3 +56,42 @@ Identify:
 - Practices that might help activate underactive chakras
 `;
 }
+
+/**
+ * Create a prompt for spiritual growth questions
+ */
+export function createSpiritualGrowthPrompt(question: string, userLevel: string = "beginner"): string {
+  return `
+[Context: User is at ${userLevel} level in their spiritual practice]
+
+QUESTION:
+${question}
+
+Please provide:
+- A thoughtful answer tailored to their level
+- Practical suggestions they can implement
+- Relevant concepts that might deepen their understanding
+- A gentle nudge toward the next step in their growth
+`;
+}
+
+/**
+ * Create a prompt for meditation guidance
+ */
+export function createMeditationGuidancePrompt(question: string, practiceHistory: any = {}): string {
+  const experienceLevel = practiceHistory.meditationMinutes > 500 ? "experienced" : 
+                          practiceHistory.meditationMinutes > 100 ? "intermediate" : "beginner";
+  
+  return `
+[Context: User is at ${experienceLevel} level in meditation practice with approximately ${practiceHistory.meditationMinutes || 0} minutes of recorded practice]
+
+QUESTION ABOUT MEDITATION:
+${question}
+
+Please provide:
+- Guidance appropriate to their experience level
+- Practical meditation techniques they could try
+- Common challenges they might encounter and how to overcome them
+- Encouragement to deepen their practice
+`;
+}

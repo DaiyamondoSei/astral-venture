@@ -35,15 +35,16 @@ export async function getCachedResponse(
 export async function cacheResponse(
   cacheKey: string, 
   response: Response, 
-  isStreamingResponse: boolean
+  isStreamingResponse: boolean,
+  ttl: number = DEFAULT_CACHE_TTL
 ): Promise<void> {
   // Clean up cache first
   await cleanupCache();
   
   responseCache.set(cacheKey, {
-    response: response,
+    response: response.clone(), // Store a clone of the response
     timestamp: Date.now(),
-    expiresAt: Date.now() + DEFAULT_CACHE_TTL,
+    expiresAt: Date.now() + ttl,
     isStreamingResponse
   });
   

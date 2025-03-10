@@ -1,118 +1,92 @@
 
-import { useState, useCallback, useMemo } from 'react';
-import { AchievementEventType, IAchievementData, ProgressTrackingResult } from './types';
+import { useCallback } from 'react';
+import { AchievementState } from './types';
 
-interface UseProgressTrackingProps {
-  userId?: string;
-  onProgress?: (type: string, value: number, previousValue: number) => void;
+type ProgressTrackingKey = string;
+type ProgressValue = number;
+type ProgressTrackingRecord = Record<ProgressTrackingKey, ProgressValue>;
+
+interface ActivityDetails {
+  value?: number;
+  amount?: number;
+  metadata?: Record<string, any>;
 }
 
-/**
- * Hook to track progress for various achievement types
- */
-export function useProgressTracking(state: any, setProgressTracking: (progress: Record<string, number>) => void): ProgressTrackingResult {
-  // Create the result object with methods that use the state and setter
-  const result = useMemo((): ProgressTrackingResult => {
-    // Get progress value for a specific type
-    const getProgressValue = (type: string): number => {
-      return state.progressTracking[type] || 0;
-    };
-    
-    // Track progress for a specific type
-    const trackProgress = (type: string, amount: number) => {
-      const currentValue = getProgressValue(type);
-      const newValue = Math.max(0, currentValue + amount);
-      
-      if (currentValue !== newValue) {
-        setProgressTracking({
-          ...state.progressTracking,
-          [type]: newValue
-        });
-      }
-    };
-    
-    // Reset progress for a specific type
-    const resetProgress = (type: string) => {
-      setProgressTracking({
-        ...state.progressTracking,
-        [type]: 0
-      });
-    };
-    
-    // Log activity for tracking and analysis
-    const logActivity = (activityType: string, details: Record<string, any> = {}) => {
-      let amountToAdd = 1; // Default value to add
-      
-      // Extract amount or value from details
-      if (details.value !== undefined) {
-        amountToAdd = details.value;
-      } else if (details.amount !== undefined) {
-        amountToAdd = details.amount;
-      }
-      
-      // Track progress based on activity type
-      switch (activityType) {
-        case 'reflection_completed':
-          trackProgress('reflections', amountToAdd);
-          break;
-        case 'meditation_completed':
-          trackProgress('meditation_minutes', amountToAdd);
-          break;
-        case 'chakra_activated':
-          trackProgress('chakras_activated', amountToAdd);
-          break;
-        case 'wisdom_resources':
-          trackProgress('wisdom_resources', amountToAdd);
-          break;
-        default:
-          // If it's a generic tracked event, increment by the specified amount
-          if (activityType.startsWith('track_')) {
-            const trackType = activityType.replace('track_', '');
-            trackProgress(trackType, amountToAdd);
-          } else {
-            // If the activity type matches directly a tracked metric, update it
-            if (Object.keys(state.progressTracking).includes(activityType)) {
-              trackProgress(activityType, amountToAdd);
-            }
-          }
-      }
-    };
-    
-    // Track multiple progress types at once
-    const trackMultipleProgress = (progressUpdates: Record<string, number>) => {
-      const newProgress = { ...state.progressTracking };
-      let hasChanges = false;
-      
-      // Update each progress type
-      Object.entries(progressUpdates).forEach(([type, amount]) => {
-        const currentValue = state.progressTracking[type] || 0;
-        const newValue = Math.max(0, currentValue + amount);
-        
-        if (currentValue !== newValue) {
-          newProgress[type] = newValue;
-          hasChanges = true;
-        }
-      });
-      
-      // Only update if there were changes
-      if (hasChanges) {
-        setProgressTracking(newProgress);
-      }
-    };
+export const useProgressTracking = (
+  state: AchievementState,
+  setProgressTracking: (progress: ProgressTrackingRecord) => void
+) => {
+  // Get current progress value for a tracking type
+  const getProgressValue = useCallback((trackingType: ProgressTrackingKey): ProgressValue => {
+    return state.progressTracking?.[trackingType] || 0;
+  }, [state.progressTracking]);
 
-    return {
-      earnedPoints: 0,
-      progress: state.progressTracking,
-      didUnlockAchievement: false,
-      unlockedAchievements: [],
-      updated: false,
-      getProgressValue,
-      trackProgress,
-      resetProgress,
-      logActivity,
-      trackMultipleProgress
-    };
+  // Update progress for a specific tracking type
+  const trackProgress = useCallback((trackingType: ProgressTrackingKey, amount: ProgressValue) => {
+    // If amount is 0, no need to update
+    if (amount === 0) return;
+
+    const currentValue = getProgressValue(trackingType);
+    const newValue = Math.max(0, currentValue + amount); // Ensure value doesn't go below 0
+
+    setProgressTracking({
+      ...state.progressTracking,
+      [trackingType]: newValue
+    });
+  }, [getProgressValue, state.progressTracking, setProgressTracking]);
+
+  // Reset progress for a specific tracking type
+  const resetProgress = useCallback((trackingType: ProgressTrackingKey) => {
+    setProgressTracking({
+      ...state.progressTracking,
+      [trackingType]: 0
+    });
   }, [state.progressTracking, setProgressTracking]);
-  
-  return result;
-}
+
+  // Update multiple tracking types at once
+  const trackMultipleProgress = useCallback((updates: Record<ProgressTrackingKey, ProgressValue>) => {
+    const newProgressTracking = { ...state.progressTracking };
+    let hasUpdates = false;
+
+    Object.entries(updates).forEach(([trackingType, amount]) => {
+      if (amount === 0) return;
+
+      const currentValue = getProgressValue(trackingType);
+      newProgressTracking[trackingType] = Math.max(0, currentValue + amount);
+      hasUpdates = true;
+    });
+
+    if (hasUpdates) {
+      setProgressTracking(newProgressTracking);
+    }
+  }, [getProgressValue, state.progressTracking, setProgressTracking]);
+
+  // Log an activity with optional details
+  const logActivity = useCallback((
+    activityType: ProgressTrackingKey,
+    details: ActivityDetails = {}
+  ) => {
+    // Determine amount to increment:
+    // 1. Use details.value if provided (absolute value)
+    // 2. Use details.amount if provided (increment)
+    // 3. Default to 1 (simple increment)
+    const incrementAmount = details.value !== undefined
+      ? details.value - getProgressValue(activityType)
+      : details.amount !== undefined
+        ? details.amount
+        : 1;
+
+    // Only update if there's a non-zero change
+    if (incrementAmount !== 0) {
+      trackProgress(activityType, incrementAmount);
+    }
+  }, [getProgressValue, trackProgress]);
+
+  return {
+    getProgressValue,
+    trackProgress,
+    resetProgress,
+    trackMultipleProgress,
+    logActivity
+  };
+};
