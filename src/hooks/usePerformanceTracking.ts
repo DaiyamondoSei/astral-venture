@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useCallback } from 'react';
-import { usePerformanceContext } from '@/contexts/PerfConfigContext';
+import { usePerfConfig } from '@/contexts/PerfConfigContext';
 import performanceMonitor, { MetricType } from '@/utils/performance/performanceMonitor';
 
 export interface UsePerformanceTrackingOptions {
@@ -23,10 +23,8 @@ export function usePerformanceTracking(options: UsePerformanceTrackingOptions) {
     trackInteractions = true
   } = options;
 
-  const { enablePerformanceTracking, samplingRate } = usePerformanceContext || {
-    enablePerformanceTracking: true,
-    samplingRate: 0.1
-  };
+  const { config } = usePerfConfig();
+  const { enablePerformanceTracking, samplingRate } = config;
 
   const renderStartTimeRef = useRef<number>(0);
   const renderCountRef = useRef<number>(0);

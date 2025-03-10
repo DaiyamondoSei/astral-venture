@@ -1,194 +1,120 @@
 /**
- * Performance monitoring utility
+ * Performance Monitoring Utility
  * 
- * This module provides tools for tracking and analyzing performance metrics
- * across the application.
+ * This module provides utilities for tracking component render times and user interactions.
+ * It supports batched reporting to minimize performance impact.
  */
 
 import { supabase } from '@/lib/supabaseClient';
 
-// Metric types
-export enum MetricType {
-  RENDER = 'render',
-  LOAD = 'load',
-  INTERACTION = 'interaction',
-  NETWORK = 'network',
-  BACKGROUND = 'background'
-}
+export type MetricType = 'render' | 'load' | 'interaction';
 
-// Performance metric interface
-export interface PerformanceMetric {
-  id?: string;
-  component_name: string;
-  average_render_time: number;
-  total_renders: number;
-  slow_renders: number;
-  first_render_time?: number;
-  interaction_latency?: number;
-  created_at?: string;
-}
-
-// Component-specific metrics
-export interface ComponentMetrics {
+export interface ComponentMetric {
   componentName: string;
-  renderCount: number;
-  totalRenderTime: number;
-  slowRenderCount: number;
-  lastRenderTime: number;
-  firstRenderTime: number;
-  interactionLatency: number;
-  renderTimes: number[];
+  renderTime: number;
+  timestamp: number;
+  type: MetricType;
 }
 
-// Web vital metrics
-export interface WebVital {
+export interface ComponentMetrics {
+  totalRenders: number;
+  slowRenders: number;
+  totalRenderTime: number;
+  firstRenderTime: number | null;
+  lastRenderTime: number;
+  metrics: ComponentMetric[];
+}
+
+export interface WebVitalMetric {
   name: string;
   value: number;
-  category: 'loading' | 'interaction' | 'visual_stability';
+  category: 'interaction' | 'loading' | 'visual_stability';
   timestamp: number;
 }
 
-// Config options
-export interface PerformanceMonitorConfig {
-  enabled: boolean;
-  slowThreshold: number;
-  criticalThreshold: number;
-  sampleRate: number;
-  maxMetrics: number;
-  reportInterval: number;
-  logToConsole: boolean;
-  logToServer: boolean;
-  trackInteractions: boolean;
-}
-
 class PerformanceMonitor {
-  private static instance: PerformanceMonitor;
   private metrics: Map<string, ComponentMetrics> = new Map();
-  private webVitals: WebVital[] = [];
-  private config: PerformanceMonitorConfig;
-  private reportTimer: number | null = null;
-  private isReporting = false;
-  
-  private constructor() {
-    // Default configuration
-    this.config = {
-      enabled: true,
-      slowThreshold: 50, // ms
-      criticalThreshold: 200, // ms
-      sampleRate: 0.2, // 20% of renders
-      maxMetrics: 100,
-      reportInterval: 60000, // 1 minute
-      logToConsole: false,
-      logToServer: false,
-      trackInteractions: true
-    };
-    
-    // Start metrics reporting if enabled
-    if (this.config.enabled && this.config.reportInterval > 0) {
-      this.startReporting();
-    }
+  private webVitals: WebVitalMetric[] = [];
+  private batchSize: number = 10;
+  private slowThreshold: number = 16; // 16ms = 60fps
+  private isEnabled: boolean = true;
+  private subscribers: Set<(metrics: Map<string, ComponentMetrics>) => void> = new Set();
+
+  constructor() {
+    // Initialize with default values
+    this.reset();
   }
-  
-  public static getInstance(): PerformanceMonitor {
-    if (!PerformanceMonitor.instance) {
-      PerformanceMonitor.instance = new PerformanceMonitor();
-    }
-    return PerformanceMonitor.instance;
+
+  public reset(): void {
+    this.metrics = new Map();
+    this.webVitals = [];
   }
-  
-  /**
-   * Update monitor configuration
-   */
-  public setConfig(config: Partial<PerformanceMonitorConfig>): void {
-    const oldConfig = {...this.config};
-    this.config = {...this.config, ...config};
-    
-    // Handle reporting interval changes
-    if (this.config.reportInterval !== oldConfig.reportInterval ||
-        this.config.enabled !== oldConfig.enabled) {
-      this.stopReporting();
-      if (this.config.enabled && this.config.reportInterval > 0) {
-        this.startReporting();
-      }
-    }
+
+  public configure(options: {
+    batchSize?: number;
+    slowThreshold?: number;
+    enabled?: boolean;
+  }): void {
+    if (options.batchSize !== undefined) this.batchSize = options.batchSize;
+    if (options.slowThreshold !== undefined) this.slowThreshold = options.slowThreshold;
+    if (options.enabled !== undefined) this.isEnabled = options.enabled;
   }
-  
-  /**
-   * Add a component render metric
-   */
+
   public addComponentMetric(
     componentName: string,
     renderTime: number,
-    type: MetricType = MetricType.RENDER
+    type: MetricType = 'render'
   ): void {
-    if (!this.config.enabled || Math.random() > this.config.sampleRate) return;
-    
-    const existingMetrics = this.metrics.get(componentName) || {
+    if (!this.isEnabled) return;
+
+    const timestamp = Date.now();
+    const metric: ComponentMetric = {
       componentName,
-      renderCount: 0,
+      renderTime,
+      timestamp,
+      type
+    };
+
+    const existingMetrics = this.metrics.get(componentName) || {
+      totalRenders: 0,
+      slowRenders: 0,
       totalRenderTime: 0,
-      slowRenderCount: 0,
-      lastRenderTime: 0,
-      firstRenderTime: 0,
-      interactionLatency: 0,
-      renderTimes: []
+      firstRenderTime: null,
+      lastRenderTime: timestamp,
+      metrics: []
     };
+
+    existingMetrics.totalRenders += 1;
+    existingMetrics.totalRenderTime += renderTime;
+    existingMetrics.lastRenderTime = timestamp;
     
-    const updatedMetrics = {
-      ...existingMetrics,
-      renderCount: existingMetrics.renderCount + 1,
-      totalRenderTime: existingMetrics.totalRenderTime + renderTime,
-      lastRenderTime: renderTime
-    };
-    
-    // Track first render time
-    if (existingMetrics.renderCount === 0 || !existingMetrics.firstRenderTime) {
-      updatedMetrics.firstRenderTime = renderTime;
+    if (renderTime > this.slowThreshold) {
+      existingMetrics.slowRenders += 1;
     }
     
-    // Track interaction latency
-    if (type === MetricType.INTERACTION) {
-      updatedMetrics.interactionLatency = renderTime;
+    if (existingMetrics.firstRenderTime === null) {
+      existingMetrics.firstRenderTime = renderTime;
     }
     
-    // Track slow renders
-    if (renderTime > this.config.slowThreshold) {
-      updatedMetrics.slowRenderCount++;
-      
-      // Log critical renders
-      if (renderTime > this.config.criticalThreshold && this.config.logToConsole) {
-        console.warn(
-          `[Performance] Slow render detected: ${componentName} took ${renderTime.toFixed(2)}ms`
-        );
-      }
+    existingMetrics.metrics.push(metric);
+    
+    // Keep only the most recent metrics to avoid memory leaks
+    if (existingMetrics.metrics.length > 20) {
+      existingMetrics.metrics = existingMetrics.metrics.slice(-20);
     }
     
-    // Add render time to history (keep last 10)
-    updatedMetrics.renderTimes = [
-      ...existingMetrics.renderTimes.slice(-9),
-      renderTime
-    ];
+    this.metrics.set(componentName, existingMetrics);
     
-    // Store updated metrics
-    this.metrics.set(componentName, updatedMetrics);
-    
-    // Limit metrics storage
-    if (this.metrics.size > this.config.maxMetrics) {
-      // Remove the oldest entry
-      const firstKey = this.metrics.keys().next().value;
-      this.metrics.delete(firstKey);
-    }
+    // Notify subscribers
+    this.notifySubscribers();
   }
-  
-  /**
-   * Add a web vital metric
-   */
+
   public addWebVital(
     name: string,
     value: number,
-    category: 'loading' | 'interaction' | 'visual_stability'
+    category: 'interaction' | 'loading' | 'visual_stability'
   ): void {
-    if (!this.config.enabled) return;
+    if (!this.isEnabled) return;
     
     this.webVitals.push({
       name,
@@ -197,120 +123,102 @@ class PerformanceMonitor {
       timestamp: Date.now()
     });
     
-    // Limit storage to latest 50 vitals
+    // Keep only recent web vitals
     if (this.webVitals.length > 50) {
       this.webVitals = this.webVitals.slice(-50);
     }
-    
-    // Log to console if enabled
-    if (this.config.logToConsole) {
-      console.info(`[Web Vital] ${name}: ${value}`);
+  }
+
+  public getMetrics(): Map<string, ComponentMetrics> {
+    return new Map(this.metrics);
+  }
+
+  public getSlowestComponents(limit: number = 5): [string, ComponentMetrics][] {
+    const metricsArray = Array.from(this.metrics.entries());
+    return metricsArray
+      .sort((a, b) => {
+        const aAvg = a[1].totalRenderTime / a[1].totalRenders;
+        const bAvg = b[1].totalRenderTime / b[1].totalRenders;
+        return bAvg - aAvg;
+      })
+      .slice(0, limit);
+  }
+
+  public subscribe(callback: (metrics: Map<string, ComponentMetrics>) => void): () => void {
+    this.subscribers.add(callback);
+    return () => {
+      this.subscribers.delete(callback);
+    };
+  }
+
+  private notifySubscribers(): void {
+    for (const subscriber of this.subscribers) {
+      try {
+        subscriber(this.metrics);
+      } catch (error) {
+        console.error('Error in performance metrics subscriber:', error);
+      }
     }
   }
-  
-  /**
-   * Get performance metrics for all components
-   */
-  public getMetrics(): ComponentMetrics[] {
-    return Array.from(this.metrics.values());
-  }
-  
-  /**
-   * Get metrics for a specific component
-   */
-  public getComponentMetrics(componentName: string): ComponentMetrics | undefined {
-    return this.metrics.get(componentName);
-  }
-  
-  /**
-   * Get all web vitals
-   */
-  public getWebVitals(): WebVital[] {
-    return this.webVitals;
-  }
-  
-  /**
-   * Clear all metrics
-   */
-  public clearMetrics(): void {
-    this.metrics.clear();
-    this.webVitals = [];
-  }
-  
-  /**
-   * Start reporting metrics at the configured interval
-   */
-  private startReporting(): void {
-    if (this.reportTimer) return;
-    
-    this.reportTimer = window.setInterval(() => {
-      this.reportMetrics();
-    }, this.config.reportInterval);
-  }
-  
-  /**
-   * Stop reporting metrics
-   */
-  private stopReporting(): void {
-    if (this.reportTimer) {
-      window.clearInterval(this.reportTimer);
-      this.reportTimer = null;
-    }
-  }
-  
-  /**
-   * Report metrics to the server
-   */
-  public async reportMetrics(): Promise<boolean> {
-    if (!this.config.enabled || !this.config.logToServer || this.isReporting) return false;
-    if (this.metrics.size === 0) return false;
-    
-    this.isReporting = true;
+
+  public async reportNow(): Promise<boolean> {
+    if (!this.isEnabled || this.metrics.size === 0) return false;
     
     try {
-      // Convert metrics to format for storage
-      const metricsToReport = Array.from(this.metrics.values()).map(metric => ({
-        component_name: metric.componentName,
-        average_render_time: metric.renderCount > 0 ? 
-          metric.totalRenderTime / metric.renderCount : 0,
-        total_renders: metric.renderCount,
-        slow_renders: metric.slowRenderCount,
-        first_render_time: metric.firstRenderTime,
-        interaction_latency: metric.interactionLatency,
-        created_at: new Date().toISOString()
-      }));
+      // Create metrics data for server
+      const componentsToReport = Array.from(this.metrics.entries())
+        .map(([componentName, metrics]) => {
+          const averageRenderTime = metrics.totalRenderTime / metrics.totalRenders;
+          
+          return {
+            component_name: componentName,
+            average_render_time: averageRenderTime,
+            total_renders: metrics.totalRenders,
+            slow_renders: metrics.slowRenders,
+            first_render_time: metrics.firstRenderTime,
+            client_timestamp: new Date().toISOString()
+          };
+        });
       
-      // Send metrics to the server through Edge Function
-      const response = await fetch('/api/track-performance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          metrics: metricsToReport,
-          vitals: this.webVitals,
-          timestamp: new Date().toISOString()
-        })
+      // Ensure the performance_metrics table exists
+      await supabase.rpc('ensure_performance_metrics_table');
+      
+      // Call the edge function to track performance data
+      const { error } = await supabase.functions.invoke('track-performance', {
+        body: { metrics: componentsToReport }
       });
       
-      if (!response.ok) {
-        console.error('[Performance] Failed to report metrics:', await response.text());
+      if (error) {
+        console.error('Error reporting performance metrics:', error);
         return false;
       }
       
-      // Clear metrics after reporting
-      this.clearMetrics();
+      // Report web vitals if available
+      if (this.webVitals.length > 0) {
+        const vitalsToReport = this.webVitals.map(vital => ({
+          name: vital.name,
+          value: vital.value,
+          category: vital.category,
+          client_timestamp: new Date(vital.timestamp).toISOString()
+        }));
+        
+        await supabase.functions.invoke('track-performance', {
+          body: { web_vitals: vitalsToReport }
+        });
+        
+        // Clear reported web vitals
+        this.webVitals = [];
+      }
+      
       return true;
     } catch (error) {
-      console.error('[Performance] Error reporting metrics:', error);
+      console.error('Failed to report performance metrics:', error);
       return false;
-    } finally {
-      this.isReporting = false;
     }
   }
 }
 
-// Export the singleton instance
-export const performanceMonitor = PerformanceMonitor.getInstance();
+// Create a singleton instance
+const performanceMonitor = new PerformanceMonitor();
 
 export default performanceMonitor;

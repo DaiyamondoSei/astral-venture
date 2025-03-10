@@ -4,20 +4,20 @@ import { AuthContext } from '@/contexts/AuthContext';
 import type { IAuthContext } from './types';
 
 /**
- * Hook for accessing authentication context
- * This is the recommended way to access authentication state and methods.
+ * Custom hook for accessing authentication context
+ * 
+ * Provides access to user authentication state and methods for login, logout, etc.
+ * 
+ * @returns The authentication context with user state and authentication methods
  */
 export function useAuth(): IAuthContext {
-  const authContext = useContext(AuthContext);
+  const context = useContext(AuthContext);
   
-  if (authContext === null) {
-    throw new Error(
-      'useAuth must be used within an AuthProvider. ' +
-      'Ensure the component is wrapped in an AuthProvider component.'
-    );
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   
-  return authContext;
+  return context;
 }
 
 export default useAuth;

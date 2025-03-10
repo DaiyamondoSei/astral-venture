@@ -1,115 +1,61 @@
 
-import React, { createContext, useState, useCallback, useEffect } from 'react';
-import { PerfConfig, defaultConfigs } from '@/hooks/usePerfConfig';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+
+export type DeviceCapability = 'high' | 'medium' | 'low';
+export type TrackingLevel = 'high' | 'medium' | 'low';
+
+export interface PerfConfig {
+  enablePerformanceTracking: boolean;
+  samplingRate: number;
+  renderTimeThreshold: number;
+  interactionTimeThreshold: number;
+  deviceCapability: DeviceCapability;
+  trackingLevel: TrackingLevel;
+  reportToServer: boolean;
+  batchReportSize: number;
+}
 
 export interface PerfConfigContextType {
   config: PerfConfig;
-  updateConfig: (newConfig: Partial<PerfConfig>) => void;
+  updateConfig: (updates: Partial<PerfConfig>) => void;
   resetConfig: () => void;
-  deviceCapability: 'low' | 'medium' | 'high';
-  setDeviceCapability: (capability: 'low' | 'medium' | 'high') => void;
-  manualPerformanceMode: boolean;
-  setManualPerformanceMode: (enabled: boolean) => void;
-  features: Record<string, boolean>;
-  webVitals: Record<string, number>;
-  applyPreset: (preset: 'low' | 'medium' | 'high') => void;
-  // Extra helper methods
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  // Advanced configuration
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  // Metrics settings
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
 }
 
-const PerfConfigContext = createContext<PerfConfigContextType | undefined>(undefined);
+const defaultConfig: PerfConfig = {
+  enablePerformanceTracking: true,
+  samplingRate: 0.1, // Track 10% of component renders by default
+  renderTimeThreshold: 16, // 16ms = 60fps threshold
+  interactionTimeThreshold: 100, // 100ms interaction time threshold
+  deviceCapability: 'medium',
+  trackingLevel: 'medium',
+  reportToServer: false,
+  batchReportSize: 10
+};
+
+const PerfConfigContext = createContext<PerfConfigContextType>({
+  config: defaultConfig,
+  updateConfig: () => {},
+  resetConfig: () => {}
+});
+
+export const usePerfConfig = () => useContext(PerfConfigContext);
 
 export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Detect the device capability
-  const [deviceCapability, setDeviceCapability] = useState<'low' | 'medium' | 'high'>('medium');
-  const [manualPerformanceMode, setManualPerformanceMode] = useState(false);
-  const [config, setConfig] = useState<PerfConfig>(defaultConfigs[deviceCapability]);
-  const [features, setFeatures] = useState<Record<string, boolean>>({});
-  const [webVitals, setWebVitals] = useState<Record<string, number>>({});
+  const [config, setConfig] = useState<PerfConfig>(defaultConfig);
 
-  // Update config when device capability changes
-  useEffect(() => {
-    if (!manualPerformanceMode) {
-      setConfig(defaultConfigs[deviceCapability]);
-    }
-  }, [deviceCapability, manualPerformanceMode]);
-
-  const updateConfig = useCallback((newConfig: Partial<PerfConfig>) => {
+  const updateConfig = useCallback((updates: Partial<PerfConfig>) => {
     setConfig(prevConfig => ({
       ...prevConfig,
-      ...newConfig
+      ...updates
     }));
-    
-    // Enable manual mode when user explicitly updates config
-    setManualPerformanceMode(true);
   }, []);
 
   const resetConfig = useCallback(() => {
-    setConfig(defaultConfigs[deviceCapability]);
-    setManualPerformanceMode(false);
-  }, [deviceCapability]);
-
-  const applyPreset = useCallback((preset: 'low' | 'medium' | 'high') => {
-    setConfig(defaultConfigs[preset]);
-    setManualPerformanceMode(true);
+    setConfig(defaultConfig);
   }, []);
 
-  // Expose key configuration properties directly for convenience
-  const enablePerformanceTracking = config.enablePerformanceTracking ?? false;
-  const enableRenderTracking = config.enableRenderTracking ?? false;
-  const enableValidation = config.enableValidation ?? false;
-  const enablePropTracking = config.enablePropTracking ?? false;
-  const enableDebugLogging = config.enableDetailedLogging ?? false;
-  
-  // Advanced configuration
-  const intelligentProfiling = config.intelligentProfiling ?? false;
-  const inactiveTabThrottling = config.inactiveTabThrottling ?? false;
-  const batchUpdates = config.batchUpdates ?? false;
-  
-  // Metrics settings
-  const samplingRate = config.samplingRate ?? 0.1;
-  const throttleInterval = config.throttleInterval ?? 300;
-  const maxTrackedComponents = config.maxTrackedComponents ?? 20;
-
   return (
-    <PerfConfigContext.Provider value={{
-      config,
-      updateConfig,
-      resetConfig,
-      deviceCapability,
-      setDeviceCapability,
-      manualPerformanceMode,
-      setManualPerformanceMode,
-      features,
-      webVitals,
-      applyPreset,
-      // Convenience accessors
-      enablePerformanceTracking,
-      enableRenderTracking,
-      enableValidation,
-      enablePropTracking,
-      enableDebugLogging,
-      // Advanced configuration
-      intelligentProfiling,
-      inactiveTabThrottling,
-      batchUpdates,
-      // Metrics settings
-      samplingRate,
-      throttleInterval,
-      maxTrackedComponents,
-    }}>
+    <PerfConfigContext.Provider value={{ config, updateConfig, resetConfig }}>
       {children}
     </PerfConfigContext.Provider>
   );
