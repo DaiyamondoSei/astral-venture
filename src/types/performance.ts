@@ -5,40 +5,37 @@ export interface PerformanceMetric {
   total_renders: number;
   slow_renders: number;
   created_at: string;
+  user_id?: string;
+  type?: 'render' | 'interaction' | 'navigation' | 'resource' | 'custom';
+  metadata?: Record<string, any>;
+  id?: string;
 }
 
 export interface ComponentMetric {
   componentName: string;
-  averageRenderTime: number;
   renderCount: number;
-  slowRenderCount: number;
+  averageRenderTime: number;
+  slowRenders: number;
   lastRenderTime: number;
+  totalRenderTime: number;
   firstRenderTime: number;
 }
 
 export interface ComponentMetrics {
-  components: Record<string, ComponentMetric>;
-  totalComponents: number;
-  slowestComponent: string;
-  fastestComponent: string;
-  averageTime: number;
+  [key: string]: ComponentMetric;
 }
 
 export interface WebVitalMetric {
   name: string;
   value: number;
   rating: 'good' | 'needs-improvement' | 'poor';
-  category: 'loading' | 'interaction' | 'visual_stability';
   timestamp: number;
 }
 
-export interface PerformanceReport {
-  componentMetrics: ComponentMetrics;
-  webVitals: Record<string, WebVitalMetric>;
-  resourceMetrics: any[];
-  timestamp: string;
+export interface PerformanceConfig {
+  monitoringLevel: 'high' | 'medium' | 'low' | 'debug';
+  autoOptimize: boolean;
+  trackInteractions: boolean;
+  reportToServer: boolean;
+  debugMode: boolean;
 }
-
-export type GlassmorphicVariant = 'default' | 'ethereal' | 'quantum' | 'cosmic';
-
-export type CubeSize = 'small' | 'medium' | 'large' | 'full';

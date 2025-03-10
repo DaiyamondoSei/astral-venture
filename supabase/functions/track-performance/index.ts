@@ -2,14 +2,66 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
-import { 
-  corsHeaders, 
-  createSuccessResponse, 
-  createErrorResponse, 
-  ErrorCode,
-  handleCorsRequest,
-  validateRequiredParameters
-} from "../shared/responseUtils.ts";
+
+// Define CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Handle CORS preflight requests
+function handleCorsRequest() {
+  return new Response(null, {
+    headers: corsHeaders
+  });
+}
+
+// Create error response with consistent format
+function createErrorResponse(code: string, message: string, details?: any, status = 400) {
+  return new Response(
+    JSON.stringify({
+      error: {
+        code,
+        message,
+        details
+      },
+      success: false
+    }),
+    {
+      status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
+    }
+  );
+}
+
+// Create success response with consistent format
+function createSuccessResponse(data: any, metadata?: any) {
+  return new Response(
+    JSON.stringify({
+      data,
+      metadata,
+      success: true
+    }),
+    {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
+    }
+  );
+}
+
+// Validate required parameters
+function validateRequiredParameters(data: any, requiredParams: string[]) {
+  const missingParams = requiredParams.filter(param => !data[param]);
+  return {
+    isValid: missingParams.length === 0,
+    missingParams
+  };
+}
 
 // Create Supabase client
 function createSupabaseClient() {
@@ -38,13 +90,12 @@ serve(async (req: Request) => {
     
     // Validate required fields
     const { metrics } = requestData;
-    const validation = validateRequiredParameters({ metrics }, ["metrics"]);
     
-    if (!validation.isValid) {
+    if (!metrics || !Array.isArray(metrics) || metrics.length === 0) {
       return createErrorResponse(
-        ErrorCode.MISSING_PARAMETERS,
-        "Missing required performance metrics",
-        { missingParams: validation.missingParams },
+        "MISSING_PARAMETERS",
+        "Missing or invalid performance metrics",
+        { missingParams: ["metrics"] },
         400
       );
     }
@@ -74,23 +125,29 @@ serve(async (req: Request) => {
     // Create a new Supabase client
     const supabase = createSupabaseClient();
     
+    // Prepare metrics with user ID and timestamps
+    const formattedMetrics = metrics.map((metric: any) => ({
+      ...metric,
+      user_id: effectiveUserId,
+      created_at: new Date().toISOString()
+    }));
+    
     // Insert the performance metrics
     const { error } = await supabase
       .from('performance_metrics')
-      .insert(metrics.map((metric: any) => ({
-        ...metric,
-        user_id: effectiveUserId
-      })));
+      .insert(formattedMetrics);
     
     if (error) {
       console.error("Error inserting performance metrics:", error);
       return createErrorResponse(
-        ErrorCode.INTERNAL_ERROR,
+        "DATABASE_ERROR",
         "Failed to store performance metrics",
         { dbError: error.message },
         500
       );
     }
+    
+    console.log(`Successfully stored ${metrics.length} performance metrics for user ${effectiveUserId}`);
     
     return createSuccessResponse(
       { 
@@ -106,7 +163,7 @@ serve(async (req: Request) => {
     console.error("Error in track-performance function:", error);
     
     return createErrorResponse(
-      ErrorCode.INTERNAL_ERROR,
+      "INTERNAL_ERROR",
       "An error occurred while tracking performance",
       { error: error.message },
       500
