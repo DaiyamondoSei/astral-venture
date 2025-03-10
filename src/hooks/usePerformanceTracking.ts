@@ -1,6 +1,135 @@
 
 import { useEffect, useRef, useCallback } from 'react';
-import { performanceMetrics } from '@/utils/performance/performanceMonitor';
+
+// Define performance metrics interface
+export interface PerformanceMetric {
+  component_name: string;
+  event_name?: string;
+  duration: number;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+  category?: string[];
+}
+
+// Create a singleton for performance metrics collection
+export class PerformanceMonitor {
+  private static instance: PerformanceMonitor;
+  private metrics: PerformanceMetric[] = [];
+  private config = {
+    enabled: true,
+    logLevel: 'medium' as 'high' | 'medium' | 'low',
+    slowRenderThreshold: 16.67, // ms (60fps)
+    slowInteractionThreshold: 100, // ms
+    debugLogging: false
+  };
+
+  private constructor() {}
+
+  public static getInstance(): PerformanceMonitor {
+    if (!PerformanceMonitor.instance) {
+      PerformanceMonitor.instance = new PerformanceMonitor();
+    }
+    return PerformanceMonitor.instance;
+  }
+
+  public addComponentMetric(
+    componentName: string, 
+    renderTime: number,
+    type: 'load' | 'render' | 'interaction' = 'render'
+  ): void {
+    if (!this.config.enabled) return;
+
+    this.metrics.push({
+      component_name: componentName,
+      event_name: type,
+      duration: renderTime,
+      timestamp: new Date().toISOString(),
+      category: ['component', type]
+    });
+
+    if (
+      this.config.debugLogging && 
+      ((type === 'render' && renderTime > this.config.slowRenderThreshold) ||
+       (type === 'interaction' && renderTime > this.config.slowInteractionThreshold))
+    ) {
+      console.warn(`Slow ${type} detected in ${componentName}: ${renderTime.toFixed(2)}ms`);
+    }
+  }
+
+  public recordRender(
+    componentName: string,
+    renderTime: number,
+    metadata: Record<string, unknown> = {}
+  ): void {
+    this.addComponentMetric(componentName, renderTime, 'render');
+  }
+
+  public recordInteraction(
+    componentName: string,
+    interactionName: string,
+    duration: number,
+    metadata: Record<string, unknown> = {}
+  ): void {
+    if (!this.config.enabled) return;
+
+    this.metrics.push({
+      component_name: componentName,
+      event_name: interactionName,
+      duration,
+      timestamp: new Date().toISOString(),
+      metadata,
+      category: ['interaction']
+    });
+
+    if (
+      this.config.debugLogging && 
+      duration > this.config.slowInteractionThreshold
+    ) {
+      console.warn(`Slow interaction "${interactionName}" in ${componentName}: ${duration.toFixed(2)}ms`);
+    }
+  }
+
+  public addWebVital(
+    name: string,
+    value: number,
+    category: 'loading' | 'interaction' | 'visual_stability'
+  ): void {
+    if (!this.config.enabled) return;
+
+    this.metrics.push({
+      component_name: 'WebVitals',
+      event_name: name,
+      duration: value,
+      timestamp: new Date().toISOString(),
+      category: ['web-vital', category]
+    });
+  }
+
+  public getMetrics(): PerformanceMetric[] {
+    return [...this.metrics];
+  }
+
+  public clearMetrics(): void {
+    this.metrics = [];
+  }
+
+  public updateConfig(newConfig: Partial<typeof this.config>): void {
+    this.config = { ...this.config, ...newConfig };
+  }
+
+  public getConfig() {
+    return { ...this.config };
+  }
+
+  public async reportNow(): Promise<{ success: boolean; message?: string }> {
+    // This would send metrics to a server in a real implementation
+    console.info(`Reporting ${this.metrics.length} performance metrics`);
+    return { success: true };
+  }
+}
+
+// Export singleton instance
+export const performanceMetrics = PerformanceMonitor.getInstance();
 
 export interface UsePerformanceTrackingOptions {
   enabled?: boolean;

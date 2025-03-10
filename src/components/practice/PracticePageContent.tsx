@@ -23,7 +23,8 @@ const ErrorDisplay = ({ error }: { error: string }) => (
 );
 
 const PracticePageContent: React.FC = () => {
-  const { startInteractionTiming } = usePerformanceTracking('PracticePageContent', {
+  const { startInteractionTiming } = usePerformanceTracking({
+    componentName: 'PracticePageContent',
     autoStart: true,
     logSlowRenders: true,
     trackInteractions: true

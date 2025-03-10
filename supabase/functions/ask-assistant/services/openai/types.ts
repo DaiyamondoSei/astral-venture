@@ -31,7 +31,7 @@ export type ResponseFormat =
   | { type: "json_object" };
 
 /**
- * AI request options
+ * AI request options with better types
  */
 export interface AIRequestOptions {
   model?: AIModel;
@@ -40,16 +40,47 @@ export interface AIRequestOptions {
   stream?: boolean;
   user?: string;
   responseFormat?: ResponseFormat;
+  functions?: Array<ChatFunction>;
+  functionCall?: string | { name: string };
 }
 
 /**
- * AI completion metrics
+ * Chat function for function calling
  */
-export interface CompletionMetrics {
-  promptTokens: number;
-  completionTokens: number;
+export interface ChatFunction {
+  name: string;
+  description?: string;
+  parameters: {
+    type: "object";
+    properties: Record<string, FunctionParameter>;
+    required?: string[];
+  };
+}
+
+/**
+ * Function parameter definition
+ */
+export type FunctionParameter = {
+  type: "string" | "number" | "integer" | "boolean" | "array" | "object";
+  description?: string;
+  enum?: string[];
+  items?: {
+    type: string;
+    enum?: string[];
+  };
+  properties?: Record<string, FunctionParameter>;
+  required?: string[];
+};
+
+/**
+ * AI completion metrics for tracking
+ */
+export interface ChatMetrics {
+  model: string;
+  promptTokens?: number;
+  completionTokens?: number;
   totalTokens: number;
-  latency: number;
+  latency?: number;
 }
 
 /**
@@ -57,12 +88,30 @@ export interface CompletionMetrics {
  */
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "function";
-  content: string;
+  content: string | null;
   name?: string;
+  function_call?: {
+    name: string;
+    arguments: string;
+  };
 }
 
 /**
- * AI completion response
+ * AI chat options
+ */
+export interface ChatOptions {
+  model?: AIModel;
+  temperature?: number;
+  max_tokens?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  user?: string;
+  functions?: Array<ChatFunction>;
+  function_call?: string | { name: string };
+}
+
+/**
+ * AI completion response structure from OpenAI
  */
 export interface ChatCompletionResponse {
   id: string;
@@ -79,4 +128,19 @@ export interface ChatCompletionResponse {
     completion_tokens: number;
     total_tokens: number;
   };
+}
+
+/**
+ * Streaming response chunk from OpenAI
+ */
+export interface StreamingResponseChunk {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: {
+    index: number;
+    delta: Partial<ChatMessage>;
+    finish_reason: null | "stop" | "length" | "content_filter" | "function_call";
+  }[];
 }

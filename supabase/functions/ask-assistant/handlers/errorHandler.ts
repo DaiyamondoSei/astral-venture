@@ -1,11 +1,10 @@
 
 /**
  * Centralized error handler for AI assistant requests
- * Handles different error types and provides appropriate responses
+ * with improved type safety and error categorization
  */
 
 import { createErrorResponse, ErrorCode, corsHeaders } from "../../shared/responseUtils.ts";
-import { ValidationError, AuthenticationError, DatabaseError, ExternalApiError } from "../../shared/types.ts";
 
 /**
  * Error handling options
@@ -37,6 +36,37 @@ export enum ErrorCategory {
   INTERNAL = 'internal',
   EXTERNAL_API = 'external_api',
   UNDEFINED = 'undefined'
+}
+
+/**
+ * Custom error types for better error handling
+ */
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+export class AuthenticationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthenticationError';
+  }
+}
+
+export class DatabaseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DatabaseError';
+  }
+}
+
+export class ExternalApiError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ExternalApiError';
+  }
 }
 
 /**
@@ -282,5 +312,9 @@ export function handleCorsRequest(): Response {
 export default {
   handleError,
   handleCorsRequest,
-  ErrorCategory
+  ErrorCategory,
+  ValidationError,
+  AuthenticationError,
+  DatabaseError,
+  ExternalApiError
 };

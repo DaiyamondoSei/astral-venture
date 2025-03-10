@@ -1,239 +1,208 @@
 
-import { ApiError, ApiErrorType } from './ApiError';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 
-/**
- * Options for error handling behavior
- */
-export interface ErrorHandlingOptions {
-  showToast?: boolean;
-  logToConsole?: boolean;
-  logToServer?: boolean;
-  retry?: boolean | number;
-  fallbackValue?: any;
-  context?: Record<string, any>;
-  suppressErrors?: ApiErrorType[];
-  transform?: (error: ApiError) => ApiError;
-  onError?: (error: ApiError) => void;
+export enum ErrorCode {
+  NETWORK_ERROR = 'network_error',
+  TIMEOUT = 'timeout',
+  RATE_LIMITED = 'rate_limited',
+  AUTHENTICATION_ERROR = 'authentication_error',
+  VALIDATION_FAILED = 'validation_failed',
+  CONTENT_POLICY_VIOLATION = 'content_policy_violation',
+  DATABASE_ERROR = 'database_error',
+  INTERNAL_ERROR = 'internal_error',
+  EXTERNAL_API_ERROR = 'external_api_error',
+  UNDEFINED = 'undefined'
+}
+
+export class ApiError extends Error {
+  code: ErrorCode;
+  statusCode?: number;
+  details?: any;
+  shouldRetry: boolean;
+
+  constructor(message: string, code: ErrorCode, options: {
+    statusCode?: number;
+    details?: any;
+    shouldRetry?: boolean;
+  } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.statusCode = options.statusCode;
+    this.details = options.details;
+    this.shouldRetry = options.shouldRetry || false;
+  }
+
+  static network(message: string = 'Network connection error', details?: any): ApiError {
+    return new ApiError(message, ErrorCode.NETWORK_ERROR, {
+      details,
+      shouldRetry: true,
+      statusCode: 0
+    });
+  }
+
+  static timeout(message: string = 'Request timed out', details?: any): ApiError {
+    return new ApiError(message, ErrorCode.TIMEOUT, {
+      details,
+      shouldRetry: true,
+      statusCode: 408
+    });
+  }
+
+  static authentication(message: string = 'Authentication required', details?: any): ApiError {
+    return new ApiError(message, ErrorCode.AUTHENTICATION_ERROR, {
+      details,
+      statusCode: 401
+    });
+  }
+
+  static validation(message: string, details?: any): ApiError {
+    return new ApiError(message, ErrorCode.VALIDATION_FAILED, {
+      details,
+      statusCode: 400
+    });
+  }
+
+  static serverError(message: string = 'Internal server error', details?: any): ApiError {
+    return new ApiError(message, ErrorCode.INTERNAL_ERROR, {
+      details,
+      statusCode: 500,
+      shouldRetry: true
+    });
+  }
+
+  static fromResponse(response: Response, message?: string): ApiError {
+    const statusCode = response.status;
+    
+    // Determine error type from status code
+    if (statusCode === 401 || statusCode === 403) {
+      return ApiError.authentication(message || 'Authentication failed');
+    } else if (statusCode === 400) {
+      return ApiError.validation(message || 'Invalid request');
+    } else if (statusCode === 429) {
+      return new ApiError(message || 'Rate limit exceeded', ErrorCode.RATE_LIMITED, {
+        statusCode,
+        shouldRetry: true
+      });
+    } else if (statusCode >= 500) {
+      return ApiError.serverError(message || 'Server error');
+    }
+    
+    // Default error
+    return new ApiError(
+      message || `Request failed with status ${statusCode}`,
+      ErrorCode.UNDEFINED,
+      { statusCode }
+    );
+  }
+
+  static fromError(error: any): ApiError {
+    if (error instanceof ApiError) {
+      return error;
+    }
+
+    // Network error detection
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      return ApiError.network();
+    }
+
+    // Timeout detection
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      return ApiError.timeout();
+    }
+
+    // Default to generic error
+    return new ApiError(
+      error.message || 'An unknown error occurred',
+      ErrorCode.UNDEFINED,
+      { details: error }
+    );
+  }
 }
 
 /**
- * Default error handling options
+ * Process and format API errors consistently
  */
-const defaultOptions: ErrorHandlingOptions = {
-  showToast: true,
-  logToConsole: true,
-  logToServer: false,
-  retry: false,
-  suppressErrors: []
-};
-
-/**
- * Central error handler for API errors
- */
-export function handleApiError(
-  error: unknown,
-  options: ErrorHandlingOptions = {}
-): ApiError {
-  const mergedOptions = { ...defaultOptions, ...options };
+export function processApiError(error: any, options: {
+  showToast?: boolean;
+  context?: string;
+  fallbackMessage?: string;
+} = {}): ApiError {
+  const { showToast = true, context = '', fallbackMessage = 'An error occurred' } = options;
   
-  // Normalize to ApiError
-  let apiError: ApiError;
+  // Convert to ApiError if it's not already
+  const apiError = ApiError.fromError(error);
   
-  if (error instanceof ApiError) {
-    apiError = error;
-  } else if (error instanceof Error) {
-    apiError = ApiError.fromNetworkError(error);
-  } else if (typeof error === 'string') {
-    apiError = new ApiError(error);
-  } else {
-    apiError = new ApiError(
-      'An unknown error occurred',
-      ApiErrorType.UNKNOWN_ERROR,
-      { originalError: error }
-    );
+  // Show toast notification if requested
+  if (showToast) {
+    const contextPrefix = context ? `[${context}] ` : '';
+    toast({
+      title: "Error",
+      description: `${contextPrefix}${apiError.message || fallbackMessage}`,
+      variant: "destructive",
+    });
   }
   
-  // Apply error transformation if provided
-  if (mergedOptions.transform) {
-    apiError = mergedOptions.transform(apiError);
-  }
-  
-  // Check if this error type should be suppressed
-  const shouldSuppress = mergedOptions.suppressErrors?.includes(apiError.type);
-  
-  // Console logging
-  if (mergedOptions.logToConsole && !shouldSuppress) {
-    console.error(
-      `API Error (${apiError.type}): ${apiError.message}`,
-      mergedOptions.context ? { context: mergedOptions.context, error: apiError } : apiError
-    );
-  }
-  
-  // Toast notification
-  if (mergedOptions.showToast && !shouldSuppress) {
-    showErrorToast(apiError);
-  }
-  
-  // Log to server
-  if (mergedOptions.logToServer && !shouldSuppress) {
-    logErrorToServer(apiError, mergedOptions.context).catch(console.error);
-  }
-  
-  // Custom error handler
-  if (mergedOptions.onError) {
-    mergedOptions.onError(apiError);
-  }
+  // Log error for debugging
+  console.error(`API Error ${context ? `in ${context}` : ''}:`, apiError);
   
   return apiError;
 }
 
 /**
- * Display a toast notification for an error
+ * Process API response and handle errors consistently
  */
-function showErrorToast(error: ApiError): void {
-  // Select appropriate toast variant based on error type
-  switch (error.type) {
-    case ApiErrorType.NETWORK_ERROR:
-    case ApiErrorType.CONNECTION_ERROR:
-      toast.error('Network Error', {
-        description: 'Please check your internet connection and try again.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.TIMEOUT_ERROR:
-      toast.error('Request Timeout', {
-        description: 'The server took too long to respond. Please try again later.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.UNAUTHORIZED:
-      toast.error('Authentication Required', {
-        description: 'Please log in to continue.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.FORBIDDEN:
-      toast.error('Access Denied', {
-        description: 'You don\'t have permission to perform this action.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.NOT_FOUND:
-      toast.error('Not Found', {
-        description: 'The requested resource could not be found.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.VALIDATION_ERROR:
-      toast.error('Validation Error', {
-        description: error.message || 'Please check your input and try again.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.SERVER_ERROR:
-      toast.error('Server Error', {
-        description: 'Something went wrong on our end. Please try again later.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.SERVICE_UNAVAILABLE:
-      toast.error('Service Unavailable', {
-        description: 'The service is currently unavailable. Please try again later.',
-        duration: 5000
-      });
-      break;
-    
-    case ApiErrorType.RATE_LIMITED:
-      toast.error('Too Many Requests', {
-        description: 'Please slow down and try again later.',
-        duration: 5000
-      });
-      break;
-    
-    default:
-      toast.error('Error', {
-        description: error.message || 'An unexpected error occurred.',
-        duration: 5000
-      });
-      break;
-  }
-}
-
-/**
- * Log error to a server for monitoring
- */
-async function logErrorToServer(
-  error: ApiError,
-  context?: Record<string, any>
-): Promise<void> {
-  try {
-    // Implementation depends on your error tracking service
-    // This is a placeholder implementation
-    const payload = {
-      type: error.type,
-      message: error.message,
-      statusCode: error.statusCode,
-      endpoint: error.endpoint,
-      timestamp: new Date().toISOString(),
-      context: context || {},
-      // Exclude potentially large or sensitive data
-      details: error.details ? JSON.stringify(error.details).substring(0, 1000) : undefined
-    };
-    
-    // Example implementation using fetch
-    await fetch('/api/error-logging', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      // Don't wait too long and don't retry
-      signal: AbortSignal.timeout(3000)
-    });
-  } catch (e) {
-    // Don't throw from the error handler
-    console.error('Failed to log error to server:', e);
-  }
-}
-
-/**
- * Higher-order function to wrap an async function with error handling
- */
-export function withErrorHandling<T, Args extends any[]>(
-  fn: (...args: Args) => Promise<T>,
-  options?: ErrorHandlingOptions
-): (...args: Args) => Promise<T> {
-  return async (...args: Args): Promise<T> => {
+export async function handleApiResponse<T>(
+  response: Response, 
+  options: {
+    context?: string;
+    showToast?: boolean;
+    customErrorMessage?: string;
+  } = {}
+): Promise<T> {
+  const { context, showToast = true, customErrorMessage } = options;
+  
+  if (!response.ok) {
+    // Try to parse error details from response
+    let errorData: any;
     try {
-      return await fn(...args);
-    } catch (error) {
-      const apiError = handleApiError(error, options);
-      
-      // Return fallback value if provided
-      if (options?.fallbackValue !== undefined) {
-        return options.fallbackValue as T;
-      }
-      
-      throw apiError;
+      errorData = await response.json();
+    } catch (e) {
+      errorData = { message: 'Could not parse error response' };
     }
-  };
-}
-
-/**
- * Utility to check if an error is of a specific type
- */
-export function isErrorType(error: unknown, type: ApiErrorType): boolean {
-  return error instanceof ApiError && error.type === type;
+    
+    // Create appropriate error
+    const apiError = ApiError.fromResponse(
+      response, 
+      errorData?.message || errorData?.error || customErrorMessage
+    );
+    
+    // Add details from response
+    apiError.details = errorData;
+    
+    // Process error with consistent handling
+    throw processApiError(apiError, { showToast, context });
+  }
+  
+  // Handle empty responses
+  if (response.status === 204) {
+    return null as unknown as T;
+  }
+  
+  // Parse JSON response
+  try {
+    return await response.json();
+  } catch (error) {
+    throw processApiError(
+      new ApiError('Invalid JSON in response', ErrorCode.EXTERNAL_API_ERROR),
+      { showToast, context }
+    );
+  }
 }
 
 export default {
-  handleApiError,
-  withErrorHandling,
-  isErrorType
+  ApiError,
+  processApiError,
+  handleApiResponse,
+  ErrorCode
 };
