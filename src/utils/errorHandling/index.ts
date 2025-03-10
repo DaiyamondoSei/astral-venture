@@ -1,29 +1,10 @@
 
-/**
- * Centralized error handling system exports
- */
+// Export all error handling utilities for easy importing
+export * from './AppError';
+export * from './handleError';
+export * from './handlers/apiErrorHandler';
+export * from './handlers/validationErrorHandler';
+export * from './handlers/networkErrorHandler';
 
-// Core error types and utilities
-export { 
-  ErrorSeverity, 
-  ErrorCategory,
-  createAppError,
-  isAppError,
-  getUserErrorMessage,
-  createValidationError,
-  createApiError,
-  createNetworkError,
-  createPermissionError
-} from './AppError';
-
-// Error handling utilities
-export {
-  handleError,
-  handleValidationError,
-  handleApiError,
-  withErrorHandling,
-  type ErrorHandlingOptions
-} from './handleError';
-
-// Re-export error boundary for convenience
+// Export the ErrorBoundary component
 export { default as ErrorBoundary } from '../../components/error-handling/ErrorBoundary';

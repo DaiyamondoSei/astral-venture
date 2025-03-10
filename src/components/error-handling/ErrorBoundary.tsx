@@ -1,3 +1,4 @@
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { handleError } from '../../utils/errorHandling/handleError';
 import { ErrorSeverity, ErrorCategory } from '../../utils/errorHandling/AppError';
@@ -9,6 +10,8 @@ interface ErrorBoundaryProps {
   errorComponent?: React.ComponentType<{ error: Error; resetError: () => void }>;
   componentName?: string;
   suppressConsoleErrors?: boolean;
+  onReset?: () => void;
+  retryRender?: boolean;
 }
 
 interface ErrorBoundaryState {
@@ -64,6 +67,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       hasError: false,
       error: null
     });
+    
+    // Call custom reset handler if provided
+    if (this.props.onReset) {
+      this.props.onReset();
+    }
   }
 
   render(): ReactNode {
@@ -78,6 +86,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       return this.props.fallback;
     }
 
+    // If no error, render children normally
     return this.props.children;
   }
 }
