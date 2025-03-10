@@ -2,99 +2,135 @@
 /**
  * Error Classification Utilities
  * 
- * This module provides utilities for classifying errors by type and severity.
+ * Utilities for classifying and categorizing errors.
  */
 
 import { ErrorCategory, ErrorSeverity } from './types';
-import { isValidationError } from '../validation/ValidationError';
+import ValidationError, { isValidationError } from '../validation/ValidationError';
 
 /**
- * Determine error category from error type
+ * Determine the category of an error based on its properties or message
  */
 export function determineErrorCategory(error: unknown): ErrorCategory {
+  // Check if it's already a categorized AppError
+  if (error && typeof error === 'object' && 'category' in error) {
+    return error.category as ErrorCategory;
+  }
+  
+  // Check for validation errors
   if (isValidationError(error)) {
-    if (error.rule === 'type-check') {
-      return ErrorCategory.TYPE_ERROR;
-    }
-    if (error.rule === 'required' || error.rule?.includes('min') || error.rule?.includes('max') || error.rule === 'pattern') {
-      return ErrorCategory.CONSTRAINT_ERROR;
-    }
     return ErrorCategory.VALIDATION;
   }
   
+  // Check for network errors
+  if (
+    error instanceof Error && (
+      error.name === 'NetworkError' ||
+      error.name === 'FetchError' ||
+      error.message.includes('network') ||
+      error.message.includes('fetch') ||
+      error.message.includes('connection') ||
+      error.message.includes('timeout')
+    )
+  ) {
+    return ErrorCategory.NETWORK;
+  }
+  
+  // Check for auth errors
+  if (
+    error instanceof Error && (
+      error.name === 'AuthError' ||
+      error.message.includes('auth') ||
+      error.message.includes('token') ||
+      error.message.includes('permission') ||
+      error.message.includes('unauthorized') ||
+      error.message.includes('forbidden')
+    )
+  ) {
+    return ErrorCategory.AUTHORIZATION;
+  }
+  
+  // Check for type errors
   if (error instanceof TypeError) {
     return ErrorCategory.TYPE_ERROR;
   }
   
-  if (error instanceof SyntaxError) {
-    return ErrorCategory.DATA_PROCESSING;
-  }
-  
-  if (error instanceof ReferenceError) {
-    return ErrorCategory.UNEXPECTED;
-  }
-  
-  if (typeof error === 'object' && error !== null) {
-    // Handle fetch errors
-    if ('status' in error && 'statusText' in error) {
-      return ErrorCategory.NETWORK;
-    }
-    
-    // Handle authentication errors
-    if ('code' in error && typeof error.code === 'string' && 
-        (error.code.includes('auth') || error.code.includes('permission'))) {
-      return ErrorCategory.AUTHENTICATION;
-    }
-  }
-  
+  // Default to unexpected
   return ErrorCategory.UNEXPECTED;
 }
 
 /**
- * Determine error severity based on category
+ * Determine the severity of an error based on its category
  */
 export function determineErrorSeverity(category: ErrorCategory): ErrorSeverity {
   switch (category) {
-    case ErrorCategory.AUTHENTICATION:
-    case ErrorCategory.AUTHORIZATION:
     case ErrorCategory.NETWORK:
+    case ErrorCategory.AUTHORIZATION:
+    case ErrorCategory.AUTHENTICATION:
       return ErrorSeverity.ERROR;
-    
+      
     case ErrorCategory.VALIDATION:
     case ErrorCategory.USER_INPUT:
-    case ErrorCategory.CONSTRAINT_ERROR:
       return ErrorSeverity.WARNING;
-    
-    case ErrorCategory.UNEXPECTED:
+      
     case ErrorCategory.TYPE_ERROR:
+    case ErrorCategory.CONSTRAINT_ERROR:
+    case ErrorCategory.UNEXPECTED:
       return ErrorSeverity.CRITICAL;
-    
+      
     default:
       return ErrorSeverity.ERROR;
   }
 }
 
 /**
- * Extract error message from various error types
+ * Extract a user-friendly message from an error object
  */
 export function extractErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
+  // Check if it already has a user message
+  if (error && typeof error === 'object' && 'userMessage' in error && typeof error.userMessage === 'string') {
+    return error.userMessage;
+  }
+  
+  // Check if it's a validation error
+  if (isValidationError(error)) {
     return error.message;
   }
   
+  // Check if it's a standard error
+  if (error instanceof Error) {
+    return sanitizeErrorMessage(error.message);
+  }
+  
+  // Handle string errors
   if (typeof error === 'string') {
-    return error;
+    return sanitizeErrorMessage(error);
   }
   
-  if (error && typeof error === 'object') {
-    if ('message' in error && typeof error.message === 'string') {
-      return error.message;
-    }
-    
-    if ('error' in error && typeof error.error === 'string') {
-      return error.error;
-    }
-  }
-  
-  return 'An unknown error occurred';
+  // Default message
+  return 'An unexpected error occurred';
 }
+
+/**
+ * Clean up error messages to make them more user-friendly
+ */
+function sanitizeErrorMessage(message: string): string {
+  // Remove technical details
+  message = message.replace(/Error:\s*/i, '');
+  
+  // Capitalize first letter
+  message = message.charAt(0).toUpperCase() + message.slice(1);
+  
+  // Add period if needed
+  if (!message.endsWith('.') && !message.endsWith('!') && !message.endsWith('?')) {
+    message += '.';
+  }
+  
+  return message;
+}
+
+export default {
+  determineErrorCategory,
+  determineErrorSeverity,
+  extractErrorMessage
+};

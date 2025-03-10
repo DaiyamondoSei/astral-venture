@@ -1,15 +1,51 @@
 
+/**
+ * Performance Tracking Hook
+ * 
+ * Custom hook for tracking component performance including render times
+ * and user interactions.
+ */
+
 import { useCallback, useEffect, useRef } from 'react';
 import { usePerfConfig } from '@/contexts/PerfConfigContext';
 import performanceMonitor from '@/utils/performance/performanceMonitor';
 import type { MetricType } from '@/utils/performance/types';
 
 export interface UsePerformanceTrackingOptions {
+  /**
+   * Name of the component being tracked
+   */
   componentName?: string;
+  
+  /**
+   * Whether to track interactions
+   */
   trackInteractions?: boolean;
+  
+  /**
+   * Whether to track renders
+   */
   trackRenders?: boolean;
+  
+  /**
+   * Whether to disable automatic reporting
+   */
   disableAutoReport?: boolean;
+  
+  /**
+   * Interval for automatic reporting in milliseconds
+   */
   reportInterval?: number;
+  
+  /**
+   * Whether to log slow renders to the console
+   */
+  logSlowRenders?: boolean;
+  
+  /**
+   * Custom threshold for slow renders in milliseconds
+   */
+  slowRenderThreshold?: number;
 }
 
 /**
@@ -27,11 +63,14 @@ export function usePerformanceTracking(
     trackRenders = true,
     disableAutoReport = false,
     reportInterval = 30000, // 30 seconds
+    logSlowRenders = false,
+    slowRenderThreshold = 16, // 16ms = 1 frame at 60fps
   } = options;
 
   const { config } = usePerfConfig();
   const reportIntervalRef = useRef<number | null>(null);
   const interactionTimers = useRef<Record<string, number>>({});
+  const lastRenderTime = useRef<number | null>(null);
 
   // Clean up on unmount
   useEffect(() => {
@@ -71,8 +110,14 @@ export function usePerformanceTracking(
   const recordRenderTime = useCallback((time: number) => {
     if (config.enablePerformanceTracking && trackRenders) {
       performanceMonitor.addComponentMetric(componentName, time, 'render');
+      
+      if (logSlowRenders && time > slowRenderThreshold) {
+        console.warn(`Slow render detected in ${componentName}: ${time.toFixed(2)}ms`);
+      }
+      
+      lastRenderTime.current = time;
     }
-  }, [componentName, config.enablePerformanceTracking, trackRenders]);
+  }, [componentName, config.enablePerformanceTracking, trackRenders, logSlowRenders, slowRenderThreshold]);
 
   /**
    * Starts timing an interaction and returns a function to stop and record it

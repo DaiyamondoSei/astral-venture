@@ -1,12 +1,16 @@
 
+/**
+ * Custom hook for accessing authentication context
+ * 
+ * Provides access to user authentication state and methods for login, logout, etc.
+ */
+
 import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
 import type { IAuthContext, UseAuthProps } from './types';
 
 /**
  * Custom hook for accessing authentication context
- * 
- * Provides access to user authentication state and methods for login, logout, etc.
  * 
  * @param options - Configuration options for authentication behavior
  * @returns The authentication context with user state and authentication methods

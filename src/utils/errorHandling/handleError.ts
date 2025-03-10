@@ -23,16 +23,6 @@ const defaultOptions: ErrorHandlingOptions = {
 };
 
 /**
- * Stub function for server-side error logging
- * This would be implemented with your actual backend service
- */
-async function logErrorToServer(appError: AppError): Promise<void> {
-  // This is a placeholder for actual server logging implementation
-  // In a real app, this would send the error to your logging service
-  console.log('Would log to server:', appError);
-}
-
-/**
  * Centralized error handler for consistent error handling across the app
  */
 export async function handleError(
@@ -165,3 +155,19 @@ export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
     }
   };
 }
+
+/**
+ * Stub function for server-side error logging
+ * This would be implemented with your actual backend service
+ */
+async function logErrorToServer(appError: AppError): Promise<void> {
+  // In a real implementation, this would send the error to your backend
+  console.log('Would log to server:', appError);
+}
+
+export default {
+  handleError,
+  handleValidationError,
+  handleApiError,
+  withErrorHandling
+};

@@ -1,4 +1,8 @@
 
+/**
+ * @deprecated Import from "@/hooks/auth/useAuth" instead for better organization and type safety.
+ */
+
 import { useAuth as useAuthHook } from '@/hooks/auth/useAuth';
 import type { IAuthContext, UseAuthProps } from '@/hooks/auth/types';
 

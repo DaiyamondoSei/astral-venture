@@ -1,217 +1,215 @@
 
 /**
- * Runtime Validation Utilities
+ * Runtime Type Validation Utilities
  * 
- * This module provides utility functions for validating data at runtime.
- * It helps ensure that data matches expected types and formats.
+ * Provides utilities for validating data types at runtime with detailed errors.
  */
 
-import { ValidationError } from './ValidationError';
+import ValidationError, { isValidationError } from './ValidationError';
 
 /**
- * Validates that a value is defined (not null or undefined)
+ * Validates that a value is not undefined or null
  */
-export function validateDefined<T>(
-  value: T | null | undefined, 
-  fieldName: string
-): T {
+export function validateRequired(
+  value: unknown, 
+  fieldName: string, 
+  message?: string
+): void {
+  if (value === undefined || value === null) {
+    throw ValidationError.requiredError(fieldName, message);
+  }
+}
+
+/**
+ * Validates that a value is of a specific primitive type
+ */
+export function validateType(
+  value: unknown, 
+  expectedType: 'string' | 'number' | 'boolean' | 'object' | 'function' | 'symbol' | 'bigint', 
+  fieldName: string,
+  message?: string
+): void {
+  // Skip validation for null/undefined to avoid confusing errors
   if (value === null || value === undefined) {
-    throw ValidationError.requiredField(fieldName);
+    return;
   }
-  return value;
-}
-
-/**
- * Validates that a value is a string
- */
-export function validateString(
-  value: unknown, 
-  fieldName: string
-): string {
-  if (typeof value !== 'string') {
-    throw ValidationError.invalidType(fieldName, 'string', value);
+  
+  if (typeof value !== expectedType) {
+    throw ValidationError.typeError(
+      fieldName, 
+      expectedType, 
+      value,
+      message
+    );
   }
-  return value;
-}
-
-/**
- * Validates that a value is a number
- */
-export function validateNumber(
-  value: unknown, 
-  fieldName: string
-): number {
-  if (typeof value !== 'number' || isNaN(value)) {
-    throw ValidationError.invalidType(fieldName, 'number', value);
-  }
-  return value;
-}
-
-/**
- * Validates that a value is a boolean
- */
-export function validateBoolean(
-  value: unknown, 
-  fieldName: string
-): boolean {
-  if (typeof value !== 'boolean') {
-    throw ValidationError.invalidType(fieldName, 'boolean', value);
-  }
-  return value;
 }
 
 /**
  * Validates that a value is an array
  */
-export function validateArray<T>(
+export function validateArray(
   value: unknown, 
   fieldName: string,
-  itemValidator?: (item: unknown, index: number) => T
-): T[] {
+  message?: string
+): void {
+  // Skip validation for null/undefined to avoid confusing errors
+  if (value === null || value === undefined) {
+    return;
+  }
+  
   if (!Array.isArray(value)) {
-    throw ValidationError.invalidType(fieldName, 'array', value);
+    throw ValidationError.typeError(
+      fieldName, 
+      'array', 
+      value,
+      message
+    );
   }
-  
-  if (itemValidator) {
-    return value.map((item, index) => {
-      try {
-        return itemValidator(item, index);
-      } catch (error) {
-        if (error instanceof ValidationError) {
-          error.field = `${fieldName}[${index}].${error.field}`;
-        }
-        throw error;
-      }
-    });
-  }
-  
-  return value as T[];
 }
 
 /**
- * Validates that a value is an object
+ * Validates that a value is one of the allowed values
  */
-export function validateObject<T extends object = Record<string, unknown>>(
-  value: unknown, 
-  fieldName: string
-): T {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw ValidationError.invalidType(fieldName, 'object', value);
-  }
-  return value as T;
-}
-
-/**
- * Validates that a string matches a specific format using a regular expression
- */
-export function validateStringFormat(
-  value: unknown, 
-  fieldName: string,
-  regex: RegExp,
-  formatName: string
-): string {
-  const str = validateString(value, fieldName);
-  
-  if (!regex.test(str)) {
-    throw ValidationError.invalidFormat(fieldName, formatName, str);
-  }
-  
-  return str;
-}
-
-/**
- * Validates that a string has a specific length or range of lengths
- */
-export function validateStringLength(
+export function validateOneOf<T>(
   value: unknown,
+  allowedValues: readonly T[],
   fieldName: string,
-  minLength: number | null = null,
-  maxLength: number | null = null
-): string {
-  const str = validateString(value, fieldName);
-  
-  if (minLength !== null && str.length < minLength) {
-    throw ValidationError.invalidLength(fieldName, minLength, maxLength, str);
+  message?: string
+): void {
+  // Skip validation for null/undefined to avoid confusing errors
+  if (value === null || value === undefined) {
+    return;
   }
   
-  if (maxLength !== null && str.length > maxLength) {
-    throw ValidationError.invalidLength(fieldName, minLength, maxLength, str);
+  if (!allowedValues.includes(value as T)) {
+    throw new ValidationError(
+      message || `${fieldName} must be one of: ${allowedValues.join(', ')}`,
+      {
+        field: fieldName,
+        rule: 'oneOf',
+        details: {
+          allowedValues,
+          received: value
+        },
+        code: 'invalid_value'
+      }
+    );
+  }
+}
+
+/**
+ * Validates that a string matches a specific pattern
+ */
+export function validatePattern(
+  value: string,
+  pattern: RegExp,
+  fieldName: string,
+  message?: string
+): void {
+  // Skip validation for null/undefined to avoid confusing errors
+  if (value === null || value === undefined) {
+    return;
   }
   
-  return str;
+  validateType(value, 'string', fieldName);
+  
+  if (!pattern.test(value)) {
+    throw ValidationError.formatError(
+      fieldName,
+      pattern.toString(),
+      value,
+      message
+    );
+  }
 }
 
 /**
  * Validates that a number is within a specific range
  */
-export function validateNumberRange(
-  value: unknown,
+export function validateRange(
+  value: number,
+  min: number | undefined,
+  max: number | undefined,
   fieldName: string,
-  min: number | null = null,
-  max: number | null = null
-): number {
-  const num = validateNumber(value, fieldName);
-  
-  if (min !== null && num < min) {
-    throw ValidationError.outOfRange(fieldName, min, max, num);
+  message?: string
+): void {
+  // Skip validation for null/undefined to avoid confusing errors
+  if (value === null || value === undefined) {
+    return;
   }
   
-  if (max !== null && num > max) {
-    throw ValidationError.outOfRange(fieldName, min, max, num);
-  }
+  validateType(value, 'number', fieldName);
   
-  return num;
+  if ((min !== undefined && value < min) || (max !== undefined && value > max)) {
+    throw ValidationError.rangeError(
+      fieldName,
+      min,
+      max,
+      value,
+      message
+    );
+  }
 }
 
 /**
- * Validates an email address format
+ * Validates an object against a schema of validation functions
  */
-export function validateEmail(value: unknown, fieldName: string = 'email'): string {
-  return validateStringFormat(
-    value,
-    fieldName,
-    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-    'email address'
-  );
-}
-
-/**
- * Validates a UUID format
- */
-export function validateUUID(value: unknown, fieldName: string): string {
-  return validateStringFormat(
-    value,
-    fieldName,
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    'UUID'
-  );
-}
-
-/**
- * Safe type assertion - returns a default value if validation fails
- */
-export function safeValidate<T>(
-  validator: () => T,
-  defaultValue: T
-): T {
-  try {
-    return validator();
-  } catch (error) {
-    return defaultValue;
+export function validateObject<T extends Record<string, unknown>>(
+  value: unknown,
+  schema: Record<string, (value: unknown) => void>,
+  fieldName: string = 'object'
+): void {
+  // Skip validation for null/undefined to avoid confusing errors
+  if (value === null || value === undefined) {
+    return;
+  }
+  
+  validateType(value, 'object', fieldName);
+  
+  const errors: ValidationError[] = [];
+  
+  Object.entries(schema).forEach(([key, validator]) => {
+    try {
+      validator((value as Record<string, unknown>)[key]);
+    } catch (error) {
+      if (isValidationError(error)) {
+        errors.push(error);
+      } else {
+        errors.push(new ValidationError(
+          `Validation failed for ${key}`,
+          {
+            field: key,
+            rule: 'custom',
+            originalError: error
+          }
+        ));
+      }
+    }
+  });
+  
+  if (errors.length > 0) {
+    throw new ValidationError(
+      `Object validation failed`,
+      {
+        field: fieldName,
+        rule: 'object',
+        details: { errors: errors.map(e => e.message) },
+        code: 'object_validation'
+      }
+    );
   }
 }
+
+// Re-export isValidationError from ValidationError.ts
+export { isValidationError };
 
 export default {
-  validateDefined,
-  validateString,
-  validateNumber,
-  validateBoolean,
+  validateRequired,
+  validateType,
   validateArray,
+  validateOneOf,
+  validatePattern,
+  validateRange,
   validateObject,
-  validateStringFormat,
-  validateStringLength,
-  validateNumberRange,
-  validateEmail,
-  validateUUID,
-  safeValidate
+  isValidationError
 };

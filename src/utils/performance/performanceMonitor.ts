@@ -78,5 +78,8 @@ class PerformanceMonitor {
 // Create a singleton instance
 const performanceMonitor = new PerformanceMonitor();
 
-export { MetricType };
+// Export the types for better type checking
+export type { MetricType, ComponentMetrics };
+
+// Default export for the singleton
 export default performanceMonitor;
