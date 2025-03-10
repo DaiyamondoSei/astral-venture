@@ -56,7 +56,7 @@ function createSuccessResponse(data: any, metadata?: any) {
 
 // Validate required parameters
 function validateRequiredParameters(data: any, requiredParams: string[]) {
-  const missingParams = requiredParams.filter(param => !data[param]);
+  const missingParams = requiredParams.filter(param => data[param] === undefined);
   return {
     isValid: missingParams.length === 0,
     missingParams
@@ -77,6 +77,53 @@ function createSupabaseClient() {
   );
 }
 
+// Process performance data
+function processPerformanceData(data: any, userId: string) {
+  try {
+    const sessionId = data.sessionId || `session-${Date.now()}`;
+    
+    // Process component metrics
+    const componentMetrics = Array.isArray(data.metrics) 
+      ? data.metrics.map((metric: any) => ({
+          component_name: metric.componentName,
+          render_time: metric.renderTime,
+          render_type: metric.renderType || 'update',
+          timestamp: new Date(metric.timestamp || Date.now()).toISOString(),
+          user_id: userId
+        }))
+      : [];
+    
+    // Process web vitals
+    const webVitals = Array.isArray(data.webVitals) 
+      ? data.webVitals.map((vital: any) => ({
+          metric_name: vital.name,
+          metric_value: vital.value,
+          category: vital.category || 'performance',
+          timestamp: new Date(vital.timestamp || Date.now()).toISOString(),
+          user_id: userId
+        }))
+      : [];
+    
+    // Create session record
+    const session = {
+      session_id: sessionId,
+      user_id: userId,
+      device_info: data.deviceInfo || {},
+      app_version: data.appVersion || '1.0.0',
+      created_at: new Date().toISOString()
+    };
+    
+    return {
+      session,
+      componentMetrics,
+      webVitals
+    };
+  } catch (error) {
+    console.error("Error processing performance data:", error);
+    throw new Error(`Failed to process performance data: ${error.message}`);
+  }
+}
+
 // Main handler for tracking performance metrics
 serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -86,20 +133,33 @@ serve(async (req: Request) => {
 
   try {
     // Parse the request body
-    const requestData = await req.json();
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return createErrorResponse(
+        "INVALID_JSON",
+        "Invalid JSON in request body",
+        { error: parseError.message },
+        400
+      );
+    }
     
-    // Validate required fields
-    const { metrics } = requestData;
-    
-    if (!metrics || !Array.isArray(metrics) || metrics.length === 0) {
+    // Validate required fields - metrics or webVitals must be present
+    if ((!requestData.metrics || !Array.isArray(requestData.metrics) || requestData.metrics.length === 0) &&
+        (!requestData.webVitals || !Array.isArray(requestData.webVitals) || requestData.webVitals.length === 0)) {
       return createErrorResponse(
         "MISSING_PARAMETERS",
         "Missing or invalid performance metrics",
-        { missingParams: ["metrics"] },
+        { details: "Either metrics or webVitals array must be provided" },
         400
       );
     }
 
+    // Get session ID or generate one
+    const sessionId = requestData.sessionId || `session-${Date.now()}`;
+    
     // Extract user information if available
     const { userId } = requestData;
     let tokenUserId = null;
@@ -119,40 +179,55 @@ serve(async (req: Request) => {
       }
     }
     
-    // Use provided userId or tokenUserId
+    // Use provided userId, tokenUserId, or 'anonymous'
     const effectiveUserId = userId || tokenUserId || 'anonymous';
+    
+    // Process the performance data
+    const processedData = processPerformanceData(requestData, effectiveUserId);
     
     // Create a new Supabase client
     const supabase = createSupabaseClient();
     
-    // Prepare metrics with user ID and timestamps
-    const formattedMetrics = metrics.map((metric: any) => ({
-      ...metric,
-      user_id: effectiveUserId,
-      created_at: new Date().toISOString()
-    }));
+    // Store session data
+    const { error: sessionError } = await supabase
+      .from('performance_sessions')
+      .upsert([processedData.session], {
+        onConflict: 'session_id'
+      });
     
-    // Insert the performance metrics
-    const { error } = await supabase
-      .from('performance_metrics')
-      .insert(formattedMetrics);
-    
-    if (error) {
-      console.error("Error inserting performance metrics:", error);
-      return createErrorResponse(
-        "DATABASE_ERROR",
-        "Failed to store performance metrics",
-        { dbError: error.message },
-        500
-      );
+    if (sessionError) {
+      console.error("Error storing session data:", sessionError);
     }
     
-    console.log(`Successfully stored ${metrics.length} performance metrics for user ${effectiveUserId}`);
+    // Store component metrics if present
+    if (processedData.componentMetrics.length > 0) {
+      const { error: metricsError } = await supabase
+        .from('performance_component_metrics')
+        .insert(processedData.componentMetrics);
+      
+      if (metricsError) {
+        console.error("Error storing component metrics:", metricsError);
+      }
+    }
     
+    // Store web vitals if present
+    if (processedData.webVitals.length > 0) {
+      const { error: vitalsError } = await supabase
+        .from('performance_web_vitals')
+        .insert(processedData.webVitals);
+      
+      if (vitalsError) {
+        console.error("Error storing web vitals:", vitalsError);
+      }
+    }
+    
+    // Return success response
     return createSuccessResponse(
       { 
-        count: metrics.length,
-        message: `Tracked ${metrics.length} performance metrics`
+        session: sessionId,
+        metricsCount: processedData.componentMetrics.length,
+        vitalsCount: processedData.webVitals.length,
+        message: `Successfully tracked performance data for user ${effectiveUserId}`
       },
       { 
         userId: effectiveUserId,

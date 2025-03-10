@@ -1,108 +1,335 @@
 
-import { ComponentMetrics } from '@/services/ai/types';
+import { ComponentMetric, ComponentMetrics, WebVitalMetric } from '@/types/performance';
 
 /**
- * Lightweight PerformanceMonitor class for tracking component render times
+ * PerformanceMonitor class
+ * Singleton class for tracking component render performance and web vitals
  */
-export class PerformanceMonitor {
-  private metrics: Map<string, ComponentMetrics> = new Map();
-  private isMonitoring: boolean = false;
-  private renderThreshold: number = 16; // Default threshold in ms (60fps)
+class PerformanceMonitor {
+  private static instance: PerformanceMonitor;
+  private metrics: ComponentMetrics = {};
+  private webVitals: WebVitalMetric[] = [];
+  private sessionId: string;
+  private subscribers: Array<(metrics: ComponentMetrics) => void> = [];
+  private isReporting = false;
+  private lastReportTime = 0;
+  private reportIntervalMs = 30000; // 30 seconds
+  private enabledTracking = true;
+  private samplingRate = 100; // percentage
+  private isRunningInBackground = false;
   
-  /**
-   * Start monitoring component performance
-   */
-  public startMonitoring(): void {
-    this.isMonitoring = true;
-    console.log("Performance monitoring started");
+  private constructor() {
+    this.sessionId = this.generateSessionId();
+    this.setupBackgroundDetection();
   }
   
   /**
-   * Stop monitoring component performance
+   * Get singleton instance
    */
-  public stopMonitoring(): void {
-    this.isMonitoring = false;
-    console.log("Performance monitoring stopped");
+  public static getInstance(): PerformanceMonitor {
+    if (!PerformanceMonitor.instance) {
+      PerformanceMonitor.instance = new PerformanceMonitor();
+    }
+    return PerformanceMonitor.instance;
   }
   
   /**
-   * Record a component render event
-   * @param componentName The name of the component that rendered
-   * @param renderTime The time it took to render in milliseconds
+   * Generate a unique session ID
    */
-  public recordRender(componentName: string, renderTime: number): void {
-    if (!this.isMonitoring) return;
+  private generateSessionId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  }
+  
+  /**
+   * Record a component render
+   * @param componentName Name of the component
+   * @param renderTime Time in milliseconds
+   * @param renderType Type of render (default: update)
+   */
+  public recordRender(
+    componentName: string, 
+    renderTime: number,
+    renderType: 'initial' | 'update' | 'effect' = 'update'
+  ): void {
+    // Skip if tracking is disabled or fails sampling rate check
+    if (!this.enabledTracking || Math.random() * 100 > this.samplingRate) {
+      return;
+    }
     
-    const existing = this.metrics.get(componentName);
-    const now = performance.now();
+    // Skip if throttling in background
+    if (this.isRunningInBackground && renderType === 'update') {
+      return;
+    }
     
-    if (existing) {
-      const totalTime = existing.totalRenderTime + renderTime;
-      const renderCount = existing.renderCount + 1;
+    try {
+      // Initialize component metrics if not exist
+      if (!this.metrics[componentName]) {
+        this.metrics[componentName] = {
+          componentName,
+          renderCount: 0,
+          averageRenderTime: 0,
+          minRenderTime: Infinity,
+          maxRenderTime: 0,
+          lastRenderTime: 0,
+          totalRenderTime: 0,
+          slowRenders: 0,
+          timestamp: Date.now()
+        };
+      }
       
-      this.metrics.set(componentName, {
-        componentName,
-        renderCount,
-        totalRenderTime: totalTime,
-        averageRenderTime: totalTime / renderCount,
-        lastRenderTime: renderTime,
-        firstRenderTime: existing.firstRenderTime
+      const metric = this.metrics[componentName];
+      
+      // Update metrics
+      metric.renderCount++;
+      metric.lastRenderTime = renderTime;
+      metric.totalRenderTime += renderTime;
+      metric.averageRenderTime = metric.totalRenderTime / metric.renderCount;
+      metric.minRenderTime = Math.min(metric.minRenderTime, renderTime);
+      metric.maxRenderTime = Math.max(metric.maxRenderTime, renderTime);
+      
+      // Check for slow renders (threshold could be configurable)
+      if (renderTime > 16.67) { // Approximately 60fps threshold
+        metric.slowRenders++;
+      }
+      
+      // Notify subscribers
+      this.notifySubscribers();
+      
+      // Auto-report if enough time has passed
+      this.checkAutoReport();
+    } catch (error) {
+      console.error(`Error recording render for ${componentName}:`, error);
+    }
+  }
+  
+  /**
+   * Record a web vital metric
+   * @param name Metric name
+   * @param value Metric value
+   * @param category Metric category
+   */
+  public recordWebVital(
+    name: string,
+    value: number,
+    category: 'loading' | 'interaction' | 'visual_stability'
+  ): void {
+    if (!this.enabledTracking) return;
+    
+    try {
+      this.webVitals.push({
+        name,
+        value,
+        category,
+        timestamp: Date.now()
       });
+      
+      // Limit array size to prevent memory issues
+      if (this.webVitals.length > 100) {
+        this.webVitals.shift();
+      }
+      
+      // Auto-report if enough time has passed
+      this.checkAutoReport();
+    } catch (error) {
+      console.error(`Error recording web vital ${name}:`, error);
+    }
+  }
+  
+  /**
+   * Subscribe to metric updates
+   * @param callback Function to call when metrics change
+   * @returns Unsubscribe function
+   */
+  public subscribe(callback: (metrics: ComponentMetrics) => void): () => void {
+    this.subscribers.push(callback);
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
+  }
+  
+  /**
+   * Notify subscribers of metrics update
+   */
+  private notifySubscribers(): void {
+    for (const subscriber of this.subscribers) {
+      try {
+        subscriber(this.metrics);
+      } catch (error) {
+        console.error("Error in performance monitor subscriber:", error);
+      }
+    }
+  }
+  
+  /**
+   * Check if it's time to auto-report metrics
+   */
+  private checkAutoReport(): void {
+    const now = Date.now();
+    
+    // Check if enough time has passed since last report
+    if (!this.isReporting && now - this.lastReportTime > this.reportIntervalMs) {
+      this.reportMetrics();
+    }
+  }
+  
+  /**
+   * Report metrics to server
+   */
+  public async reportMetrics(): Promise<boolean> {
+    if (this.isReporting) return false;
+    
+    try {
+      this.isReporting = true;
+      
+      // Skip if no metrics to report
+      if (Object.keys(this.metrics).length === 0 && this.webVitals.length === 0) {
+        this.isReporting = false;
+        return false;
+      }
+      
+      // Format metrics for reporting
+      const metricsArray = Object.values(this.metrics).map(metric => ({
+        componentName: metric.componentName,
+        renderTime: metric.averageRenderTime,
+        renderCount: metric.renderCount,
+        slowRenders: metric.slowRenders
+      }));
+      
+      // Create payload
+      const payload = {
+        sessionId: this.sessionId,
+        metrics: metricsArray,
+        webVitals: this.webVitals,
+        timestamp: Date.now(),
+        deviceInfo: this.getDeviceInfo()
+      };
+      
+      // Send metrics to server
+      const response = await fetch('/api/track-performance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        // Clear reported metrics and update last report time
+        this.metrics = {};
+        this.webVitals = [];
+        this.lastReportTime = Date.now();
+        this.isReporting = false;
+        return true;
+      } else {
+        console.error('Failed to report metrics:', await response.text());
+        this.isReporting = false;
+        return false;
+      }
+    } catch (error) {
+      console.error('Error reporting metrics:', error);
+      this.isReporting = false;
+      return false;
+    }
+  }
+  
+  /**
+   * Get device information
+   */
+  private getDeviceInfo() {
+    try {
+      const navigatorInfo = navigator as any;
+      
+      return {
+        userAgent: navigator.userAgent,
+        deviceCategory: this.getDeviceCategory(),
+        deviceMemory: navigatorInfo.deviceMemory || 'unknown',
+        hardwareConcurrency: navigatorInfo.hardwareConcurrency || 'unknown',
+        connectionType: navigatorInfo.connection ? navigatorInfo.connection.effectiveType : 'unknown',
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        }
+      };
+    } catch (error) {
+      console.error('Error getting device info:', error);
+      return {
+        userAgent: 'unknown',
+        deviceCategory: 'unknown'
+      };
+    }
+  }
+  
+  /**
+   * Categorize device capabilities
+   */
+  private getDeviceCategory(): string {
+    const navigatorInfo = navigator as any;
+    
+    if (navigatorInfo.deviceMemory < 2 || navigatorInfo.hardwareConcurrency < 4) {
+      return 'low-end';
+    } else if (navigatorInfo.deviceMemory >= 4 && navigatorInfo.hardwareConcurrency >= 8) {
+      return 'high-end';
     } else {
-      this.metrics.set(componentName, {
-        componentName,
-        renderCount: 1,
-        totalRenderTime: renderTime,
-        averageRenderTime: renderTime,
-        lastRenderTime: renderTime,
-        firstRenderTime: now
+      return 'mid-range';
+    }
+  }
+  
+  /**
+   * Setup background detection
+   */
+  private setupBackgroundDetection(): void {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        this.isRunningInBackground = document.visibilityState === 'hidden';
       });
+    }
+  }
+  
+  /**
+   * Configure the performance monitor
+   */
+  public configure(options: {
+    enabledTracking?: boolean;
+    samplingRate?: number;
+    reportIntervalMs?: number;
+  }): void {
+    if (options.enabledTracking !== undefined) {
+      this.enabledTracking = options.enabledTracking;
     }
     
-    // Track slow renders
-    if (renderTime > this.renderThreshold) {
-      console.warn(`Slow render detected: ${componentName} took ${renderTime.toFixed(2)}ms`);
+    if (options.samplingRate !== undefined) {
+      this.samplingRate = Math.max(0, Math.min(100, options.samplingRate));
+    }
+    
+    if (options.reportIntervalMs !== undefined) {
+      this.reportIntervalMs = options.reportIntervalMs;
     }
   }
   
   /**
-   * Get metrics for a specific component
-   * @param componentName The name of the component
-   * @returns The component metrics or null if not found
+   * Get current metrics
    */
-  public getComponentMetrics(componentName: string): ComponentMetrics | null {
-    return this.metrics.get(componentName) || null;
+  public getMetrics(): ComponentMetrics {
+    return this.metrics;
   }
   
   /**
-   * Get all metrics
-   * @returns All component metrics
+   * Get web vitals metrics
    */
-  public getMetrics(): Array<ComponentMetrics> {
-    return Array.from(this.metrics.values());
+  public getWebVitals(): WebVitalMetric[] {
+    return this.webVitals;
   }
   
   /**
-   * Get sorted metrics for the slowest components
-   * @param limit Maximum number of components to return
-   * @returns Sorted array of component metrics
+   * Reset performance monitor
    */
-  public getSlowestComponents(limit: number = 10): Array<ComponentMetrics> {
-    return Array.from(this.metrics.values())
-      .sort((a, b) => b.averageRenderTime - a.averageRenderTime)
-      .slice(0, limit);
-  }
-  
-  /**
-   * Reset all metrics
-   */
-  public resetMetrics(): void {
-    this.metrics.clear();
+  public reset(): void {
+    this.metrics = {};
+    this.webVitals = [];
+    this.lastReportTime = 0;
+    this.sessionId = this.generateSessionId();
   }
 }
 
-// Create and export a singleton instance for consistent monitoring
-export const performanceMonitor = new PerformanceMonitor();
-
-// Export the singleton for use throughout the application
-export default performanceMonitor;
+// Export singleton instance
+export default PerformanceMonitor.getInstance();

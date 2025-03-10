@@ -1,263 +1,282 @@
 
 /**
- * Web Vitals Monitor - Streamlined, efficient performance tracking
+ * Web Vitals Monitoring System
+ * Enhanced monitoring system for collecting, analyzing and reporting web vitals metrics
  */
 
-// Basic performance marker storage
-interface PerformanceMark {
+// Performance marks storage
+const performanceMarks: Record<string, { start?: number; end?: number; duration?: number }> = {};
+
+// Web vitals storage
+interface WebVitalMetric {
   name: string;
-  startTime: number;
-  endTime?: number;
-  duration?: number;
+  value: number;
+  category: 'loading' | 'interaction' | 'visual_stability';
+  timestamp: number;
 }
 
-// Storage for performance marks
-const marks: Map<string, PerformanceMark> = new Map();
-
-/**
- * Mark the start of a performance measurement
- */
-export function markStart(name: string): void {
-  if (typeof performance === 'undefined') return;
-  
-  try {
-    performance.mark(`app-${name}-start`);
-    marks.set(name, {
-      name,
-      startTime: performance.now()
-    });
-  } catch (e) {
-    console.error(`Error starting performance mark ${name}:`, e);
-  }
+// Components render time tracking
+interface ComponentRenderTiming {
+  componentName: string;
+  renderTime: number;
+  timestamp: number;
+  renderType: 'initial' | 'update' | 'effect';
 }
 
+// Component metrics storage
+const componentMetrics: Record<string, ComponentRenderTiming[]> = {};
+const webVitalsMetrics: WebVitalMetric[] = [];
+
+// Session identifier
+const sessionId = generateSessionId();
+
+// Device information
+const deviceInfo = getDeviceInfo();
+
 /**
- * Mark the end of a performance measurement and record the duration
- * @returns The duration in milliseconds
+ * Create a performance mark start point
+ * @param markName Unique identifier for the performance mark
  */
-export function markEnd(name: string): number {
-  if (typeof performance === 'undefined') return 0;
-  
+export function markStart(markName: string): void {
   try {
-    performance.mark(`app-${name}-end`);
+    const now = performance.now();
+    performanceMarks[markName] = performanceMarks[markName] || {};
+    performanceMarks[markName].start = now;
     
-    const mark = marks.get(name);
-    if (!mark) return 0;
-    
-    try {
-      const measure = performance.measure(
-        `app-${name}`,
-        `app-${name}-start`,
-        `app-${name}-end`
-      );
-      
-      mark.endTime = performance.now();
-      mark.duration = measure.duration;
-      
-      return measure.duration;
-    } catch (e) {
-      // Fallback if the measure fails
-      const endTime = performance.now();
-      const duration = endTime - mark.startTime;
-      
-      mark.endTime = endTime;
-      mark.duration = duration;
-      
-      return duration;
+    // Also use the native Performance API if available
+    if (typeof performance !== 'undefined' && performance.mark) {
+      performance.mark(`${markName}_start`);
     }
-  } catch (e) {
-    console.error(`Error ending performance mark ${name}:`, e);
-    return 0;
+  } catch (error) {
+    console.error(`Error in markStart(${markName}):`, error);
   }
 }
 
-// LCP observer
-let lcpObserver: PerformanceObserver | null = null;
-
-// CLS values and entries
-let clsValue = 0;
-let clsEntries: PerformanceEntry[] = [];
-
-// FID observer
-let fidObserver: PerformanceObserver | null = null;
-
 /**
- * Initialize Web Vitals monitoring
+ * End a performance mark and calculate duration
+ * @param markName Identifier matching a previous markStart call
+ * @returns Duration in milliseconds or undefined if no matching start mark
  */
-export function initWebVitals(): void {
-  if (typeof window === 'undefined' || typeof PerformanceObserver === 'undefined') {
-    console.warn('Web Vitals monitoring not supported in this environment');
-    return;
-  }
-
+export function markEnd(markName: string): number | undefined {
   try {
-    // Clean up any existing observers first
-    cleanupObservers();
+    const now = performance.now();
+    const mark = performanceMarks[markName];
     
-    // LCP (Largest Contentful Paint)
-    lcpObserver = new PerformanceObserver((entryList) => {
-      const entries = entryList.getEntries();
-      const lastEntry = entries[entries.length - 1] as PerformanceEntry;
-      
-      if (lastEntry) {
-        const lcp = lastEntry.startTime;
-        const lcpValue = Math.round(lcp);
-        
-        // Store in marks for reporting
-        marks.set('LCP', {
-          name: 'LCP',
-          startTime: 0,
-          endTime: lcpValue,
-          duration: lcpValue
-        });
-        
-        // Log performance classification
-        classifyMetric('LCP', lcpValue, [2500, 4000]);
+    if (!mark || typeof mark.start !== 'number') {
+      console.warn(`No matching start mark found for "${markName}"`);
+      return undefined;
+    }
+    
+    mark.end = now;
+    mark.duration = mark.end - mark.start;
+    
+    // Also use the native Performance API if available
+    if (typeof performance !== 'undefined' && performance.mark && performance.measure) {
+      performance.mark(`${markName}_end`);
+      try {
+        performance.measure(markName, `${markName}_start`, `${markName}_end`);
+      } catch (e) {
+        // Some browsers may throw if the marks have been cleared
       }
-    });
+    }
     
-    lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
-    
-    // CLS (Cumulative Layout Shift)
-    const clsObserver = new PerformanceObserver((entryList) => {
-      const entries = entryList.getEntries();
-      
-      entries.forEach(entry => {
-        // Ignore layout shifts when user is interacting
-        if (!(entry as any).hadRecentInput) {
-          const currentEntry = entry as PerformanceEntry & { value: number };
-          clsValue += currentEntry.value;
-          clsEntries.push(currentEntry);
-          
-          // Store in marks for reporting
-          marks.set('CLS', {
-            name: 'CLS',
-            startTime: 0,
-            endTime: 0,
-            duration: clsValue
-          });
-          
-          // Log performance classification
-          classifyMetric('CLS', clsValue, [0.1, 0.25]);
-        }
-      });
-    });
-    
-    clsObserver.observe({ type: 'layout-shift', buffered: true });
-    
-    // FID (First Input Delay)
-    fidObserver = new PerformanceObserver((entryList) => {
-      const firstInput = entryList.getEntries()[0] as PerformanceEventTiming;
-      
-      if (firstInput) {
-        const delay = firstInput.processingStart - firstInput.startTime;
-        const fidValue = Math.round(delay);
-        
-        // Store in marks for reporting
-        marks.set('FID', {
-          name: 'FID',
-          startTime: firstInput.startTime,
-          endTime: firstInput.processingStart,
-          duration: fidValue
-        });
-        
-        // Log performance classification
-        classifyMetric('FID', fidValue, [100, 300]);
-      }
-    });
-    
-    fidObserver.observe({ type: 'first-input', buffered: true });
-    
-    console.info('Web Vitals monitoring initialized');
-  } catch (err) {
-    console.warn('Performance observer for Web Vitals not fully supported:', err);
+    return mark.duration;
+  } catch (error) {
+    console.error(`Error in markEnd(${markName}):`, error);
+    return undefined;
   }
 }
 
 /**
- * Cleanup observers to prevent memory leaks
+ * Track component render time
+ * @param componentName Name of the component
+ * @param renderTime Time taken to render in milliseconds
+ * @param renderType Type of render (initial, update, effect)
  */
-function cleanupObservers(): void {
-  if (lcpObserver) {
-    lcpObserver.disconnect();
-    lcpObserver = null;
-  }
-  
-  if (fidObserver) {
-    fidObserver.disconnect();
-    fidObserver = null;
-  }
-  
-  // Reset CLS tracking
-  clsValue = 0;
-  clsEntries = [];
-}
-
-/**
- * Classify a metric's performance
- */
-function classifyMetric(
-  name: string, 
-  value: number, 
-  thresholds: [number, number]
+export function trackComponentRender(
+  componentName: string, 
+  renderTime: number,
+  renderType: 'initial' | 'update' | 'effect' = 'update'
 ): void {
-  const [good, needsImprovement] = thresholds;
-  
-  if (value < good) {
-    console.info(`${name}: ${value} - Good`);
-  } else if (value < needsImprovement) {
-    console.info(`${name}: ${value} - Needs Improvement`);
-  } else {
-    console.warn(`${name}: ${value} - Poor`);
+  try {
+    if (!componentMetrics[componentName]) {
+      componentMetrics[componentName] = [];
+    }
+    
+    componentMetrics[componentName].push({
+      componentName,
+      renderTime,
+      timestamp: Date.now(),
+      renderType
+    });
+    
+    // Limit stored metrics per component to prevent memory issues
+    if (componentMetrics[componentName].length > 100) {
+      componentMetrics[componentName].shift();
+    }
+  } catch (error) {
+    console.error(`Error tracking render for ${componentName}:`, error);
   }
 }
 
 /**
- * Report all collected performance marks
+ * Track web vital metrics
+ * @param name Metric name
+ * @param value Metric value
+ * @param category Metric category (loading, interaction, visual_stability)
  */
-export function getPerformanceReport(): PerformanceMark[] {
-  return Array.from(marks.values());
+export function trackWebVital(
+  name: string,
+  value: number,
+  category: 'loading' | 'interaction' | 'visual_stability'
+): void {
+  try {
+    webVitalsMetrics.push({
+      name,
+      value,
+      category,
+      timestamp: Date.now()
+    });
+    
+    // Limit stored metrics to prevent memory issues
+    if (webVitalsMetrics.length > 200) {
+      webVitalsMetrics.shift();
+    }
+  } catch (error) {
+    console.error(`Error tracking web vital ${name}:`, error);
+  }
 }
 
 /**
- * Get a specific performance mark
+ * Get all collected performance metrics
+ * @returns Object containing all performance metrics
  */
-export function getPerformanceMark(name: string): PerformanceMark | undefined {
-  return marks.get(name);
+export function getAllMetrics() {
+  return {
+    performanceMarks,
+    componentMetrics,
+    webVitalsMetrics,
+    sessionId,
+    deviceInfo
+  };
 }
 
 /**
- * Get core web vitals metrics
+ * Clear collected metrics
  */
-export function getWebVitals(): Record<string, number> {
-  const vitals: Record<string, number> = {};
-  
-  const lcp = marks.get('LCP');
-  if (lcp?.duration) vitals.LCP = lcp.duration;
-  
-  const cls = marks.get('CLS');
-  if (cls?.duration) vitals.CLS = cls.duration;
-  
-  const fid = marks.get('FID');
-  if (fid?.duration) vitals.FID = fid.duration;
-  
-  return vitals;
+export function clearMetrics(): void {
+  Object.keys(performanceMarks).forEach(key => delete performanceMarks[key]);
+  Object.keys(componentMetrics).forEach(key => delete componentMetrics[key]);
+  webVitalsMetrics.length = 0;
 }
 
 /**
- * Clean up monitoring when no longer needed
+ * Send metrics to the server
+ * @returns Promise that resolves when metrics are sent
  */
-export function shutdown(): void {
-  cleanupObservers();
-  marks.clear();
+export async function reportMetricsToServer(): Promise<boolean> {
+  try {
+    // Get only the latest metrics since last report
+    const metrics = Object.entries(componentMetrics).flatMap(([componentName, timings]) => {
+      return timings.map(timing => ({
+        componentName: timing.componentName,
+        renderTime: timing.renderTime,
+        renderType: timing.renderType,
+        timestamp: timing.timestamp
+      }));
+    });
+    
+    // Skip if no metrics to report
+    if (metrics.length === 0 && webVitalsMetrics.length === 0) {
+      return false;
+    }
+    
+    // Prepare payload
+    const payload = {
+      sessionId,
+      deviceInfo,
+      appVersion: '1.0.0', // Should be dynamically derived in a real app
+      metrics,
+      webVitals: webVitalsMetrics,
+      timestamp: Date.now()
+    };
+    
+    // Send metrics to the server endpoint
+    const response = await fetch('/api/track-performance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (response.ok) {
+      // Clear reported metrics
+      clearMetrics();
+      return true;
+    } else {
+      console.error('Failed to report metrics:', await response.text());
+      return false;
+    }
+  } catch (error) {
+    console.error('Error reporting metrics:', error);
+    return false;
+  }
 }
 
-export default {
-  initWebVitals,
+// Helper functions
+
+/**
+ * Generate a unique session ID
+ */
+function generateSessionId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 12)}`;
+}
+
+/**
+ * Get device information
+ */
+function getDeviceInfo() {
+  try {
+    const navigatorInfo = navigator as any;
+    const isLowEndDevice = 
+      navigatorInfo.deviceMemory < 4 || 
+      navigatorInfo.hardwareConcurrency < 4;
+    
+    return {
+      userAgent: navigator.userAgent,
+      deviceCategory: isLowEndDevice ? 'low-end' : 'high-end',
+      deviceMemory: navigatorInfo.deviceMemory || 'unknown',
+      hardwareConcurrency: navigatorInfo.hardwareConcurrency || 'unknown',
+      connectionType: navigatorInfo.connection ? navigatorInfo.connection.effectiveType : 'unknown',
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      screenSize: {
+        width: window.screen.width,
+        height: window.screen.height
+      },
+      pixelRatio: window.devicePixelRatio || 1
+    };
+  } catch (error) {
+    console.error('Error getting device info:', error);
+    return {
+      userAgent: 'unknown',
+      deviceCategory: 'unknown'
+    };
+  }
+}
+
+// Export additional utility functions
+export const webVitalsMonitor = {
   markStart,
   markEnd,
-  getPerformanceReport,
-  getPerformanceMark,
-  getWebVitals,
-  shutdown
+  trackComponentRender,
+  trackWebVital,
+  getAllMetrics,
+  clearMetrics,
+  reportMetricsToServer
 };
+
+export default webVitalsMonitor;
