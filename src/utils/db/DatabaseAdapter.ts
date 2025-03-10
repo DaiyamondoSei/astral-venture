@@ -1,171 +1,165 @@
 
 import { supabase } from '@/lib/supabaseClient';
-import { PostgrestError, PostgrestSingleResponse } from '@supabase/supabase-js';
-import { reportError } from '@/utils/errorHandling/errorReporter';
 import { ValidationError } from '@/utils/validation/ValidationError';
+import { captureException } from '@/utils/errorHandling/errorReporter';
+import { extractSupabaseData, unwrapSupabaseResult, handleSupabaseError } from '@/utils/supabase/typeUtils';
 
 /**
- * Processes a database response with proper error handling
- */
-function processDbResponse<T>(
-  response: PostgrestSingleResponse<T>, 
-  entityName: string
-): T {
-  if (response.error) {
-    throw new ValidationError(`Failed to fetch ${entityName}`, {
-      field: entityName,
-      details: response.error.message,
-      originalError: response.error
-    });
-  }
-  
-  return response.data as T;
-}
-
-/**
- * Type-safe database adapter with consistent error handling
+ * Type-safe database adapter for consistent data access patterns
+ * 
+ * This adapter provides:
+ * 1. Consistent error handling
+ * 2. Type safety throughout the data layer 
+ * 3. Validation of inputs and outputs
+ * 4. Automatic error reporting
  */
 export class DatabaseAdapter<T extends { id: string }> {
-  private table: string;
+  private tableName: string;
+  private entityName: string;
   
-  constructor(tableName: string) {
-    this.table = tableName;
+  constructor(tableName: string, entityName: string) {
+    this.tableName = tableName;
+    this.entityName = entityName;
   }
   
   /**
-   * Fetches a single entity by ID
+   * Safely fetch a record by ID with type validation
    */
   async getById(id: string): Promise<T> {
     try {
-      const response = await supabase
-        .from(this.table)
+      if (!id) {
+        throw new ValidationError(`${this.entityName} ID is required`, {
+          field: 'id',
+          rule: 'required'
+        });
+      }
+      
+      const result = await supabase
+        .from(this.tableName)
         .select('*')
         .eq('id', id)
         .single();
-      
-      return processDbResponse<T>(response, this.table);
+        
+      return unwrapSupabaseResult<T>(result, this.entityName);
     } catch (error) {
-      reportError(error, { 
-        source: 'api-error',
-        metadata: { operation: 'getById', table: this.table, id }
-      });
-      throw error;
+      const enhancedError = handleSupabaseError(error, 'fetch', this.entityName);
+      captureException(enhancedError);
+      throw enhancedError;
     }
   }
   
   /**
-   * Fetches multiple entities with optional filtering
+   * Safely fetch all records with type validation
    */
-  async getMany(filters?: Record<string, unknown>): Promise<T[]> {
+  async getAll(): Promise<T[]> {
     try {
-      let query = supabase
-        .from(this.table)
+      const result = await supabase
+        .from(this.tableName)
         .select('*');
-      
-      // Apply filters if provided
-      if (filters) {
-        for (const [key, value] of Object.entries(filters)) {
-          query = query.eq(key, value);
-        }
-      }
-      
-      const response = await query;
-      
-      return processDbResponse<T[]>(response, `${this.table}[]`);
+        
+      return unwrapSupabaseResult<T[]>(result, `${this.entityName} list`);
     } catch (error) {
-      reportError(error, { 
-        source: 'api-error',
-        metadata: { operation: 'getMany', table: this.table, filters }
-      });
-      throw error;
+      const enhancedError = handleSupabaseError(error, 'fetch', `${this.entityName} list`);
+      captureException(enhancedError);
+      throw enhancedError;
     }
   }
   
   /**
-   * Creates a new entity
+   * Safely create a new record with type validation
    */
   async create(data: Partial<T>): Promise<T> {
     try {
-      const response = await supabase
-        .from(this.table)
-        .insert(data as any)
+      const result = await supabase
+        .from(this.tableName)
+        .insert(data)
         .select()
         .single();
-      
-      return processDbResponse<T>(response, this.table);
+        
+      return unwrapSupabaseResult<T>(result, this.entityName);
     } catch (error) {
-      reportError(error, { 
-        source: 'api-error',
-        metadata: { operation: 'create', table: this.table }
-      });
-      throw error;
+      const enhancedError = handleSupabaseError(error, 'create', this.entityName);
+      captureException(enhancedError);
+      throw enhancedError;
     }
   }
   
   /**
-   * Updates an existing entity
+   * Safely update a record with type validation
    */
   async update(id: string, data: Partial<T>): Promise<T> {
     try {
-      const response = await supabase
-        .from(this.table)
-        .update(data as any)
+      if (!id) {
+        throw new ValidationError(`${this.entityName} ID is required`, {
+          field: 'id',
+          rule: 'required'
+        });
+      }
+      
+      const result = await supabase
+        .from(this.tableName)
+        .update(data)
         .eq('id', id)
         .select()
         .single();
-      
-      return processDbResponse<T>(response, this.table);
+        
+      return unwrapSupabaseResult<T>(result, this.entityName);
     } catch (error) {
-      reportError(error, { 
-        source: 'api-error',
-        metadata: { operation: 'update', table: this.table, id }
-      });
-      throw error;
+      const enhancedError = handleSupabaseError(error, 'update', this.entityName);
+      captureException(enhancedError);
+      throw enhancedError;
     }
   }
   
   /**
-   * Deletes an entity by ID
+   * Safely delete a record
    */
   async delete(id: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from(this.table)
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        throw new ValidationError(`Failed to delete ${this.table}`, {
-          field: this.table,
-          details: error.message,
-          originalError: error
+      if (!id) {
+        throw new ValidationError(`${this.entityName} ID is required`, {
+          field: 'id',
+          rule: 'required'
         });
       }
+      
+      const { error } = await supabase
+        .from(this.tableName)
+        .delete()
+        .eq('id', id);
+        
+      if (error) {
+        throw error;
+      }
     } catch (error) {
-      reportError(error, { 
-        source: 'api-error',
-        metadata: { operation: 'delete', table: this.table, id }
-      });
-      throw error;
+      const enhancedError = handleSupabaseError(error, 'delete', this.entityName);
+      captureException(enhancedError);
+      throw enhancedError;
     }
   }
   
   /**
-   * Executes a custom query with proper error handling
+   * Safely query records with filters
    */
-  async customQuery<R>(
-    queryFn: (query: typeof supabase) => Promise<PostgrestSingleResponse<R>>
-  ): Promise<R> {
+  async query(filters: Record<string, unknown>): Promise<T[]> {
     try {
-      const response = await queryFn(supabase);
-      
-      return processDbResponse<R>(response, `${this.table} (custom)`);
-    } catch (error) {
-      reportError(error, { 
-        source: 'api-error',
-        metadata: { operation: 'customQuery', table: this.table }
+      let query = supabase
+        .from(this.tableName)
+        .select('*');
+        
+      // Apply filters
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          query = query.eq(key, value);
+        }
       });
-      throw error;
+      
+      const result = await query;
+      return unwrapSupabaseResult<T[]>(result, `${this.entityName} list`);
+    } catch (error) {
+      const enhancedError = handleSupabaseError(error, 'query', this.entityName);
+      captureException(enhancedError);
+      throw enhancedError;
     }
   }
 }

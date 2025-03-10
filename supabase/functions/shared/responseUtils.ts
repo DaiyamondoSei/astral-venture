@@ -1,60 +1,55 @@
 
 /**
- * Standardized error codes for edge functions
+ * Shared utilities for API responses in edge functions
  */
+
+import { ApiResponse, ValidationError } from "./types.ts";
+
+// Standard CORS headers
+export const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Error codes for standardized error handling
 export enum ErrorCode {
-  // Generic errors
-  INTERNAL_ERROR = 'internal_error',
-  NOT_FOUND = 'not_found',
-  VALIDATION_FAILED = 'validation_failed',
+  // Authentication errors
+  UNAUTHORIZED = "unauthorized",
+  AUTHENTICATION_ERROR = "authentication_error",
+  INVALID_TOKEN = "invalid_token",
   
-  // Authentication & authorization errors
-  AUTHENTICATION_ERROR = 'authentication_error',
-  AUTHORIZATION_ERROR = 'authorization_error',
-  UNAUTHORIZED = 'unauthorized',
+  // Validation errors
+  VALIDATION_FAILED = "validation_failed",
+  MISSING_PARAMETERS = "missing_parameters",
+  INVALID_PARAMETERS = "invalid_parameters",
   
-  // Service errors
-  SERVICE_UNAVAILABLE = 'service_unavailable',
-  RATE_LIMITED = 'rate_limited',
-  TIMEOUT = 'timeout',
-  NETWORK_ERROR = 'network_error',
+  // Processing errors
+  INTERNAL_ERROR = "internal_error",
+  EXTERNAL_API_ERROR = "external_api_error",
+  TIMEOUT = "timeout",
+  
+  // Rate limiting
+  RATE_LIMITED = "rate_limited",
+  QUOTA_EXCEEDED = "quota_exceeded",
+  
+  // Network errors
+  NETWORK_ERROR = "network_error",
   
   // Database errors
-  DATABASE_ERROR = 'database_error',
-  QUERY_ERROR = 'query_error',
+  DATABASE_ERROR = "database_error",
   
-  // User input errors
-  INVALID_INPUT = 'invalid_input',
-  DUPLICATE_ENTRY = 'duplicate_entry',
-  RESOURCE_EXISTS = 'resource_exists'
+  // Content errors
+  CONTENT_POLICY_VIOLATION = "content_policy_violation"
 }
 
 /**
- * Interface for standardized Edge Function responses
+ * Create a standardized success response
  */
-export interface EdgeFunctionResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: {
-    code: ErrorCode | string;
-    message: string;
-    details?: Record<string, unknown>;
-  };
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Creates a successful response
- * 
- * @param data - The response data
- * @param metadata - Optional metadata
- * @returns A successful response object
- */
-export function createSuccessResponse<T = any>(
-  data: T,
+export function createSuccessResponse<T>(
+  data: T, 
   metadata?: Record<string, unknown>
 ): Response {
-  const response: EdgeFunctionResponse<T> = {
+  const response: ApiResponse<T> = {
     success: true,
     data,
     metadata
@@ -62,28 +57,25 @@ export function createSuccessResponse<T = any>(
   
   return new Response(
     JSON.stringify(response),
-    {
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    { 
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "application/json" 
+      } 
     }
   );
 }
 
 /**
- * Creates an error response
- * 
- * @param code - The error code
- * @param message - The error message
- * @param details - Optional error details or metadata
- * @returns An error response object
+ * Create a standardized error response
  */
 export function createErrorResponse(
-  code: ErrorCode | string,
+  code: ErrorCode,
   message: string,
-  details?: Record<string, unknown>
+  details?: unknown,
+  status: number = 400
 ): Response {
-  const response: EdgeFunctionResponse = {
+  const response: ApiResponse<null> = {
     success: false,
     error: {
       code,
@@ -92,61 +84,39 @@ export function createErrorResponse(
     }
   };
   
-  const statusCode = getHttpStatusFromErrorCode(code);
-  
   return new Response(
     JSON.stringify(response),
-    {
-      status: statusCode,
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    { 
+      status, 
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "application/json" 
+      } 
     }
   );
 }
 
 /**
- * Maps error codes to HTTP status codes
- * 
- * @param code - The error code
- * @returns The corresponding HTTP status code
+ * Handle CORS preflight requests
  */
-function getHttpStatusFromErrorCode(code: ErrorCode | string): number {
-  switch (code) {
-    case ErrorCode.NOT_FOUND:
-      return 404;
-    case ErrorCode.VALIDATION_FAILED:
-    case ErrorCode.INVALID_INPUT:
-      return 400;
-    case ErrorCode.AUTHENTICATION_ERROR:
-    case ErrorCode.UNAUTHORIZED:
-      return 401;
-    case ErrorCode.AUTHORIZATION_ERROR:
-      return 403;
-    case ErrorCode.RATE_LIMITED:
-      return 429;
-    case ErrorCode.DUPLICATE_ENTRY:
-    case ErrorCode.RESOURCE_EXISTS:
-      return 409;
-    case ErrorCode.TIMEOUT:
-      return 408;
-    case ErrorCode.SERVICE_UNAVAILABLE:
-      return 503;
-    default:
-      return 500;
-  }
+export function handleCorsRequest(): Response {
+  return new Response(null, { headers: corsHeaders });
 }
 
 /**
- * Validates that required parameters are present
+ * Validate required parameters in a request
  */
-export function validateRequiredParameters(
-  params: Record<string, unknown>,
-  requiredParams: string[]
+export function validateRequiredParameters<T extends Record<string, any>>(
+  params: T,
+  requiredParams: Array<keyof T>
 ): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredParams.filter(param => 
-    params[param] === undefined || params[param] === null
-  );
+  const missingParams: string[] = [];
+  
+  for (const param of requiredParams) {
+    if (params[param] === undefined || params[param] === null || params[param] === '') {
+      missingParams.push(String(param));
+    }
+  }
   
   return {
     isValid: missingParams.length === 0,
@@ -155,10 +125,49 @@ export function validateRequiredParameters(
 }
 
 /**
- * Log an event for debugging
+ * Validate parameter types
+ */
+export function validateParameterTypes<T extends Record<string, any>>(
+  params: T,
+  typeValidations: Record<keyof T, (value: any) => boolean>
+): { isValid: boolean; invalidParams: { param: string; expected: string; received: string }[] } {
+  const invalidParams: { param: string; expected: string; received: string }[] = [];
+  
+  for (const [param, validator] of Object.entries(typeValidations) as [keyof T, (value: any) => boolean][]) {
+    if (params[param] !== undefined && !validator(params[param])) {
+      invalidParams.push({
+        param: String(param),
+        expected: getFunctionExpectedType(validator),
+        received: typeof params[param]
+      });
+    }
+  }
+  
+  return {
+    isValid: invalidParams.length === 0,
+    invalidParams
+  };
+}
+
+/**
+ * Get the expected type from a validator function
+ */
+function getFunctionExpectedType(validator: Function): string {
+  const fnStr = validator.toString();
+  if (fnStr.includes('typeof') && fnStr.includes('===')) {
+    const match = fnStr.match(/typeof .+ === ['"](.+)['"]/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return "unknown";
+}
+
+/**
+ * Log events with structured information
  */
 export function logEvent(
-  level: 'debug' | 'info' | 'warn' | 'error',
+  level: "info" | "warn" | "error",
   message: string,
   data?: Record<string, unknown>
 ): void {
@@ -166,42 +175,49 @@ export function logEvent(
     timestamp: new Date().toISOString(),
     level,
     message,
-    data
+    ...data
   };
   
-  switch (level) {
-    case 'debug':
-      console.debug(JSON.stringify(logData));
-      break;
-    case 'info':
-      console.log(JSON.stringify(logData));
-      break;
-    case 'warn':
-      console.warn(JSON.stringify(logData));
-      break;
-    case 'error':
-      console.error(JSON.stringify(logData));
-      break;
+  if (level === "error") {
+    console.error(JSON.stringify(logData));
+  } else if (level === "warn") {
+    console.warn(JSON.stringify(logData));
+  } else {
+    console.log(JSON.stringify(logData));
   }
 }
 
 /**
- * Handle CORS preflight requests
+ * Parse an API error into a standardized format
  */
-export function handleCorsRequest(): Response {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
-  };
+export function parseApiError(error: unknown): {
+  message: string;
+  status?: number;
+  code?: string;
+  details?: unknown;
+} {
+  if (error instanceof Error) {
+    if (error instanceof ValidationError) {
+      return {
+        message: error.message,
+        code: error.code || ErrorCode.VALIDATION_FAILED,
+        details: { field: error.field, details: error.details }
+      };
+    }
+    
+    // Check for fetch/response errors
+    const anyError = error as any;
+    if (anyError.status && anyError.statusText) {
+      return {
+        message: anyError.statusText || error.message,
+        status: anyError.status,
+        details: anyError.data
+      };
+    }
+    
+    return { message: error.message };
+  }
   
-  return new Response(null, {
-    headers: corsHeaders
-  });
+  // Handle unknown error types
+  return { message: String(error) };
 }
-
-export default {
-  createSuccessResponse,
-  createErrorResponse,
-  ErrorCode
-};

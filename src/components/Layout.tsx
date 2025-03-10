@@ -16,15 +16,16 @@ interface LayoutProps {
   removeBackground?: boolean;
 }
 
-const Layout = ({ 
+const Layout: React.FC<LayoutProps> = ({ 
   children, 
   className,
   contentWidth = 'standard',
   removeBackground = false
 }: LayoutProps) => {
-  // Use performance tracking with minimal options
-  usePerformanceTracking('Layout', { 
-    logSlowRenders: true
+  // Use enhanced performance tracking
+  const { recordInteraction } = usePerformanceTracking('Layout', { 
+    logSlowRenders: true,
+    categories: ['layout', 'core']
   });
   
   // Map content width options to appropriate max-width classes
@@ -44,7 +45,11 @@ const Layout = ({
   };
   
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white text-gray-800" role="main">
+    <div 
+      className="min-h-screen relative overflow-hidden bg-white text-gray-800" 
+      role="main"
+      onClick={() => recordInteraction('layout-click', 0)}
+    >
       {/* Always show simple fallback */}
       <SimpleFallbackBackground />
       

@@ -1,6 +1,6 @@
 
 /**
- * Custom error class for validation errors
+ * Custom error class for validation errors with improved type safety
  */
 export class ValidationError extends Error {
   /** Field that failed validation */
@@ -17,6 +17,8 @@ export class ValidationError extends Error {
   statusCode?: number;
   /** Original error if this is wrapping another error */
   originalError?: unknown;
+  /** Error code for categorization */
+  code?: string;
 
   /**
    * Create a new validation error
@@ -31,6 +33,7 @@ export class ValidationError extends Error {
       details?: string;
       statusCode?: number;
       originalError?: unknown;
+      code?: string;
     }
   ) {
     super(message);
@@ -42,6 +45,7 @@ export class ValidationError extends Error {
     this.details = details.details;
     this.statusCode = details.statusCode;
     this.originalError = details.originalError;
+    this.code = details.code;
     
     // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, ValidationError.prototype);
@@ -52,48 +56,94 @@ export class ValidationError extends Error {
   }
   
   /**
+   * Get a user-friendly error message
+   */
+  getUserMessage(): string {
+    return this.details || this.message;
+  }
+  
+  /**
+   * Convert to a plain object for serialization
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      field: this.field,
+      expectedType: this.expectedType,
+      rule: this.rule,
+      details: this.details,
+      code: this.code,
+      statusCode: this.statusCode
+    };
+  }
+  
+  /**
    * Create a validation error for an API response
    */
-  static fromApiError(message: string, statusCode: number, details?: any): ValidationError {
+  static fromApiError(
+    message: string, 
+    statusCode: number, 
+    details?: any,
+    field: string = 'response'
+  ): ValidationError {
     return new ValidationError(message, {
-      field: 'response',
+      field,
       statusCode,
       details: details ? JSON.stringify(details) : undefined,
-      metadata: { details }
+      metadata: { details },
+      code: 'API_ERROR'
     });
   }
   
   /**
    * Create a validation error for a specific validation rule
    */
-  static fromRule(message: string, field: string, rule: string): ValidationError {
+  static fromRule(
+    message: string, 
+    field: string, 
+    rule: string,
+    code?: string
+  ): ValidationError {
     return new ValidationError(message, {
       field,
-      rule
+      rule,
+      code: code || `RULE_${rule.toUpperCase()}`
     });
   }
   
   /**
    * Create a validation error that wraps an original error
    */
-  static fromError(message: string, originalError: unknown, field: string = 'unknown'): ValidationError {
+  static fromError(
+    message: string, 
+    originalError: unknown, 
+    field: string = 'unknown',
+    code?: string
+  ): ValidationError {
     return new ValidationError(message, {
       field,
       originalError,
-      details: originalError instanceof Error ? originalError.message : String(originalError)
+      details: originalError instanceof Error ? originalError.message : String(originalError),
+      code: code || 'WRAPPED_ERROR'
     });
   }
 
   /**
    * Create a type error for when a value doesn't match the expected type
    */
-  static typeError(value: unknown, expectedType: string, field: string): ValidationError {
+  static typeError(
+    value: unknown, 
+    expectedType: string, 
+    field: string
+  ): ValidationError {
     return new ValidationError(
       `Expected ${field} to be of type ${expectedType}, but received ${typeof value}`,
       {
         field,
         expectedType,
-        rule: 'type-check'
+        rule: 'type-check',
+        code: 'TYPE_ERROR'
       }
     );
   }
@@ -101,13 +151,18 @@ export class ValidationError extends Error {
   /**
    * Create a constraint error for when a value doesn't meet specific constraints
    */
-  static constraintError(field: string, constraint: string, details?: string): ValidationError {
+  static constraintError(
+    field: string, 
+    constraint: string, 
+    details?: string
+  ): ValidationError {
     return new ValidationError(
       `${field} failed constraint: ${constraint}${details ? ` (${details})` : ''}`,
       {
         field,
         rule: constraint,
-        details
+        details,
+        code: `CONSTRAINT_${constraint.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`
       }
     );
   }
@@ -120,7 +175,8 @@ export class ValidationError extends Error {
       `${field} is required but was not provided`,
       {
         field,
-        rule: 'required'
+        rule: 'required',
+        code: 'REQUIRED_FIELD'
       }
     );
   }
@@ -128,14 +184,74 @@ export class ValidationError extends Error {
   /**
    * Create a schema validation error for object validation failures
    */
-  static schemaError(field: string, errors: Record<string, string>): ValidationError {
+  static schemaError(
+    field: string, 
+    errors: Record<string, string>
+  ): ValidationError {
     return new ValidationError(
       `${field} failed schema validation`,
       {
         field,
         rule: 'schema',
         details: JSON.stringify(errors),
-        metadata: { validationErrors: errors }
+        metadata: { validationErrors: errors },
+        code: 'SCHEMA_ERROR'
+      }
+    );
+  }
+  
+  /**
+   * Create a format validation error
+   */
+  static formatError(
+    field: string,
+    format: string,
+    providedValue?: string
+  ): ValidationError {
+    const detailPart = providedValue ? ` (provided: ${providedValue})` : '';
+    return new ValidationError(
+      `${field} must be in ${format} format${detailPart}`,
+      {
+        field,
+        rule: 'format',
+        details: `Must be in ${format} format`,
+        code: `FORMAT_${format.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`
+      }
+    );
+  }
+  
+  /**
+   * Create a range validation error
+   */
+  static rangeError(
+    field: string,
+    min?: number,
+    max?: number,
+    actual?: number
+  ): ValidationError {
+    let rangeDescription = '';
+    let code = 'RANGE';
+    
+    if (min !== undefined && max !== undefined) {
+      rangeDescription = `between ${min} and ${max}`;
+      code = 'RANGE_MIN_MAX';
+    } else if (min !== undefined) {
+      rangeDescription = `at least ${min}`;
+      code = 'RANGE_MIN';
+    } else if (max !== undefined) {
+      rangeDescription = `at most ${max}`;
+      code = 'RANGE_MAX';
+    }
+    
+    const actualPart = actual !== undefined ? ` (provided: ${actual})` : '';
+    
+    return new ValidationError(
+      `${field} must be ${rangeDescription}${actualPart}`,
+      {
+        field,
+        rule: 'range',
+        details: `Must be ${rangeDescription}`,
+        code
       }
     );
   }

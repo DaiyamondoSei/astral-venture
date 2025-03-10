@@ -1,40 +1,99 @@
 
+/**
+ * Runtime validation utilities for type safety
+ */
+
 import { ValidationError } from './ValidationError';
 
 /**
- * Validates that a value is a string
- * @param value The value to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated string
- * @throws ValidationError if validation fails
+ * Validate that a value is defined (not null or undefined)
  */
-export function validateString(value: unknown, fieldName: string): string {
+export function validateDefined<T>(
+  value: T | null | undefined, 
+  fieldName: string
+): T {
+  if (value === null || value === undefined) {
+    throw ValidationError.requiredError(fieldName);
+  }
+  return value;
+}
+
+/**
+ * Validate that a value is a string
+ */
+export function validateString(
+  value: unknown, 
+  fieldName: string,
+  options: { minLength?: number; maxLength?: number; pattern?: RegExp } = {}
+): string {
   if (typeof value !== 'string') {
     throw ValidationError.typeError(value, 'string', fieldName);
   }
+  
+  const { minLength, maxLength, pattern } = options;
+  
+  if (minLength !== undefined && value.length < minLength) {
+    throw ValidationError.constraintError(
+      fieldName,
+      'minLength',
+      `String must be at least ${minLength} characters`
+    );
+  }
+  
+  if (maxLength !== undefined && value.length > maxLength) {
+    throw ValidationError.constraintError(
+      fieldName,
+      'maxLength',
+      `String must be at most ${maxLength} characters`
+    );
+  }
+  
+  if (pattern !== undefined && !pattern.test(value)) {
+    throw ValidationError.constraintError(
+      fieldName,
+      'pattern',
+      `String must match pattern ${pattern}`
+    );
+  }
+  
   return value;
 }
 
 /**
- * Validates that a value is a number
- * @param value The value to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated number
- * @throws ValidationError if validation fails
+ * Validate that a value is a number
  */
-export function validateNumber(value: unknown, fieldName: string): number {
+export function validateNumber(
+  value: unknown, 
+  fieldName: string,
+  options: { min?: number; max?: number; integer?: boolean } = {}
+): number {
   if (typeof value !== 'number' || isNaN(value)) {
     throw ValidationError.typeError(value, 'number', fieldName);
   }
+  
+  const { min, max, integer } = options;
+  
+  if (min !== undefined && value < min) {
+    throw ValidationError.rangeError(fieldName, min, max, value);
+  }
+  
+  if (max !== undefined && value > max) {
+    throw ValidationError.rangeError(fieldName, min, max, value);
+  }
+  
+  if (integer === true && !Number.isInteger(value)) {
+    throw ValidationError.constraintError(
+      fieldName,
+      'integer',
+      'Value must be an integer'
+    );
+  }
+  
   return value;
 }
 
 /**
- * Validates that a value is a boolean
- * @param value The value to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated boolean
- * @throws ValidationError if validation fails
+ * Validate that a value is a boolean
  */
 export function validateBoolean(value: unknown, fieldName: string): boolean {
   if (typeof value !== 'boolean') {
@@ -44,156 +103,191 @@ export function validateBoolean(value: unknown, fieldName: string): boolean {
 }
 
 /**
- * Validates that a value is an object
- * @param value The value to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated object
- * @throws ValidationError if validation fails
+ * Validate that a value is an array
  */
-export function validateObject(value: unknown, fieldName: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw ValidationError.typeError(value, 'object', fieldName);
-  }
-  return value as Record<string, unknown>;
-}
-
-/**
- * Validates that a value is an array
- * @param value The value to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated array
- * @throws ValidationError if validation fails
- */
-export function validateArray<T = unknown>(value: unknown, fieldName: string): T[] {
+export function validateArray<T>(
+  value: unknown, 
+  fieldName: string,
+  options: { 
+    minLength?: number; 
+    maxLength?: number; 
+    itemValidator?: (item: unknown, index: number) => T 
+  } = {}
+): T[] {
   if (!Array.isArray(value)) {
     throw ValidationError.typeError(value, 'array', fieldName);
   }
+  
+  const { minLength, maxLength, itemValidator } = options;
+  
+  if (minLength !== undefined && value.length < minLength) {
+    throw ValidationError.constraintError(
+      fieldName,
+      'minLength',
+      `Array must have at least ${minLength} items`
+    );
+  }
+  
+  if (maxLength !== undefined && value.length > maxLength) {
+    throw ValidationError.constraintError(
+      fieldName,
+      'maxLength',
+      `Array must have at most ${maxLength} items`
+    );
+  }
+  
+  if (itemValidator) {
+    return value.map((item, index) => {
+      try {
+        return itemValidator(item, index);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          throw new ValidationError(
+            `Invalid item at index ${index} in array ${fieldName}: ${error.message}`,
+            {
+              field: `${fieldName}[${index}]`,
+              rule: error.rule,
+              details: error.details,
+              originalError: error
+            }
+          );
+        }
+        throw error;
+      }
+    });
+  }
+  
   return value as T[];
 }
 
 /**
- * Validates that a value exists (not undefined or null)
- * @param value The value to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated value
- * @throws ValidationError if validation fails
+ * Validate that a value is an object
  */
-export function validateExists<T>(value: T | null | undefined, fieldName: string): T {
-  if (value === undefined || value === null) {
-    throw ValidationError.requiredError(fieldName);
-  }
-  return value;
-}
-
-/**
- * Validates that a value is one of the allowed values
- * @param value The value to validate
- * @param allowedValues Array of allowed values
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated value
- * @throws ValidationError if validation fails
- */
-export function validateOneOf<T>(value: unknown, allowedValues: T[], fieldName: string): T {
-  if (!allowedValues.includes(value as T)) {
-    throw ValidationError.constraintError(
-      fieldName,
-      'one-of',
-      `Expected one of: ${allowedValues.join(', ')}, but got: ${String(value)}`
-    );
+export function validateObject<T extends object>(
+  value: unknown, 
+  fieldName: string
+): T {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw ValidationError.typeError(value, 'object', fieldName);
   }
   return value as T;
 }
 
 /**
- * Validates that a string is not empty
- * @param value The string to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated string
- * @throws ValidationError if validation fails
- */
-export function validateNonEmptyString(value: unknown, fieldName: string): string {
-  const stringValue = validateString(value, fieldName);
-  if (stringValue.trim() === '') {
-    throw ValidationError.constraintError(fieldName, 'non-empty-string', 'String cannot be empty');
-  }
-  return stringValue;
-}
-
-/**
- * Validates an email address format
- * @param value The email to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated email
- * @throws ValidationError if validation fails
+ * Validate an email address
  */
 export function validateEmail(value: unknown, fieldName: string): string {
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const email = validateString(value, fieldName);
-  // Simple email validation regex - production systems might need more sophisticated validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
   if (!emailRegex.test(email)) {
-    throw ValidationError.constraintError(fieldName, 'email-format', 'Invalid email format');
+    throw ValidationError.formatError(fieldName, 'email', email);
   }
+  
   return email;
 }
 
 /**
- * Validates a UUID format
- * @param value The UUID to validate
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The validated UUID
- * @throws ValidationError if validation fails
+ * Validate a URL
  */
-export function validateUUID(value: unknown, fieldName: string): string {
-  const uuid = validateString(value, fieldName);
-  // UUID v4 regex
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(uuid)) {
-    throw ValidationError.constraintError(fieldName, 'uuid-format', 'Invalid UUID format');
+export function validateUrl(
+  value: unknown, 
+  fieldName: string,
+  options: { protocols?: string[] } = {}
+): string {
+  const url = validateString(value, fieldName);
+  
+  try {
+    const urlObj = new URL(url);
+    
+    if (options.protocols && options.protocols.length > 0) {
+      const protocol = urlObj.protocol.replace(':', '');
+      if (!options.protocols.includes(protocol)) {
+        throw ValidationError.constraintError(
+          fieldName,
+          'protocol',
+          `URL must use one of these protocols: ${options.protocols.join(', ')}`
+        );
+      }
+    }
+    
+    return url;
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw ValidationError.formatError(fieldName, 'URL', url);
   }
+}
+
+/**
+ * Validate a date string or object
+ */
+export function validateDate(
+  value: unknown, 
+  fieldName: string
+): Date {
+  let date: Date;
+  
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === 'string' || typeof value === 'number') {
+    date = new Date(value);
+  } else {
+    throw ValidationError.typeError(value, 'Date, string, or number', fieldName);
+  }
+  
+  if (isNaN(date.getTime())) {
+    throw ValidationError.formatError(fieldName, 'date', String(value));
+  }
+  
+  return date;
+}
+
+/**
+ * Validate a UUID string
+ */
+export function validateUuid(value: unknown, fieldName: string): string {
+  const uuid = validateString(value, fieldName);
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  
+  if (!uuidRegex.test(uuid)) {
+    throw ValidationError.formatError(fieldName, 'UUID', uuid);
+  }
+  
   return uuid;
 }
 
 /**
- * Safely attempts to parse JSON
- * @param value The string to parse
- * @param fieldName Name of the field being validated (for error messages)
- * @returns The parsed JSON object
- * @throws ValidationError if parsing fails
+ * Validate an enumeration value
  */
-export function validateJSON<T = unknown>(value: string, fieldName: string): T {
-  try {
-    return JSON.parse(value) as T;
-  } catch (error) {
+export function validateEnum<T extends string | number>(
+  value: unknown, 
+  fieldName: string,
+  allowedValues: T[]
+): T {
+  if (!allowedValues.includes(value as T)) {
     throw ValidationError.constraintError(
-      fieldName, 
-      'json-format',
-      error instanceof Error ? error.message : 'Invalid JSON'
+      fieldName,
+      'enum',
+      `Value must be one of: ${allowedValues.join(', ')}`
     );
   }
+  
+  return value as T;
 }
 
 /**
- * Validates that a value has required properties
- * @param value The object to validate
- * @param requiredProps Array of required property names
- * @param objectName Name of the object being validated (for error messages)
- * @returns The validated object
- * @throws ValidationError if validation fails
+ * Create a validator for optional values
  */
-export function validateRequiredProps<T extends Record<string, unknown>>(
-  value: T,
-  requiredProps: string[],
-  objectName: string
-): T {
-  const missingProps = requiredProps.filter(prop => !(prop in value) || value[prop] === undefined || value[prop] === null);
-  
-  if (missingProps.length > 0) {
-    throw ValidationError.constraintError(
-      objectName,
-      'required-properties',
-      `Missing required properties: ${missingProps.join(', ')}`
-    );
-  }
-  
-  return value;
+export function optional<T>(
+  validator: (value: unknown, fieldName: string) => T,
+  defaultValue?: T
+): (value: unknown, fieldName: string) => T | undefined {
+  return (value: unknown, fieldName: string): T | undefined => {
+    if (value === undefined || value === null) {
+      return defaultValue;
+    }
+    return validator(value, fieldName);
+  };
 }
