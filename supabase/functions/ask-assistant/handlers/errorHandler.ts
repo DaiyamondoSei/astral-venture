@@ -4,8 +4,8 @@
  * Handles different error types and provides appropriate responses
  */
 
-import { createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
-import { ValidationError } from "../../shared/types.ts";
+import { createErrorResponse, ErrorCode, corsHeaders } from "../../shared/responseUtils.ts";
+import { ValidationError, AuthenticationError, DatabaseError, ExternalApiError } from "../../shared/types.ts";
 
 /**
  * Error handling options
@@ -43,6 +43,22 @@ export enum ErrorCategory {
  * Categorize an error based on its message and type
  */
 function categorizeError(error: unknown): ErrorCategory {
+  if (error instanceof ValidationError) {
+    return ErrorCategory.VALIDATION;
+  }
+  
+  if (error instanceof AuthenticationError) {
+    return ErrorCategory.AUTHENTICATION;
+  }
+  
+  if (error instanceof DatabaseError) {
+    return ErrorCategory.DATABASE;
+  }
+  
+  if (error instanceof ExternalApiError) {
+    return ErrorCategory.EXTERNAL_API;
+  }
+  
   const errorMessage = error instanceof Error ? error.message : String(error);
   
   // Check for network errors
@@ -81,8 +97,7 @@ function categorizeError(error: unknown): ErrorCategory {
   if (errorMessage.includes("validation") || 
       errorMessage.includes("invalid") || 
       errorMessage.includes("parameter") ||
-      errorMessage.includes("required") ||
-      error instanceof ValidationError) {
+      errorMessage.includes("required")) {
     return ErrorCategory.VALIDATION;
   }
   
@@ -170,71 +185,102 @@ export function handleError(error: unknown, options: ErrorHandlingOptions = {}):
     ...additionalInfo
   };
   
-  // Map error category to appropriate error code and message
+  // Extract error message
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
+  // Map error category to appropriate error code and status code
   switch (errorCategory) {
     case ErrorCategory.NETWORK:
       return createErrorResponse(
         ErrorCode.NETWORK_ERROR,
-        "Unable to reach AI service due to network issues",
-        metadata
+        "Unable to reach service due to network issues",
+        metadata,
+        503
       );
     
     case ErrorCategory.TIMEOUT:
       return createErrorResponse(
         ErrorCode.TIMEOUT,
-        "Request to AI service timed out",
-        { ...metadata, shouldRetry: true }
+        "Request timed out",
+        { ...metadata, shouldRetry: true },
+        504
       );
     
     case ErrorCategory.RATE_LIMIT:
       return createErrorResponse(
         ErrorCode.RATE_LIMITED,
-        "AI service temporarily unavailable due to high demand",
-        { ...metadata, shouldRetry: true, retryAfter: '30 seconds' }
+        "Service temporarily unavailable due to high demand",
+        { ...metadata, shouldRetry: true, retryAfter: '30 seconds' },
+        429
       );
     
     case ErrorCategory.AUTHENTICATION:
       return createErrorResponse(
         ErrorCode.AUTHENTICATION_ERROR,
-        "Unable to authenticate with AI service",
-        metadata
+        error instanceof AuthenticationError 
+          ? errorMessage 
+          : "Authentication failed",
+        metadata,
+        401
       );
     
     case ErrorCategory.VALIDATION:
       return createErrorResponse(
         ErrorCode.VALIDATION_FAILED,
-        "Invalid input parameters for AI request",
-        metadata
+        error instanceof ValidationError 
+          ? errorMessage 
+          : "Invalid input parameters",
+        metadata,
+        400
       );
     
     case ErrorCategory.CONTENT_MODERATION:
       return createErrorResponse(
         ErrorCode.CONTENT_POLICY_VIOLATION,
-        "Your request contains content that violates our content policy",
-        metadata
+        "Content violates policy guidelines",
+        metadata,
+        403
       );
     
     case ErrorCategory.DATABASE:
       return createErrorResponse(
         ErrorCode.DATABASE_ERROR,
-        "Error accessing database resources",
-        metadata
+        error instanceof DatabaseError 
+          ? errorMessage 
+          : "Database operation failed",
+        metadata,
+        500
       );
       
     case ErrorCategory.EXTERNAL_API:
       return createErrorResponse(
         ErrorCode.EXTERNAL_API_ERROR,
-        "Error communicating with external AI service",
-        { ...metadata, shouldRetry: true }
+        error instanceof ExternalApiError 
+          ? errorMessage 
+          : "Error communicating with external service",
+        { ...metadata, shouldRetry: true },
+        502
       );
     
     default:
       return createErrorResponse(
         ErrorCode.INTERNAL_ERROR,
-        "An error occurred while processing your request",
-        metadata
+        "An internal error occurred",
+        metadata,
+        500
       );
   }
 }
 
-export default handleError;
+/**
+ * Handle CORS preflight requests
+ */
+export function handleCorsRequest(): Response {
+  return new Response(null, { headers: corsHeaders });
+}
+
+export default {
+  handleError,
+  handleCorsRequest,
+  ErrorCategory
+};

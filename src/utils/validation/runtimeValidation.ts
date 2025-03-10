@@ -278,6 +278,39 @@ export function validateEnum<T extends string | number>(
 }
 
 /**
+ * Validate one of multiple possible types
+ */
+export function validateOneOf<T>(
+  value: unknown,
+  fieldName: string,
+  validators: ((value: unknown) => any)[]
+): T {
+  const errors: string[] = [];
+  
+  for (const validator of validators) {
+    try {
+      return validator(value) as T;
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        errors.push(error.message);
+      } else {
+        errors.push(String(error));
+      }
+    }
+  }
+  
+  throw new ValidationError(
+    `${fieldName} did not match any of the expected types`,
+    {
+      field: fieldName,
+      rule: 'oneOf',
+      details: `Validation errors: ${errors.join('; ')}`,
+      code: 'ONE_OF_FAILED'
+    }
+  );
+}
+
+/**
  * Create a validator for optional values
  */
 export function optional<T>(
@@ -291,3 +324,21 @@ export function optional<T>(
     return validator(value, fieldName);
   };
 }
+
+export {
+  validateDefined,
+  validateString,
+  validateNumber,
+  validateBoolean,
+  validateArray,
+  validateObject,
+  validateEmail,
+  validateUrl,
+  validateDate,
+  validateUuid,
+  validateEnum,
+  validateOneOf,
+  optional,
+  ValidationError,
+  isValidationError
+};

@@ -2,7 +2,7 @@
 /**
  * Parameter validation utilities for edge functions
  */
-import { ValidationError } from "./types.ts";
+import { ValidationError, ErrorCode } from "./types.ts";
 
 /**
  * Validator function signature
@@ -15,7 +15,7 @@ type ValidatorFn<T> = (value: unknown) => T;
 export function required<T>(validator: ValidatorFn<T>): ValidatorFn<T> {
   return (value: unknown): T => {
     if (value === undefined || value === null) {
-      throw new ValidationError("Required parameter is missing", "unknown", "required");
+      throw new ValidationError("Required parameter is missing", "required", "missing_parameter");
     }
     return validator(value);
   };
@@ -41,8 +41,8 @@ export function string(options: { minLength?: number; maxLength?: number; patter
     if (typeof value !== "string") {
       throw new ValidationError(
         `Expected string but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
@@ -51,24 +51,24 @@ export function string(options: { minLength?: number; maxLength?: number; patter
     if (minLength !== undefined && value.length < minLength) {
       throw new ValidationError(
         `String must be at least ${minLength} characters`, 
-        "value", 
-        "minLength"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
     if (maxLength !== undefined && value.length > maxLength) {
       throw new ValidationError(
         `String must be at most ${maxLength} characters`, 
-        "value", 
-        "maxLength"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
     if (pattern !== undefined && !pattern.test(value)) {
       throw new ValidationError(
         `String must match pattern ${pattern}`, 
-        "value", 
-        "pattern"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
@@ -87,15 +87,15 @@ export function number(options: { min?: number; max?: number; integer?: boolean 
       if (isNaN(num)) {
         throw new ValidationError(
           `Cannot convert string to number: ${value}`, 
-          "value", 
-          "type"
+          "type", 
+          ErrorCode.INVALID_PARAMETERS
         );
       }
     } else if (typeof value !== "number") {
       throw new ValidationError(
         `Expected number but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     } else {
       num = value;
@@ -106,24 +106,24 @@ export function number(options: { min?: number; max?: number; integer?: boolean 
     if (min !== undefined && num < min) {
       throw new ValidationError(
         `Number must be at least ${min}`, 
-        "value", 
-        "min"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
     if (max !== undefined && num > max) {
       throw new ValidationError(
         `Number must be at most ${max}`, 
-        "value", 
-        "max"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
     if (integer === true && !Number.isInteger(num)) {
       throw new ValidationError(
         "Number must be an integer", 
-        "value", 
-        "integer"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
@@ -141,16 +141,16 @@ export function boolean(): ValidatorFn<boolean> {
       if (value.toLowerCase() === "false") return false;
       throw new ValidationError(
         `Cannot convert string to boolean: ${value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
     if (typeof value !== "boolean") {
       throw new ValidationError(
         `Expected boolean but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
@@ -166,8 +166,8 @@ export function array<T>(itemValidator: ValidatorFn<T>, options: { minLength?: n
     if (!Array.isArray(value)) {
       throw new ValidationError(
         `Expected array but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
@@ -176,16 +176,16 @@ export function array<T>(itemValidator: ValidatorFn<T>, options: { minLength?: n
     if (minLength !== undefined && value.length < minLength) {
       throw new ValidationError(
         `Array must have at least ${minLength} items`, 
-        "value", 
-        "minLength"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
     if (maxLength !== undefined && value.length > maxLength) {
       throw new ValidationError(
         `Array must have at most ${maxLength} items`, 
-        "value", 
-        "maxLength"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
@@ -196,8 +196,8 @@ export function array<T>(itemValidator: ValidatorFn<T>, options: { minLength?: n
         if (error instanceof ValidationError) {
           throw new ValidationError(
             `Invalid item at index ${index}: ${error.message}`, 
-            `[${index}]`, 
-            error.code
+            "validation", 
+            ErrorCode.VALIDATION_FAILED
           );
         }
         throw error;
@@ -214,8 +214,8 @@ export function object<T extends Record<string, unknown>>(schema: Record<keyof T
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new ValidationError(
         `Expected object but got ${value === null ? "null" : typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
@@ -229,8 +229,8 @@ export function object<T extends Record<string, unknown>>(schema: Record<keyof T
         if (error instanceof ValidationError) {
           throw new ValidationError(
             `Invalid value for field "${key}": ${error.message}`, 
-            key, 
-            error.code
+            "validation", 
+            ErrorCode.VALIDATION_FAILED
           );
         }
         throw error;
@@ -249,16 +249,16 @@ export function enumValue<T extends string | number>(allowedValues: readonly T[]
     if (typeof value !== "string" && typeof value !== "number") {
       throw new ValidationError(
         `Expected string or number but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
     if (!allowedValues.includes(value as T)) {
       throw new ValidationError(
         `Value must be one of: ${allowedValues.join(", ")}`, 
-        "value", 
-        "enum"
+        "constraint", 
+        ErrorCode.VALIDATION_FAILED
       );
     }
     
@@ -275,16 +275,16 @@ export function uuid(): ValidatorFn<string> {
     if (typeof value !== "string") {
       throw new ValidationError(
         `Expected UUID string but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
     if (!uuidPattern.test(value)) {
       throw new ValidationError(
         "Invalid UUID format", 
-        "value", 
-        "format"
+        "format", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
@@ -300,8 +300,8 @@ export function date(): ValidatorFn<Date> {
     if (typeof value !== "string" && !(value instanceof Date) && typeof value !== "number") {
       throw new ValidationError(
         `Expected date string, Date object, or timestamp but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
@@ -310,8 +310,8 @@ export function date(): ValidatorFn<Date> {
     if (isNaN(date.getTime())) {
       throw new ValidationError(
         "Invalid date format", 
-        "value", 
-        "format"
+        "format", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
@@ -328,20 +328,47 @@ export function email(): ValidatorFn<string> {
     if (typeof value !== "string") {
       throw new ValidationError(
         `Expected email string but got ${typeof value}`, 
-        "value", 
-        "type"
+        "type", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
     if (!emailPattern.test(value)) {
       throw new ValidationError(
         "Invalid email format", 
-        "value", 
-        "format"
+        "format", 
+        ErrorCode.INVALID_PARAMETERS
       );
     }
     
     return value;
+  };
+}
+
+/**
+ * Validate one of multiple possible types
+ */
+export function oneOf<T>(validators: ValidatorFn<any>[]): ValidatorFn<T> {
+  return (value: unknown): T => {
+    const errors: string[] = [];
+    
+    for (const validator of validators) {
+      try {
+        return validator(value) as T;
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          errors.push(error.message);
+        } else {
+          errors.push(String(error));
+        }
+      }
+    }
+    
+    throw new ValidationError(
+      `Value didn't match any of the expected types. Errors: ${errors.join(", ")}`,
+      "validation",
+      ErrorCode.VALIDATION_FAILED
+    );
   };
 }
 
@@ -354,3 +381,19 @@ export function validateParams<T extends Record<string, unknown>>(
 ): T {
   return object<T>(schema)(params);
 }
+
+export default {
+  required,
+  optional,
+  string,
+  number,
+  boolean,
+  array,
+  object,
+  enumValue,
+  uuid,
+  date,
+  email,
+  oneOf,
+  validateParams
+};
