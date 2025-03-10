@@ -35,39 +35,53 @@ const validateWebVitalMetric = (metric: unknown, name: string): WebVitalMetric =
   };
 };
 
-// Initialize web vitals monitoring with enhanced error handling
-export const initWebVitalsMonitoring = (): void => {
-  if (typeof window === 'undefined') return;
+/**
+ * Initialize web vitals monitoring
+ * @returns A cleanup function
+ */
+export function initWebVitals(): () => void {
+  if (typeof window === 'undefined') return () => {};
   
   try {
-    import('web-vitals').then(({ onCLS, onFID, onLCP, onTTFB, onINP }) => {
-      // Core Web Vitals with improved error handling
-      const safeAnalytics = createSafeAsyncFunction(
-        sendToAnalytics,
-        {
+    const handleImport = async () => {
+      try {
+        const webVitals = await import('web-vitals');
+        
+        // Core Web Vitals with improved error handling
+        const safeAnalytics = createSafeAsyncFunction(
+          sendToAnalytics,
+          {
+            context: 'Web Vitals',
+            severity: ErrorSeverity.WARNING,
+            category: ErrorCategory.DATA_PROCESSING,
+            showToast: false
+          }
+        );
+        
+        webVitals.onCLS(safeAnalytics, { reportAllChanges: false });
+        webVitals.onFID(safeAnalytics, { reportAllChanges: false });
+        webVitals.onLCP(safeAnalytics, { reportAllChanges: false });
+        webVitals.onTTFB(safeAnalytics, { reportAllChanges: false });
+        webVitals.onINP(safeAnalytics, { reportAllChanges: false });
+        
+        console.info('Web Vitals monitoring initialized');
+      } catch (error) {
+        handleError(error, {
           context: 'Web Vitals',
           severity: ErrorSeverity.WARNING,
-          category: ErrorCategory.DATA_PROCESSING,
+          category: ErrorCategory.RESOURCE,
+          customMessage: 'Failed to load web-vitals library',
           showToast: false
-        }
-      );
-      
-      onCLS(safeAnalytics, { reportAllChanges: false });
-      onFID(safeAnalytics, { reportAllChanges: false });
-      onLCP(safeAnalytics, { reportAllChanges: false });
-      onTTFB(safeAnalytics, { reportAllChanges: false });
-      onINP(safeAnalytics, { reportAllChanges: false });
-      
-      console.info('Web Vitals monitoring initialized');
-    }).catch(error => {
-      handleError(error, {
-        context: 'Web Vitals',
-        severity: ErrorSeverity.WARNING,
-        category: ErrorCategory.RESOURCE,
-        customMessage: 'Failed to load web-vitals library',
-        showToast: false
-      });
-    });
+        });
+      }
+    };
+    
+    handleImport();
+    
+    return () => {
+      // No specific cleanup needed
+      console.info('Web Vitals monitoring stopped');
+    };
   } catch (error) {
     handleError(error, {
       context: 'Web Vitals',
@@ -75,8 +89,93 @@ export const initWebVitalsMonitoring = (): void => {
       customMessage: 'Failed to initialize web vitals monitoring',
       showToast: false
     });
+    return () => {};
   }
-};
+}
+
+/**
+ * Track component render time
+ * @param componentName - Name of the component
+ * @param renderTime - Time taken to render in ms
+ * @param type - Type of render event
+ */
+export function trackComponentRender(
+  componentName: string, 
+  renderTime: number, 
+  type: 'initial' | 'update' | 'effect' = 'update'
+): void {
+  try {
+    // Log to console in development
+    if (import.meta.env.DEV) {
+      console.debug(`[PERF] ${componentName} ${type} render: ${renderTime.toFixed(2)}ms`);
+    }
+    
+    // We could send this to an analytics service in production
+  } catch (error) {
+    // Silently fail for performance tracking
+    console.error('Error tracking component render:', error);
+  }
+}
+
+/**
+ * Track web vital metric
+ * @param name - Metric name
+ * @param value - Metric value
+ * @param category - Metric category
+ */
+export function trackWebVital(
+  name: string, 
+  value: number, 
+  category: 'loading' | 'interaction' | 'visual_stability'
+): void {
+  try {
+    // Log to console in development
+    if (import.meta.env.DEV) {
+      console.debug(`[VITAL] ${name}: ${value} (${category})`);
+    }
+    
+    // We could send this to an analytics service in production
+  } catch (error) {
+    // Silently fail for performance tracking
+    console.error('Error tracking web vital:', error);
+  }
+}
+
+/**
+ * Mark the start of a performance measure
+ * @param label - Measurement label
+ */
+export function markStart(label: string): void {
+  if (typeof performance === 'undefined') return;
+  performance.mark(`${label}:start`);
+}
+
+/**
+ * Mark the end of a performance measure and record the duration
+ * @param label - Measurement label
+ * @returns Duration in milliseconds
+ */
+export function markEnd(label: string): number {
+  if (typeof performance === 'undefined') return 0;
+  
+  try {
+    performance.mark(`${label}:end`);
+    performance.measure(label, `${label}:start`, `${label}:end`);
+    
+    const entries = performance.getEntriesByName(label);
+    const duration = entries.length > 0 ? entries[0].duration : 0;
+    
+    // Clear marks and measures to avoid memory leaks
+    performance.clearMarks(`${label}:start`);
+    performance.clearMarks(`${label}:end`);
+    performance.clearMeasures(label);
+    
+    return duration;
+  } catch (error) {
+    console.error(`Error measuring ${label}:`, error);
+    return 0;
+  }
+}
 
 // Send metrics to analytics with validation and error handling
 const sendToAnalytics = async (rawMetric: unknown): Promise<void> => {
@@ -144,8 +243,20 @@ const sendToAnalytics = async (rawMetric: unknown): Promise<void> => {
   }
 };
 
-// Calculate performance score based on Web Vitals with validation
-export const calculatePerformanceScore = (metrics: Record<string, number>): number => {
+/**
+ * Report collected metrics to the server
+ * @returns Promise indicating success or failure
+ */
+export async function reportMetricsToServer(): Promise<boolean> {
+  // Implementation would send batched metrics to server
+  // This is a placeholder for now
+  return true;
+}
+
+/**
+ * Calculate performance score based on Web Vitals with validation
+ */
+export function calculatePerformanceScore(metrics: Record<string, number>): number {
   try {
     // Validate input
     validateDefined(metrics, 'metrics');
@@ -193,7 +304,7 @@ export const calculatePerformanceScore = (metrics: Record<string, number>): numb
     });
     return 0; // Return 0 as fallback
   }
-};
+}
 
 /**
  * Get performance grade based on score

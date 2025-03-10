@@ -1,6 +1,5 @@
-
 import React, { createContext, useEffect, useState, useCallback } from 'react';
-import { initWebVitals } from '../utils/webVitalsMonitor';
+import { initWebVitals, trackWebVital, trackComponentRender, reportMetricsToServer } from '../utils/webVitalsMonitor';
 
 // Define device capability levels
 export type DeviceCapability = 'low' | 'medium' | 'high';
@@ -183,16 +182,12 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const metricsCollector: PerformanceMetricsCollector = {
     addComponentMetric: (componentName, renderTime, type = 'render') => {
       try {
-        // Import dynamically to avoid SSR issues
-        import('../utils/webVitalsMonitor').then(({ trackComponentRender }) => {
-          trackComponentRender(
-            componentName, 
-            renderTime, 
-            type === 'load' ? 'initial' : (type === 'interaction' ? 'effect' : 'update')
-          );
-        }).catch(error => {
-          console.error('Error importing webVitalsMonitor:', error);
-        });
+        // Use the trackComponentRender function directly
+        trackComponentRender(
+          componentName, 
+          renderTime, 
+          type === 'load' ? 'initial' : (type === 'interaction' ? 'effect' : 'update')
+        );
       } catch (error) {
         console.error('Error recording component metric:', error);
       }
@@ -200,12 +195,8 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     addWebVital: (name, value, category) => {
       try {
-        // Import dynamically to avoid SSR issues
-        import('../utils/webVitalsMonitor').then(({ trackWebVital }) => {
-          trackWebVital(name, value, category);
-        }).catch(error => {
-          console.error('Error importing webVitalsMonitor:', error);
-        });
+        // Use the trackWebVital function directly
+        trackWebVital(name, value, category);
       } catch (error) {
         console.error('Error recording web vital:', error);
       }
@@ -213,7 +204,7 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     
     reportNow: async () => {
       try {
-        const { reportMetricsToServer } = await import('../utils/webVitalsMonitor');
+        // Use the reportMetricsToServer function directly
         return await reportMetricsToServer();
       } catch (error) {
         console.error('Error reporting metrics:', error);
@@ -232,12 +223,9 @@ export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       
       // Only initialize in production to avoid development overhead
       if (import.meta.env.PROD) {
-        import('../utils/webVitalsMonitor').then(({ initWebVitals }) => {
-          const cleanup = initWebVitals();
-          setWebVitalsCleanup(() => cleanup);
-        }).catch(error => {
-          console.error('Error initializing web vitals:', error);
-        });
+        // Use the initWebVitals function directly
+        const cleanup = initWebVitals();
+        setWebVitalsCleanup(() => cleanup);
       }
     }
     

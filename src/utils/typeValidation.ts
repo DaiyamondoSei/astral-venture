@@ -1,7 +1,8 @@
-import { ValidationError } from './validation/runtimeValidation';
 
-// Re-export ValidationError from our runtime validation
-export { ValidationError };
+/**
+ * Re-export ValidationError from our runtime validation
+ */
+export { ValidationError } from './validation/runtimeValidation';
 
 /**
  * Validates that a value is defined (not null or undefined)

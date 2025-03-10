@@ -7,6 +7,19 @@ import { validateDefined } from './validation/runtimeValidation';
 export type AchievementStatus = 'locked' | 'in-progress' | 'completed';
 
 /**
+ * Achievement category types
+ */
+export type AchievementCategory = 
+  | 'meditation'
+  | 'practice'
+  | 'reflection'
+  | 'chakra'
+  | 'consciousness'
+  | 'portal'
+  | 'learning'
+  | 'community';
+
+/**
  * Calculate the percentage of progress towards an achievement
  * 
  * @param current - Current progress value
@@ -88,9 +101,116 @@ export function isNewlyCompleted(
   return previousValue < targetValue && currentValue >= targetValue;
 }
 
+/**
+ * Get color for achievement category
+ * 
+ * @param category - Achievement category
+ * @returns CSS color string for the category
+ */
+export function getCategoryColor(category: AchievementCategory): string {
+  switch (category) {
+    case 'meditation':
+      return 'hsl(250, 95%, 70%)'; // Purple
+    case 'practice':
+      return 'hsl(200, 95%, 50%)'; // Blue
+    case 'reflection':
+      return 'hsl(170, 80%, 40%)'; // Teal
+    case 'chakra':
+      return 'hsl(40, 100%, 50%)'; // Gold
+    case 'consciousness':
+      return 'hsl(280, 90%, 60%)'; // Violet
+    case 'portal':
+      return 'hsl(320, 80%, 55%)'; // Magenta
+    case 'learning':
+      return 'hsl(140, 70%, 45%)'; // Green
+    case 'community':
+      return 'hsl(20, 90%, 55%)'; // Orange
+    default:
+      return 'hsl(220, 15%, 50%)'; // Neutral slate
+  }
+}
+
+/**
+ * Track achievement progress for a user
+ * 
+ * @param achievementId - The ID of the achievement to track
+ * @param progress - The progress value to add
+ * @returns Promise resolving to updated progress percentage
+ */
+export async function trackAchievementProgress(
+  achievementId: string, 
+  progress: number
+): Promise<number> {
+  try {
+    // In a real implementation, this would call a Supabase edge function
+    // For now, we'll just simulate the behavior
+    console.info(`Tracking achievement progress: ${achievementId}, +${progress}`);
+    return Math.min(100, Math.round(Math.random() * 100)); // Simulated progress
+  } catch (error) {
+    console.error("Failed to track achievement progress:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get user achievements list
+ * 
+ * @returns Promise resolving to achievement array
+ */
+export async function getUserAchievements(): Promise<Achievement[]> {
+  try {
+    // In a real implementation, this would fetch from Supabase
+    // For now, return sample data
+    return [
+      {
+        id: 'first-meditation',
+        title: 'First Meditation',
+        description: 'Complete your first meditation session',
+        category: 'meditation',
+        progress: 100,
+        target: 1,
+        awarded: true,
+        awardedAt: new Date().toISOString(),
+        icon: 'lotus'
+      },
+      {
+        id: 'reflection-streak',
+        title: 'Reflection Streak',
+        description: 'Complete 7 consecutive days of reflection',
+        category: 'reflection',
+        progress: 5,
+        target: 7,
+        awarded: false,
+        icon: 'thinking'
+      }
+    ];
+  } catch (error) {
+    console.error("Failed to fetch user achievements:", error);
+    return [];
+  }
+}
+
+/**
+ * Achievement data interface
+ */
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  category: AchievementCategory;
+  progress: number;
+  target: number;
+  awarded: boolean;
+  awardedAt?: string;
+  icon?: string;
+}
+
 export default {
   calculateProgressPercentage,
   getAchievementStatus,
   formatProgressMessage,
-  isNewlyCompleted
+  isNewlyCompleted,
+  getCategoryColor,
+  trackAchievementProgress,
+  getUserAchievements
 };
