@@ -1,23 +1,32 @@
 
 /**
- * Validation utilities index file
- * Centralizes exports from all validation-related files
+ * Centralized validation system exports
  */
 
-// Re-export from ValidationError
-export { ValidationError, isValidationError } from './ValidationError';
+// Core validation error class
+export { 
+  ValidationError,
+  isValidationError,
+  type ValidationErrorOptions 
+} from './ValidationError';
 
-// Export from runtime validation modules
-export * from './runtimeValidation';
+// Runtime validation utilities
+export {
+  validateString,
+  validateNumber,
+  validateBoolean,
+  validateObject,
+  validateArray,
+  validateEmail,
+  validateUrl,
+  validateDate,
+  validateEnum,
+  validateRegex
+} from './runtimeValidator';
 
-// Export type validators if available
-import * as typeValidators from '../typeValidation';
-export { typeValidators };
-
-// Export schema validators
-import * as schemaValidator from './schemaValidator';
-export { schemaValidator };
-
-// Export API validators
-import * as apiValidator from './apiValidator';
-export { apiValidator };
+// For forms and complex validation
+export { 
+  useRuntimeValidation,
+  type ValidationResult,
+  type ValidationOptions
+} from '../../hooks/useRuntimeValidation';

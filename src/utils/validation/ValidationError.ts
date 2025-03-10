@@ -159,6 +159,47 @@ export class ValidationError extends Error {
       }
     );
   }
+
+  /**
+   * Create an error from API response
+   */
+  static fromApiError(error: unknown, field?: string): ValidationError {
+    const fieldName = field || 'api';
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    return new ValidationError(
+      `API Error in ${fieldName}: ${errorMessage}`,
+      {
+        field: fieldName,
+        statusCode: error instanceof Error && 'statusCode' in error ? (error as any).statusCode : 500,
+        originalError: error,
+        code: 'API_ERROR'
+      }
+    );
+  }
+
+  /**
+   * Create a schema validation error
+   */
+  static schemaError(errors: string[], field: string): ValidationError {
+    return new ValidationError(
+      `Schema validation failed for ${field}`,
+      {
+        field,
+        rule: 'schema',
+        details: Array.isArray(errors) ? errors.join(', ') : String(errors),
+        code: 'SCHEMA_VALIDATION_ERROR'
+      }
+    );
+  }
+
+  /**
+   * Utility to check if an error is a ValidationError
+   */
+  static isValidationError(error: unknown): error is ValidationError {
+    return error instanceof ValidationError;
+  }
 }
 
 export default ValidationError;
+export const isValidationError = ValidationError.isValidationError;
