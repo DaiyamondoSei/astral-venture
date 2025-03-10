@@ -1,4 +1,3 @@
-
 /**
  * Runtime type validation utilities
  */
@@ -6,19 +5,31 @@
 import { z } from 'zod';
 
 /**
- * Custom type for validation errors
+ * Custom validation error class
  */
-export interface ValidationErrorDetails {
-  message: string;
+export class ValidationError extends Error {
+  code?: string;
   path?: string;
+  
+  constructor(message: string, code?: string, path?: string) {
+    super(message);
+    this.name = 'ValidationError';
+    this.code = code;
+    this.path = path;
+  }
 }
 
 /**
- * Check if an error is a validation error
+ * Check if a value matches one of the allowed values
  */
-export function isValidationError(error: unknown): error is Error {
-  return error instanceof Error && 
-    (error.name === 'ValidationError' || error.message.includes('validation'));
+export function validateOneOf<T>(value: unknown, allowedValues: T[], name = 'value'): T {
+  if (!allowedValues.includes(value as T)) {
+    throw new ValidationError(
+      `${name} must be one of: ${allowedValues.join(', ')}`,
+      'INVALID_VALUE'
+    );
+  }
+  return value as T;
 }
 
 /**
@@ -173,18 +184,12 @@ export function validateRange(
 }
 
 /**
- * Validate that a value is defined
- * 
- * @param value - Value to validate
- * @param name - Name of the value (for error messages)
- * @returns The validated value
- * @throws Error if validation fails
+ * Validate that a value is defined and matches expected type
  */
 export function validateDefined<T>(value: T | null | undefined, name = 'value'): T {
   if (value === null || value === undefined) {
-    throw new Error(`${name} is required`);
+    throw new ValidationError(`${name} is required`, 'REQUIRED_VALUE');
   }
-  
   return value;
 }
 

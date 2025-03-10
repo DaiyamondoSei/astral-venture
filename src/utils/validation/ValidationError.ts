@@ -1,47 +1,21 @@
 
 /**
- * Custom validation error class
+ * Custom validation error type
  */
 export class ValidationError extends Error {
+  code?: string;
   path?: string;
-  value?: unknown;
-  
-  constructor(message: string, path?: string, value?: unknown) {
+  details?: Record<string, unknown>;
+
+  constructor(message: string, code?: string, path?: string, details?: Record<string, unknown>) {
     super(message);
     this.name = 'ValidationError';
+    this.code = code;
     this.path = path;
-    this.value = value;
-    
-    // Ensures proper stack trace in modern JS engines
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ValidationError);
-    }
+    this.details = details;
   }
 }
 
-/**
- * Creates a validation error with formatted message
- * 
- * @param path - Path to the invalid field
- * @param message - Error message
- * @param value - Invalid value
- * @returns ValidationError instance
- */
-export function createValidationError(
-  path: string,
-  message: string,
-  value?: unknown
-): ValidationError {
-  const formattedMessage = path ? `${path}: ${message}` : message;
-  return new ValidationError(formattedMessage, path, value);
-}
-
-/**
- * Type guard to check if an error is a ValidationError
- * 
- * @param error - Error to check
- * @returns True if error is a ValidationError
- */
 export function isValidationError(error: unknown): error is ValidationError {
   return error instanceof ValidationError;
 }

@@ -1,78 +1,56 @@
 
-/**
- * Schema validation utilities
- */
 import { z } from 'zod';
 import { ValidationError } from './ValidationError';
 
-/**
- * Validation result interface
- */
 export interface ValidationResult<T> {
-  valid: boolean;
+  isValid: boolean;
   data?: T;
-  error?: string;
+  error?: ValidationError;
 }
 
 /**
- * Creates a schema for validating data
- * 
- * @param schema - Schema definition
- * @returns Schema object
+ * Create a schema validator function
  */
-function createSchema<T>(schema: z.ZodType<T>) {
-  return {
-    /**
-     * Validate data against the schema
-     * 
-     * @param data - Data to validate
-     * @returns Validation result
-     */
-    validate: (data: unknown): ValidationResult<T> => {
-      try {
-        const result = schema.safeParse(data);
-        if (result.success) {
-          return {
-            valid: true,
-            data: result.data
-          };
-        } else {
-          return {
-            valid: false,
-            error: result.error.message
-          };
-        }
-      } catch (error) {
+export function createSchemaValidator<T>(schema: z.ZodType<T>) {
+  return (data: unknown): ValidationResult<T> => {
+    try {
+      const result = schema.parse(data);
+      return {
+        isValid: true,
+        data: result
+      };
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const firstError = err.errors[0];
         return {
-          valid: false,
-          error: error instanceof Error ? error.message : 'Unknown validation error'
+          isValid: false,
+          error: new ValidationError(
+            firstError.message,
+            'SCHEMA_VALIDATION_ERROR',
+            firstError.path.join('.')
+          )
         };
       }
-    },
-    
-    /**
-     * Parse data with the schema, throwing errors if invalid
-     * 
-     * @param data - Data to parse
-     * @returns Parsed data
-     * @throws ValidationError if validation fails
-     */
-    parse: (data: unknown): T => {
-      try {
-        return schema.parse(data);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          const firstError = error.errors[0];
-          throw new ValidationError(
-            firstError.message,
-            firstError.path.join('.'),
-            firstError.input
-          );
-        }
-        throw error;
-      }
+      return {
+        isValid: false,
+        error: new ValidationError('Unknown validation error')
+      };
     }
   };
 }
 
-export default createSchema;
+/**
+ * Validate data against a schema
+ */
+export function validateSchema<T>(
+  data: unknown,
+  schema: z.ZodType<T>
+): ValidationResult<T> {
+  const validator = createSchemaValidator(schema);
+  return validator(data);
+}
+
+export default {
+  createSchemaValidator,
+  validateSchema
+};

@@ -1,11 +1,10 @@
-
 /**
  * Type validation and transformation utilities
  */
 
 import { z } from 'zod';
 import { isNil, isString, isNumber, isArray, isObject, isBoolean } from 'lodash';
-import { validateBoolean, validateNumber, validateString, validateArray, validateObject } from './validation/runtimeValidation';
+import { validateBoolean, validateNumber, validateString, validateArray, validateObject, validateDefined } from './validation/runtimeValidation';
 
 /**
  * Ensures a value is of a specific type or returns a default
@@ -15,7 +14,7 @@ import { validateBoolean, validateNumber, validateString, validateArray, validat
  * @param validator - Validation function to apply
  * @returns Validated value or default
  */
-export function withDefault<T>(
+export function ensureWithDefault<T>(
   value: unknown,
   defaultValue: T,
   validator: (val: unknown, name?: string) => T
@@ -38,7 +37,7 @@ export function withDefault<T>(
  * @returns Validated string or default
  */
 export function stringWithDefault(value: unknown, defaultValue = ''): string {
-  return withDefault(value, defaultValue, validateString);
+  return ensureWithDefault(value, defaultValue, validateString);
 }
 
 /**
@@ -49,7 +48,7 @@ export function stringWithDefault(value: unknown, defaultValue = ''): string {
  * @returns Validated number or default
  */
 export function numberWithDefault(value: unknown, defaultValue = 0): number {
-  return withDefault(value, defaultValue, validateNumber);
+  return ensureWithDefault(value, defaultValue, validateNumber);
 }
 
 /**
@@ -60,7 +59,7 @@ export function numberWithDefault(value: unknown, defaultValue = 0): number {
  * @returns Validated boolean or default
  */
 export function booleanWithDefault(value: unknown, defaultValue = false): boolean {
-  return withDefault(value, defaultValue, validateBoolean);
+  return ensureWithDefault(value, defaultValue, validateBoolean);
 }
 
 /**
@@ -71,7 +70,7 @@ export function booleanWithDefault(value: unknown, defaultValue = false): boolea
  * @returns Validated array or default
  */
 export function arrayWithDefault<T>(value: unknown, defaultValue: T[] = []): T[] {
-  return withDefault(value, defaultValue, validateArray as (val: unknown, name?: string) => T[]);
+  return ensureWithDefault(value, defaultValue, validateArray as (val: unknown, name?: string) => T[]);
 }
 
 /**
@@ -85,7 +84,7 @@ export function objectWithDefault<T extends object>(
   value: unknown, 
   defaultValue: T = {} as T
 ): T {
-  return withDefault(value, defaultValue, validateObject as (val: unknown, name?: string) => T);
+  return ensureWithDefault(value, defaultValue, validateObject as (val: unknown, name?: string) => T);
 }
 
 /**
@@ -136,5 +135,6 @@ export {
   validateNumber,
   validateBoolean,
   validateArray,
-  validateObject
+  validateObject,
+  validateDefined
 };
