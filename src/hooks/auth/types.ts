@@ -1,9 +1,6 @@
 
 import type { User } from '@supabase/supabase-js';
 
-/**
- * User profile interface
- */
 export interface IUserProfile {
   id: string;
   email: string;
@@ -12,36 +9,18 @@ export interface IUserProfile {
   preferences?: Record<string, unknown>;
 }
 
-/**
- * User streak tracking interface
- */
 export interface IUserStreak {
   current: number;
   longest: number;
   lastActivity?: string;
 }
 
-/**
- * Today's challenge interface
- */
-export interface ITodayChallenge {
-  id: string;
-  title: string;
-  description: string;
-  completed: boolean;
-  energy_points: number;
-  category: string;
-}
-
-/**
- * Auth context interface
- */
 export interface IAuthContext {
   user: User | null;
   userProfile: IUserProfile | null;
   userStreak: IUserStreak | null;
   activatedChakras: number[];
-  todayChallenge: ITodayChallenge | null;
+  todayChallenge: any; // Will be typed properly later
   isAuthenticated: boolean;
   isLoading: boolean;
   hasCompletedLoading: boolean;
