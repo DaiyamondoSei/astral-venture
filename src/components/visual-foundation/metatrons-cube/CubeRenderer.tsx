@@ -99,7 +99,7 @@ const CubeRenderer: React.FC<CubeRendererProps> = ({
           primaryColor={primaryColor}
           secondaryColor={secondaryColor}
           isActive={activeNodeId === node.id}
-          onClick={onNodeClick ? onNodeClick : () => {}}
+          onClick={onNodeClick ? () => onNodeClick(node.id) : undefined}
           glowIntensity={glowIntensity}
           isSimplified={isSimplified}
         />

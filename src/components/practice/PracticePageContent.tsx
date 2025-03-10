@@ -29,7 +29,7 @@ const PracticePageContent: React.FC = () => {
   // Handle practice completion
   const handleComplete = async (duration: number, reflection?: string) => {
     if (selectedPractice) {
-      const success = await completePractice(duration, reflection);
+      const success = await completePractice(selectedPractice.id, duration, reflection);
       if (success) {
         // Briefly delay going back to list to show completion
         setTimeout(() => {

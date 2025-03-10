@@ -17,7 +17,7 @@ export function useAuthState() {
   }, [auth]);
 
   const handleLogout = useCallback(async () => {
-    return auth.handleLogout();
+    return auth.logout();
   }, [auth]);
 
   const handleRegister = useCallback(async (email: string, password: string) => {

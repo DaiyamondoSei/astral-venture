@@ -1,7 +1,51 @@
 
 import { useCallback, useEffect, useRef } from 'react';
-import { performanceMonitor } from '@/utils/performance';
-import type { PerformanceTrackingOptions } from '@/utils/performance';
+
+// Import types
+export interface PerformanceTrackingOptions {
+  /** Automatically start monitoring when component mounts */
+  autoStart?: boolean;
+  /** Log slow renders to console */
+  logSlowRenders?: boolean;
+  /** Threshold in ms for what's considered a slow render */
+  slowRenderThreshold?: number;
+}
+
+// Placeholder for performance monitor functions until we implement them fully
+const performanceMonitor = {
+  recordRender: (componentName: string, renderTime: number) => {
+    console.debug(`[Performance] ${componentName} rendered in ${renderTime.toFixed(2)}ms`);
+  },
+  
+  recordUnmount: (componentName: string) => {
+    console.debug(`[Performance] ${componentName} unmounted`);
+  },
+  
+  recordEvent: (category: string, name: string, duration: number) => {
+    console.debug(`[Performance] ${category}:${name} took ${duration.toFixed(2)}ms`);
+  },
+  
+  startMonitoring: () => {
+    console.debug('[Performance] Started monitoring');
+  },
+  
+  stopMonitoring: () => {
+    console.debug('[Performance] Stopped monitoring');
+  },
+  
+  resetMetrics: () => {
+    console.debug('[Performance] Metrics reset');
+  },
+  
+  getComponentMetrics: (componentName: string) => {
+    return {
+      component: componentName,
+      averageRenderTime: 0,
+      totalRenders: 0,
+      slowRenders: 0
+    };
+  }
+};
 
 /**
  * Hook for tracking component performance

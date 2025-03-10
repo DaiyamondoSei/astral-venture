@@ -3,8 +3,9 @@ import { useContext } from 'react';
 import AuthContext, { IAuthContext } from '@/contexts/AuthContext';
 
 /**
- * Hook for accessing auth context with type safety
- * @returns Auth context with full typing
+ * Primary hook for accessing auth context with full type safety
+ * 
+ * @returns Auth context with complete typing
  * @throws Error if used outside AuthProvider
  */
 export function useAuth(): IAuthContext {
@@ -16,3 +17,5 @@ export function useAuth(): IAuthContext {
   
   return context;
 }
+
+export default useAuth;

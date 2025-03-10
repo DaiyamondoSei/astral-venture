@@ -1,16 +1,117 @@
+
 /**
  * Comprehensive pattern matching service for insight extraction
  * Combines multiple extraction approaches for better results
  */
-
-import { extractListItems } from './listPatternMatcher';
-import { identifyInsightsByKeywords } from './keywordPatternMatcher';
 
 // Insight type definition
 export interface Insight {
   type: string;       // The category of insight (emotional, chakra, practice, etc.)
   content: string;    // The actual content of the insight
   relevance?: number; // Optional relevance score (0-10)
+}
+
+/**
+ * Extract list items from text as insights
+ * @param text The text to analyze
+ * @returns Array of extracted insights from lists
+ */
+export function extractListItems(text: string): Insight[] {
+  if (!text) return [];
+  
+  const insights: Insight[] = [];
+  
+  // Look for bullet points and numbered lists
+  const listItemRegex = /(?:^|\n)[-*•]|\d+\.\s+(.+?)(?=$|\n)/g;
+  let match;
+  
+  while ((match = listItemRegex.exec(text)) !== null) {
+    const content = match[1] || match[0].replace(/^[-*•]|\d+\.\s+/, '').trim();
+    if (content.length > 5) { // Minimum content length
+      insights.push({
+        type: 'list-item',
+        content: content.trim()
+      });
+    }
+  }
+  
+  return insights;
+}
+
+/**
+ * Identify insights by looking for key phrases and patterns
+ * @param text The text to analyze
+ * @returns Array of extracted insights by keywords
+ */
+export function identifyInsightsByKeywords(text: string): Insight[] {
+  if (!text) return [];
+  
+  const insights: Insight[] = [];
+  const paragraphs = text.split(/\n\n+/);
+  
+  // Keywords that indicate different types of insights
+  const keywordPatterns = [
+    { pattern: /chakra|energy center|root|sacral|solar plexus|heart|throat|third eye|crown/i, type: 'chakra' },
+    { pattern: /emotion|feel|feeling|emotional|mood|anxiety|stress|joy|happiness|sadness/i, type: 'emotional' },
+    { pattern: /meditat|breath|mindful|practice|technique|exercise|routine/i, type: 'practice' },
+    { pattern: /reflect|insight|realiz|understand|awareness|conscious/i, type: 'awareness' },
+    { pattern: /recommend|suggest|try|consider|might help|could benefit/i, type: 'recommendation' }
+  ];
+  
+  // Examine each paragraph for insights
+  paragraphs.forEach(paragraph => {
+    const trimmedParagraph = paragraph.trim();
+    if (trimmedParagraph.length < 15) return; // Skip very short paragraphs
+    
+    // Determine the type based on keywords
+    for (const { pattern, type } of keywordPatterns) {
+      if (pattern.test(trimmedParagraph)) {
+        insights.push({
+          type,
+          content: trimmedParagraph,
+          relevance: calculateRelevance(trimmedParagraph, type)
+        });
+        break; // Assign only one type per paragraph
+      }
+    }
+  });
+  
+  return insights;
+}
+
+/**
+ * Calculate relevance score for an insight based on content and type
+ * @param content The insight content
+ * @param type The insight type
+ * @returns Relevance score (0-10)
+ */
+function calculateRelevance(content: string, type: string): number {
+  // Base relevance
+  let relevance = 5;
+  
+  // Adjust based on content length (longer content may be more detailed)
+  if (content.length > 100) relevance += 1;
+  if (content.length > 200) relevance += 1;
+  
+  // Adjust based on specific keywords presence
+  const strongIndicators = {
+    chakra: ['balance', 'blockage', 'alignment', 'energy flow', 'activation'],
+    emotional: ['pattern', 'trigger', 'response', 'regulation', 'healing'],
+    practice: ['daily', 'regular', 'consistent', 'technique', 'method'],
+    awareness: ['insight', 'realization', 'understanding', 'perspective', 'clarity'],
+    recommendation: ['specific', 'personalized', 'tailored', 'effective', 'proven']
+  };
+  
+  // Add points for strong indicators
+  const indicators = strongIndicators[type as keyof typeof strongIndicators] || [];
+  for (const indicator of indicators) {
+    if (content.toLowerCase().includes(indicator)) {
+      relevance += 0.5;
+    }
+  }
+  
+  // Cap at 10
+  return Math.min(10, relevance);
 }
 
 /**
