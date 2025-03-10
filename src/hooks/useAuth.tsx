@@ -5,10 +5,10 @@ import AuthContext, { IAuthContext } from '@/contexts/AuthContext';
 /**
  * Custom hook to access the authentication context
  * 
- * @returns Authentication context with user data and auth methods
+ * @returns The authentication context
  * @throws Error if used outside of an AuthProvider
  */
-export const useAuth = (): IAuthContext => {
+export function useAuth(): IAuthContext {
   const context = useContext(AuthContext);
   
   if (!context) {
@@ -16,6 +16,6 @@ export const useAuth = (): IAuthContext => {
   }
   
   return context;
-};
+}
 
 export default useAuth;

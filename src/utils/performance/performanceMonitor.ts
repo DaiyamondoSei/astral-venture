@@ -1,9 +1,9 @@
 
-// Import directly from the PerformanceMonitor file
 import { PerformanceMonitor, performanceMonitor, IComponentMetrics } from './PerformanceMonitor';
+import type { ComponentMetrics } from '@/services/ai/types';
 
-// Export the singleton, class and types
+// Re-export the singleton instance, class and types
 export { performanceMonitor, PerformanceMonitor, IComponentMetrics };
-export type { ComponentMetrics } from '@/services/ai/types';
+export type { ComponentMetrics };
 
 export default performanceMonitor;

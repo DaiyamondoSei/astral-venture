@@ -9,6 +9,7 @@ import { PanelProvider } from '@/contexts/PanelContext';
 import SwipeablePanel from '@/components/panels/SwipeablePanelController';
 import SwipeIndicator from '@/components/panels/SwipeIndicator';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { AppErrorBoundary } from '@/components/error-handling/AppErrorBoundary';
 
 import LandingPage from '@/pages/LandingPage';
 import HomePage from '@/pages/HomePage';
@@ -44,58 +45,60 @@ function App() {
         <AdaptivePerformanceProvider>
           <QuantumThemeProvider>
             <AuthProvider>
-              <PanelProvider>
-                {/* Swipeable panels controller */}
-                <SwipeablePanel 
-                  position="bottom" 
-                  initialState={false}
-                  title="Default Panel"
-                  height="50vh"
-                >
-                  <div>Default panel content</div>
-                </SwipeablePanel>
-                
-                {/* Routes configuration */}
-                <Routes>
-                  <Route 
-                    path="/home" 
-                    element={
-                      <>
-                        <SwipeIndicator position="top" />
-                        <SwipeIndicator position="bottom" />
-                        <HomePage />
-                      </>
-                    } 
-                  />
-                  <Route 
-                    path="/dashboard" 
-                    element={
-                      <>
-                        <SwipeIndicator position="top" />
-                        <SwipeIndicator position="bottom" />
-                        <DashboardPage />
-                      </>
-                    } 
-                  />
-                  <Route 
-                    path="/practice" 
-                    element={
-                      <>
-                        <SwipeIndicator position="top" />
-                        <SwipeIndicator position="bottom" />
-                        <PracticePage />
-                      </>
-                    } 
-                  />
-                  <Route path="/" element={<LandingPage />} />
-                  <Route path="/entry-animation" element={<EntryAnimationPage />} />
-                  <Route path="/design-system" element={<DesignSystemDemo />} />
-                  <Route path="/onboarding" element={<OnboardingPage />} />
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
-                
-                <Toaster />
-              </PanelProvider>
+              <AppErrorBoundary>
+                <PanelProvider>
+                  {/* Swipeable panels controller */}
+                  <SwipeablePanel 
+                    position="bottom" 
+                    initialState={false}
+                    title="Default Panel"
+                    height="50vh"
+                  >
+                    <div>Default panel content</div>
+                  </SwipeablePanel>
+                  
+                  {/* Routes configuration */}
+                  <Routes>
+                    <Route 
+                      path="/home" 
+                      element={
+                        <>
+                          <SwipeIndicator position="top" />
+                          <SwipeIndicator position="bottom" />
+                          <HomePage />
+                        </>
+                      } 
+                    />
+                    <Route 
+                      path="/dashboard" 
+                      element={
+                        <>
+                          <SwipeIndicator position="top" />
+                          <SwipeIndicator position="bottom" />
+                          <DashboardPage />
+                        </>
+                      } 
+                    />
+                    <Route 
+                      path="/practice" 
+                      element={
+                        <>
+                          <SwipeIndicator position="top" />
+                          <SwipeIndicator position="bottom" />
+                          <PracticePage />
+                        </>
+                      } 
+                    />
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/entry-animation" element={<EntryAnimationPage />} />
+                    <Route path="/design-system" element={<DesignSystemDemo />} />
+                    <Route path="/onboarding" element={<OnboardingPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                  
+                  <Toaster />
+                </PanelProvider>
+              </AppErrorBoundary>
             </AuthProvider>
           </QuantumThemeProvider>
         </AdaptivePerformanceProvider>
