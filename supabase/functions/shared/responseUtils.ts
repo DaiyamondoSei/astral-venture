@@ -37,3 +37,50 @@ export function createErrorResponse(message: string, details?: any, status: numb
     }
   );
 }
+
+// Error codes for consistent error handling
+export enum ErrorCode {
+  MISSING_PARAMETERS = "MISSING_PARAMETERS",
+  VALIDATION_FAILED = "VALIDATION_FAILED",
+  UNAUTHORIZED = "UNAUTHORIZED",
+  FORBIDDEN = "FORBIDDEN",
+  NOT_FOUND = "NOT_FOUND",
+  RATE_LIMITED = "RATE_LIMITED",
+  EXTERNAL_API_ERROR = "EXTERNAL_API_ERROR",
+  CONFIGURATION_ERROR = "CONFIGURATION_ERROR",
+  NETWORK_ERROR = "NETWORK_ERROR",
+  TIMEOUT = "TIMEOUT",
+  AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR",
+  INTERNAL_ERROR = "INTERNAL_ERROR"
+}
+
+// Create a standardized success response
+export function createSuccessResponse(data: any, metadata?: any): Response {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data,
+      metadata: metadata || null,
+      timestamp: new Date().toISOString()
+    }),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+// Validate required parameters in a request
+export function validateRequiredParameters(
+  params: Record<string, any>,
+  required: string[]
+): {
+  isValid: boolean;
+  missingParams: string[];
+} {
+  const missingParams = required.filter(param => params[param] === undefined || params[param] === null);
+  
+  return {
+    isValid: missingParams.length === 0,
+    missingParams
+  };
+}

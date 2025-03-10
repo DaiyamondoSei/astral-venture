@@ -1,5 +1,5 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
 import { corsHeaders, createErrorResponse } from "./responseUtils.ts";
 
 /**
@@ -34,5 +34,51 @@ export async function withAuth(req: Request, handler: Function): Promise<Respons
   } catch (error) {
     console.error("Auth error:", error);
     return createErrorResponse('Internal server error during authentication', error.message, 500);
+  }
+}
+
+/**
+ * Helper to create Supabase client from request
+ * This approach allows more flexible access to Supabase client
+ */
+export function createClientFromRequest(req: Request): { 
+  client: any; 
+  token?: string;
+  error?: string;
+} {
+  try {
+    const authorization = req.headers.get('Authorization') || '';
+    if (!authorization.startsWith('Bearer ')) {
+      return { 
+        client: null, 
+        error: 'Missing or invalid token format' 
+      };
+    }
+    
+    const token = authorization.replace('Bearer ', '');
+    
+    const client = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { 
+        auth: { 
+          persistSession: false,
+          autoRefreshToken: false
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      }
+    );
+    
+    return { client, token };
+  } catch (error) {
+    console.error("Error creating client:", error);
+    return { 
+      client: null, 
+      error: error.message 
+    };
   }
 }

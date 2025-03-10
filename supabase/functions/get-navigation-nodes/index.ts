@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -43,6 +42,7 @@ async function handler(user: any, req: Request): Promise<Response> {
 
 // Generate nodes and connections
 function generateNavigationData(level: number, theme: string, userId: string) {
+  
   // Base nodes (always present)
   const baseNodes = [
     {
@@ -180,6 +180,7 @@ function generateNavigationData(level: number, theme: string, userId: string) {
 
 // Get theme-specific settings
 function getThemeSettings(theme: string) {
+  
   const baseColors = {
     default: { 
       primary: '#3498db', 

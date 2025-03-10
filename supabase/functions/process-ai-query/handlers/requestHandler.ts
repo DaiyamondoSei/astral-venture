@@ -1,5 +1,5 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
 import { corsHeaders, createResponse, createErrorResponse } from "../../shared/responseUtils.ts";
 import { extractInsights } from "../services/insightExtractor.ts";
 import { getCachedResponse, cacheResponse } from "../services/cacheHandler.ts";
