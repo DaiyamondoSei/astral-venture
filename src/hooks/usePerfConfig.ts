@@ -18,4 +18,30 @@ export const usePerfConfig = (): PerfConfigContextType => {
   return context;
 };
 
+/**
+ * Get the performance configuration for a specific device capability
+ * 
+ * @param deviceCapability - The device capability to get configuration for
+ * @returns The performance configuration for the specified device capability
+ */
+export const getPerfConfigForCapability = (
+  deviceCapability: 'low' | 'medium' | 'high'
+): PerfConfigContextType['config'] => {
+  // Import directly from the context to avoid circular dependencies
+  const { defaultConfigs } = require('@/contexts/PerfConfigContext');
+  return defaultConfigs[deviceCapability];
+};
+
+/**
+ * Get a safe configuration that works on all devices
+ * This is useful for components that need to run in any environment
+ * 
+ * @returns Performance configuration safe for all device capabilities
+ */
+export const getSafeConfig = (): PerfConfigContextType['config'] => {
+  // Import directly from the context to avoid circular dependencies
+  const { defaultConfigs } = require('@/contexts/PerfConfigContext');
+  return defaultConfigs.low;
+};
+
 export default usePerfConfig;

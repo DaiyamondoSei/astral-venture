@@ -66,7 +66,10 @@ export function createSupabaseClient() {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables');
+    throw new ValidationError('Missing Supabase environment variables', {
+      code: 'CONFIGURATION_ERROR',
+      statusCode: 500
+    });
   }
   
   return createClient(supabaseUrl, supabaseKey);

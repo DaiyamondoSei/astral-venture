@@ -9,7 +9,18 @@ export interface ColorScheme {
   accentColor?: string;
 }
 
-export const getColorScheme = (scheme: 'default' | 'ethereal' | 'astral' | 'quantum'): ColorScheme => {
+/**
+ * Available color scheme types
+ */
+export type ColorSchemeType = 'default' | 'ethereal' | 'astral' | 'quantum' | 'cosmic';
+
+/**
+ * Get a color scheme by name
+ * 
+ * @param scheme - The color scheme to retrieve
+ * @returns The color scheme configuration
+ */
+export const getColorScheme = (scheme: ColorSchemeType): ColorScheme => {
   switch (scheme) {
     case 'ethereal':
       return {
@@ -41,6 +52,16 @@ export const getColorScheme = (scheme: 'default' | 'ethereal' | 'astral' | 'quan
         connectionColor: 'rgba(249, 168, 212, 0.3)',
         accentColor: '#F472B6'
       };
+    case 'cosmic':
+      return {
+        background: 'from-[#070B14] via-[#0F182A] to-[#0A1022]',
+        particlePrimary: '#7DD3FC',
+        particleSecondary: '#0EA5E9',
+        glowColor: 'rgba(125, 211, 252, 0.5)',
+        nodeColor: '#BAE6FD',
+        connectionColor: 'rgba(186, 230, 253, 0.3)',
+        accentColor: '#38BDF8'
+      };
     default:
       return {
         background: 'from-[#221F26] via-[#2C2B33] to-[#191A23]',
@@ -54,8 +75,19 @@ export const getColorScheme = (scheme: 'default' | 'ethereal' | 'astral' | 'quan
   }
 };
 
-// Export additional color utilities
-export const getGlowColorByIntensity = (baseColor: string, intensity: 'low' | 'medium' | 'high'): string => {
+/**
+ * Intensity levels for glow effects
+ */
+export type GlowIntensity = 'low' | 'medium' | 'high';
+
+/**
+ * Get a glow color with a specific intensity
+ * 
+ * @param baseColor - The base color to apply the glow to
+ * @param intensity - The intensity level for the glow
+ * @returns The glow color with applied intensity
+ */
+export const getGlowColorByIntensity = (baseColor: string, intensity: GlowIntensity): string => {
   const alphaMap = {
     low: 0.3,
     medium: 0.5,
@@ -70,7 +102,126 @@ export const getGlowColorByIntensity = (baseColor: string, intensity: 'low' | 'm
   return `rgba(${r}, ${g}, ${b}, ${alphaMap[intensity]})`;
 };
 
-// Utility to create gradient string from colors
+/**
+ * Create a gradient string from two colors
+ * 
+ * @param color1 - The first color in the gradient
+ * @param color2 - The second color in the gradient
+ * @param direction - The direction of the gradient in degrees
+ * @returns A CSS gradient string
+ */
 export const createGradientString = (color1: string, color2: string, direction = '135deg'): string => {
   return `linear-gradient(${direction}, ${color1}, ${color2})`;
+};
+
+/**
+ * Create a radial gradient string
+ * 
+ * @param centerColor - The center color of the gradient
+ * @param outerColor - The outer color of the gradient
+ * @param shape - The shape of the gradient
+ * @returns A CSS radial gradient string
+ */
+export const createRadialGradientString = (
+  centerColor: string, 
+  outerColor: string,
+  shape: 'circle' | 'ellipse' = 'circle'
+): string => {
+  return `radial-gradient(${shape} at center, ${centerColor}, ${outerColor})`;
+};
+
+/**
+ * Available animation patterns
+ */
+export type AnimationPattern = 'pulse' | 'wave' | 'sparkle' | 'glow' | 'shimmer';
+
+/**
+ * Get animation properties for a specified pattern
+ * 
+ * @param pattern - The animation pattern to use
+ * @param duration - The duration of the animation in seconds
+ * @returns Animation properties object
+ */
+export const getAnimationProperties = (
+  pattern: AnimationPattern,
+  duration: number = 3
+): Record<string, unknown> => {
+  switch (pattern) {
+    case 'pulse':
+      return {
+        scale: [1, 1.05, 1],
+        opacity: [0.7, 1, 0.7],
+        transition: {
+          duration,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }
+      };
+    case 'wave':
+      return {
+        y: [0, -5, 0, 5, 0],
+        transition: {
+          duration,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }
+      };
+    case 'sparkle':
+      return {
+        filter: [
+          'brightness(1)',
+          'brightness(1.2) saturate(1.2)',
+          'brightness(1)'
+        ],
+        transition: {
+          duration,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }
+      };
+    case 'glow':
+      return {
+        boxShadow: [
+          '0 0 5px rgba(255,255,255,0.3)',
+          '0 0 20px rgba(255,255,255,0.6)',
+          '0 0 5px rgba(255,255,255,0.3)'
+        ],
+        transition: {
+          duration,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }
+      };
+    case 'shimmer':
+      return {
+        background: [
+          'linear-gradient(45deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 55%, rgba(255,255,255,0) 100%)',
+          'linear-gradient(45deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 55%, rgba(255,255,255,0) 100%)'
+        ],
+        backgroundPosition: ['200% 0', '-200% 0'],
+        backgroundSize: '200% 100%',
+        transition: {
+          duration,
+          repeat: Infinity,
+          ease: "linear"
+        }
+      };
+    default:
+      return {
+        opacity: [0.7, 1, 0.7],
+        transition: {
+          duration,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }
+      };
+  }
+};
+
+export default {
+  getColorScheme,
+  getGlowColorByIntensity,
+  createGradientString,
+  createRadialGradientString,
+  getAnimationProperties
 };
