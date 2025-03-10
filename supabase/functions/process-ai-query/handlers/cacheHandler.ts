@@ -1,131 +1,111 @@
 
+/**
+ * Cache handling utilities for AI query responses
+ */
+
 import { corsHeaders } from "../../shared/responseUtils.ts";
-import { getFromMemoryCache, storeInMemoryCache } from "../services/cache/memoryCache.ts";
-import { 
-  getFromDatabaseCache, 
-  storeInDatabaseCache
-} from "../services/cache/databaseCache.ts";
-import { calculateCacheTTL } from "../../shared/cacheUtils.ts";
+
+// In-memory cache for development (in production, this would use KV or Redis)
+const responseCache = new Map<string, {
+  response: Response;
+  timestamp: number;
+  isStream: boolean;
+}>();
+
+// Cache TTL in milliseconds (default: 30 minutes)
+const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
 
 /**
  * Get a cached response if available
- * First checks in-memory cache, then falls back to database cache
+ * 
+ * @param key - Cache key
+ * @param isStream - Whether the response is a stream
+ * @returns Cached response or null
  */
 export async function getCachedResponse(
-  cacheKey: string, 
-  isStreamingRequest: boolean
+  key: string,
+  isStream = false
 ): Promise<Response | null> {
-  // Check memory cache first for performance
-  const cachedMemoryData = getFromMemoryCache(cacheKey);
+  const cached = responseCache.get(key);
   
-  if (cachedMemoryData) {
-    console.log(`Memory cache hit for key: ${cacheKey}`);
-    
-    // Ensure the data type (streaming vs non-streaming) matches
-    if (cachedMemoryData.isStreaming === isStreamingRequest) {
-      return new Response(cachedMemoryData.data, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": isStreamingRequest 
-            ? "text/event-stream" 
-            : "application/json",
-          "Cache-Control": "max-age=300",
-          "X-Cache-Source": "memory"
-        }
-      });
-    }
+  if (!cached) {
+    return null;
   }
   
-  // Check database cache as fallback
-  const dbCacheData = await getFromDatabaseCache(cacheKey);
+  // Check if cache entry has expired
+  const now = Date.now();
+  if (now - cached.timestamp > DEFAULT_CACHE_TTL) {
+    responseCache.delete(key);
+    return null;
+  }
   
-  if (dbCacheData && dbCacheData.isStreaming === isStreamingRequest) {
-    console.log(`Database cache hit for key: ${cacheKey}`);
+  // Clone the response for streaming or non-streaming cases
+  if (cached.isStream) {
+    // For streaming responses, we need special handling
+    const { readable, writable } = new TransformStream();
+    cached.response.body?.pipeTo(writable);
     
-    // Store in memory cache for faster access next time
-    if (dbCacheData.responseData) {
-      const encoder = new TextEncoder();
-      const responseData = encoder.encode(dbCacheData.responseData);
-      
-      storeInMemoryCache(
-        cacheKey, 
-        responseData, 
-        isStreamingRequest
-      );
-    }
-    
-    return new Response(dbCacheData.responseData, {
+    return new Response(readable, {
       headers: {
         ...corsHeaders,
-        "Content-Type": isStreamingRequest 
-          ? "text/event-stream" 
-          : "application/json",
-        "Cache-Control": "max-age=300",
-        "X-Cache-Source": "database"
+        "Content-Type": "text/event-stream"
       }
     });
   }
   
-  return null;
+  // For regular responses, we can just clone
+  return cached.response.clone();
 }
 
 /**
  * Cache a response for future use
- * Stores in both memory and database caches
+ * 
+ * @param key - Cache key
+ * @param response - Response to cache
+ * @param isStream - Whether the response is a stream
+ * @param ttl - Cache time-to-live in milliseconds
  */
 export async function cacheResponse(
-  cacheKey: string, 
-  response: Response, 
-  isStreamingResponse: boolean,
-  ttl?: number
+  key: string,
+  response: Response,
+  isStream = false,
+  ttl = DEFAULT_CACHE_TTL
 ): Promise<void> {
-  try {
-    // Clone the response so we can read the body
-    const responseClone = response.clone();
-    const contentType = isStreamingResponse ? "streaming" : "query";
-    
-    // Calculate appropriate TTL if not provided
-    const cacheTTL = ttl || calculateCacheTTL(contentType);
-    
-    // Get response as array buffer
-    const responseBuffer = await responseClone.arrayBuffer();
-    const responseData = new Uint8Array(responseBuffer);
-    
-    // Store in memory cache
-    storeInMemoryCache(
-      cacheKey, 
-      responseData, 
-      isStreamingResponse, 
-      cacheTTL
-    );
-    
-    // Store in database cache for persistence across edge function invocations
-    const responseText = new TextDecoder().decode(responseData);
-    
-    // Run as a background task
-    EdgeRuntime.waitUntil(
-      storeInDatabaseCache(cacheKey, responseText, isStreamingResponse)
-    );
-    
-    console.log(`Response cached with key: ${cacheKey}, ttl: ${cacheTTL}ms`);
-  } catch (error) {
-    console.error("Error caching response:", error);
-  }
+  responseCache.set(key, {
+    response: response.clone(),
+    timestamp: Date.now(),
+    isStream
+  });
+  
+  // Set up automatic cache expiration
+  setTimeout(() => {
+    responseCache.delete(key);
+  }, ttl);
 }
 
 /**
- * Clear all cache entries (for maintenance/debugging)
+ * Clean up expired cache entries
+ * 
+ * @param force - Whether to force clear all cache entries
+ * @returns Number of cache entries cleared
  */
-export async function cleanupCache(forceCleanAll = false): Promise<number> {
-  try {
-    // Implement cleanup logic
-    // This could involve clearing expired items from both memory and database caches
-    
-    // For now, we're just logging this and returning 0
-    console.log("Cache cleanup requested, force clean all:", forceCleanAll);
-    return 0;
-  } catch (error) {
-    console.error("Error cleaning up cache:", error);
-    return 0;
+export async function cleanupCache(force = false): Promise<number> {
+  if (force) {
+    const count = responseCache.size;
+    responseCache.clear();
+    return count;
   }
+  
+  const now = Date.now();
+  let clearedCount = 0;
+  
+  // Clean up expired entries
+  for (const [key, cached] of responseCache.entries()) {
+    if (now - cached.timestamp > DEFAULT_CACHE_TTL) {
+      responseCache.delete(key);
+      clearedCount++;
+    }
+  }
+  
+  return clearedCount;
 }

@@ -1,17 +1,16 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
 import { 
   corsHeaders, 
   createSuccessResponse, 
   createErrorResponse, 
   ErrorCode,
-  handleCorsRequest,
   validateRequiredParameters
 } from "../shared/responseUtils.ts";
 
-import { withAuth, createAdminClient } from "../shared/authUtils.ts";
 import { fetchContextData, buildRichContext } from "./handlers/contextHandler.ts";
 import { callOpenAI, processOpenAIResponse } from "./handlers/openaiHandler.ts";
 import { processAIResponse } from "./handlers/aiResponseHandler.ts";
@@ -22,14 +21,9 @@ import { createCacheKey } from "../shared/cacheUtils.ts";
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return handleCorsRequest();
+    return new Response(null, { headers: corsHeaders });
   }
 
-  return withAuth(req, handleRequest);
-});
-
-// Process AI query request (after authentication)
-async function handleRequest(user: any, req: Request): Promise<Response> {
   try {
     // Process start time for tracking
     const startTime = Date.now();
@@ -65,6 +59,26 @@ async function handleRequest(user: any, req: Request): Promise<Response> {
       cacheKey: userProvidedCacheKey
     } = requestData;
 
+    // Get user from auth header
+    const authHeader = req.headers.get("authorization");
+    let userId = null;
+    
+    if (authHeader) {
+      try {
+        // Initialize Supabase client
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        // Get the user ID from the auth token
+        const token = authHeader.replace("Bearer ", "");
+        const { data } = await supabase.auth.getUser(token);
+        userId = data?.user?.id;
+      } catch (error) {
+        console.error("Auth error:", error);
+      }
+    }
+
     // Generate cache key if not provided
     const cacheKey = userProvidedCacheKey || 
       createCacheKey(query, reflectionContent || null, model);
@@ -84,18 +98,23 @@ async function handleRequest(user: any, req: Request): Promise<Response> {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       return createErrorResponse(
-        ErrorCode.CONFIGURATION_ERROR,
+        ErrorCode.INTERNAL_ERROR,
         "OpenAI API key is not configured",
-        { detail: "Missing API key in environment" },
+        null,
         500
       );
     }
 
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     // Fetch user context for more relevant responses
-    console.log(`Fetching context for user: ${user.id}`);
+    console.log(`Fetching context for user: ${userId}`);
     const userContext = await fetchContextData(
-      createAdminClient(),
-      user.id,
+      supabase,
+      userId,
       reflectionId
     );
     
@@ -150,60 +169,25 @@ async function handleRequest(user: any, req: Request): Promise<Response> {
     // For non-streaming responses, process and format the data
     console.log("Processing non-streaming response");
     
-    // Check if the response is an error from OpenAI
-    if (!openAIResponse.ok || openAIResponse.headers.get("Content-Type")?.includes("application/json")) {
-      const responseData = await openAIResponse.json();
-      
-      if (responseData.error) {
-        return createErrorResponse(
-          ErrorCode.EXTERNAL_API_ERROR,
-          `OpenAI API error: ${responseData.error}`,
-          { openaiError: responseData.error },
-          responseData.status || 500
-        );
-      }
-      
-      // Process the AI response data
-      const aiContent = responseData.choices?.[0]?.message?.content || "";
-      const tokensUsed = responseData.usage?.total_tokens || 0;
-      
-      // Process the AI response
-      const response = await processAIResponse(
-        aiContent,
-        reflectionId,
-        startTime,
-        model,
-        tokensUsed
-      );
-      
-      // Cache the response if caching is enabled
-      if (useCache) {
-        console.log(`Caching response with key: ${cacheKey}`);
-        await cacheResponse(cacheKey, response.clone(), false);
-      }
-      
-      return response;
-    } else {
-      // Process the OpenAI response
-      const { content, usage } = await processOpenAIResponse(openAIResponse);
-      
-      // Process the AI response
-      const response = await processAIResponse(
-        content,
-        reflectionId,
-        startTime,
-        model,
-        usage.totalTokens
-      );
-      
-      // Cache the response if caching is enabled
-      if (useCache) {
-        console.log(`Caching response with key: ${cacheKey}`);
-        await cacheResponse(cacheKey, response.clone(), false);
-      }
-      
-      return response;
+    // Process the OpenAI response
+    const { content, usage } = await processOpenAIResponse(openAIResponse);
+    
+    // Process the AI response
+    const response = await processAIResponse(
+      content,
+      reflectionId,
+      startTime,
+      model,
+      usage.totalTokens
+    );
+    
+    // Cache the response if caching is enabled
+    if (useCache) {
+      console.log(`Caching response with key: ${cacheKey}`);
+      await cacheResponse(cacheKey, response.clone(), false);
     }
+    
+    return response;
   } catch (error) {
     console.error("Error in process-ai-query:", error);
     
@@ -238,4 +222,4 @@ async function handleRequest(user: any, req: Request): Promise<Response> {
       { errorMessage: error.message }
     );
   }
-}
+});

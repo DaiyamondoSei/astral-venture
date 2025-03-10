@@ -6,22 +6,10 @@ import { ValidationError } from './ValidationError';
  * 
  * @param value - Value to validate
  * @param path - Path for error reporting
- * @param options - Optional validation options
- * @returns The value as a string if valid
- * @throws ValidationError if validation fails
+ * @returns The validated string
+ * @throws ValidationError if the value is not a string
  */
-export function validateString(
-  value: unknown, 
-  path: string,
-  options: { 
-    allowEmpty?: boolean;
-    minLength?: number;
-    maxLength?: number;
-    pattern?: RegExp;
-  } = {}
-): string {
-  const { allowEmpty = false, minLength, maxLength, pattern } = options;
-  
+export function validateString(value: unknown, path: string): string {
   if (typeof value !== 'string') {
     throw new ValidationError(
       `Expected string at ${path}, got ${typeof value}`,
@@ -30,43 +18,6 @@ export function validateString(
       'TYPE_ERROR'
     );
   }
-  
-  if (!allowEmpty && value.trim() === '') {
-    throw new ValidationError(
-      `String at ${path} cannot be empty`,
-      path,
-      value,
-      'EMPTY_STRING'
-    );
-  }
-  
-  if (minLength !== undefined && value.length < minLength) {
-    throw new ValidationError(
-      `String at ${path} must be at least ${minLength} characters long`,
-      path,
-      value,
-      'MIN_LENGTH'
-    );
-  }
-  
-  if (maxLength !== undefined && value.length > maxLength) {
-    throw new ValidationError(
-      `String at ${path} must be at most ${maxLength} characters long`,
-      path,
-      value,
-      'MAX_LENGTH'
-    );
-  }
-  
-  if (pattern !== undefined && !pattern.test(value)) {
-    throw new ValidationError(
-      `String at ${path} does not match required pattern`,
-      path,
-      value,
-      'PATTERN_MISMATCH'
-    );
-  }
-  
   return value;
 }
 
@@ -75,22 +26,11 @@ export function validateString(
  * 
  * @param value - Value to validate
  * @param path - Path for error reporting
- * @param options - Optional validation options
- * @returns The value as a number if valid
- * @throws ValidationError if validation fails
+ * @returns The validated number
+ * @throws ValidationError if the value is not a number
  */
-export function validateNumber(
-  value: unknown, 
-  path: string,
-  options: { 
-    min?: number;
-    max?: number;
-    integer?: boolean;
-  } = {}
-): number {
-  const { min, max, integer = false } = options;
-  
-  if (typeof value !== 'number' || Number.isNaN(value)) {
+export function validateNumber(value: unknown, path: string): number {
+  if (typeof value !== 'number' || isNaN(value)) {
     throw new ValidationError(
       `Expected number at ${path}, got ${typeof value}`,
       path,
@@ -98,34 +38,6 @@ export function validateNumber(
       'TYPE_ERROR'
     );
   }
-  
-  if (min !== undefined && value < min) {
-    throw new ValidationError(
-      `Number at ${path} must be at least ${min}`,
-      path,
-      value,
-      'MIN_VALUE'
-    );
-  }
-  
-  if (max !== undefined && value > max) {
-    throw new ValidationError(
-      `Number at ${path} must be at most ${max}`,
-      path,
-      value,
-      'MAX_VALUE'
-    );
-  }
-  
-  if (integer && !Number.isInteger(value)) {
-    throw new ValidationError(
-      `Number at ${path} must be an integer`,
-      path,
-      value,
-      'INTEGER_REQUIRED'
-    );
-  }
-  
   return value;
 }
 
@@ -134,8 +46,8 @@ export function validateNumber(
  * 
  * @param value - Value to validate
  * @param path - Path for error reporting
- * @returns The value as a boolean if valid
- * @throws ValidationError if validation fails
+ * @returns The validated boolean
+ * @throws ValidationError if the value is not a boolean
  */
 export function validateBoolean(value: unknown, path: string): boolean {
   if (typeof value !== 'boolean') {
@@ -146,7 +58,6 @@ export function validateBoolean(value: unknown, path: string): boolean {
       'TYPE_ERROR'
     );
   }
-  
   return value;
 }
 
@@ -155,23 +66,19 @@ export function validateBoolean(value: unknown, path: string): boolean {
  * 
  * @param value - Value to validate
  * @param path - Path for error reporting
- * @returns The value as an object if valid
- * @throws ValidationError if validation fails
+ * @returns The validated object
+ * @throws ValidationError if the value is not an object
  */
-export function validateObject<T = Record<string, unknown>>(
-  value: unknown, 
-  path: string
-): T {
-  if (typeof value !== 'object' || value === null) {
+export function validateObject(value: unknown, path: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new ValidationError(
-      `Expected object at ${path}, got ${value === null ? 'null' : typeof value}`,
+      `Expected object at ${path}, got ${typeof value}`,
       path,
       value,
       'TYPE_ERROR'
     );
   }
-  
-  return value as T;
+  return value as Record<string, unknown>;
 }
 
 /**
@@ -179,21 +86,10 @@ export function validateObject<T = Record<string, unknown>>(
  * 
  * @param value - Value to validate
  * @param path - Path for error reporting
- * @param options - Optional validation options
- * @returns The value as an array if valid
- * @throws ValidationError if validation fails
+ * @returns The validated array
+ * @throws ValidationError if the value is not an array
  */
-export function validateArray<T = unknown>(
-  value: unknown, 
-  path: string,
-  options: { 
-    itemValidator?: (item: unknown, itemPath: string) => T;
-    minLength?: number;
-    maxLength?: number;
-  } = {}
-): T[] {
-  const { itemValidator, minLength, maxLength } = options;
-  
+export function validateArray(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) {
     throw new ValidationError(
       `Expected array at ${path}, got ${typeof value}`,
@@ -202,84 +98,64 @@ export function validateArray<T = unknown>(
       'TYPE_ERROR'
     );
   }
-  
-  if (minLength !== undefined && value.length < minLength) {
-    throw new ValidationError(
-      `Array at ${path} must have at least ${minLength} items`,
-      path,
-      value,
-      'MIN_LENGTH'
-    );
-  }
-  
-  if (maxLength !== undefined && value.length > maxLength) {
-    throw new ValidationError(
-      `Array at ${path} must have at most ${maxLength} items`,
-      path,
-      value,
-      'MAX_LENGTH'
-    );
-  }
-  
-  if (itemValidator) {
-    return value.map((item, index) => 
-      itemValidator(item, `${path}[${index}]`)
-    );
-  }
-  
-  return value as T[];
-}
-
-/**
- * Validates that a value is one of the allowed values
- * 
- * @param value - Value to validate
- * @param allowedValues - Array of allowed values
- * @param path - Path for error reporting
- * @returns The value if it's one of the allowed values
- * @throws ValidationError if validation fails
- */
-export function validateOneOf<T>(value: unknown, allowedValues: T[], path: string): T {
-  if (!allowedValues.includes(value as T)) {
-    throw new ValidationError(
-      `Value at ${path} must be one of: ${allowedValues.join(', ')}`,
-      path,
-      value,
-      'INVALID_ENUM'
-    );
-  }
-  
-  return value as T;
-}
-
-/**
- * Checks if a value is defined (not undefined or null)
- * 
- * @param value - Value to check
- * @param path - Path for error reporting
- * @returns The value if it's defined
- * @throws ValidationError if validation fails
- */
-export function validateDefined<T>(value: T | undefined | null, path: string): T {
-  if (value === undefined || value === null) {
-    throw new ValidationError(
-      `Required value at ${path} is ${value === undefined ? 'undefined' : 'null'}`,
-      path,
-      value,
-      'REQUIRED'
-    );
-  }
-  
   return value;
 }
 
 /**
- * Provides a default value if the input is undefined or null
+ * Validates that a value is one of a set of allowed values
  * 
- * @param value - The value to check
- * @param defaultValue - Default value to use if input is undefined or null
+ * @param value - Value to validate
+ * @param allowedValues - Set of allowed values
+ * @param path - Path for error reporting
+ * @returns The validated value
+ * @throws ValidationError if the value is not one of the allowed values
+ */
+export function validateOneOf<T>(value: unknown, allowedValues: T[], path: string): T {
+  if (!allowedValues.includes(value as T)) {
+    throw new ValidationError(
+      `Expected one of [${allowedValues.join(', ')}] at ${path}, got ${value}`,
+      path,
+      value,
+      'INVALID_OPTION'
+    );
+  }
+  return value as T;
+}
+
+/**
+ * Validates that a value is defined (not null or undefined)
+ * 
+ * @param value - Value to validate
+ * @param path - Path for error reporting
+ * @returns The validated value
+ * @throws ValidationError if the value is null or undefined
+ */
+export function validateDefined<T>(value: T | null | undefined, path: string): T {
+  if (value === null || value === undefined) {
+    throw new ValidationError(
+      `Expected defined value at ${path}, got ${value === null ? 'null' : 'undefined'}`,
+      path,
+      value,
+      'MISSING_VALUE'
+    );
+  }
+  return value;
+}
+
+/**
+ * Provides a default value if the input is null or undefined
+ * 
+ * @param value - Value to check
+ * @param defaultValue - Default value to use if input is null or undefined
  * @returns The input value or the default value
  */
-export function withDefault<T>(value: T | undefined | null, defaultValue: T): T {
-  return (value === undefined || value === null) ? defaultValue : value;
+export function withDefault<T>(value: T | null | undefined, defaultValue: T): T {
+  return value === null || value === undefined ? defaultValue : value;
+}
+
+/**
+ * Type guard to check if a value is a ValidationError
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  return error instanceof ValidationError;
 }

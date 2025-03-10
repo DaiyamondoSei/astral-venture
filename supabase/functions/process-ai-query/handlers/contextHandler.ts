@@ -1,94 +1,83 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 /**
- * Rich context data for AI queries
+ * Context handling utilities for AI query processing
  */
-interface UserContextData {
-  username?: string;
-  consciousnessLevel?: number;
-  interests?: string[];
-  recentReflections?: {
-    id: string;
-    text: string;
-    createdAt: string;
-  }[];
-  chakraData?: Record<string, any>;
-}
+
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js";
 
 /**
- * Fetch context data for the AI query
+ * Fetch contextual data for an AI query
  * 
- * @param supabase Supabase client
- * @param userId User ID to fetch context for
- * @param reflectionId Optional reflection ID for more specific context
+ * @param supabase - Supabase client
+ * @param userId - User ID
+ * @param reflectionId - Optional reflection ID
+ * @returns Context data object
  */
 export async function fetchContextData(
-  supabase: any,
+  supabase: SupabaseClient,
   userId?: string, 
   reflectionId?: string
-): Promise<UserContextData> {
-  const contextData: UserContextData = {};
+): Promise<Record<string, any>> {
+  const contextData: Record<string, any> = {};
+  
+  if (!userId) {
+    return contextData;
+  }
   
   try {
-    // Skip if no user ID provided
-    if (!userId) return contextData;
-    
-    // Fetch user profile data (in parallel)
-    const userProfilePromise = supabase
-      .from("user_profiles")
-      .select("username, astral_level, interests")
-      .eq("id", userId)
+    // Fetch user profile data
+    const { data: userProfile, error: userError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
       .single();
     
-    // Fetch reflection data if ID is provided
-    const reflectionPromise = reflectionId 
-      ? supabase
-          .from("energy_reflections")
-          .select("*")
-          .eq("id", reflectionId)
-          .single()
-      : Promise.resolve({ data: null });
+    if (userError) {
+      console.error("Error fetching user profile:", userError);
+    } else if (userProfile) {
+      contextData.userProfile = userProfile;
+    }
     
-    // Fetch recent reflections regardless
-    const recentReflectionsPromise = supabase
-      .from("energy_reflections")
-      .select("id, content, created_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
+    // Fetch user's consciousness metrics
+    const { data: metricsData, error: metricsError } = await supabase
+      .from('consciousness_metrics')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+    
+    if (metricsError) {
+      console.error("Error fetching consciousness metrics:", metricsError);
+    } else if (metricsData) {
+      contextData.consciousnessMetrics = metricsData;
+    }
+    
+    // If reflectionId is provided, fetch the specific reflection
+    if (reflectionId) {
+      const { data: reflection, error: reflectionError } = await supabase
+        .from('energy_reflections')
+        .select('*')
+        .eq('id', reflectionId)
+        .single();
+      
+      if (reflectionError) {
+        console.error("Error fetching reflection:", reflectionError);
+      } else if (reflection) {
+        contextData.reflection = reflection;
+      }
+    }
+    
+    // Fetch recent reflections for context
+    const { data: recentReflections, error: reflectionsError } = await supabase
+      .from('energy_reflections')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
       .limit(3);
     
-    // Wait for all requests to complete
-    const [
-      { data: userProfile, error: userProfileError },
-      { data: reflection, error: reflectionError },
-      { data: recentReflections, error: recentReflectionsError }
-    ] = await Promise.all([
-      userProfilePromise,
-      reflectionPromise,
-      recentReflectionsPromise
-    ]);
-    
-    // Add user profile data
-    if (userProfile && !userProfileError) {
-      contextData.username = userProfile.username;
-      contextData.consciousnessLevel = userProfile.astral_level;
-      contextData.interests = userProfile.interests;
-    }
-    
-    // Add reflection data
-    if (reflection && !reflectionError) {
-      // Specific reflection data would be added here
-      // This could be structured differently based on needs
-    }
-    
-    // Add recent reflections
-    if (recentReflections && !recentReflectionsError) {
-      contextData.recentReflections = recentReflections.map(r => ({
-        id: r.id,
-        text: r.content,
-        createdAt: r.created_at
-      }));
+    if (reflectionsError) {
+      console.error("Error fetching recent reflections:", reflectionsError);
+    } else if (recentReflections) {
+      contextData.recentReflections = recentReflections;
     }
     
     return contextData;
@@ -99,45 +88,52 @@ export async function fetchContextData(
 }
 
 /**
- * Build a rich context string for the AI model based on available data
+ * Build a rich context object for AI request
  * 
- * @param userProvidedContext Context provided by the user in their request
- * @param contextData Context data fetched from the database
+ * @param userProvidedContext - Context provided by the user
+ * @param contextData - Context data from the database
+ * @returns Rich context string for the AI
  */
 export function buildRichContext(
   userProvidedContext?: string,
-  contextData: UserContextData = {}
+  contextData: Record<string, any> = {}
 ): string {
-  const contextParts: string[] = [];
+  let richContext = '';
   
   // Add user-provided context if available
   if (userProvidedContext) {
-    contextParts.push(`User context: ${userProvidedContext.trim()}`);
+    richContext += `User Context: ${userProvidedContext}\n\n`;
   }
   
   // Add user profile context if available
-  if (contextData.username || contextData.consciousnessLevel) {
-    contextParts.push(
-      "User profile information:" +
-      (contextData.username ? ` Name: ${contextData.username}.` : "") +
-      (contextData.consciousnessLevel ? ` Consciousness level: ${contextData.consciousnessLevel}.` : "")
-    );
+  if (contextData.userProfile) {
+    const profile = contextData.userProfile;
+    richContext += `User Profile: Astral Level ${profile.astral_level}, Energy Points ${profile.energy_points}\n\n`;
   }
   
-  // Add interests if available
-  if (contextData.interests && contextData.interests.length > 0) {
-    contextParts.push(`User interests: ${contextData.interests.join(", ")}.`);
+  // Add consciousness metrics if available
+  if (contextData.consciousnessMetrics) {
+    const metrics = contextData.consciousnessMetrics;
+    richContext += `Consciousness Level: ${metrics.level}\n`;
+    richContext += `Awareness Score: ${metrics.awareness_score}/100\n`;
+    richContext += `Chakra Balance: ${metrics.chakra_balance}/100\n\n`;
   }
   
-  // Add recent reflections if available
+  // Add reflection context if available
+  if (contextData.reflection) {
+    richContext += `Current Reflection: ${contextData.reflection.content}\n\n`;
+  }
+  
+  // Add recent reflections for historical context
   if (contextData.recentReflections && contextData.recentReflections.length > 0) {
-    contextParts.push("Recent reflections from the user:");
+    richContext += `Recent Reflections:\n`;
     
-    contextData.recentReflections.forEach((reflection) => {
-      const shortText = reflection.text.substring(0, 150) + (reflection.text.length > 150 ? "..." : "");
-      contextParts.push(`- ${shortText} (${new Date(reflection.createdAt).toLocaleDateString()})`);
+    contextData.recentReflections.forEach((reflection: any, index: number) => {
+      richContext += `${index + 1}. ${reflection.content.substring(0, 100)}...\n`;
     });
+    
+    richContext += '\n';
   }
   
-  return contextParts.join("\n\n");
+  return richContext;
 }

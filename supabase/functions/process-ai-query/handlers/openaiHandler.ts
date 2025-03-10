@@ -1,137 +1,139 @@
 
+/**
+ * OpenAI integration handler for AI queries
+ */
+
 import { corsHeaders } from "../../shared/responseUtils.ts";
 
+interface OpenAIOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  stream?: boolean;
+  apiKey: string;
+}
+
 /**
- * Call the OpenAI API with improved error handling and logging
+ * Call OpenAI API with the query and context
  * 
- * @param query User query text
- * @param context Additional context to aid the model
- * @param options Configuration options for the API call
- * @returns OpenAI API response
+ * @param query - User query
+ * @param context - Context information
+ * @param options - OpenAI API options
+ * @returns Response from OpenAI
  */
 export async function callOpenAI(
-  query: string, 
-  context: string, 
-  options: {
-    model: string;
-    temperature: number;
-    maxTokens: number;
-    stream: boolean;
-    apiKey: string;
-  }
+  query: string,
+  context: string,
+  options: OpenAIOptions
 ): Promise<Response> {
-  // Prepare messages for the AI request
-  const messages = [
-    {
-      role: "system",
-      content: "You are a consciousness expansion assistant. Provide insightful, helpful responses that expand awareness. Be concise yet profound."
-    }
-  ];
+  const { 
+    model = "gpt-4o-mini", 
+    temperature = 0.7, 
+    maxTokens = 1000, 
+    stream = false,
+    apiKey 
+  } = options;
   
-  // Add context if available
-  if (context) {
-    messages.push({
-      role: "system",
-      content: `Additional context: ${context}`
-    });
-  }
+  const systemPrompt = `You are a spiritual guide and meditation assistant with expertise in energy work, 
+chakra balancing, and emotional wellness. Your goal is to provide insightful, 
+compassionate responses that help users on their spiritual journey.
+
+Format your responses in clear paragraphs with occasional emphasis for readability. 
+When appropriate, suggest 1-3 specific practices that might help the user.
+
+${context ? 'Here is additional context about the user:\n' + context : ''}`;
   
-  // Add the user query
-  messages.push({
-    role: "user",
-    content: query
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${apiKey}`,
+  };
+  
+  const body = JSON.stringify({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content: query
+      }
+    ],
+    temperature,
+    max_tokens: maxTokens,
+    stream
   });
   
-  // Log the request model and settings (not the content for privacy)
-  console.log(`OpenAI request: model=${options.model}, temperature=${options.temperature}, stream=${options.stream}`);
-  
   try {
-    // Make request to OpenAI
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${options.apiKey}`
-      },
-      body: JSON.stringify({
-        model: options.model,
-        messages,
-        temperature: options.temperature,
-        max_tokens: options.maxTokens,
-        stream: options.stream
-      })
+      headers,
+      body
     });
     
-    // Log response status
-    console.log(`OpenAI response status: ${response.status}`);
-    
-    // Handle non-2xx responses
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: { message: "Unknown error" } }));
+      const errorData = await response.json();
       console.error("OpenAI API error:", errorData);
       
-      // Create a formatted error response
       return new Response(
-        JSON.stringify({
-          error: errorData.error?.message || "Unknown error",
-          type: "openai_api_error",
-          status: response.status
-        }),
+        JSON.stringify({ error: errorData.error || "OpenAI API error" }),
         { 
-          status: response.status,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json"
-          }
+          status: response.status, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
     }
     
+    if (stream) {
+      // Return the stream directly
+      return new Response(response.body, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream"
+        }
+      });
+    }
+    
     return response;
   } catch (error) {
-    // Log and format network or runtime errors
     console.error("Error calling OpenAI:", error);
     
     return new Response(
-      JSON.stringify({
-        error: error.message || "Failed to communicate with OpenAI API",
-        type: "network_error"
-      }),
+      JSON.stringify({ error: error.message || "Error calling OpenAI" }),
       { 
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }
 }
 
 /**
- * Process a raw OpenAI response for non-streaming requests
+ * Process OpenAI response into a standardized format
  * 
- * @param response OpenAI API response
- * @returns Processed response with extracted content and metadata
+ * @param response - Response from OpenAI API
+ * @returns Processed response content and usage metrics
  */
-export async function processOpenAIResponse(response: Response): Promise<{
+export async function processOpenAIResponse(
+  response: Response
+): Promise<{
   content: string;
-  model: string;
   usage: {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
   };
 }> {
-  const responseData = await response.json();
+  const data = await response.json();
   
-  return {
-    content: responseData.choices[0]?.message?.content || "",
-    model: responseData.model || "unknown",
-    usage: {
-      promptTokens: responseData.usage?.prompt_tokens || 0,
-      completionTokens: responseData.usage?.completion_tokens || 0,
-      totalTokens: responseData.usage?.total_tokens || 0
-    }
+  const content = data.choices?.[0]?.message?.content || "";
+  
+  const usage = {
+    promptTokens: data.usage?.prompt_tokens || 0,
+    completionTokens: data.usage?.completion_tokens || 0,
+    totalTokens: data.usage?.total_tokens || 0
   };
+  
+  return { content, usage };
 }

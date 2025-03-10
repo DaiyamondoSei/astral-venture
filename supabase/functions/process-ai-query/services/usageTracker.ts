@@ -1,113 +1,121 @@
 
 /**
- * Track AI usage for analytics and billing
- * This function runs as a background task and doesn't block the response
+ * Utility for tracking AI usage for analytics and quotas
+ */
+
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js";
+
+interface UsageMetrics {
+  model: string;
+  tokensUsed: number;
+  queryType: string;
+  processingTime: number;
+  answerLength: number;
+  insightsCount: number;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Track AI usage for a user
+ * 
+ * @param supabase - Supabase client
+ * @param userId - User ID
+ * @param metrics - Usage metrics
  */
 export async function trackUsage(
-  supabase: any, 
-  userId: string, 
-  usageData: {
-    model: string;
-    tokensUsed: number;
-    queryType: string;
-    processingTime?: number;
-    answerLength?: number;
-    insightsCount?: number;
-    metadata?: Record<string, any>;
-  }
+  supabase: SupabaseClient,
+  userId: string,
+  metrics: UsageMetrics
 ): Promise<void> {
   try {
-    console.log(`Tracking usage for user ${userId}: ${JSON.stringify(usageData)}`);
-    
-    // Record usage in the database
+    // Log the usage to a dedicated table
     const { error } = await supabase
-      .from("ai_usage")
+      .from('ai_usage_logs')
       .insert({
         user_id: userId,
-        model: usageData.model,
-        tokens_used: usageData.tokensUsed,
-        query_type: usageData.queryType,
-        processing_time: usageData.processingTime,
-        answer_length: usageData.answerLength,
-        insights_count: usageData.insightsCount,
-        additional_metadata: usageData.metadata,
-        timestamp: new Date().toISOString()
+        model: metrics.model,
+        tokens_used: metrics.tokensUsed,
+        query_type: metrics.queryType,
+        processing_time_ms: metrics.processingTime,
+        answer_length: metrics.answerLength,
+        insights_count: metrics.insightsCount,
+        metadata: metrics.metadata || {}
       });
     
     if (error) {
-      throw error;
+      console.error("Error tracking usage:", error);
     }
     
-    // Perform additional analytics if needed
-    if (usageData.tokensUsed > 1000) {
-      await updateUserHighUsageMetric(supabase, userId);
-    }
-    
-    // Update user's total token usage
-    await updateUserTotalTokens(supabase, userId, usageData.tokensUsed);
-    
-    console.log(`Usage tracking completed for user ${userId}`);
+    // Update user metrics for personalization
+    await updateUserMetrics(supabase, userId, metrics);
   } catch (error) {
-    console.error("Error tracking AI usage:", error);
-    // Don't throw the error since this is a background task
+    console.error("Error in trackUsage:", error);
   }
 }
 
 /**
- * Update high usage metric for users
+ * Update user metrics based on AI usage
+ * 
+ * @param supabase - Supabase client
+ * @param userId - User ID
+ * @param metrics - Usage metrics
  */
-async function updateUserHighUsageMetric(supabase: any, userId: string): Promise<void> {
+async function updateUserMetrics(
+  supabase: SupabaseClient,
+  userId: string,
+  metrics: UsageMetrics
+): Promise<void> {
   try {
-    const { data: userProfile } = await supabase
-      .from("user_profiles")
-      .select("high_usage_count")
-      .eq("id", userId)
-      .maybeSingle();
+    // Check if personalization metrics exist for the user
+    const { data, error } = await supabase
+      .from('personalization_metrics')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
     
-    if (userProfile) {
-      const highUsageCount = (userProfile.high_usage_count || 0) + 1;
-      
-      await supabase
-        .from("user_profiles")
-        .update({ high_usage_count: highUsageCount })
-        .eq("id", userId);
+    if (error && error.code !== 'PGRST116') { // Not found
+      console.error("Error checking personalization metrics:", error);
+      return;
     }
-  } catch (error) {
-    console.error("Error updating high usage metric:", error);
-  }
-}
-
-/**
- * Update total token usage for a user
- */
-async function updateUserTotalTokens(supabase: any, userId: string, tokensUsed: number): Promise<void> {
-  try {
-    const { data: userStats } = await supabase
-      .from("user_ai_stats")
-      .select("total_tokens")
-      .eq("user_id", userId)
-      .maybeSingle();
     
-    if (userStats) {
-      // Update existing record
-      await supabase
-        .from("user_ai_stats")
-        .update({ 
-          total_tokens: userStats.total_tokens + tokensUsed,
-          last_query_at: new Date().toISOString()
+    // Calculate engagement score increase based on query complexity
+    const engagementIncrease = Math.min(
+      5,
+      Math.ceil(metrics.tokensUsed / 100) + 
+      Math.ceil(metrics.insightsCount / 2)
+    );
+    
+    if (data) {
+      // Update existing metrics
+      const { error: updateError } = await supabase
+        .from('personalization_metrics')
+        .update({
+          engagement_score: Math.min(100, data.engagement_score + engagementIncrease),
+          updated_at: new Date().toISOString()
         })
-        .eq("user_id", userId);
+        .eq('id', data.id);
+      
+      if (updateError) {
+        console.error("Error updating personalization metrics:", updateError);
+      }
     } else {
-      // Create new record
-      await supabase
-        .from("user_ai_stats")
+      // Create new metrics record
+      const { error: insertError } = await supabase
+        .from('personalization_metrics')
         .insert({
           user_id: userId,
-          total_tokens: tokensUsed,
-          last_query_at: new Date().toISOString()
+          engagement_score: engagementIncrease,
+          content_relevance_rating: 50, // Default starting value
+          emotional_growth_rate: 0,
+          chakra_balance_improvement: 0,
+          progress_acceleration: 0
         });
+      
+      if (insertError) {
+        console.error("Error creating personalization metrics:", insertError);
+      }
     }
   } catch (error) {
-    console.error("Error updating total tokens:", error);
+    console.error("Error in updateUserMetrics:", error);
   }
 }
