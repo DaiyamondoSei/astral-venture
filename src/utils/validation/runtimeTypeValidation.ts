@@ -1,164 +1,140 @@
 
 /**
- * Type validation utilities that provide TypeScript-aware runtime validation
+ * Runtime type validation utilities for safer data handling
  */
 
+import { z } from 'zod';
+import { isArray, isBoolean, isNumber, isObject, isString } from 'lodash';
 import {
-  validateDefined,
   validateString,
   validateNumber,
   validateBoolean,
-  validateObject,
   validateArray,
+  validateObject,
   validateOneOf,
-  validateRange,
-  validatePattern,
-  composeValidators,
-  ValidationError
+  validateDefined,
+  isValidationError
 } from './runtimeValidation';
 
 /**
- * Generic type guard function interface
+ * Custom validation error class
  */
-export type TypeGuard<T> = (value: unknown) => value is T;
-
-/**
- * Create a type guard for a specific validator
- * 
- * @param validator - The validator function to create a type guard for
- * @returns A TypeScript type guard function
- */
-export function createTypeGuard<T>(
-  validator: (value: unknown, name: string) => T
-): TypeGuard<T> {
-  return (value: unknown): value is T => {
-    try {
-      validator(value, 'value');
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
 }
 
 /**
- * Type guard for string values
- */
-export const isString = createTypeGuard(validateString);
-
-/**
- * Type guard for number values
- */
-export const isNumber = createTypeGuard(validateNumber);
-
-/**
- * Type guard for boolean values
- */
-export const isBoolean = createTypeGuard(validateBoolean);
-
-/**
- * Type guard for object values
- */
-export const isObject = createTypeGuard(validateObject);
-
-/**
- * Type guard for array values
- */
-export const isArray = createTypeGuard(validateArray);
-
-/**
- * Create a type guard for values that must be one of a specific set
- * 
- * @param allowedValues - The set of allowed values
- * @returns A TypeScript type guard function
- */
-export function createEnumTypeGuard<T extends readonly unknown[]>(
-  allowedValues: T
-): TypeGuard<T[number]> {
-  return (value: unknown): value is T[number] => {
-    try {
-      validateOneOf(value, allowedValues, 'value');
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-}
-
-/**
- * Create a type guard for numbers within a specific range
- * 
- * @param min - The minimum allowed value
- * @param max - The maximum allowed value
- * @returns A TypeScript type guard function
- */
-export function createRangeTypeGuard(
-  min: number,
-  max: number
-): TypeGuard<number> {
-  return (value: unknown): value is number => {
-    try {
-      validateRange(value, min, max, 'value');
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-}
-
-/**
- * Create a type guard for strings matching a specific pattern
- * 
- * @param pattern - The regex pattern to match
- * @returns A TypeScript type guard function
- */
-export function createPatternTypeGuard(
-  pattern: RegExp
-): TypeGuard<string> {
-  return (value: unknown): value is string => {
-    try {
-      validatePattern(value, pattern, 'value');
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-}
-
-/**
- * Safe type assertion function that validates at runtime
+ * Validates that a value matches a specific pattern
  * 
  * @param value - The value to validate
- * @param typeGuard - The type guard function to use
- * @param name - The name of the value for error messages
- * @returns The validated value with the correct type
+ * @param pattern - Regular expression pattern to match
+ * @param name - Name of the parameter (for error messages)
+ * @returns The validated string
  * @throws ValidationError if validation fails
  */
-export function assertType<T>(
+export function validatePattern(
   value: unknown,
-  typeGuard: TypeGuard<T>,
+  pattern: RegExp,
   name = 'value'
-): T {
-  if (typeGuard(value)) {
-    return value;
+): string {
+  const strValue = validateString(value, name);
+  
+  if (!pattern.test(strValue)) {
+    throw new ValidationError(
+      `${name} must match pattern ${pattern}`
+    );
   }
   
-  throw new ValidationError(`${name} is not of the expected type`, {
-    code: 'TYPE_VALIDATION_FAILED',
-    details: { value }
+  return strValue;
+}
+
+/**
+ * Validates that a number is within a specific range
+ * 
+ * @param value - The value to validate
+ * @param min - Minimum allowed value (inclusive)
+ * @param max - Maximum allowed value (inclusive)
+ * @param name - Name of the parameter (for error messages)
+ * @returns The validated number
+ * @throws ValidationError if validation fails
+ */
+export function validateRange(
+  value: unknown,
+  min: number,
+  max: number,
+  name = 'value'
+): number {
+  const numValue = validateNumber(value, name);
+  
+  if (numValue < min || numValue > max) {
+    throw new ValidationError(
+      `${name} must be between ${min} and ${max}`
+    );
+  }
+  
+  return numValue;
+}
+
+/**
+ * Composes multiple validators into a single validator
+ * 
+ * @param validators - Array of validator functions
+ * @returns A function that runs all validators in sequence
+ */
+export function composeValidators<T>(
+  validators: Array<(value: unknown, name?: string) => unknown>
+): (value: unknown, name?: string) => T {
+  return (value: unknown, name = 'value'): T => {
+    return validators.reduce(
+      (result, validator) => validator(result, name),
+      value
+    ) as T;
+  };
+}
+
+/**
+ * Validates an array of items using a specific item validator
+ * 
+ * @param value - The array to validate
+ * @param itemValidator - Validator for each item
+ * @param name - Name of the parameter (for error messages)
+ * @returns The validated array
+ * @throws ValidationError if validation fails
+ */
+export function validateArrayItems<T>(
+  value: unknown,
+  itemValidator: (item: unknown, index: number) => T,
+  name = 'array'
+): T[] {
+  const arrayValue = validateArray(value, name);
+  
+  return arrayValue.map((item, index) => {
+    try {
+      return itemValidator(item, index);
+    } catch (error) {
+      if (isValidationError(error)) {
+        throw new ValidationError(
+          `${name}[${index}]: ${error.message}`
+        );
+      }
+      throw error;
+    }
   });
 }
 
-export default {
-  createTypeGuard,
-  isString,
-  isNumber,
-  isBoolean,
-  isObject,
-  isArray,
-  createEnumTypeGuard,
-  createRangeTypeGuard,
-  createPatternTypeGuard,
-  assertType,
-  ValidationError
+/**
+ * Export all utility functions
+ */
+export {
+  validateString,
+  validateNumber,
+  validateBoolean,
+  validateArray,
+  validateObject,
+  validateOneOf,
+  validateDefined,
+  isValidationError
 };

@@ -3,6 +3,13 @@
  * Shared cache utilities for Edge Functions
  */
 
+// In-memory cache for development (in production, this would use KV or Redis)
+const memoryCache = new Map<string, {
+  value: any;
+  timestamp: number;
+  ttl: number;
+}>();
+
 /**
  * Create a cache key based on the query and optional context
  * 
@@ -44,6 +51,110 @@ export function createCacheKey(
 export function isValidCacheKey(key: string): boolean {
   // Basic validation to prevent injection or other issues
   return /^[a-zA-Z0-9_-]+$/.test(key);
+}
+
+/**
+ * Store a value in the memory cache
+ * 
+ * @param key - Cache key
+ * @param value - Value to store
+ * @param ttl - Time to live in milliseconds
+ * @returns Success status
+ */
+export function setMemoryCacheValue<T>(
+  key: string,
+  value: T,
+  ttl = 30 * 60 * 1000 // 30 minutes by default
+): boolean {
+  try {
+    if (!isValidCacheKey(key)) {
+      console.warn(`Invalid cache key: ${key}`);
+      return false;
+    }
+    
+    memoryCache.set(key, {
+      value,
+      timestamp: Date.now(),
+      ttl
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error setting cache value:", error);
+    return false;
+  }
+}
+
+/**
+ * Retrieve a value from the memory cache
+ * 
+ * @param key - Cache key
+ * @returns Cached value or null if not found or expired
+ */
+export function getMemoryCacheValue<T>(key: string): T | null {
+  try {
+    if (!isValidCacheKey(key)) {
+      console.warn(`Invalid cache key: ${key}`);
+      return null;
+    }
+    
+    const cached = memoryCache.get(key);
+    if (!cached) {
+      return null;
+    }
+    
+    // Check if expired
+    const now = Date.now();
+    if (now - cached.timestamp > cached.ttl) {
+      memoryCache.delete(key);
+      return null;
+    }
+    
+    return cached.value as T;
+  } catch (error) {
+    console.error("Error getting cache value:", error);
+    return null;
+  }
+}
+
+/**
+ * Clear all expired cache entries
+ * 
+ * @returns Number of expired entries cleared
+ */
+export function clearExpiredCache(): number {
+  try {
+    const now = Date.now();
+    let clearedCount = 0;
+    
+    for (const [key, entry] of memoryCache.entries()) {
+      if (now - entry.timestamp > entry.ttl) {
+        memoryCache.delete(key);
+        clearedCount++;
+      }
+    }
+    
+    return clearedCount;
+  } catch (error) {
+    console.error("Error clearing expired cache:", error);
+    return 0;
+  }
+}
+
+/**
+ * Clear all cache entries
+ * 
+ * @returns Number of entries cleared
+ */
+export function clearAllCache(): number {
+  try {
+    const size = memoryCache.size;
+    memoryCache.clear();
+    return size;
+  } catch (error) {
+    console.error("Error clearing all cache:", error);
+    return 0;
+  }
 }
 
 /**

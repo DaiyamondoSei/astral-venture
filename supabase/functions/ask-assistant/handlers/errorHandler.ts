@@ -1,23 +1,51 @@
 
+/**
+ * Centralized error handler for AI assistant requests
+ * Handles different error types and provides appropriate responses
+ */
+
 import { createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
+
+// Define the type for error handling options
+export interface ErrorHandlingOptions {
+  context?: string;
+  operation?: string;
+  shouldRetry?: boolean;
+  additionalInfo?: Record<string, unknown>;
+}
 
 /**
  * Centralized error handler for AI assistant requests
  * Categorizes errors and provides appropriate responses
+ * 
+ * @param error - The error to handle
+ * @param options - Error handling options
+ * @returns Formatted error response
  */
-export function handleError(error: any): Response {
-  console.error("Error in AI assistant:", error);
+export function handleError(error: any, options: ErrorHandlingOptions = {}): Response {
+  console.error(`Error in ${options.context || 'AI assistant'}:`, error);
   
-  // Determine error type for better client handling
+  // Extract error information
   const errorMessage = error?.message || "An unknown error occurred";
   const errorStack = error?.stack || "";
+  const errorContext = options.context || "general";
+  const errorOperation = options.operation || "unknown_operation";
+  
+  // Create metadata for tracking and debugging
+  const metadata = {
+    originalError: errorMessage,
+    timestamp: new Date().toISOString(),
+    context: errorContext,
+    operation: errorOperation,
+    ...(options.additionalInfo || {}),
+  };
   
   // Check for network errors
   if (errorMessage.includes("fetch") || errorMessage.includes("network")) {
     return createErrorResponse(
       ErrorCode.NETWORK_ERROR,
       "Unable to reach AI service due to network issues",
-      { originalError: errorMessage }
+      metadata
     );
   }
   
@@ -26,7 +54,7 @@ export function handleError(error: any): Response {
     return createErrorResponse(
       ErrorCode.TIMEOUT,
       "Request to AI service timed out",
-      { originalError: errorMessage }
+      metadata
     );
   }
   
@@ -40,7 +68,7 @@ export function handleError(error: any): Response {
     return createErrorResponse(
       ErrorCode.RATE_LIMITED,
       "AI service temporarily unavailable due to high demand",
-      { originalError: errorMessage }
+      metadata
     );
   }
   
@@ -54,7 +82,7 @@ export function handleError(error: any): Response {
     return createErrorResponse(
       ErrorCode.AUTHENTICATION_ERROR,
       "Unable to authenticate with AI service",
-      { originalError: errorMessage }
+      metadata
     );
   }
   
@@ -63,7 +91,7 @@ export function handleError(error: any): Response {
     return createErrorResponse(
       ErrorCode.VALIDATION_FAILED,
       "Invalid input parameters for AI request",
-      { originalError: errorMessage }
+      metadata
     );
   }
   
@@ -71,7 +99,7 @@ export function handleError(error: any): Response {
   return createErrorResponse(
     ErrorCode.INTERNAL_ERROR,
     "An error occurred while processing your request",
-    { originalError: errorMessage, timestamp: new Date().toISOString() }
+    metadata
   );
 }
 

@@ -4,13 +4,12 @@
  */
 
 import { corsHeaders } from "../../shared/responseUtils.ts";
-
-// In-memory cache for development (in production, this would use KV or Redis)
-const responseCache = new Map<string, {
-  response: Response;
-  timestamp: number;
-  isStream: boolean;
-}>();
+import { 
+  setMemoryCacheValue, 
+  getMemoryCacheValue, 
+  clearExpiredCache, 
+  clearAllCache 
+} from "../../shared/cacheUtils.ts";
 
 // Cache TTL in milliseconds (default: 30 minutes)
 const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
@@ -26,16 +25,17 @@ export async function getCachedResponse(
   key: string,
   isStream = false
 ): Promise<Response | null> {
-  const cached = responseCache.get(key);
+  const cached = getMemoryCacheValue<{
+    response: Response;
+    isStream: boolean;
+  }>(key);
   
   if (!cached) {
     return null;
   }
   
-  // Check if cache entry has expired
-  const now = Date.now();
-  if (now - cached.timestamp > DEFAULT_CACHE_TTL) {
-    responseCache.delete(key);
+  // We can't use streams if the types don't match
+  if (cached.isStream !== isStream) {
     return null;
   }
   
@@ -71,15 +71,9 @@ export async function cacheResponse(
   isStream = false,
   ttl = DEFAULT_CACHE_TTL
 ): Promise<void> {
-  responseCache.set(key, {
+  setMemoryCacheValue(key, {
     response: response.clone(),
-    timestamp: Date.now(),
     isStream
-  });
-  
-  // Set up automatic cache expiration
-  setTimeout(() => {
-    responseCache.delete(key);
   }, ttl);
 }
 
@@ -91,21 +85,8 @@ export async function cacheResponse(
  */
 export async function cleanupCache(force = false): Promise<number> {
   if (force) {
-    const count = responseCache.size;
-    responseCache.clear();
-    return count;
+    return clearAllCache();
   }
   
-  const now = Date.now();
-  let clearedCount = 0;
-  
-  // Clean up expired entries
-  for (const [key, cached] of responseCache.entries()) {
-    if (now - cached.timestamp > DEFAULT_CACHE_TTL) {
-      responseCache.delete(key);
-      clearedCount++;
-    }
-  }
-  
-  return clearedCount;
+  return clearExpiredCache();
 }

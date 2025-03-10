@@ -51,3 +51,29 @@ export async function processAIResponse(
     }
   );
 }
+
+/**
+ * Process streaming AI response
+ * 
+ * @param stream - ReadableStream from AI service
+ * @param reflectionId - Optional reflection ID
+ * @param model - AI model used
+ * @returns Streaming response
+ */
+export function processStreamingAIResponse(
+  stream: ReadableStream,
+  reflectionId: string | undefined,
+  model: string
+): Response {
+  // Return the streaming response with appropriate headers
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "X-Content-Type-Options": "nosniff",
+      "X-Model-Used": model,
+      "X-Reflection-Id": reflectionId || "",
+    }
+  });
+}

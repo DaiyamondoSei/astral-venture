@@ -1,169 +1,140 @@
 
-import { ValidationError } from './validation/ValidationError';
-import { validateArray, validateBoolean, validateDefined, validateNumber, validateObject, validateOneOf, validateString } from './validation/runtimeValidation';
+/**
+ * Type validation and transformation utilities
+ */
+
+import { z } from 'zod';
+import { isNil, isString, isNumber, isArray, isObject, isBoolean } from 'lodash';
+import { validateBoolean, validateNumber, validateString, validateArray, validateObject } from './validation/runtimeValidation';
 
 /**
- * Validates an email string
+ * Ensures a value is of a specific type or returns a default
  * 
- * @param value - Value to validate as an email
- * @param path - Path for error reporting
- * @returns The validated email string
- * @throws ValidationError if the email format is invalid
+ * @param value - Value to validate
+ * @param defaultValue - Default value to use if validation fails
+ * @param validator - Validation function to apply
+ * @returns Validated value or default
  */
-export function validateEmail(value: unknown, path: string): string {
-  const email = validateString(value, path);
-  
-  // Basic email validation regex
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    throw new ValidationError(
-      `Invalid email format at ${path}`,
-      path,
-      email,
-      'INVALID_EMAIL'
-    );
-  }
-  
-  return email;
-}
-
-/**
- * Validates a URL string
- * 
- * @param value - Value to validate as a URL
- * @param path - Path for error reporting
- * @returns The validated URL string
- * @throws ValidationError if the URL format is invalid
- */
-export function validateUrl(value: unknown, path: string): string {
-  const url = validateString(value, path);
-  
+export function withDefault<T>(
+  value: unknown,
+  defaultValue: T,
+  validator: (val: unknown, name?: string) => T
+): T {
   try {
-    new URL(url);
-  } catch {
-    throw new ValidationError(
-      `Invalid URL format at ${path}`,
-      path,
-      url,
-      'INVALID_URL'
-    );
+    if (isNil(value)) {
+      return defaultValue;
+    }
+    return validator(value, 'value');
+  } catch (error) {
+    return defaultValue;
   }
-  
-  return url;
 }
 
 /**
- * Validates a date string or object
+ * Ensures a string value or returns default
  * 
- * @param value - Value to validate as a date
- * @param path - Path for error reporting
- * @returns The validated Date object
- * @throws ValidationError if the date format is invalid
+ * @param value - Value to validate
+ * @param defaultValue - Default value to use if validation fails
+ * @returns Validated string or default
  */
-export function validateDate(value: unknown, path: string): Date {
-  let date: Date;
-  
-  if (value instanceof Date) {
-    date = value;
-  } else if (typeof value === 'string' || typeof value === 'number') {
-    date = new Date(value);
-  } else {
-    throw new ValidationError(
-      `Expected Date, string, or number at ${path}, got ${typeof value}`,
-      path,
-      value,
-      'TYPE_ERROR'
-    );
+export function stringWithDefault(value: unknown, defaultValue = ''): string {
+  return withDefault(value, defaultValue, validateString);
+}
+
+/**
+ * Ensures a number value or returns default
+ * 
+ * @param value - Value to validate
+ * @param defaultValue - Default value to use if validation fails
+ * @returns Validated number or default
+ */
+export function numberWithDefault(value: unknown, defaultValue = 0): number {
+  return withDefault(value, defaultValue, validateNumber);
+}
+
+/**
+ * Ensures a boolean value or returns default
+ * 
+ * @param value - Value to validate
+ * @param defaultValue - Default value to use if validation fails
+ * @returns Validated boolean or default
+ */
+export function booleanWithDefault(value: unknown, defaultValue = false): boolean {
+  return withDefault(value, defaultValue, validateBoolean);
+}
+
+/**
+ * Ensures an array value or returns default
+ * 
+ * @param value - Value to validate
+ * @param defaultValue - Default value to use if validation fails
+ * @returns Validated array or default
+ */
+export function arrayWithDefault<T>(value: unknown, defaultValue: T[] = []): T[] {
+  return withDefault(value, defaultValue, validateArray as (val: unknown, name?: string) => T[]);
+}
+
+/**
+ * Ensures an object value or returns default
+ * 
+ * @param value - Value to validate
+ * @param defaultValue - Default value to use if validation fails
+ * @returns Validated object or default
+ */
+export function objectWithDefault<T extends object>(
+  value: unknown, 
+  defaultValue: T = {} as T
+): T {
+  return withDefault(value, defaultValue, validateObject as (val: unknown, name?: string) => T);
+}
+
+/**
+ * Type-safe accessor for nested object properties
+ * 
+ * @param obj - Object to access property from
+ * @param path - Property path (dot notation)
+ * @param defaultValue - Default value if property doesn't exist
+ * @returns Property value or default
+ */
+export function getPropertySafe<T>(
+  obj: unknown,
+  path: string,
+  defaultValue: T
+): T {
+  if (!isObject(obj) || !path) {
+    return defaultValue;
   }
-  
-  if (isNaN(date.getTime())) {
-    throw new ValidationError(
-      `Invalid date at ${path}`,
-      path,
-      value,
-      'INVALID_DATE'
-    );
+
+  const properties = path.split('.');
+  let current: any = obj;
+
+  for (const prop of properties) {
+    if (!isObject(current) || current[prop] === undefined) {
+      return defaultValue;
+    }
+    current = current[prop];
   }
-  
-  return date;
+
+  return current as T;
 }
 
 /**
- * Validates a UUID string
+ * Creates a Zod schema for validating configuration objects
  * 
- * @param value - Value to validate as a UUID
- * @param path - Path for error reporting
- * @returns The validated UUID string
- * @throws ValidationError if the UUID format is invalid
+ * @param schema - Schema definition object
+ * @returns Zod schema
  */
-export function validateUuid(value: unknown, path: string): string {
-  const uuid = validateString(value, path);
-  
-  // UUID v4 format regex
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(uuid)) {
-    throw new ValidationError(
-      `Invalid UUID format at ${path}`,
-      path,
-      uuid,
-      'INVALID_UUID'
-    );
-  }
-  
-  return uuid;
+export function createConfigSchema<T extends Record<string, unknown>>(
+  schema: Record<keyof T, z.ZodType<any>>
+): z.ZodObject<any> {
+  return z.object(schema);
 }
 
-/**
- * Type guard to check if a value is a non-empty string
- * 
- * @param value - Value to check
- * @returns True if the value is a non-empty string
- */
-export function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '';
-}
-
-/**
- * Type guard to check if a value is a valid number
- * 
- * @param value - Value to check
- * @returns True if the value is a valid number
- */
-export function isValidNumber(value: unknown): value is number {
-  return typeof value === 'number' && !isNaN(value) && isFinite(value);
-}
-
-/**
- * Type guard to check if a value is a non-empty array
- * 
- * @param value - Value to check
- * @returns True if the value is a non-empty array
- */
-export function isNonEmptyArray<T>(value: unknown): value is T[] {
-  return Array.isArray(value) && value.length > 0;
-}
-
-/**
- * Type guard to check if a value is a non-empty object
- * 
- * @param value - Value to check
- * @returns True if the value is a non-empty object
- */
-export function isNonEmptyObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && 
-         value !== null && 
-         !Array.isArray(value) && 
-         Object.keys(value).length > 0;
-}
-
-// Export the validators from runtimeValidation to provide a unified API
 export {
   validateString,
   validateNumber,
   validateBoolean,
-  validateObject,
   validateArray,
-  validateOneOf,
-  validateDefined,
+  validateObject,
   withDefault
 };
