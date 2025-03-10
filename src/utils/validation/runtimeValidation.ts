@@ -6,6 +6,13 @@
 import { ValidationError } from './ValidationError';
 
 /**
+ * Check if an error is a ValidationError
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  return error instanceof ValidationError;
+}
+
+/**
  * Validate that a value is defined (not null or undefined)
  */
 export function validateDefined<T>(
@@ -324,21 +331,3 @@ export function optional<T>(
     return validator(value, fieldName);
   };
 }
-
-export {
-  validateDefined,
-  validateString,
-  validateNumber,
-  validateBoolean,
-  validateArray,
-  validateObject,
-  validateEmail,
-  validateUrl,
-  validateDate,
-  validateUuid,
-  validateEnum,
-  validateOneOf,
-  optional,
-  ValidationError,
-  isValidationError
-};

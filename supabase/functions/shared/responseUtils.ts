@@ -184,6 +184,36 @@ export function createStreamingResponse(
   );
 }
 
+/**
+ * Validate required parameters in a request
+ */
+export function validateRequiredParameters(
+  params: Record<string, unknown>,
+  requiredParams: string[]
+): { isValid: boolean; missingParams: string[] } {
+  const missingParams = requiredParams.filter(param => params[param] === undefined);
+  return {
+    isValid: missingParams.length === 0,
+    missingParams
+  };
+}
+
+/**
+ * Helper to create a response
+ */
+export function createResponse(data: unknown, status: number = 200): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
+    }
+  );
+}
+
 export {
   createSuccessResponse,
   createErrorResponse,
@@ -193,6 +223,8 @@ export {
   buildErrorDetails,
   createJsonResponse,
   createStreamingResponse,
+  validateRequiredParameters,
+  createResponse,
   corsHeaders,
   ErrorCode
 };
