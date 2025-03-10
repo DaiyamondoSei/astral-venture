@@ -4,25 +4,21 @@
  */
 export type AchievementCategory = 
   | 'meditation'
-  | 'chakra'
   | 'reflection'
   | 'practice'
-  | 'portal'
-  | 'wisdom'
-  | 'consciousness'
-  | 'special';
+  | 'chakra'
+  | 'learning'
+  | 'exploration'
+  | 'social';
 
 /**
- * Icon types for achievements
+ * Achievement difficulty levels
  */
-export type AchievementIcon = 
-  | 'star'
-  | 'award'
-  | 'brain'
-  | 'flame'
-  | 'energy'
-  | 'book'
-  | 'sparkles';
+export type AchievementDifficulty = 
+  | 'beginner'
+  | 'intermediate'
+  | 'advanced'
+  | 'master';
 
 /**
  * Achievement data structure
@@ -32,47 +28,60 @@ export interface Achievement {
   title: string;
   description: string;
   category: AchievementCategory;
-  target?: number;
+  icon?: string;
+  unlocked: boolean;
   progress?: number;
-  awarded?: boolean;
-  awarded_at?: string | null;
-  icon?: AchievementIcon;
-  secret?: boolean;
+  difficulty?: AchievementDifficulty;
+  createdAt?: string;
+  unlockedAt?: string;
+  requiredCount?: number;
+  currentCount?: number;
 }
 
 /**
- * Achievement with user progress
+ * Achievement progress data
  */
-export interface UserAchievement extends Achievement {
+export interface AchievementProgress {
+  achievementId: string;
   progress: number;
   awarded: boolean;
-  awarded_at: string | null;
+  awardedAt?: string;
 }
 
 /**
- * Achievement progress event
+ * User interaction data for tracking achievement progress
  */
-export interface AchievementProgressEvent {
-  achievement_id: string;
-  progress: number;
+export interface UserInteraction {
+  type: string;
+  value?: number | string;
   metadata?: Record<string, unknown>;
+  timestamp: string;
 }
 
 /**
- * Achievement notification data
+ * Achievement event data
  */
-export interface AchievementNotification {
+export interface AchievementEvent {
+  achievementId: string;
+  userId: string;
+  progress: number;
+  awarded: boolean;
+  timestamp: string;
+}
+
+/**
+ * Step interaction for incremental achievements
+ */
+export interface StepInteraction {
+  stepId: string;
+  completed: boolean;
+  timestamp: string;
+}
+
+/**
+ * Achievement notification props
+ */
+export interface AchievementNotificationProps {
   achievement: Achievement;
-  isNew: boolean;
-  timestamp: Date;
-}
-
-/**
- * Achievement filter options
- */
-export interface AchievementFilterOptions {
-  categories?: AchievementCategory[];
-  showAwarded?: boolean;
-  showUnawarded?: boolean;
-  sortBy?: 'recent' | 'progress' | 'category';
+  onDismiss: () => void;
 }

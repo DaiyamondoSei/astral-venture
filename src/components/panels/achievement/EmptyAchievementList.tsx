@@ -3,14 +3,17 @@ import React from 'react';
 import { Search } from 'lucide-react';
 import type { AchievementCategory } from '@/types/achievement';
 
-interface EmptyAchievementListProps {
+/**
+ * Props for the EmptyAchievementList component
+ */
+interface IEmptyAchievementListProps {
   selectedCategory: AchievementCategory | null;
 }
 
 /**
  * Component displayed when no achievements match the current filters
  */
-const EmptyAchievementList: React.FC<EmptyAchievementListProps> = ({ selectedCategory }) => {
+const EmptyAchievementList: React.FC<IEmptyAchievementListProps> = ({ selectedCategory }) => {
   let message = "No achievements found";
   
   if (selectedCategory) {

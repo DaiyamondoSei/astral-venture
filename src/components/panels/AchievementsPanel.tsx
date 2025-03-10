@@ -1,177 +1,107 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
-import AchievementItem from './achievement/AchievementItem';
+import { toast } from 'sonner';
 import AchievementHeader from './achievement/AchievementHeader';
-import AchievementFilter from './achievement/AchievementFilter';
+import AchievementItem from './achievement/AchievementItem';
 import EmptyAchievementList from './achievement/EmptyAchievementList';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
+import AchievementFilter from './achievement/AchievementFilter';
+import SwipeablePanelController from './SwipeablePanelController';
+import { handleError, ErrorCategory } from '@/utils/errorHandling';
+import { invokeEdgeFunction } from '@/utils/edgeFunctionHelper';
 import type { Achievement, AchievementCategory } from '@/types/achievement';
 
 /**
- * Panel that displays user achievements and allows filtering
+ * Panel that displays user achievements
  */
 const AchievementsPanel: React.FC = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showAwarded, setShowAwarded] = useState<boolean>(true);
-  const [showUnawarded, setShowUnawarded] = useState<boolean>(true);
-  const [detailsShown, setDetailsShown] = useState<boolean>(false);
-  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
-
-  // Fetch achievements from Supabase
-  const { data: achievements, isLoading } = useQuery({
-    queryKey: ['achievements'],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('get_user_achievements');
-      
-      if (error) {
-        console.error('Error fetching achievements:', error);
-        throw error;
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [filteredAchievements, setFilteredAchievements] = useState<Achievement[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<AchievementCategory | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Fetch achievements on mount
+  useEffect(() => {
+    const fetchAchievements = async () => {
+      try {
+        setIsLoading(true);
+        
+        const data = await invokeEdgeFunction<{
+          achievements: Achievement[];
+          unlocked: string[];
+        }>('get_user_achievements');
+        
+        // Mark achievements as unlocked
+        const achievementsWithStatus = data.achievements.map(achievement => ({
+          ...achievement,
+          unlocked: data.unlocked.includes(achievement.id)
+        }));
+        
+        setAchievements(achievementsWithStatus);
+        setFilteredAchievements(achievementsWithStatus);
+        
+        toast.success('Achievements loaded');
+      } catch (error) {
+        handleError(error, {
+          category: ErrorCategory.DATA_PROCESSING,
+          context: 'Achievement loading',
+          customMessage: 'Failed to load achievements'
+        });
+      } finally {
+        setIsLoading(false);
       }
-      
-      return data as Achievement[];
-    }
-  });
-
-  // Filter achievements based on user selection
-  const filteredAchievements = achievements?.filter(achievement => {
-    // Filter by category
-    if (selectedCategory && achievement.category !== selectedCategory) {
-      return false;
-    }
+    };
     
-    // Filter by awarded status
-    if (achievement.awarded && !showAwarded) {
-      return false;
+    fetchAchievements();
+  }, []);
+  
+  // Filter achievements when category changes
+  useEffect(() => {
+    if (selectedCategory === null) {
+      setFilteredAchievements(achievements);
+    } else {
+      setFilteredAchievements(
+        achievements.filter(achievement => achievement.category === selectedCategory)
+      );
     }
-    
-    if (!achievement.awarded && !showUnawarded) {
-      return false;
-    }
-    
-    return true;
-  }) || [];
-
-  // Show achievement details
-  const showDetails = (achievement: Achievement): void => {
-    setSelectedAchievement(achievement);
-    setDetailsShown(true);
+  }, [selectedCategory, achievements]);
+  
+  // Handlers
+  const handleCategoryChange = (category: AchievementCategory | null) => {
+    setSelectedCategory(category);
   };
-
-  // Hide achievement details
-  const hideDetails = (): void => {
-    setDetailsShown(false);
-  };
-
-  // Calculate counts for the header
-  const totalCount = achievements?.length || 0;
-  const unlockedCount = achievements?.filter(a => a.awarded).length || 0;
-
+  
+  // Calculate counts
+  const unlockedCount = achievements.filter(a => a.unlocked).length;
+  const totalCount = achievements.length;
+  
   return (
-    <div className="h-full flex flex-col">
-      <AchievementHeader 
-        unlockedCount={unlockedCount}
-        totalCount={totalCount}
-      />
-      
-      <AchievementFilter
-        selectedCategory={selectedCategory}
-        showAwarded={showAwarded}
-        showUnawarded={showUnawarded}
-        onCategoryChange={setSelectedCategory}
-        onShowAwardedChange={setShowAwarded}
-        onShowUnawardedChange={setShowUnawarded}
-      />
-      
-      <div className="flex-1 overflow-y-auto mt-4">
+    <SwipeablePanelController position="bottom" height="85vh" title="Achievements">
+      <div className="space-y-4">
+        <AchievementHeader unlockedCount={unlockedCount} totalCount={totalCount} />
+        
+        <AchievementFilter 
+          selectedCategory={selectedCategory} 
+          onCategoryChange={handleCategoryChange} 
+        />
+        
         {isLoading ? (
-          <div className="flex justify-center items-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+          <div className="flex justify-center py-8">
+            <div className="animate-pulse h-8 w-8 rounded-full bg-primary-600"></div>
           </div>
-        ) : filteredAchievements.length === 0 ? (
-          <EmptyAchievementList selectedCategory={selectedCategory as AchievementCategory | null} />
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            {filteredAchievements.map((achievement) => (
-              <AchievementItem
-                key={achievement.id}
-                achievement={achievement}
-                onClick={() => showDetails(achievement)}
+        ) : filteredAchievements.length > 0 ? (
+          <div className="space-y-3">
+            {filteredAchievements.map(achievement => (
+              <AchievementItem 
+                key={achievement.id} 
+                achievement={achievement} 
               />
             ))}
-          </motion.div>
+          </div>
+        ) : (
+          <EmptyAchievementList selectedCategory={selectedCategory} />
         )}
       </div>
-      
-      {/* Achievement details modal */}
-      {detailsShown && selectedAchievement && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={hideDetails}
-        >
-          <motion.div
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            className="bg-gray-900 p-6 rounded-xl w-full max-w-md"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="text-yellow-400" />
-                <h2 className="text-xl font-semibold text-white">{selectedAchievement.title}</h2>
-              </div>
-              <button
-                onClick={hideDetails}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <p className="text-gray-300 mb-4">{selectedAchievement.description}</p>
-            
-            {selectedAchievement.awarded ? (
-              <div className="bg-green-900/30 text-green-300 p-3 rounded-md flex items-center">
-                <Sparkles className="mr-2" />
-                <span>Achievement unlocked! Congratulations!</span>
-              </div>
-            ) : (
-              <div className="mt-4">
-                <div className="bg-gray-800 h-3 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-full" 
-                    style={{ 
-                      width: `${selectedAchievement.progress && selectedAchievement.target 
-                        ? (selectedAchievement.progress / selectedAchievement.target) * 100 
-                        : 0}%` 
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-sm text-gray-400">
-                    {selectedAchievement.progress || 0} / {selectedAchievement.target || 1}
-                  </span>
-                  <span className="text-sm text-gray-400">
-                    {selectedAchievement.progress && selectedAchievement.target 
-                      ? Math.round((selectedAchievement.progress / selectedAchievement.target) * 100) 
-                      : 0}%
-                  </span>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
-      )}
-    </div>
+    </SwipeablePanelController>
   );
 };
 

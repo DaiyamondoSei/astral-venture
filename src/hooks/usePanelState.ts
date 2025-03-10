@@ -1,6 +1,6 @@
 
 import { useContext } from 'react';
-import PanelContext from '@/contexts/PanelContext';
+import { PanelContext } from '@/contexts/PanelContext';
 
 /**
  * Panel types supported by the application

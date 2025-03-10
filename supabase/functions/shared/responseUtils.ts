@@ -1,151 +1,144 @@
 
 /**
- * Error codes for API responses
+ * Standardized error codes for edge functions
  */
 export enum ErrorCode {
+  // Generic errors
   INTERNAL_ERROR = 'internal_error',
   NOT_FOUND = 'not_found',
-  UNAUTHORIZED = 'unauthorized',
   VALIDATION_FAILED = 'validation_failed',
-  MISSING_PARAMETERS = 'missing_parameters',
-  RATE_LIMITED = 'rate_limited',
+  
+  // Authentication & authorization errors
+  AUTHENTICATION_ERROR = 'authentication_error',
+  AUTHORIZATION_ERROR = 'authorization_error',
+  UNAUTHORIZED = 'unauthorized',
+  
+  // Service errors
   SERVICE_UNAVAILABLE = 'service_unavailable',
-  FORBIDDEN = 'forbidden',
+  RATE_LIMITED = 'rate_limited',
+  TIMEOUT = 'timeout',
+  NETWORK_ERROR = 'network_error',
+  
+  // Database errors
+  DATABASE_ERROR = 'database_error',
+  QUERY_ERROR = 'query_error',
+  
+  // User input errors
+  INVALID_INPUT = 'invalid_input',
+  DUPLICATE_ENTRY = 'duplicate_entry',
+  RESOURCE_EXISTS = 'resource_exists'
 }
 
 /**
- * Creates a standardized error response
+ * Interface for standardized Edge Function responses
+ */
+export interface EdgeFunctionResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: ErrorCode | string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Creates a successful response
  * 
- * @param code - Error code
- * @param message - Error message
- * @param data - Additional error data
- * @param status - HTTP status code
- * @param headers - Optional response headers
- * @returns Response object with error details
+ * @param data - The response data
+ * @param metadata - Optional metadata
+ * @returns A successful response object
+ */
+export function createSuccessResponse<T = any>(
+  data: T,
+  metadata?: Record<string, unknown>
+): Response {
+  const response: EdgeFunctionResponse<T> = {
+    success: true,
+    data,
+    metadata
+  };
+  
+  return new Response(
+    JSON.stringify(response),
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+}
+
+/**
+ * Creates an error response
+ * 
+ * @param code - The error code
+ * @param message - The error message
+ * @param details - Optional error details or metadata
+ * @returns An error response object
  */
 export function createErrorResponse(
-  code: ErrorCode,
+  code: ErrorCode | string,
   message: string,
-  data: Record<string, unknown> | null = null,
-  status: number = 400,
-  headers: Record<string, string> = {}
+  details?: Record<string, unknown>
 ): Response {
-  const body = {
+  const response: EdgeFunctionResponse = {
     success: false,
     error: {
       code,
       message,
-      ...(data ? { details: data } : {})
+      details
     }
   };
   
+  const statusCode = getHttpStatusFromErrorCode(code);
+  
   return new Response(
-    JSON.stringify(body),
+    JSON.stringify(response),
     {
-      status,
+      status: statusCode,
       headers: {
-        'Content-Type': 'application/json',
-        ...headers
+        'Content-Type': 'application/json'
       }
     }
   );
 }
 
 /**
- * Creates a standardized success response
+ * Maps error codes to HTTP status codes
  * 
- * @param data - Response data
- * @param metadata - Optional metadata
- * @param status - HTTP status code
- * @param headers - Optional response headers
- * @returns Response object with success result
+ * @param code - The error code
+ * @returns The corresponding HTTP status code
  */
-export function createSuccessResponse(
-  data: Record<string, unknown> | Array<unknown>,
-  metadata: Record<string, unknown> = {},
-  status: number = 200,
-  headers: Record<string, string> = {}
-): Response {
-  const body = {
-    success: true,
-    data,
-    ...(Object.keys(metadata).length > 0 ? { metadata } : {})
-  };
-  
-  return new Response(
-    JSON.stringify(body),
-    {
-      status,
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      }
-    }
-  );
-}
-
-/**
- * Result of parameter validation
- */
-export interface ValidationResult {
-  isValid: boolean;
-  missingParams?: string[];
-}
-
-/**
- * Validates that required parameters are present in a request body
- * 
- * @param body - Request body object
- * @param requiredParams - Array of required parameter names
- * @returns Validation result
- */
-export function validateRequiredParameters(
-  body: Record<string, unknown>,
-  requiredParams: string[]
-): ValidationResult {
-  const missingParams: string[] = [];
-  
-  for (const param of requiredParams) {
-    if (body[param] === undefined) {
-      missingParams.push(param);
-    }
-  }
-  
-  return {
-    isValid: missingParams.length === 0,
-    missingParams: missingParams.length > 0 ? missingParams : undefined
-  };
-}
-
-/**
- * Log events for monitoring and debugging
- * 
- * @param level - Log level
- * @param message - Log message
- * @param data - Additional log data
- */
-export function logEvent(
-  level: 'info' | 'warn' | 'error',
-  message: string,
-  data?: Record<string, unknown>
-): void {
-  const timestamp = new Date().toISOString();
-  const logEntry = {
-    timestamp,
-    level,
-    message,
-    ...(data ? { data } : {})
-  };
-  
-  switch (level) {
-    case 'info':
-      console.log(JSON.stringify(logEntry));
-      break;
-    case 'warn':
-      console.warn(JSON.stringify(logEntry));
-      break;
-    case 'error':
-      console.error(JSON.stringify(logEntry));
-      break;
+function getHttpStatusFromErrorCode(code: ErrorCode | string): number {
+  switch (code) {
+    case ErrorCode.NOT_FOUND:
+      return 404;
+    case ErrorCode.VALIDATION_FAILED:
+    case ErrorCode.INVALID_INPUT:
+      return 400;
+    case ErrorCode.AUTHENTICATION_ERROR:
+    case ErrorCode.UNAUTHORIZED:
+      return 401;
+    case ErrorCode.AUTHORIZATION_ERROR:
+      return 403;
+    case ErrorCode.RATE_LIMITED:
+      return 429;
+    case ErrorCode.DUPLICATE_ENTRY:
+    case ErrorCode.RESOURCE_EXISTS:
+      return 409;
+    case ErrorCode.TIMEOUT:
+      return 408;
+    case ErrorCode.SERVICE_UNAVAILABLE:
+      return 503;
+    default:
+      return 500;
   }
 }
+
+export default {
+  createSuccessResponse,
+  createErrorResponse,
+  ErrorCode
+};

@@ -6,11 +6,17 @@
 
 import { createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
 
-// Define the type for error handling options
-export interface ErrorHandlingOptions {
+/**
+ * Error handling options
+ */
+export interface IErrorHandlingOptions {
+  /** Context where the error occurred */
   context?: string;
+  /** Operation that was being performed */
   operation?: string;
+  /** Whether the client should retry the request */
   shouldRetry?: boolean;
+  /** Additional information to include in the error response */
   additionalInfo?: Record<string, unknown>;
 }
 
@@ -22,12 +28,12 @@ export interface ErrorHandlingOptions {
  * @param options - Error handling options
  * @returns Formatted error response
  */
-export function handleError(error: any, options: ErrorHandlingOptions = {}): Response {
+export function handleError(error: unknown, options: IErrorHandlingOptions = {}): Response {
   console.error(`Error in ${options.context || 'AI assistant'}:`, error);
   
   // Extract error information
-  const errorMessage = error?.message || "An unknown error occurred";
-  const errorStack = error?.stack || "";
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : undefined;
   const errorContext = options.context || "general";
   const errorOperation = options.operation || "unknown_operation";
   

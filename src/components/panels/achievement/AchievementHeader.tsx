@@ -7,7 +7,7 @@ import GlassmorphicContainer from '@/components/visual-foundation/GlassmorphicCo
 /**
  * Props for the AchievementHeader component
  */
-interface AchievementHeaderProps {
+interface IAchievementHeaderProps {
   unlockedCount: number;
   totalCount: number;
 }
@@ -15,15 +15,16 @@ interface AchievementHeaderProps {
 /**
  * Header component for the achievements panel, showing progress stats
  */
-const AchievementHeader: React.FC<AchievementHeaderProps> = ({ 
+const AchievementHeader: React.FC<IAchievementHeaderProps> = ({ 
   unlockedCount, 
   totalCount 
 }) => {
   const { theme } = useQuantumTheme();
+  const variant = theme === 'default' ? 'quantum' : theme;
   
   return (
     <GlassmorphicContainer 
-      variant={theme === 'default' ? 'quantum' : theme}
+      variant={variant}
       intensity="medium"
       withGlow={true}
       className="p-4 mb-4"

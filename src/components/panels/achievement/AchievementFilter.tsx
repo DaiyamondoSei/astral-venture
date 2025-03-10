@@ -1,79 +1,75 @@
 
 import React from 'react';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { motion } from 'framer-motion';
 import type { AchievementCategory } from '@/types/achievement';
 
 /**
  * Props for the AchievementFilter component
  */
-interface AchievementFilterProps {
-  selectedCategory: string | null;
-  showAwarded: boolean;
-  showUnawarded: boolean;
-  onCategoryChange: (category: string | null) => void;
-  onShowAwardedChange: (show: boolean) => void;
-  onShowUnawardedChange: (show: boolean) => void;
+interface IAchievementFilterProps {
+  selectedCategory: AchievementCategory | null;
+  onCategoryChange: (category: AchievementCategory | null) => void;
 }
 
 /**
- * Filter component for achievements by category and status
+ * Component for filtering achievements by category
  */
-const AchievementFilter: React.FC<AchievementFilterProps> = ({
-  selectedCategory,
-  showAwarded,
-  showUnawarded,
-  onCategoryChange,
-  onShowAwardedChange,
-  onShowUnawardedChange
+const AchievementFilter: React.FC<IAchievementFilterProps> = ({ 
+  selectedCategory, 
+  onCategoryChange 
 }) => {
-  const handleTabChange = (value: string) => {
-    if (value === 'all') {
-      onCategoryChange(null);
-    } else {
-      onCategoryChange(value);
-    }
+  const categories: (AchievementCategory | null)[] = [
+    null, // "All" option
+    'meditation',
+    'reflection',
+    'practice',
+    'chakra',
+    'learning',
+    'exploration',
+    'social'
+  ];
+  
+  // Map category names to display names
+  const getCategoryName = (category: AchievementCategory | null): string => {
+    if (category === null) return 'All';
+    
+    const displayNames: Record<AchievementCategory, string> = {
+      meditation: 'Meditation',
+      reflection: 'Reflection',
+      practice: 'Practice',
+      chakra: 'Chakra',
+      learning: 'Learning',
+      exploration: 'Exploration',
+      social: 'Social'
+    };
+    
+    return displayNames[category] || category;
   };
-
+  
   return (
-    <div className="space-y-4">
-      <Tabs 
-        defaultValue={selectedCategory || 'all'} 
-        value={selectedCategory || 'all'} 
-        onValueChange={handleTabChange} 
-        className="mb-4"
-      >
-        <TabsList className="grid grid-cols-4 md:grid-cols-8 bg-white/10 backdrop-blur border-white/10">
-          <TabsTrigger value="all" className="text-white">All</TabsTrigger>
-          <TabsTrigger value="meditation" className="text-white">Meditation</TabsTrigger>
-          <TabsTrigger value="practice" className="text-white">Practice</TabsTrigger>
-          <TabsTrigger value="reflection" className="text-white">Reflection</TabsTrigger>
-          <TabsTrigger value="wisdom" className="text-white">Wisdom</TabsTrigger>
-          <TabsTrigger value="portal" className="text-white">Portal</TabsTrigger>
-          <TabsTrigger value="chakra" className="text-white">Chakra</TabsTrigger>
-          <TabsTrigger value="special" className="text-white">Special</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      
-      <div className="flex gap-4">
-        <label className="flex items-center text-white">
-          <input
-            type="checkbox"
-            checked={showAwarded}
-            onChange={(e) => onShowAwardedChange(e.target.checked)}
-            className="mr-2 h-4 w-4"
-          />
-          Show Awarded
-        </label>
-        
-        <label className="flex items-center text-white">
-          <input
-            type="checkbox"
-            checked={showUnawarded}
-            onChange={(e) => onShowUnawardedChange(e.target.checked)}
-            className="mr-2 h-4 w-4"
-          />
-          Show Unawarded
-        </label>
+    <div className="pb-2 overflow-x-auto">
+      <div className="flex space-x-2 pb-1">
+        {categories.map(category => (
+          <button
+            key={category || 'all'}
+            onClick={() => onCategoryChange(category)}
+            className={`relative px-4 py-1.5 rounded-full min-w-max 
+              ${selectedCategory === category 
+                ? 'text-white font-medium' 
+                : 'text-gray-400 hover:text-gray-300'
+              }`}
+          >
+            {selectedCategory === category && (
+              <motion.div
+                layoutId="active-category"
+                className="absolute inset-0 bg-gray-700/50 rounded-full"
+                initial={false}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10">{getCategoryName(category)}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
