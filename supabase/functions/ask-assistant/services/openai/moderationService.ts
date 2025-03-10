@@ -1,16 +1,25 @@
 
 import { ContentModerationType } from "./types.ts";
 
-// Content moderation check
-export async function moderateContent(content: string): Promise<{
-  flagged: boolean;
-  flaggedCategories: ContentModerationType[];
-}> {
+/**
+ * Content moderation result
+ */
+interface ModerationResult {
+  allowed: boolean;
+  flags: ContentModerationType[];
+  reason?: string;
+  score?: Record<ContentModerationType, number>;
+}
+
+/**
+ * Check content against OpenAI's content moderation API
+ */
+export async function moderateContent(content: string): Promise<ModerationResult> {
   try {
     const apiKey = Deno.env.get("OPENAI_API_KEY");
+    
     if (!apiKey) {
-      console.error("Missing OPENAI_API_KEY environment variable");
-      throw new Error("OpenAI API key is not configured");
+      throw new Error("Missing OPENAI_API_KEY environment variable");
     }
     
     const response = await fetch('https://api.openai.com/v1/moderations', {
@@ -19,44 +28,53 @@ export async function moderateContent(content: string): Promise<{
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ input: content })
+      body: JSON.stringify({
+        input: content
+      })
     });
     
     if (!response.ok) {
       const error = await response.json();
-      console.error('Moderation API error:', error);
-      throw new Error(`Moderation API error: ${error.error?.message || 'Unknown error'}`);
+      console.error('OpenAI moderation API error:', error);
+      
+      // Default to allowing content if moderation fails, but log the error
+      return {
+        allowed: true,
+        flags: [],
+        reason: `Moderation API error: ${error.error?.message || 'Unknown error'}`
+      };
     }
     
     const data = await response.json();
-    
-    if (!data.results || data.results.length === 0) {
-      throw new Error('Invalid response from moderation API');
-    }
-    
     const result = data.results[0];
-    const flaggedCategories: ContentModerationType[] = [];
     
     // Extract flagged categories
-    if (result.categories) {
-      if (result.categories.sexual && result.category_scores.sexual > 0.5) flaggedCategories.push('sexual');
-      if (result.categories.hate && result.category_scores.hate > 0.5) flaggedCategories.push('hate');
-      if (result.categories.harassment && result.category_scores.harassment > 0.5) flaggedCategories.push('harassment');
-      if (result.categories['self-harm'] && result.category_scores['self-harm'] > 0.5) flaggedCategories.push('self-harm');
-      if (result.categories.violence && result.category_scores.violence > 0.5) flaggedCategories.push('violence');
-      if (result.categories.graphic && result.category_scores.graphic > 0.5) flaggedCategories.push('graphic');
+    const flags: ContentModerationType[] = [];
+    const flagsScore: Record<ContentModerationType, number> = {} as Record<ContentModerationType, number>;
+    
+    for (const [category, flagged] of Object.entries(result.categories)) {
+      if (flagged) {
+        flags.push(category as ContentModerationType);
+      }
+      
+      // Store score for each category
+      flagsScore[category as ContentModerationType] = result.category_scores[category];
     }
     
     return {
-      flagged: result.flagged,
-      flaggedCategories
+      allowed: !result.flagged,
+      flags,
+      score: flagsScore,
+      reason: flags.length > 0 ? `Content contains ${flags.join(', ')}` : undefined
     };
   } catch (error) {
-    console.error('Error in content moderation:', error);
-    // Default to not flagged if moderation fails
+    console.error('Error checking content moderation:', error);
+    
+    // Default to allowing content if moderation errors out completely
     return {
-      flagged: false,
-      flaggedCategories: []
+      allowed: true,
+      flags: [],
+      reason: `Moderation check failed: ${error.message}`
     };
   }
 }

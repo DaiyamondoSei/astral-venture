@@ -45,11 +45,16 @@ const Layout: React.FC<LayoutProps> = ({
     }
   };
   
+  const handleLayoutClick = () => {
+    const trackMetadata = trackInteraction('layout-click');
+    return trackMetadata();
+  };
+  
   return (
     <div 
       className="min-h-screen relative overflow-hidden bg-white text-gray-800" 
       role="main"
-      onClick={trackInteraction('layout-click')}
+      onClick={handleLayoutClick}
     >
       {/* Always show simple fallback */}
       <SimpleFallbackBackground />

@@ -1,306 +1,350 @@
 
-import { ApiError, ApiErrorCode } from '../api/ApiError';
+import ApiError, { ApiErrorType } from '../api/ApiError';
+import { toast } from 'sonner';
 
-// Default retry configuration
-export interface RetryConfig {
-  retries: number;             // Maximum number of retry attempts
-  initialDelay: number;        // Initial delay in ms
-  maxDelay: number;            // Maximum delay in ms
-  backoffFactor: number;       // Exponential backoff factor
-  shouldRetry?: (error: unknown, attempt: number) => boolean;  // Custom retry condition
-  onRetry?: (error: unknown, attempt: number, delay: number) => void;  // Called before retry
-}
-
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  retries: 3,
-  initialDelay: 300,
-  maxDelay: 10000,
-  backoffFactor: 2,
-  shouldRetry: (error) => {
-    // Automatically retry network errors and server errors
-    if (error instanceof ApiError) {
-      return (
-        error.code === ApiErrorCode.NETWORK_ERROR ||
-        error.code === ApiErrorCode.TIMEOUT ||
-        (error.statusCode !== undefined && error.statusCode >= 500)
-      );
-    }
-    return false;
-  }
-};
+// Standard fetch timeout in milliseconds
+const DEFAULT_TIMEOUT = 30000;
 
 /**
- * Execute a function with retry logic for better network resilience
- * @param fn The function to execute, which returns a Promise
- * @param config Retry configuration
- * @returns Promise with the result or last error
+ * Configuration options for enhanced fetch
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  config: Partial<RetryConfig> = {}
-): Promise<T> {
-  const retryConfig: RetryConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
-  let lastError: unknown;
-  
-  for (let attempt = 0; attempt <= retryConfig.retries; attempt++) {
-    try {
-      // First attempt or retry
-      return await fn();
-    } catch (error) {
-      lastError = error;
-      
-      // Check if we should retry
-      const shouldRetry = attempt < retryConfig.retries && 
-        (retryConfig.shouldRetry?.(error, attempt) ?? false);
-      
-      if (!shouldRetry) {
-        break;
-      }
-      
-      // Calculate backoff delay
-      const delay = Math.min(
-        retryConfig.initialDelay * Math.pow(retryConfig.backoffFactor, attempt),
-        retryConfig.maxDelay
-      );
-      
-      // Add some jitter to prevent synchronized retries
-      const jitteredDelay = delay * (0.8 + Math.random() * 0.4);
-      
-      // Call retry callback if provided
-      if (retryConfig.onRetry) {
-        retryConfig.onRetry(error, attempt + 1, jitteredDelay);
-      }
-      
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, jitteredDelay));
-    }
-  }
-  
-  // If we get here, we've exhausted all retries
-  throw lastError;
+export interface EnhancedFetchOptions extends RequestInit {
+  timeout?: number;
+  retries?: number;
+  retryDelay?: number;
+  retryStatusCodes?: number[];
+  skipErrorToast?: boolean;
+  fallbackData?: any;
+  useOfflineQueue?: boolean;
+  cacheKey?: string;
+  cacheTtl?: number;
+  abortSignal?: AbortSignal;
 }
 
 /**
- * Batch multiple network requests together
- * @param requests Array of request functions that return promises
- * @param options Batching options
- * @returns Promise with array of results or errors
+ * Enhanced fetch with timeouts, retries, and better error handling
  */
-export async function batchRequests<T>(
-  requests: Array<() => Promise<T>>,
-  options: {
-    concurrency?: number;  // Maximum concurrent requests
-    abortOnError?: boolean;  // Whether to abort on first error
-    timeout?: number;  // Overall timeout for all requests
-  } = {}
-): Promise<Array<T | Error>> {
+export async function enhancedFetch(
+  url: string,
+  options: EnhancedFetchOptions = {}
+): Promise<Response> {
   const {
-    concurrency = 4,
-    abortOnError = false,
-    timeout
+    timeout = DEFAULT_TIMEOUT,
+    retries = 3,
+    retryDelay = 1000,
+    retryStatusCodes = [408, 429, 500, 502, 503, 504],
+    skipErrorToast = false,
+    useOfflineQueue = true,
+    cacheKey,
+    abortSignal,
+    ...fetchOptions
   } = options;
   
-  const results: Array<T | Error> = new Array(requests.length);
-  const queue = [...requests.keys()];
-  const inProgress = new Set<number>();
+  let currentRetry = 0;
   
-  // Create abort controller for timeout
-  const controller = new AbortController();
-  const signal = controller.signal;
-  
-  // Set timeout if specified
-  let timeoutId: number | undefined;
-  if (timeout) {
-    timeoutId = window.setTimeout(() => controller.abort(), timeout);
+  // Check if we're offline
+  if (!navigator.onLine && useOfflineQueue) {
+    // Queue the request to be processed when back online
+    queueOfflineRequest(url, options);
+    
+    const offlineError = ApiError.offline({
+      endpoint: url,
+      method: fetchOptions.method || 'GET',
+      requestData: fetchOptions.body ? JSON.parse(fetchOptions.body as string) : undefined
+    });
+    
+    if (!skipErrorToast) {
+      toast.error(offlineError.getUserMessage());
+    }
+    
+    throw offlineError;
   }
   
-  try {
-    await new Promise<void>((resolve, reject) => {
-      // Process a specific request
-      const processRequest = async (index: number) => {
-        inProgress.add(index);
-        
-        try {
-          // Execute the request with abort signal
-          results[index] = await requests[index]();
-        } catch (error) {
-          results[index] = error instanceof Error ? error : new Error(String(error));
-          
-          // If set to abort on error, abort all remaining requests
-          if (abortOnError) {
-            controller.abort();
-            reject(results[index]);
-            return;
-          }
-        }
-        
-        inProgress.delete(index);
-        
-        // Process next request in queue
-        if (queue.length > 0) {
-          const nextIndex = queue.shift()!;
-          processRequest(nextIndex);
-        } else if (inProgress.size === 0) {
-          // All requests completed
-          resolve();
-        }
-      };
-      
-      // Set up abort handler
-      signal.addEventListener('abort', () => {
-        reject(new Error('Batch request aborted'));
+  // Add retry loop
+  while (currentRetry <= retries) {
+    // Create timeout controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    // Combine with user-provided signal if any
+    const signal = abortSignal
+      ? combineAbortSignals(controller.signal, abortSignal)
+      : controller.signal;
+    
+    try {
+      const response = await fetch(url, {
+        ...fetchOptions,
+        signal
       });
       
-      // Start initial batch of requests
-      const initialBatch = Math.min(concurrency, requests.length);
-      for (let i = 0; i < initialBatch; i++) {
-        const index = queue.shift()!;
-        processRequest(index);
-      }
-    });
-    
-    return results;
-  } finally {
-    // Clean up timeout
-    if (timeoutId !== undefined) {
       clearTimeout(timeoutId);
-    }
-  }
-}
-
-/**
- * Deduplicate identical API calls made close together
- */
-const pendingRequests = new Map<string, Promise<any>>();
-
-/**
- * Execute a request with deduplication of identical concurrent requests
- * @param key Unique key to identify the request
- * @param fn The request function
- * @param options Deduplication options
- * @returns Promise with the result
- */
-export async function deduplicateRequest<T>(
-  key: string,
-  fn: () => Promise<T>,
-  options: {
-    expirationMs?: number;  // How long to cache the request
-  } = {}
-): Promise<T> {
-  const { expirationMs = 50 } = options;
-  
-  // Check if an identical request is already in progress
-  if (pendingRequests.has(key)) {
-    return pendingRequests.get(key) as Promise<T>;
-  }
-  
-  // Create a new request promise
-  const requestPromise = fn();
-  
-  // Store the promise for deduplication
-  pendingRequests.set(key, requestPromise);
-  
-  // Remove from pending after completion or expiration
-  const cleanup = () => {
-    pendingRequests.delete(key);
-  };
-  
-  // Set expiration
-  setTimeout(cleanup, expirationMs);
-  
-  try {
-    return await requestPromise;
-  } finally {
-    // Clean up after completion
-    cleanup();
-  }
-}
-
-/**
- * Check online status and optionally update connectivity
- */
-export function isOnline(): boolean {
-  return typeof navigator !== 'undefined' && 
-        typeof navigator.onLine === 'boolean' ? 
-        navigator.onLine : true;
-}
-
-/**
- * Add a listener for online/offline events
- */
-export function addConnectivityListener(
-  callback: (online: boolean) => void
-): () => void {
-  const handleOnline = () => callback(true);
-  const handleOffline = () => callback(false);
-  
-  window.addEventListener('online', handleOnline);
-  window.addEventListener('offline', handleOffline);
-  
-  // Return cleanup function
-  return () => {
-    window.removeEventListener('online', handleOnline);
-    window.removeEventListener('offline', handleOffline);
-  };
-}
-
-/**
- * Utility to create a throttled network request
- * @param fn The function to throttle
- * @param limit Maximum calls per interval
- * @param interval Time interval in ms
- * @returns Throttled function
- */
-export function throttleRequests<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
-  limit: number = 10,
-  interval: number = 1000
-): (...args: Parameters<T>) => Promise<ReturnType<T>> {
-  const queue: Array<{
-    args: Parameters<T>;
-    resolve: (value: ReturnType<T>) => void;
-    reject: (reason: any) => void;
-  }> = [];
-  
-  let activeCount = 0;
-  let lastIntervalStart = Date.now();
-  
-  // Process the next item in the queue
-  const processQueue = async () => {
-    if (queue.length === 0 || activeCount >= limit) return;
-    
-    // Check if we need to reset the interval
-    const now = Date.now();
-    if (now - lastIntervalStart > interval) {
-      activeCount = 0;
-      lastIntervalStart = now;
-    }
-    
-    // If we're still under the limit, process the next request
-    if (activeCount < limit) {
-      activeCount++;
-      const { args, resolve, reject } = queue.shift()!;
       
-      try {
-        const result = await fn(...args);
-        resolve(result);
-      } catch (error) {
-        reject(error);
-      } finally {
-        // Schedule next processing
-        setTimeout(processQueue, 0);
+      // If response is ok or we've run out of retries, return it
+      if (response.ok || currentRetry >= retries) {
+        return response;
       }
-    } else {
-      // Wait for the next interval
-      setTimeout(processQueue, interval - (now - lastIntervalStart));
+      
+      // Check if we should retry based on status code
+      if (retryStatusCodes.includes(response.status)) {
+        // Check for rate limiting with Retry-After header
+        const retryAfter = response.headers.get('Retry-After');
+        const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : retryDelay * Math.pow(2, currentRetry);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, delay));
+        currentRetry++;
+        continue;
+      }
+      
+      // If not a retriable status code, just return the response
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      // Handle timeout (AbortError)
+      if (error.name === 'AbortError') {
+        if (currentRetry >= retries) {
+          const timeoutError = ApiError.timeout({
+            endpoint: url,
+            method: fetchOptions.method || 'GET',
+            retryCount: currentRetry
+          });
+          
+          if (!skipErrorToast) {
+            toast.error(timeoutError.getUserMessage());
+          }
+          
+          throw timeoutError;
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, currentRetry)));
+        currentRetry++;
+        continue;
+      }
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        if (currentRetry >= retries) {
+          const networkError = ApiError.network(error.message, {
+            endpoint: url,
+            method: fetchOptions.method || 'GET',
+            retryCount: currentRetry
+          }, error);
+          
+          if (!skipErrorToast) {
+            toast.error(networkError.getUserMessage());
+          }
+          
+          throw networkError;
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, currentRetry)));
+        currentRetry++;
+        continue;
+      }
+      
+      // Rethrow other errors
+      throw error;
     }
-  };
+  }
   
-  // Return the throttled function
-  return (...args: Parameters<T>): Promise<ReturnType<T>> => {
-    return new Promise((resolve, reject) => {
-      queue.push({ args, resolve, reject });
-      processQueue();
+  // This should never happen, but TypeScript wants a return here
+  throw new Error('Maximum retries exceeded');
+}
+
+/**
+ * Combine multiple AbortSignals
+ */
+function combineAbortSignals(...signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  
+  const onAbort = () => {
+    controller.abort();
+    // Cleanup
+    signals.forEach(signal => {
+      signal.removeEventListener('abort', onAbort);
     });
   };
+  
+  signals.forEach(signal => {
+    // If one signal is already aborted, abort immediately
+    if (signal.aborted) {
+      controller.abort();
+      return controller.signal;
+    }
+    
+    signal.addEventListener('abort', onAbort);
+  });
+  
+  return controller.signal;
 }
+
+/**
+ * Offline request entry
+ */
+interface OfflineRequest {
+  url: string;
+  options: EnhancedFetchOptions;
+  timestamp: number;
+}
+
+// Queue for offline requests
+const offlineQueue: OfflineRequest[] = [];
+
+/**
+ * Queue a request to be processed when back online
+ */
+function queueOfflineRequest(url: string, options: EnhancedFetchOptions): void {
+  offlineQueue.push({
+    url,
+    options,
+    timestamp: Date.now()
+  });
+  
+  // Save to local storage for persistence
+  try {
+    localStorage.setItem('offlineRequestQueue', JSON.stringify(offlineQueue));
+  } catch (e) {
+    console.error('Failed to save offline queue to local storage:', e);
+  }
+}
+
+/**
+ * Process all queued offline requests
+ */
+export async function processOfflineQueue(): Promise<void> {
+  // Load queue from storage if available
+  try {
+    const storedQueue = localStorage.getItem('offlineRequestQueue');
+    if (storedQueue) {
+      const parsedQueue = JSON.parse(storedQueue);
+      offlineQueue.push(...parsedQueue);
+      localStorage.removeItem('offlineRequestQueue');
+    }
+  } catch (e) {
+    console.error('Failed to load offline queue from local storage:', e);
+  }
+  
+  if (offlineQueue.length === 0) return;
+  
+  toast.info(`Processing ${offlineQueue.length} pending requests...`);
+  
+  // Process each request in order
+  const requests = [...offlineQueue];
+  offlineQueue.length = 0; // Clear the queue
+  
+  let successful = 0;
+  let failed = 0;
+  
+  for (const request of requests) {
+    try {
+      // Skip offline queue to prevent infinite loop
+      await enhancedFetch(request.url, {
+        ...request.options,
+        useOfflineQueue: false,
+        skipErrorToast: true
+      });
+      successful++;
+    } catch (error) {
+      failed++;
+      console.error('Failed to process offline request:', error);
+    }
+  }
+  
+  // Show toast with results
+  if (successful > 0 && failed > 0) {
+    toast.info(`Completed ${successful} requests, ${failed} failed`);
+  } else if (successful > 0) {
+    toast.success(`Successfully completed ${successful} pending requests`);
+  } else if (failed > 0) {
+    toast.error(`Failed to complete ${failed} pending requests`);
+  }
+}
+
+// Setup listener for online status
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    if (navigator.onLine) {
+      processOfflineQueue();
+    }
+  });
+}
+
+/**
+ * Batch multiple fetch requests into a single request
+ */
+export async function batchRequests<T>(
+  urls: string[],
+  options: EnhancedFetchOptions = {}
+): Promise<T[]> {
+  if (urls.length === 0) return [];
+  
+  // If only one URL, just use enhancedFetch
+  if (urls.length === 1) {
+    const response = await enhancedFetch(urls[0], options);
+    const data = await response.json();
+    return [data];
+  }
+  
+  // Use Promise.all for parallel requests
+  const promises = urls.map(url => {
+    return enhancedFetch(url, options)
+      .then(response => {
+        if (!response.ok) {
+          throw ApiError.fromResponse(response, undefined, {
+            endpoint: url,
+            method: options.method || 'GET'
+          });
+        }
+        return response.json();
+      })
+      .catch(error => {
+        // Convert to ApiError if needed
+        if (!(error instanceof ApiError)) {
+          error = ApiError.fromError(error, {
+            endpoint: url,
+            method: options.method || 'GET'
+          });
+        }
+        throw error;
+      });
+  });
+  
+  // Use allSettled to get all results even if some fail
+  const results = await Promise.allSettled(promises);
+  
+  // Process results
+  const successResults: T[] = [];
+  const errors: ApiError[] = [];
+  
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      successResults.push(result.value);
+    } else {
+      // Store errors for reporting
+      errors.push(result.reason);
+      // Add null placeholder to maintain array ordering
+      successResults.push(null as unknown as T);
+    }
+  });
+  
+  // Report errors if any
+  if (errors.length > 0) {
+    console.error(`${errors.length} of ${urls.length} batch requests failed:`, errors);
+    
+    // Show toast for errors if enabled
+    if (!options.skipErrorToast) {
+      toast.error(`${errors.length} of ${urls.length} requests failed`);
+    }
+  }
+  
+  return successResults;
+}
+
+export default {
+  enhancedFetch,
+  processOfflineQueue,
+  batchRequests
+};

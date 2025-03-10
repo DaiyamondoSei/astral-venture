@@ -1,360 +1,400 @@
 
-import { isOnline, addConnectivityListener } from './networkUtils';
+import { enhancedFetch, EnhancedFetchOptions } from './networkUtils';
+import { toast } from 'sonner';
 
-/**
- * Defines an operation that can be queued for offline execution
- */
-export interface QueuedOperation<T = any> {
-  id: string;                  // Unique identifier for the operation
-  type: string;                // Type of operation (e.g., 'create', 'update', 'delete')
-  resource: string;            // Resource being operated on (e.g., 'users', 'posts')
-  data: any;                   // Data for the operation
-  timestamp: number;           // When the operation was queued
-  retryCount: number;          // Number of failed attempts
-  priority: number;            // Priority (higher number = higher priority)
-  expiration?: number;         // Optional expiration timestamp
-  dependencies?: string[];     // IDs of operations this one depends on
-  metadata?: Record<string, any>; // Additional metadata
+// Offline request data structure
+interface OfflineRequest {
+  id: string;
+  url: string;
+  options: EnhancedFetchOptions;
+  timestamp: number;
+  attempts: number;
+  maxAttempts: number;
+  priority: 'high' | 'normal' | 'low';
+  operation: string;
+  entityId?: string;
+  entityType?: string;
+  data?: any;
+}
+
+// Queue options
+interface OfflineQueueOptions {
+  maxQueueSize: number;
+  persistToStorage: boolean;
+  storageKey: string;
+  processBatchSize: number;
+  automaticProcessing: boolean;
+  processingInterval: number;
+  debug: boolean;
 }
 
 /**
- * Configuration for the offline queue
- */
-export interface OfflineQueueConfig {
-  storageKey?: string;         // Local storage key for persistence
-  autoSync?: boolean;          // Whether to automatically sync when online
-  maxRetries?: number;         // Maximum retry attempts per operation
-  conflictStrategy?: 'client-wins' | 'server-wins' | 'manual'; // How to handle conflicts
-  processingOrder?: 'fifo' | 'lifo' | 'priority'; // Order to process operations
-  batchSize?: number;          // Number of operations to process in one batch
-  syncInterval?: number;       // Interval between sync attempts in ms
-  onOperationComplete?: (op: QueuedOperation, result: any) => void;
-  onOperationFailed?: (op: QueuedOperation, error: any) => void;
-  onSync?: (successful: number, failed: number) => void;
-}
-
-/**
- * Handler function for processing queued operations
- */
-export type OperationHandler<T = any> = (
-  operation: QueuedOperation<T>
-) => Promise<any>;
-
-/**
- * Manages offline operations and syncing
+ * Manages queuing and processing of offline API requests
  */
 export class OfflineQueue {
-  private queue: QueuedOperation[] = [];
-  private handlers: Map<string, OperationHandler> = new Map();
-  private isSyncing: boolean = false;
-  private syncTimer: number | null = null;
-  private connectivityCleanup: (() => void) | null = null;
-  private config: Required<OfflineQueueConfig>;
-
-  constructor(config: OfflineQueueConfig = {}) {
-    // Default configuration
-    this.config = {
-      storageKey: 'offlineQueue',
-      autoSync: true,
-      maxRetries: 5,
-      conflictStrategy: 'client-wins',
-      processingOrder: 'fifo',
-      batchSize: 10,
-      syncInterval: 60000, // 1 minute
-      onOperationComplete: () => {},
-      onOperationFailed: () => {},
-      onSync: () => {},
-      ...config
+  private queue: OfflineRequest[] = [];
+  private isProcessing = false;
+  private processingIntervalId?: NodeJS.Timeout;
+  private options: OfflineQueueOptions;
+  
+  constructor(options?: Partial<OfflineQueueOptions>) {
+    // Default options
+    this.options = {
+      maxQueueSize: 100,
+      persistToStorage: true,
+      storageKey: 'offline_request_queue',
+      processBatchSize: 5,
+      automaticProcessing: true,
+      processingInterval: 30000, // 30 seconds
+      debug: false,
+      ...options
     };
-
-    // Load queued operations from storage
+    
+    // Load existing queue from storage
     this.loadFromStorage();
-
-    // Set up automatic sync if enabled
-    if (this.config.autoSync) {
-      this.setupAutoSync();
+    
+    // Set up automatic processing if enabled
+    if (this.options.automaticProcessing) {
+      this.startAutomaticProcessing();
+    }
+    
+    // Add online listener to process queue when coming back online
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        if (navigator.onLine && this.queue.length > 0) {
+          this.processQueue();
+        }
+      });
     }
   }
-
+  
   /**
-   * Queue an operation for execution
+   * Add a request to the offline queue
    */
-  enqueue<T = any>(
-    operation: Omit<QueuedOperation<T>, 'id' | 'timestamp' | 'retryCount'>
-  ): string {
-    const id = `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const queuedOp: QueuedOperation<T> = {
-      ...operation,
-      id,
-      timestamp: Date.now(),
-      retryCount: 0
-    };
-
-    this.queue.push(queuedOp);
-    this.saveToStorage();
-
-    // Try to sync immediately if online
-    if (this.config.autoSync && isOnline() && !this.isSyncing) {
-      this.sync();
+  enqueue(
+    url: string,
+    options: EnhancedFetchOptions,
+    metadata: {
+      operation: string;
+      entityType?: string;
+      entityId?: string;
+      priority?: 'high' | 'normal' | 'low';
+      maxAttempts?: number;
+      data?: any;
     }
-
+  ): string {
+    // Generate unique ID for the request
+    const id = crypto.randomUUID();
+    
+    // Create request object
+    const request: OfflineRequest = {
+      id,
+      url,
+      options: {
+        ...options,
+        useOfflineQueue: false // Prevent infinite loops
+      },
+      timestamp: Date.now(),
+      attempts: 0,
+      maxAttempts: metadata.maxAttempts || 3,
+      priority: metadata.priority || 'normal',
+      operation: metadata.operation,
+      entityId: metadata.entityId,
+      entityType: metadata.entityType,
+      data: metadata.data
+    };
+    
+    // Check queue size limit
+    if (this.queue.length >= this.options.maxQueueSize) {
+      // Remove oldest low priority item
+      const lowestPriorityIndex = this.queue.findIndex(r => r.priority === 'low');
+      if (lowestPriorityIndex !== -1) {
+        this.queue.splice(lowestPriorityIndex, 1);
+      } else {
+        // Remove oldest normal priority if no low priority exists
+        const normalPriorityIndex = this.queue.findIndex(r => r.priority === 'normal');
+        if (normalPriorityIndex !== -1) {
+          this.queue.splice(normalPriorityIndex, 1);
+        } else {
+          // Remove oldest item if all are high priority
+          this.queue.shift();
+        }
+      }
+      
+      toast.info("Offline queue limit reached. Oldest request was removed.");
+    }
+    
+    // Add to queue
+    this.queue.push(request);
+    
+    // Sort queue by priority
+    this.sortQueue();
+    
+    // Save to storage
+    this.saveToStorage();
+    
+    if (this.options.debug) {
+      console.debug(`[OfflineQueue] Added request: ${request.operation}, ID: ${id}`);
+    }
+    
+    // Show notification to user
+    toast.info(`${request.operation} will be processed when you're back online.`);
+    
     return id;
   }
-
+  
   /**
-   * Register a handler for a specific operation type
+   * Remove a request from the queue
    */
-  registerHandler<T = any>(
-    type: string,
-    handler: OperationHandler<T>
-  ): void {
-    this.handlers.set(type, handler as OperationHandler);
-  }
-
-  /**
-   * Remove a handler for a specific operation type
-   */
-  unregisterHandler(type: string): boolean {
-    return this.handlers.delete(type);
-  }
-
-  /**
-   * Manually trigger a sync operation
-   */
-  async sync(): Promise<{ successful: number; failed: number }> {
-    if (this.isSyncing || this.queue.length === 0 || !isOnline()) {
-      return { successful: 0, failed: 0 };
-    }
-
-    this.isSyncing = true;
-    let successful = 0;
-    let failed = 0;
-
-    try {
-      // Get operations to process in this batch
-      let batch = this.getNextBatch();
-      
-      // Process all operations in batches
-      while (batch.length > 0) {
-        // Wait for all operations in batch to complete
-        const results = await Promise.allSettled(
-          batch.map(op => this.processOperation(op))
-        );
-
-        // Update counts
-        results.forEach(result => {
-          if (result.status === 'fulfilled') {
-            successful++;
-          } else {
-            failed++;
-          }
-        });
-
-        // Check if we're still online before continuing
-        if (!isOnline()) {
-          break;
-        }
-
-        // Get next batch
-        batch = this.getNextBatch();
-      }
-
-      // Notify about sync completion
-      this.config.onSync(successful, failed);
-      
-      return { successful, failed };
-    } finally {
-      this.isSyncing = false;
+  remove(id: string): boolean {
+    const initialLength = this.queue.length;
+    this.queue = this.queue.filter(request => request.id !== id);
+    
+    // Save if anything changed
+    if (initialLength !== this.queue.length) {
       this.saveToStorage();
+      
+      if (this.options.debug) {
+        console.debug(`[OfflineQueue] Removed request: ${id}`);
+      }
+      
+      return true;
     }
+    
+    return false;
   }
-
+  
   /**
-   * Check if the queue has pending operations
+   * Get all requests in the queue
    */
-  hasPendingOperations(): boolean {
-    return this.queue.length > 0;
-  }
-
-  /**
-   * Get the number of pending operations
-   */
-  get pendingCount(): number {
-    return this.queue.length;
-  }
-
-  /**
-   * Get all pending operations
-   */
-  getPendingOperations(): QueuedOperation[] {
+  getAll(): OfflineRequest[] {
     return [...this.queue];
   }
-
+  
   /**
-   * Clear all pending operations
+   * Get requests by entity type
+   */
+  getByEntityType(entityType: string): OfflineRequest[] {
+    return this.queue.filter(request => request.entityType === entityType);
+  }
+  
+  /**
+   * Get requests by entity ID
+   */
+  getByEntityId(entityId: string): OfflineRequest[] {
+    return this.queue.filter(request => request.entityId === entityId);
+  }
+  
+  /**
+   * Get queue size
+   */
+  size(): number {
+    return this.queue.length;
+  }
+  
+  /**
+   * Clear the entire queue
    */
   clear(): void {
     this.queue = [];
     this.saveToStorage();
-  }
-
-  /**
-   * Set up automatic sync
-   */
-  private setupAutoSync(): void {
-    // Set up connectivity listener
-    this.connectivityCleanup = addConnectivityListener(online => {
-      if (online && this.hasPendingOperations()) {
-        this.sync();
-      }
-    });
-
-    // Set up periodic sync
-    if (this.config.syncInterval > 0) {
-      this.syncTimer = window.setInterval(() => {
-        if (isOnline() && this.hasPendingOperations()) {
-          this.sync();
-        }
-      }, this.config.syncInterval);
-    }
-  }
-
-  /**
-   * Get the next batch of operations to process
-   */
-  private getNextBatch(): QueuedOperation[] {
-    // Sort operations based on processing order
-    let sortedQueue: QueuedOperation[] = [];
     
-    switch (this.config.processingOrder) {
-      case 'lifo':
-        sortedQueue = [...this.queue].sort((a, b) => b.timestamp - a.timestamp);
-        break;
-      case 'priority':
-        sortedQueue = [...this.queue].sort((a, b) => b.priority - a.priority);
-        break;
-      case 'fifo':
-      default:
-        sortedQueue = [...this.queue].sort((a, b) => a.timestamp - b.timestamp);
-        break;
+    if (this.options.debug) {
+      console.debug('[OfflineQueue] Queue cleared');
     }
-
-    // Filter out operations that depend on other operations still in the queue
-    const filteredQueue = sortedQueue.filter(op => {
-      if (!op.dependencies || op.dependencies.length === 0) {
-        return true;
+  }
+  
+  /**
+   * Process all queued requests
+   */
+  async processQueue(): Promise<{
+    processed: number;
+    succeeded: number;
+    failed: number;
+    remaining: number;
+  }> {
+    // Don't process if offline or already processing
+    if (!navigator.onLine || this.isProcessing || this.queue.length === 0) {
+      return {
+        processed: 0,
+        succeeded: 0,
+        failed: 0,
+        remaining: this.queue.length
+      };
+    }
+    
+    this.isProcessing = true;
+    
+    // Get batch to process
+    const batchSize = Math.min(this.options.processBatchSize, this.queue.length);
+    const batch = this.queue.slice(0, batchSize);
+    
+    if (this.options.debug) {
+      console.debug(`[OfflineQueue] Processing batch of ${batchSize} requests`);
+    }
+    
+    // Show toast for user
+    const toastId = batch.length > 0 
+      ? toast.loading(`Processing ${batch.length} offline ${batch.length === 1 ? 'request' : 'requests'}...`)
+      : undefined;
+    
+    let succeeded = 0;
+    let failed = 0;
+    
+    // Process each request
+    for (const request of batch) {
+      if (!navigator.onLine) {
+        // Stop processing if we go offline
+        break;
       }
       
-      // Check if all dependencies have been processed
-      return !op.dependencies.some(depId => 
-        this.queue.some(queuedOp => queuedOp.id === depId)
-      );
+      try {
+        // Increment attempt counter
+        request.attempts++;
+        
+        // Process request
+        await enhancedFetch(request.url, {
+          ...request.options,
+          skipErrorToast: true
+        });
+        
+        // Success - remove from queue
+        this.remove(request.id);
+        succeeded++;
+        
+        if (this.options.debug) {
+          console.debug(`[OfflineQueue] Successfully processed: ${request.operation}, ID: ${request.id}`);
+        }
+      } catch (error) {
+        // Failed - handle retry logic
+        if (request.attempts >= request.maxAttempts) {
+          // Max attempts reached - remove from queue
+          this.remove(request.id);
+          failed++;
+          
+          if (this.options.debug) {
+            console.error(`[OfflineQueue] Failed after ${request.attempts} attempts: ${request.operation}, ID: ${request.id}`, error);
+          }
+        } else {
+          // Update queue entry with increased attempt count
+          this.saveToStorage();
+          failed++;
+          
+          if (this.options.debug) {
+            console.warn(`[OfflineQueue] Failed attempt ${request.attempts}/${request.maxAttempts}: ${request.operation}, ID: ${request.id}`, error);
+          }
+        }
+      }
+    }
+    
+    // Update toast
+    if (toastId) {
+      if (succeeded > 0 && failed === 0) {
+        toast.success(`Successfully processed ${succeeded} offline ${succeeded === 1 ? 'request' : 'requests'}`, { id: toastId });
+      } else if (succeeded > 0 && failed > 0) {
+        toast.info(`Processed ${succeeded} request(s), ${failed} failed`, { id: toastId });
+      } else if (succeeded === 0 && failed > 0) {
+        toast.error(`Failed to process ${failed} offline ${failed === 1 ? 'request' : 'requests'}`, { id: toastId });
+      }
+    }
+    
+    this.isProcessing = false;
+    
+    return {
+      processed: succeeded + failed,
+      succeeded,
+      failed,
+      remaining: this.queue.length
+    };
+  }
+  
+  /**
+   * Start automatic processing of the queue
+   */
+  startAutomaticProcessing(): void {
+    if (this.processingIntervalId) {
+      clearInterval(this.processingIntervalId);
+    }
+    
+    this.processingIntervalId = setInterval(() => {
+      if (navigator.onLine && this.queue.length > 0 && !this.isProcessing) {
+        this.processQueue();
+      }
+    }, this.options.processingInterval);
+    
+    if (this.options.debug) {
+      console.debug(`[OfflineQueue] Started automatic processing (interval: ${this.options.processingInterval}ms)`);
+    }
+  }
+  
+  /**
+   * Stop automatic processing of the queue
+   */
+  stopAutomaticProcessing(): void {
+    if (this.processingIntervalId) {
+      clearInterval(this.processingIntervalId);
+      this.processingIntervalId = undefined;
+      
+      if (this.options.debug) {
+        console.debug('[OfflineQueue] Stopped automatic processing');
+      }
+    }
+  }
+  
+  /**
+   * Sort queue by priority (high -> normal -> low)
+   */
+  private sortQueue(): void {
+    this.queue.sort((a, b) => {
+      // First by priority
+      const priorityOrder = { high: 0, normal: 1, low: 2 };
+      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+      
+      // Then by timestamp (oldest first)
+      return a.timestamp - b.timestamp;
     });
-
-    // Return the first batch
-    return filteredQueue.slice(0, this.config.batchSize);
   }
-
+  
   /**
-   * Process a single operation
-   */
-  private async processOperation(operation: QueuedOperation): Promise<any> {
-    // Check if operation has expired
-    if (operation.expiration && Date.now() > operation.expiration) {
-      this.removeOperation(operation.id);
-      const error = new Error(`Operation expired: ${operation.id}`);
-      this.config.onOperationFailed(operation, error);
-      return Promise.reject(error);
-    }
-
-    // Check if handler exists
-    const handler = this.handlers.get(operation.type);
-    if (!handler) {
-      const error = new Error(`No handler for operation type: ${operation.type}`);
-      this.config.onOperationFailed(operation, error);
-      return Promise.reject(error);
-    }
-
-    try {
-      // Execute the operation
-      const result = await handler(operation);
-      
-      // Remove from queue on success
-      this.removeOperation(operation.id);
-      
-      // Notify about completion
-      this.config.onOperationComplete(operation, result);
-      
-      return result;
-    } catch (error) {
-      // Increment retry count
-      operation.retryCount++;
-      
-      // Remove if max retries exceeded
-      if (operation.retryCount > this.config.maxRetries) {
-        this.removeOperation(operation.id);
-        this.config.onOperationFailed(operation, error);
-      }
-      
-      return Promise.reject(error);
-    }
-  }
-
-  /**
-   * Remove an operation from the queue
-   */
-  private removeOperation(id: string): void {
-    this.queue = this.queue.filter(op => op.id !== id);
-  }
-
-  /**
-   * Save queue to local storage
+   * Save queue to localStorage
    */
   private saveToStorage(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (!this.options.persistToStorage) return;
     
     try {
-      localStorage.setItem(
-        this.config.storageKey,
-        JSON.stringify(this.queue)
-      );
-    } catch (error) {
-      console.error('Failed to save offline queue to storage:', error);
+      localStorage.setItem(this.options.storageKey, JSON.stringify(this.queue));
+    } catch (e) {
+      console.error('[OfflineQueue] Error saving queue to storage:', e);
     }
   }
-
+  
   /**
-   * Load queue from local storage
+   * Load queue from localStorage
    */
   private loadFromStorage(): void {
-    if (typeof localStorage === 'undefined') return;
+    if (!this.options.persistToStorage) return;
     
     try {
-      const data = localStorage.getItem(this.config.storageKey);
+      const data = localStorage.getItem(this.options.storageKey);
+      
       if (data) {
         this.queue = JSON.parse(data);
+        
+        if (this.options.debug) {
+          console.debug(`[OfflineQueue] Loaded ${this.queue.length} requests from storage`);
+        }
       }
-    } catch (error) {
-      console.error('Failed to load offline queue from storage:', error);
-      this.queue = [];
-    }
-  }
-
-  /**
-   * Clean up resources
-   */
-  dispose(): void {
-    if (this.syncTimer !== null) {
-      clearInterval(this.syncTimer);
-      this.syncTimer = null;
-    }
-    
-    if (this.connectivityCleanup) {
-      this.connectivityCleanup();
-      this.connectivityCleanup = null;
+    } catch (e) {
+      console.error('[OfflineQueue] Error loading queue from storage:', e);
     }
   }
 }
 
-// Export singleton instance
-export const offlineQueue = new OfflineQueue();
+// Create default instance
+const offlineQueue = new OfflineQueue();
+
+export default offlineQueue;

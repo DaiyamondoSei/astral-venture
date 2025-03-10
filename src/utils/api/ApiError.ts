@@ -1,333 +1,394 @@
 
-import { AppError, ErrorCategory, ErrorSeverity, createAppError } from '../errorHandling/AppError';
-
 /**
- * HTTP status code categories
+ * Comprehensive API Error class
+ * Advanced error handling for network requests with error categorization and recovery strategies
  */
-export enum HttpStatusCategory {
-  INFORMATIONAL = 'informational',  // 100-199
-  SUCCESS = 'success',              // 200-299
-  REDIRECT = 'redirect',            // 300-399
-  CLIENT_ERROR = 'clientError',     // 400-499
-  SERVER_ERROR = 'serverError',     // 500-599
-}
-
-/**
- * Common API error codes
- */
-export enum ApiErrorCode {
-  // Authentication errors
-  UNAUTHORIZED = 'unauthorized',
-  FORBIDDEN = 'forbidden',
-  
-  // Request errors
-  BAD_REQUEST = 'badRequest',
-  NOT_FOUND = 'notFound',
-  METHOD_NOT_ALLOWED = 'methodNotAllowed',
+export enum ApiErrorType {
+  NETWORK = 'network',
+  AUTH = 'auth',
+  SERVER = 'server',
+  CLIENT = 'client',
   TIMEOUT = 'timeout',
-  CONFLICT = 'conflict',
-  PRECONDITION_FAILED = 'preconditionFailed',
-  PAYLOAD_TOO_LARGE = 'payloadTooLarge',
-  
-  // Server errors
-  INTERNAL_SERVER_ERROR = 'internalServerError',
-  SERVICE_UNAVAILABLE = 'serviceUnavailable',
-  GATEWAY_TIMEOUT = 'gatewayTimeout',
-  
-  // Network errors
-  NETWORK_ERROR = 'networkError',
-  ABORT_ERROR = 'abortError',
-  
-  // Data errors
-  VALIDATION_ERROR = 'validationError',
-  PARSE_ERROR = 'parseError',
-  
-  // Rate limiting
-  RATE_LIMITED = 'rateLimited',
-  
-  // Unknown error
+  OFFLINE = 'offline',
+  VALIDATION = 'validation',
+  RATE_LIMIT = 'rate_limit',
   UNKNOWN = 'unknown'
 }
 
-/**
- * API error specific context
- */
+export enum HttpStatusCategory {
+  INFO = 'info',           // 100-199
+  SUCCESS = 'success',     // 200-299
+  REDIRECT = 'redirect',   // 300-399
+  CLIENT_ERROR = 'client', // 400-499
+  SERVER_ERROR = 'server', // 500-599
+  UNKNOWN = 'unknown'      // everything else
+}
+
+export type ApiErrorRecoveryStrategy = 
+  | 'retry'
+  | 'auth-refresh'
+  | 'offline-queue'
+  | 'fallback-data'
+  | 'manual-resolution'
+  | 'none';
+
 export interface ApiErrorContext {
   endpoint?: string;
   method?: string;
   requestId?: string;
+  timestamp?: string;
   statusCode?: number;
-  statusText?: string;
-  responseData?: unknown;
-  requestData?: unknown;
-  retryable?: boolean;
-  headers?: Record<string, string>;
-  duration?: number;  // Request duration in ms
+  responseData?: any;
+  requestData?: any;
+  retryCount?: number;
+  serviceId?: string;
 }
 
-/**
- * Extended AppError for API errors
- */
-export class ApiError extends Error implements AppError {
-  message: string;
-  code: ApiErrorCode;
-  severity: ErrorSeverity;
-  category: ErrorCategory;
-  originalError?: unknown;
-  statusCode?: number;
-  statusText?: string;
-  endpoint?: string;
-  method?: string;
-  context?: Record<string, unknown>;
-  recoverable: boolean;
-  userActionable: boolean;
-  suggestedAction?: string;
-  retryable: boolean;
-
+export class ApiError extends Error {
+  public readonly type: ApiErrorType;
+  public readonly statusCode?: number;
+  public readonly statusCategory?: HttpStatusCategory;
+  public readonly context: ApiErrorContext;
+  public readonly recoveryStrategy: ApiErrorRecoveryStrategy;
+  public readonly originalError?: Error;
+  public readonly retryable: boolean;
+  
   constructor(
     message: string,
-    code: ApiErrorCode = ApiErrorCode.UNKNOWN,
+    type: ApiErrorType = ApiErrorType.UNKNOWN,
     statusCode?: number,
-    originalError?: unknown,
-    context?: ApiErrorContext
+    context: ApiErrorContext = {},
+    recoveryStrategy: ApiErrorRecoveryStrategy = 'none',
+    originalError?: Error
   ) {
     super(message);
     this.name = 'ApiError';
-    this.message = message;
-    this.code = code;
+    this.type = type;
     this.statusCode = statusCode;
-    this.originalError = originalError;
-    this.endpoint = context?.endpoint;
-    this.method = context?.method;
+    this.statusCategory = statusCode ? this.getStatusCategory(statusCode) : undefined;
     this.context = context;
-    this.retryable = context?.retryable ?? this.isRetryable(statusCode);
+    this.recoveryStrategy = recoveryStrategy;
+    this.originalError = originalError;
+    this.retryable = this.isRetryable();
     
-    // Set severity based on status code
-    this.severity = this.getSeverityFromStatus(statusCode);
-    
-    // Set category based on error type
-    this.category = ErrorCategory.API;
-    
-    // Determine if the error is recoverable
-    this.recoverable = this.isRecoverable(statusCode, code);
-    
-    // Determine if the user can take action
-    this.userActionable = this.isUserActionable(statusCode, code);
-    
-    // Set suggested action based on error type
-    this.suggestedAction = this.getSuggestedAction(code, statusCode);
-    
-    // Ensure prototype chain is properly maintained
+    // Maintain the prototype chain for instanceof checks
     Object.setPrototypeOf(this, ApiError.prototype);
-  }
-
-  /**
-   * Determine if an error should be retried based on status code
-   */
-  private isRetryable(statusCode?: number): boolean {
-    if (!statusCode) return false;
     
-    // 5xx errors and specific 4xx errors may be retryable
-    return (
-      (statusCode >= 500 && statusCode < 600) || // Server errors
-      statusCode === 408 || // Request Timeout
-      statusCode === 429   // Too Many Requests
-    );
-  }
-
-  /**
-   * Get error severity based on status code
-   */
-  private getSeverityFromStatus(statusCode?: number): ErrorSeverity {
-    if (!statusCode) return ErrorSeverity.ERROR;
-    
-    if (statusCode >= 500) return ErrorSeverity.ERROR;
-    if (statusCode >= 400) return ErrorSeverity.WARNING;
-    return ErrorSeverity.INFO;
-  }
-
-  /**
-   * Determine if error is recoverable
-   */
-  private isRecoverable(statusCode?: number, code?: ApiErrorCode): boolean {
-    if (code === ApiErrorCode.NETWORK_ERROR) return true; // Network can recover
-    if (code === ApiErrorCode.TIMEOUT) return true; // Timeouts can be retried
-    if (code === ApiErrorCode.RATE_LIMITED) return true; // Rate limits pass eventually
-    
-    if (!statusCode) return false;
-    
-    // Most 4xx errors are not recoverable without user action
-    if (statusCode >= 400 && statusCode < 500) {
-      return statusCode === 401 || // Unauthorized (can log in again)
-             statusCode === 408 || // Timeout (can retry)
-             statusCode === 429;   // Rate limit (can wait and retry)
-    }
-    
-    // Most 5xx errors are potentially recoverable
-    return statusCode >= 500 && statusCode < 600;
-  }
-
-  /**
-   * Determine if user can take action to fix the error
-   */
-  private isUserActionable(statusCode?: number, code?: ApiErrorCode): boolean {
-    if (code === ApiErrorCode.NETWORK_ERROR) return true; // User can check connection
-    if (code === ApiErrorCode.VALIDATION_ERROR) return true; // User can fix input
-    
-    if (!statusCode) return false;
-    
-    // Most 4xx errors are user actionable
-    return statusCode >= 400 && statusCode < 500;
-  }
-
-  /**
-   * Get suggested action for the user
-   */
-  private getSuggestedAction(code?: ApiErrorCode, statusCode?: number): string | undefined {
-    switch (code) {
-      case ApiErrorCode.UNAUTHORIZED:
-        return 'Please log in again to continue.';
-      case ApiErrorCode.FORBIDDEN:
-        return 'You do not have permission for this action.';
-      case ApiErrorCode.NETWORK_ERROR:
-        return 'Please check your internet connection and try again.';
-      case ApiErrorCode.TIMEOUT:
-        return 'The request timed out. Please try again.';
-      case ApiErrorCode.RATE_LIMITED:
-        return 'You have made too many requests. Please wait a moment and try again.';
-      case ApiErrorCode.VALIDATION_ERROR:
-        return 'Please check your input and try again.';
-      default:
-        if (statusCode && statusCode >= 500) {
-          return 'There was a server error. Please try again later.';
-        }
-        return undefined;
+    // Add timestamp if not provided
+    if (!this.context.timestamp) {
+      this.context.timestamp = new Date().toISOString();
     }
   }
-
+  
   /**
-   * Convert any error to an ApiError
+   * Determine if this error should be retried
    */
-  static from(error: unknown, context?: ApiErrorContext): ApiError {
-    // If it's already an ApiError, enhance it with additional context if provided
-    if (error instanceof ApiError) {
-      if (context) {
-        return new ApiError(
-          error.message,
-          error.code,
-          error.statusCode || context.statusCode,
-          error.originalError,
-          { ...error.context, ...context } as ApiErrorContext
-        );
-      }
-      return error;
+  private isRetryable(): boolean {
+    // Network errors, timeouts, and certain server errors can be retried
+    if (
+      this.type === ApiErrorType.NETWORK ||
+      this.type === ApiErrorType.TIMEOUT ||
+      (this.type === ApiErrorType.SERVER && this.statusCode && this.statusCode >= 500 && this.statusCode !== 501)
+    ) {
+      return true;
     }
     
-    // Handle fetch Response objects
-    if (error instanceof Response) {
-      return new ApiError(
-        `HTTP Error: ${error.status} ${error.statusText}`,
-        ApiError.codeFromStatus(error.status),
-        error.status,
-        error,
-        {
-          ...context,
-          statusCode: error.status,
-          statusText: error.statusText,
-          endpoint: error.url
-        }
-      );
+    // Some rate limit errors can be retried after a delay
+    if (this.type === ApiErrorType.RATE_LIMIT) {
+      return true;
     }
     
-    // Handle standard errors
-    if (error instanceof Error) {
-      // Check for network errors
-      if (error.name === 'NetworkError' || error.message.includes('network')) {
-        return new ApiError(
-          'Network error: Unable to connect to the server',
-          ApiErrorCode.NETWORK_ERROR,
-          undefined,
-          error,
-          context
-        );
-      }
-      
-      // Check for abort errors
-      if (error.name === 'AbortError') {
-        return new ApiError(
-          'Request was aborted',
-          ApiErrorCode.ABORT_ERROR,
-          undefined,
-          error,
-          context
-        );
-      }
-      
-      // Generic error conversion
-      return new ApiError(
-        error.message,
-        ApiErrorCode.UNKNOWN,
-        context?.statusCode,
-        error,
-        context
-      );
+    // Offline errors can be queued for retry when online
+    if (this.type === ApiErrorType.OFFLINE) {
+      return true;
     }
     
-    // Handle string errors
-    if (typeof error === 'string') {
-      return new ApiError(
-        error,
-        ApiErrorCode.UNKNOWN,
-        context?.statusCode,
-        error,
-        context
-      );
-    }
-    
-    // Handle unknown errors
-    return new ApiError(
-      'Unknown API error',
-      ApiErrorCode.UNKNOWN,
-      context?.statusCode,
-      error,
-      context
-    );
+    return false;
   }
-
+  
   /**
-   * Convert HTTP status code to ApiErrorCode
+   * Get HTTP status category based on status code
    */
-  static codeFromStatus(status: number): ApiErrorCode {
-    switch (status) {
-      case 400: return ApiErrorCode.BAD_REQUEST;
-      case 401: return ApiErrorCode.UNAUTHORIZED;
-      case 403: return ApiErrorCode.FORBIDDEN;
-      case 404: return ApiErrorCode.NOT_FOUND;
-      case 405: return ApiErrorCode.METHOD_NOT_ALLOWED;
-      case 408: return ApiErrorCode.TIMEOUT;
-      case 409: return ApiErrorCode.CONFLICT;
-      case 412: return ApiErrorCode.PRECONDITION_FAILED;
-      case 413: return ApiErrorCode.PAYLOAD_TOO_LARGE;
-      case 429: return ApiErrorCode.RATE_LIMITED;
-      case 500: return ApiErrorCode.INTERNAL_SERVER_ERROR;
-      case 503: return ApiErrorCode.SERVICE_UNAVAILABLE;
-      case 504: return ApiErrorCode.GATEWAY_TIMEOUT;
-      default:
-        if (status >= 400 && status < 500) return ApiErrorCode.BAD_REQUEST;
-        if (status >= 500) return ApiErrorCode.INTERNAL_SERVER_ERROR;
-        return ApiErrorCode.UNKNOWN;
-    }
-  }
-
-  /**
-   * Get the HTTP status category from a status code
-   */
-  static categoryFromStatus(status: number): HttpStatusCategory {
-    if (status >= 100 && status < 200) return HttpStatusCategory.INFORMATIONAL;
+  private getStatusCategory(status: number): HttpStatusCategory {
+    if (status >= 100 && status < 200) return HttpStatusCategory.INFO;
     if (status >= 200 && status < 300) return HttpStatusCategory.SUCCESS;
     if (status >= 300 && status < 400) return HttpStatusCategory.REDIRECT;
     if (status >= 400 && status < 500) return HttpStatusCategory.CLIENT_ERROR;
     if (status >= 500 && status < 600) return HttpStatusCategory.SERVER_ERROR;
     return HttpStatusCategory.UNKNOWN;
   }
+  
+  /**
+   * Create a network error
+   */
+  static network(message: string, context?: ApiErrorContext, originalError?: Error): ApiError {
+    return new ApiError(
+      message || 'Network error occurred',
+      ApiErrorType.NETWORK,
+      undefined,
+      context,
+      'retry',
+      originalError
+    );
+  }
+  
+  /**
+   * Create a timeout error
+   */
+  static timeout(context?: ApiErrorContext, originalError?: Error): ApiError {
+    return new ApiError(
+      'Request timeout exceeded',
+      ApiErrorType.TIMEOUT,
+      408,
+      context,
+      'retry',
+      originalError
+    );
+  }
+  
+  /**
+   * Create an authentication error
+   */
+  static auth(message: string, statusCode?: number, context?: ApiErrorContext): ApiError {
+    return new ApiError(
+      message || 'Authentication failed',
+      ApiErrorType.AUTH,
+      statusCode || 401,
+      context,
+      'auth-refresh'
+    );
+  }
+  
+  /**
+   * Create a server error
+   */
+  static server(message: string, statusCode?: number, context?: ApiErrorContext): ApiError {
+    return new ApiError(
+      message || 'Server error occurred',
+      ApiErrorType.SERVER,
+      statusCode || 500,
+      context,
+      'retry'
+    );
+  }
+  
+  /**
+   * Create a client error
+   */
+  static client(message: string, statusCode?: number, context?: ApiErrorContext): ApiError {
+    return new ApiError(
+      message || 'Client error occurred',
+      ApiErrorType.CLIENT,
+      statusCode || 400,
+      context,
+      'none'
+    );
+  }
+  
+  /**
+   * Create a rate limit error
+   */
+  static rateLimit(retryAfter?: number, context?: ApiErrorContext): ApiError {
+    const errorContext = {
+      ...(context || {}),
+      retryAfter
+    };
+    
+    return new ApiError(
+      'Rate limit exceeded',
+      ApiErrorType.RATE_LIMIT,
+      429,
+      errorContext,
+      'retry'
+    );
+  }
+  
+  /**
+   * Create an offline error
+   */
+  static offline(context?: ApiErrorContext): ApiError {
+    return new ApiError(
+      'No internet connection',
+      ApiErrorType.OFFLINE,
+      undefined,
+      context,
+      'offline-queue'
+    );
+  }
+  
+  /**
+   * Create a validation error
+   */
+  static validation(message: string, fieldErrors?: Record<string, string[]>, context?: ApiErrorContext): ApiError {
+    const errorContext = {
+      ...(context || {}),
+      fieldErrors
+    };
+    
+    return new ApiError(
+      message || 'Validation failed',
+      ApiErrorType.VALIDATION,
+      422,
+      errorContext,
+      'none'
+    );
+  }
+  
+  /**
+   * Create an error from an HTTP response
+   */
+  static fromResponse(response: Response, responseData?: any, requestContext?: ApiErrorContext): ApiError {
+    const status = response.status;
+    const context = {
+      ...requestContext,
+      statusCode: status,
+      responseData,
+      method: requestContext?.method || 'GET',
+      endpoint: requestContext?.endpoint || response.url
+    };
+    
+    // Authentication errors
+    if (status === 401 || status === 403) {
+      return ApiError.auth(
+        responseData?.message || response.statusText || 'Authentication failed',
+        status,
+        context
+      );
+    }
+    
+    // Rate limiting
+    if (status === 429) {
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
+      return ApiError.rateLimit(retryAfter, context);
+    }
+    
+    // Server errors
+    if (status >= 500) {
+      return ApiError.server(
+        responseData?.message || response.statusText || 'Server error',
+        status,
+        context
+      );
+    }
+    
+    // Validation errors
+    if (status === 422 || status === 400) {
+      return ApiError.validation(
+        responseData?.message || response.statusText || 'Validation failed',
+        responseData?.errors || responseData?.fieldErrors,
+        context
+      );
+    }
+    
+    // Generic client errors for all other 4xx
+    if (status >= 400 && status < 500) {
+      return ApiError.client(
+        responseData?.message || response.statusText || 'Client error',
+        status,
+        context
+      );
+    }
+    
+    // Fallback for any other status codes
+    return new ApiError(
+      responseData?.message || response.statusText || 'Unknown error',
+      ApiErrorType.UNKNOWN,
+      status,
+      context,
+      'none'
+    );
+  }
+  
+  /**
+   * Convert from generic error
+   */
+  static fromError(error: Error, context?: ApiErrorContext): ApiError {
+    if (error instanceof ApiError) {
+      return error;
+    }
+    
+    // Network errors
+    if (
+      error.name === 'NetworkError' || 
+      error.message.includes('network') ||
+      error.message.includes('fetch')
+    ) {
+      return ApiError.network(error.message, context, error);
+    }
+    
+    // Timeout errors
+    if (
+      error.name === 'TimeoutError' ||
+      error.message.includes('timeout') ||
+      error.message.includes('timed out')
+    ) {
+      return ApiError.timeout(context, error);
+    }
+    
+    // Generic fallback
+    return new ApiError(
+      error.message,
+      ApiErrorType.UNKNOWN,
+      undefined,
+      context,
+      'none',
+      error
+    );
+  }
+  
+  /**
+   * Create a more user-friendly message for this error
+   */
+  getUserMessage(): string {
+    switch (this.type) {
+      case ApiErrorType.NETWORK:
+        return 'Network connection issue. Please check your internet connection and try again.';
+      
+      case ApiErrorType.OFFLINE:
+        return 'You appear to be offline. Your request will be sent when you reconnect.';
+      
+      case ApiErrorType.TIMEOUT:
+        return 'The request took too long to complete. Please try again.';
+      
+      case ApiErrorType.AUTH:
+        return 'You need to log in again to continue.';
+      
+      case ApiErrorType.RATE_LIMIT:
+        return 'Too many requests. Please wait a moment before trying again.';
+      
+      case ApiErrorType.SERVER:
+        return 'Something went wrong on our end. Our team has been notified. Please try again later.';
+      
+      case ApiErrorType.VALIDATION:
+        return this.message || 'Please check your input and try again.';
+      
+      case ApiErrorType.CLIENT:
+        return this.message || 'Please check your request and try again.';
+      
+      default:
+        return this.message || 'An unexpected error occurred. Please try again.';
+    }
+  }
+  
+  /**
+   * Generate a detailed log message for debugging
+   */
+  getLogDetails(): Record<string, any> {
+    return {
+      message: this.message,
+      type: this.type,
+      statusCode: this.statusCode,
+      statusCategory: this.statusCategory,
+      context: this.context,
+      recoveryStrategy: this.recoveryStrategy,
+      retryable: this.retryable,
+      originalError: this.originalError ? {
+        name: this.originalError.name,
+        message: this.originalError.message,
+        stack: this.originalError.stack
+      } : undefined
+    };
+  }
 }
+
+export default ApiError;

@@ -68,7 +68,7 @@ export function usePerformanceTracking(
         categories,
         isSlowRender: logSlowRenders && renderTime > 16.67, // 60fps threshold
         sessionUptime: Date.now() - sessionStartTime.current,
-        memoryUsage: trackMemory ? performance.memory?.usedJSHeapSize : undefined
+        memoryUsage: trackMemory && (performance as any).memory?.usedJSHeapSize
       });
     }
     
@@ -112,10 +112,11 @@ export function usePerformanceTracking(
   
   /**
    * Track a completed interaction
+   * Returns a function that can be called to track the end of the interaction
    */
   const trackInteraction = useCallback((interactionName: string) => {
-    return (metadata?: Record<string, unknown>) => {
-      if (!enabled || !trackInteractions) return () => {};
+    return () => {
+      if (!enabled || !trackInteractions) return;
       
       const startTime = performance.now();
       
@@ -126,7 +127,6 @@ export function usePerformanceTracking(
           interactionName,
           duration,
           {
-            ...metadata,
             categories
           }
         );
