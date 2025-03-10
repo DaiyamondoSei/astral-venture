@@ -1,4 +1,9 @@
 
+/**
+ * Re-export from PerformanceMonitor to provide consistent imports
+ * This helps avoid case sensitivity issues across different operating systems
+ */
+
 import { PerformanceMonitor, performanceMonitor, IComponentMetrics } from './PerformanceMonitor';
 import type { ComponentMetrics } from '@/services/ai/types';
 
