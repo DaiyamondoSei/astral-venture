@@ -221,8 +221,8 @@ const sendToAnalytics = async (rawMetric: unknown): Promise<void> => {
       return;
     }
     
-    // Track performance metric
-    const response = await fetch(`${supabase.getUrl()}/functions/v1/track-performance`, {
+    // Track performance metric using fetch API directly
+    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/track-performance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

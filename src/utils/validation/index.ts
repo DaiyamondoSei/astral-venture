@@ -1,11 +1,10 @@
 
 /**
- * Validation utilities index
- * Re-exports all validation utilities for easier imports
+ * Re-export all validation functions and types for easy importing
  */
-
-// Runtime validation (simpler validation functions)
 export * from './runtimeValidation';
-
-// Type validation (more comprehensive type checking)
 export * from './runtimeTypeValidation';
+
+// Export validation utilities in a default object for convenience
+import * as validationUtils from './runtimeValidation';
+export default validationUtils;

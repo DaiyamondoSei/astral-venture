@@ -1,8 +1,6 @@
 
-import { handleError, ErrorCategory, ErrorSeverity } from '../errorHandling';
-
 /**
- * Error thrown when validation fails
+ * Custom validation error class
  */
 export class ValidationError extends Error {
   constructor(message: string) {
@@ -52,21 +50,6 @@ export function validateString(value: unknown, name: string): string {
 export function validateNumber(value: unknown, name: string): number {
   if (typeof value !== 'number' || isNaN(value)) {
     throw new ValidationError(`${name} must be a number`);
-  }
-  return value;
-}
-
-/**
- * Validates that a value is a boolean
- * 
- * @param value - The value to check
- * @param name - Name of the field for error messages
- * @returns The validated boolean
- * @throws ValidationError if validation fails
- */
-export function validateBoolean(value: unknown, name: string): boolean {
-  if (typeof value !== 'boolean') {
-    throw new ValidationError(`${name} must be a boolean`);
   }
   return value;
 }
@@ -133,59 +116,5 @@ export function composeValidators<T>(
       (result, validator) => validator(result),
       value
     ) as T;
-  };
-}
-
-/**
- * Validates an email address format
- * 
- * @param value - The value to check
- * @param name - Name of the field for error messages
- * @returns The validated email string
- * @throws ValidationError if validation fails
- */
-export function validateEmail(value: unknown, name: string): string {
-  const email = validateString(value, name);
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
-  if (!emailRegex.test(email)) {
-    throw new ValidationError(`${name} must be a valid email address`);
-  }
-  
-  return email;
-}
-
-/**
- * Creates a safe validation function that catches and handles validation errors
- * 
- * @param validationFn - The validation function to wrap
- * @param defaultValue - Default value to return on validation failure
- * @returns A function that performs validation but never throws
- */
-export function createSafeValidator<T, R>(
-  validationFn: (value: T) => R,
-  defaultValue: R
-): (value: T) => R {
-  return (value: T): R => {
-    try {
-      return validationFn(value);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        handleError(error, {
-          category: ErrorCategory.VALIDATION,
-          severity: ErrorSeverity.WARNING,
-          context: 'Data Validation',
-          showToast: false
-        });
-      } else {
-        handleError(error, {
-          category: ErrorCategory.UNEXPECTED,
-          severity: ErrorSeverity.ERROR,
-          context: 'Validation System',
-          showToast: false
-        });
-      }
-      return defaultValue;
-    }
   };
 }

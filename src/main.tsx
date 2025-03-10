@@ -40,6 +40,7 @@ const rootElement = document.getElementById('root');
 if (!rootElement) {
   console.error('Root element not found');
 } else {
+  // Render the app with a single BrowserRouter
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
