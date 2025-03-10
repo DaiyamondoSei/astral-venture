@@ -1,31 +1,82 @@
 
-// Define supported AI models
-export type AIModel = "gpt-4o" | "gpt-4o-mini" | "gpt-3.5-turbo";
+/**
+ * Supported OpenAI models
+ */
+export type AIModel = 
+  | "gpt-3.5-turbo"
+  | "gpt-4o-mini"
+  | "gpt-4o";
 
-// Types for content moderation
+/**
+ * Content moderation categories from OpenAI
+ */
 export type ContentModerationType = 
-  | "sexual" 
-  | "hate" 
-  | "harassment" 
-  | "self-harm" 
-  | "violence" 
-  | "graphic";
+  | "hate"
+  | "hate/threatening"
+  | "harassment"
+  | "harassment/threatening"
+  | "self-harm"
+  | "self-harm/intent"
+  | "self-harm/instructions"
+  | "sexual"
+  | "sexual/minors"
+  | "violence"
+  | "violence/graphic";
 
-// Chat completion metrics
-export interface ChatMetrics {
-  model: string;
-  totalTokens: number;
-  promptTokens?: number;
-  completionTokens?: number;
+/**
+ * Response format configuration
+ */
+export type ResponseFormat = 
+  | { type: "text" }
+  | { type: "json_object" };
+
+/**
+ * AI request options
+ */
+export interface AIRequestOptions {
+  model?: AIModel;
+  temperature?: number;
+  maxTokens?: number;
+  stream?: boolean;
+  user?: string;
+  responseFormat?: ResponseFormat;
 }
 
-// Chat completion options
-export interface ChatOptions {
-  model?: AIModel;
-  stream?: boolean;
-  temperature?: number;
-  max_tokens?: number;
-  presence_penalty?: number;
-  frequency_penalty?: number;
-  top_p?: number;
+/**
+ * AI completion metrics
+ */
+export interface CompletionMetrics {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  latency: number;
+}
+
+/**
+ * AI chat message
+ */
+export interface ChatMessage {
+  role: "system" | "user" | "assistant" | "function";
+  content: string;
+  name?: string;
+}
+
+/**
+ * AI completion response
+ */
+export interface ChatCompletionResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: {
+    index: number;
+    message: ChatMessage;
+    finish_reason: "stop" | "length" | "content_filter" | "function_call";
+  }[];
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }

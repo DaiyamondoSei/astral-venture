@@ -16,6 +16,9 @@ interface LayoutProps {
   removeBackground?: boolean;
 }
 
+/**
+ * Layout component with performance tracking and flexible content width
+ */
 const Layout: React.FC<LayoutProps> = ({ 
   children, 
   className,
@@ -56,8 +59,8 @@ const Layout: React.FC<LayoutProps> = ({
       role="main"
       onClick={handleLayoutClick}
     >
-      {/* Always show simple fallback */}
-      <SimpleFallbackBackground />
+      {/* Only show background if not explicitly removed */}
+      {!removeBackground && <SimpleFallbackBackground />}
       
       {/* Main content with improved spacing and z-indexing */}
       <main className={cn(

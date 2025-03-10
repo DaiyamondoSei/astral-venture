@@ -1,12 +1,12 @@
 
 import { useContext } from 'react';
-import AuthContext, { IAuthContext } from '@/contexts/AuthContext';
+import { AuthContext, IAuthContext } from '@/contexts/AuthContext';
 
 /**
- * Primary hook for accessing auth context with full type safety
+ * Hook to access authentication context
  * 
- * @returns Auth context with complete typing
- * @throws Error if used outside AuthProvider
+ * This is the recommended way to access authentication state
+ * and methods throughout the application.
  */
 export function useAuth(): IAuthContext {
   const context = useContext(AuthContext);

@@ -1,10 +1,11 @@
 
 import { useAuth as useAuthHook } from '@/hooks/auth/useAuth';
+import type { IAuthContext } from '@/contexts/AuthContext';
 
 /**
  * @deprecated Import from "@/hooks/auth" instead for better organization and type safety.
  */
-export function useAuth() {
+export function useAuth(): IAuthContext {
   console.warn(
     '[Deprecation Warning] Importing from "useAuth.tsx" is deprecated. ' +
     'Please import from "@/hooks/auth" instead for better organization and type safety.'
