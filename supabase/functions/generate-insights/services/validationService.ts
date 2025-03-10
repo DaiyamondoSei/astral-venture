@@ -1,5 +1,12 @@
 
 /**
+ * Comprehensive validation utilities for Edge Functions
+ * 
+ * This module provides validation utilities for edge function requests and data,
+ * with structured error handling and detailed error messages.
+ */
+
+/**
  * Validation error class for edge functions
  */
 export class ValidationError extends Error {
@@ -32,13 +39,22 @@ export class ValidationError extends Error {
 }
 
 /**
- * Validate reflections data
+ * Result type for validation operations
  */
-export function validateReflectionsData(reflections: any[]): {
+export interface ValidationResult<T = undefined> {
   isValid: boolean;
   errorMessage?: string;
   error?: ValidationError;
-} {
+  validatedData?: T;
+}
+
+/**
+ * Validate reflections data
+ * 
+ * @param reflections - The reflections array to validate
+ * @returns Validation result
+ */
+export function validateReflectionsData(reflections: any[]): ValidationResult {
   try {
     if (!Array.isArray(reflections)) {
       throw new ValidationError("Reflections must be an array", {
@@ -100,7 +116,7 @@ export function validateReflectionsData(reflections: any[]): {
       }
     });
     
-    return { isValid: true };
+    return { isValid: true, validatedData: reflections };
   } catch (error) {
     if (error instanceof ValidationError) {
       return { 
@@ -119,15 +135,15 @@ export function validateReflectionsData(reflections: any[]): {
 
 /**
  * Validate user ID
+ * 
+ * @param requestUserId - User ID from the request
+ * @param authenticatedUserId - User ID from authentication
+ * @returns Validation result
  */
 export function validateUserId(
   requestUserId: string,
   authenticatedUserId: string
-): {
-  isValid: boolean;
-  errorMessage?: string;
-  error?: ValidationError;
-} {
+): ValidationResult {
   try {
     if (!requestUserId) {
       throw new ValidationError("Missing user ID", {
@@ -152,7 +168,7 @@ export function validateUserId(
       });
     }
     
-    return { isValid: true };
+    return { isValid: true, validatedData: requestUserId };
   } catch (error) {
     if (error instanceof ValidationError) {
       return { 
@@ -170,7 +186,44 @@ export function validateUserId(
 }
 
 /**
+ * Safe validation wrapper for any validation function
+ * 
+ * @param validator - Function that may throw ValidationError
+ * @param value - Value to validate
+ * @param errorMessage - Optional custom error message
+ * @returns Validation result
+ */
+export function safeValidate<T, R>(
+  validator: (value: T) => R,
+  value: T,
+  errorMessage?: string
+): ValidationResult<R> {
+  try {
+    const validatedData = validator(value);
+    return { isValid: true, validatedData };
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { 
+        isValid: false, 
+        errorMessage: errorMessage || error.message,
+        error
+      };
+    }
+    
+    return { 
+      isValid: false, 
+      errorMessage: errorMessage || (error instanceof Error ? error.message : String(error))
+    };
+  }
+}
+
+/**
  * Validates that a value is defined (not null or undefined)
+ * 
+ * @param value - Value to validate
+ * @param fieldName - Field name for error message
+ * @returns The validated value
+ * @throws ValidationError if validation fails
  */
 export function validateDefined<T>(value: T | null | undefined, fieldName: string): T {
   if (value === undefined || value === null) {
@@ -184,6 +237,11 @@ export function validateDefined<T>(value: T | null | undefined, fieldName: strin
 
 /**
  * Validates that a value is a string
+ * 
+ * @param value - Value to validate
+ * @param fieldName - Field name for error message
+ * @returns The validated string
+ * @throws ValidationError if validation fails
  */
 export function validateString(value: unknown, fieldName: string): string {
   if (typeof value !== 'string') {
@@ -197,6 +255,11 @@ export function validateString(value: unknown, fieldName: string): string {
 
 /**
  * Validates that a value is a number
+ * 
+ * @param value - Value to validate
+ * @param fieldName - Field name for error message
+ * @returns The validated number
+ * @throws ValidationError if validation fails
  */
 export function validateNumber(value: unknown, fieldName: string): number {
   if (typeof value !== 'number' || isNaN(value)) {
@@ -210,6 +273,11 @@ export function validateNumber(value: unknown, fieldName: string): number {
 
 /**
  * Validates that a value is a boolean
+ * 
+ * @param value - Value to validate
+ * @param fieldName - Field name for error message
+ * @returns The validated boolean
+ * @throws ValidationError if validation fails
  */
 export function validateBoolean(value: unknown, fieldName: string): boolean {
   if (typeof value !== 'boolean') {
@@ -223,6 +291,12 @@ export function validateBoolean(value: unknown, fieldName: string): boolean {
 
 /**
  * Validates that a value is one of the allowed values
+ * 
+ * @param value - Value to validate
+ * @param allowedValues - Array of allowed values
+ * @param fieldName - Field name for error message
+ * @returns The validated value
+ * @throws ValidationError if validation fails
  */
 export function validateOneOf<T>(value: unknown, allowedValues: T[], fieldName: string): T {
   if (!allowedValues.includes(value as T)) {
@@ -242,6 +316,12 @@ export function validateOneOf<T>(value: unknown, allowedValues: T[], fieldName: 
 
 /**
  * Validates that a value matches a specific format using regex
+ * 
+ * @param value - Value to validate
+ * @param pattern - Regular expression pattern
+ * @param fieldName - Field name for error message
+ * @returns The validated string
+ * @throws ValidationError if validation fails
  */
 export function validateFormat(value: unknown, pattern: RegExp, fieldName: string): string {
   const strValue = validateString(value, fieldName);
@@ -258,6 +338,11 @@ export function validateFormat(value: unknown, pattern: RegExp, fieldName: strin
 
 /**
  * Validates an ISO date string
+ * 
+ * @param value - Value to validate
+ * @param fieldName - Field name for error message
+ * @returns The validated date string
+ * @throws ValidationError if validation fails
  */
 export function validateDateString(value: unknown, fieldName: string): string {
   const strValue = validateString(value, fieldName);
@@ -274,4 +359,70 @@ export function validateDateString(value: unknown, fieldName: string): string {
       details: { field: fieldName, value: strValue }
     });
   }
+}
+
+/**
+ * Creates a composed validator that runs multiple validations
+ * 
+ * @param validators - Array of validator functions to run
+ * @returns A function that runs all validators in sequence
+ */
+export function composeValidators<T>(
+  ...validators: Array<(value: unknown) => unknown>
+): (value: unknown) => T {
+  return (value: unknown) => {
+    return validators.reduce(
+      (result, validator) => validator(result),
+      value
+    ) as T;
+  };
+}
+
+/**
+ * Validation helper for partial updates
+ * 
+ * @param value - Object to validate
+ * @param validators - Record of field validators
+ * @returns Validated object
+ * @throws ValidationError if validation fails
+ */
+export function validatePartialUpdate<T extends Record<string, unknown>>(
+  value: unknown,
+  validators: Partial<Record<keyof T, (val: unknown) => unknown>>
+): Partial<T> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ValidationError('Expected an object for partial update', {
+      code: "INVALID_TYPE",
+      details: { expected: "object", received: typeof value }
+    });
+  }
+  
+  const result: Partial<T> = {};
+  const errors: Record<string, string> = {};
+  let hasErrors = false;
+  
+  for (const [key, fieldValue] of Object.entries(value)) {
+    const validator = validators[key as keyof T];
+    
+    if (validator) {
+      try {
+        result[key as keyof T] = validator(fieldValue) as T[keyof T];
+      } catch (error) {
+        errors[key] = error instanceof Error ? error.message : String(error);
+        hasErrors = true;
+      }
+    } else {
+      // No validator for this field, include as-is
+      result[key as keyof T] = fieldValue as T[keyof T];
+    }
+  }
+  
+  if (hasErrors) {
+    throw new ValidationError('Invalid fields in update', {
+      code: "INVALID_UPDATE_FIELDS",
+      details: { errors }
+    });
+  }
+  
+  return result;
 }

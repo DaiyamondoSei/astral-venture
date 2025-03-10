@@ -2,179 +2,310 @@
 import { ValidationError } from './runtimeValidation';
 
 /**
+ * Type for schema validator functions
+ */
+export type ValidatorFn<T> = (value: unknown) => T;
+
+/**
  * Schema validation options
  */
 export interface SchemaValidationOptions {
-  /** Whether to allow unknown properties */
-  allowUnknown?: boolean;
-  /** Whether to strip unknown properties */
+  /**
+   * Whether to strip unknown properties from objects
+   */
   stripUnknown?: boolean;
-  /** Context for validation (passed to custom validators) */
-  context?: Record<string, unknown>;
+  
+  /**
+   * Additional context for error messages
+   */
+  context?: string;
 }
 
 /**
- * Result of a validation operation
- */
-export interface ValidationResult<T> {
-  /** Whether validation succeeded */
-  success: boolean;
-  /** Validated and potentially transformed data */
-  data?: T;
-  /** Validation errors if any */
-  errors?: ValidationError[];
-}
-
-/**
- * Validator definition for schema properties
- */
-export type PropertyValidator = (value: unknown, name: string) => unknown;
-
-/**
- * Schema definition for object validation
- */
-export type Schema = Record<string, PropertyValidator>;
-
-/**
- * Validates an object against a schema and returns a structured result
+ * Creates a schema validator for an object
  * 
- * @param data - Data to validate
- * @param schema - Schema to validate against
+ * @param schema - Object with property validators
  * @param options - Validation options
- * @returns Validation result with data or errors
- * 
- * @example
- * const userSchema = {
- *   name: validateString,
- *   age: (v) => validateMin(validateNumber(v, 'age'), 18, 'age')
- * };
- * 
- * const result = validateSchema({ name: 'Alice', age: 25 }, userSchema);
- * if (result.success) {
- *   // result.data is typed correctly
- *   console.log(result.data.name);
- * }
+ * @returns A validator function for the schema
  */
-export function validateSchema<T extends Record<string, unknown>>(
-  data: unknown,
-  schema: Record<keyof T, PropertyValidator>,
+export function objectSchema<T>(
+  schema: Record<string, ValidatorFn<any>>,
   options: SchemaValidationOptions = {}
-): ValidationResult<T> {
-  // Handle non-object data
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-    return {
-      success: false,
-      errors: [new ValidationError('Data must be an object')]
-    };
-  }
-
-  const validatedData: Record<string, unknown> = {};
-  const errors: ValidationError[] = [];
-  const unknownProps: string[] = [];
-  
-  // Check required properties and validate them
-  for (const [key, validator] of Object.entries(schema)) {
-    try {
-      const value = (data as Record<string, unknown>)[key];
-      validatedData[key] = validator(value, key);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        errors.push(error);
-      } else {
-        errors.push(new ValidationError(`${key}: ${error instanceof Error ? error.message : String(error)}`));
-      }
+): ValidatorFn<T> {
+  return (value: unknown): T => {
+    if (typeof value !== 'object' || value === null) {
+      throw new ValidationError('Expected an object', {
+        code: 'INVALID_TYPE',
+        details: { expected: 'object', received: typeof value }
+      });
     }
-  }
-  
-  // Check for unknown properties
-  if (!options.allowUnknown) {
-    for (const key of Object.keys(data as Record<string, unknown>)) {
-      if (!(key in schema)) {
-        unknownProps.push(key);
+    
+    const result: Record<string, any> = {};
+    const valueObj = value as Record<string, unknown>;
+    const errors: Record<string, string> = {};
+    let hasErrors = false;
+    
+    // Validate each field according to schema
+    for (const [key, validator] of Object.entries(schema)) {
+      try {
+        if (key in valueObj) {
+          result[key] = validator(valueObj[key]);
+        } else {
+          // Field missing from input
+          errors[key] = 'Field is required';
+          hasErrors = true;
+        }
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          errors[key] = error.message;
+        } else {
+          errors[key] = error instanceof Error ? error.message : String(error);
+        }
+        hasErrors = true;
       }
     }
     
-    if (unknownProps.length > 0) {
-      errors.push(new ValidationError(`Unknown properties: ${unknownProps.join(', ')}`));
-    }
-  } else if (options.stripUnknown) {
-    // If not stripping, we'd copy all properties
-    for (const key of Object.keys(data as Record<string, unknown>)) {
-      if (key in schema) {
-        // Already validated
-        continue;
+    // Include non-schema fields if not stripping unknown properties
+    if (!options.stripUnknown) {
+      for (const key of Object.keys(valueObj)) {
+        if (!(key in schema)) {
+          result[key] = valueObj[key];
+        }
       }
-      // Skip unknown properties when stripping
     }
-  } else {
-    // Copy unknown properties when allowUnknown but not stripping
-    for (const key of Object.keys(data as Record<string, unknown>)) {
-      if (key in schema) {
-        // Already validated
-        continue;
-      }
-      validatedData[key] = (data as Record<string, unknown>)[key];
-    }
-  }
-  
-  if (errors.length > 0) {
-    return { success: false, errors };
-  }
-  
-  return { success: true, data: validatedData as T };
-}
-
-/**
- * Validates an array of items against a schema
- * 
- * @param data - Array to validate
- * @param itemSchema - Schema for each item
- * @param options - Validation options
- * @returns Validation result with data or errors
- */
-export function validateArray<T extends Record<string, unknown>>(
-  data: unknown,
-  itemSchema: Record<keyof T, PropertyValidator>,
-  options: SchemaValidationOptions = {}
-): ValidationResult<T[]> {
-  if (!Array.isArray(data)) {
-    return {
-      success: false,
-      errors: [new ValidationError('Data must be an array')]
-    };
-  }
-  
-  const validatedItems: T[] = [];
-  const errors: ValidationError[] = [];
-  
-  data.forEach((item, index) => {
-    const result = validateSchema<T>(item, itemSchema, options);
-    if (result.success && result.data) {
-      validatedItems.push(result.data);
-    } else if (result.errors) {
-      result.errors.forEach(error => {
-        errors.push(new ValidationError(`Item at index ${index}: ${error.message}`));
+    
+    // If there were validation errors, throw with details
+    if (hasErrors) {
+      const contextPrefix = options.context ? `${options.context}: ` : '';
+      throw new ValidationError(`${contextPrefix}Invalid object data`, {
+        code: 'INVALID_OBJECT',
+        details: { errors }
       });
     }
-  });
-  
-  if (errors.length > 0) {
-    return { success: false, errors };
-  }
-  
-  return { success: true, data: validatedItems };
+    
+    return result as T;
+  };
 }
 
 /**
- * Creates a validator for API responses
+ * Creates a schema validator for an array of items
  * 
- * @param schema - Schema to validate against
- * @returns Function that validates API response data
+ * @param itemValidator - Validator for each array item
+ * @param options - Validation options
+ * @returns A validator function for an array
  */
-export function createApiValidator<T extends Record<string, unknown>>(
-  schema: Record<keyof T, PropertyValidator>
-) {
-  return (data: unknown): ValidationResult<T> => {
-    return validateSchema<T>(data, schema, { allowUnknown: true });
+export function arraySchema<T>(
+  itemValidator: ValidatorFn<T>,
+  options: SchemaValidationOptions = {}
+): ValidatorFn<T[]> {
+  return (value: unknown): T[] => {
+    if (!Array.isArray(value)) {
+      throw new ValidationError('Expected an array', {
+        code: 'INVALID_TYPE',
+        details: { expected: 'array', received: typeof value }
+      });
+    }
+    
+    const result: T[] = [];
+    const errors: Record<number, string> = {};
+    let hasErrors = false;
+    
+    // Validate each item in the array
+    value.forEach((item, index) => {
+      try {
+        result.push(itemValidator(item));
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          errors[index] = error.message;
+        } else {
+          errors[index] = error instanceof Error ? error.message : String(error);
+        }
+        hasErrors = true;
+      }
+    });
+    
+    // If there were validation errors, throw with details
+    if (hasErrors) {
+      const contextPrefix = options.context ? `${options.context}: ` : '';
+      throw new ValidationError(`${contextPrefix}Invalid array items`, {
+        code: 'INVALID_ARRAY_ITEMS',
+        details: { errors }
+      });
+    }
+    
+    return result;
+  };
+}
+
+/**
+ * Creates a validator that handles null or undefined values
+ * 
+ * @param validator - The validator to use if value is defined
+ * @param defaultValue - Optional default value to use if input is null/undefined
+ * @returns A validator function that handles null/undefined
+ */
+export function optional<T>(
+  validator: ValidatorFn<T>,
+  defaultValue?: T
+): ValidatorFn<T | undefined> {
+  return (value: unknown): T | undefined => {
+    if (value === null || value === undefined) {
+      return defaultValue;
+    }
+    return validator(value);
+  };
+}
+
+/**
+ * Creates a validator for string values
+ * 
+ * @param options - Optional constraints
+ * @returns A validator function for strings
+ */
+export function string(options: {
+  minLength?: number;
+  maxLength?: number;
+  pattern?: RegExp;
+  patternMessage?: string;
+} = {}): ValidatorFn<string> {
+  return (value: unknown): string => {
+    if (typeof value !== 'string') {
+      throw new ValidationError('Expected a string', {
+        code: 'INVALID_TYPE',
+        details: { expected: 'string', received: typeof value }
+      });
+    }
+    
+    if (options.minLength !== undefined && value.length < options.minLength) {
+      throw new ValidationError(`Must be at least ${options.minLength} characters long`, {
+        code: 'STRING_TOO_SHORT',
+        details: { minLength: options.minLength, actual: value.length }
+      });
+    }
+    
+    if (options.maxLength !== undefined && value.length > options.maxLength) {
+      throw new ValidationError(`Must be at most ${options.maxLength} characters long`, {
+        code: 'STRING_TOO_LONG',
+        details: { maxLength: options.maxLength, actual: value.length }
+      });
+    }
+    
+    if (options.pattern !== undefined && !options.pattern.test(value)) {
+      const message = options.patternMessage || 'Does not match required pattern';
+      throw new ValidationError(message, {
+        code: 'PATTERN_MISMATCH',
+        details: { pattern: options.pattern.toString() }
+      });
+    }
+    
+    return value;
+  };
+}
+
+/**
+ * Creates a validator for number values
+ * 
+ * @param options - Optional constraints
+ * @returns A validator function for numbers
+ */
+export function number(options: {
+  min?: number;
+  max?: number;
+  integer?: boolean;
+} = {}): ValidatorFn<number> {
+  return (value: unknown): number => {
+    if (typeof value !== 'number' || isNaN(value)) {
+      throw new ValidationError('Expected a number', {
+        code: 'INVALID_TYPE',
+        details: { expected: 'number', received: typeof value }
+      });
+    }
+    
+    if (options.integer && !Number.isInteger(value)) {
+      throw new ValidationError('Must be an integer', {
+        code: 'NOT_INTEGER',
+        details: { value }
+      });
+    }
+    
+    if (options.min !== undefined && value < options.min) {
+      throw new ValidationError(`Must be at least ${options.min}`, {
+        code: 'NUMBER_TOO_SMALL',
+        details: { min: options.min, actual: value }
+      });
+    }
+    
+    if (options.max !== undefined && value > options.max) {
+      throw new ValidationError(`Must be at most ${options.max}`, {
+        code: 'NUMBER_TOO_LARGE',
+        details: { max: options.max, actual: value }
+      });
+    }
+    
+    return value;
+  };
+}
+
+/**
+ * Creates a validator for boolean values
+ * 
+ * @returns A validator function for booleans
+ */
+export function boolean(): ValidatorFn<boolean> {
+  return (value: unknown): boolean => {
+    if (typeof value !== 'boolean') {
+      throw new ValidationError('Expected a boolean', {
+        code: 'INVALID_TYPE',
+        details: { expected: 'boolean', received: typeof value }
+      });
+    }
+    return value;
+  };
+}
+
+/**
+ * Creates a validator that ensures a value is one of the specified values
+ * 
+ * @param allowedValues - Array of allowed values
+ * @returns A validator function for the enum
+ */
+export function enumValue<T extends string | number>(allowedValues: readonly T[]): ValidatorFn<T> {
+  return (value: unknown): T => {
+    if (!allowedValues.includes(value as T)) {
+      throw new ValidationError(
+        `Must be one of: ${allowedValues.join(', ')}`, {
+          code: 'INVALID_ENUM',
+          details: { allowedValues, received: value }
+        }
+      );
+    }
+    return value as T;
+  };
+}
+
+/**
+ * Creates a validator that allows a value to match any of the given validators
+ * 
+ * @param validators - Array of possible validators
+ * @returns A validator function that tries each validator
+ */
+export function union<T extends any[]>(
+  validators: { [K in keyof T]: ValidatorFn<T[K]> }
+): ValidatorFn<T[number]> {
+  return (value: unknown): T[number] => {
+    const errors: string[] = [];
+    
+    for (const validator of validators) {
+      try {
+        return validator(value);
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    
+    throw new ValidationError(`Value did not match any allowed types`, {
+      code: 'UNION_TYPE_MISMATCH',
+      details: { errors }
+    });
   };
 }
