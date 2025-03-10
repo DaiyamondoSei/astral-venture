@@ -1,6 +1,15 @@
 
-import { extractInsights, trackUsage } from "../services/insightExtractor.ts";
+import { corsHeaders } from "../../shared/responseUtils.ts";
+import { extractInsights } from "../services/insights/patternMatcher.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+/**
+ * Insight type with content
+ */
+interface Insight {
+  type: string;
+  content: string;
+}
 
 /**
  * Process and enrich AI responses with extracted insights
@@ -21,15 +30,24 @@ export async function processAIResponse(
       await storeReflectionInsights(reflectionId, insights);
     }
     
+    // Calculate processing time
+    const processingTime = Date.now() - startTime;
+    
     // Create success response
     const response = new Response(
       JSON.stringify({
         response: aiResponse,
         insights: insights,
+        metrics: {
+          processingTime,
+          model,
+          tokensUsed
+        },
         processed: true
       }),
       {
         headers: {
+          ...corsHeaders,
           "Content-Type": "application/json",
           "Cache-Control": "max-age=300"
         }
@@ -37,16 +55,9 @@ export async function processAIResponse(
     );
     
     // Track usage metrics asynchronously (don't await)
-    const processingTime = Date.now() - startTime;
-    trackUsage(createSupabaseClient(), "system", {
-      model,
-      tokensUsed,
-      queryType: reflectionId ? "reflection_analysis" : "general_query",
-      processingTime,
-      answerLength: aiResponse.length,
-      insightsCount: insights.length,
-      metadata: { reflectionId }
-    });
+    EdgeRuntime.waitUntil(
+      trackUsage(model, tokensUsed, reflectionId, processingTime, insights.length, aiResponse.length)
+    );
     
     return response;
   } catch (error) {
@@ -62,6 +73,7 @@ export async function processAIResponse(
       }),
       {
         headers: {
+          ...corsHeaders,
           "Content-Type": "application/json"
         }
       }
@@ -72,7 +84,7 @@ export async function processAIResponse(
 /**
  * Store extracted insights for a reflection
  */
-async function storeReflectionInsights(reflectionId: string, insights: any[]): Promise<void> {
+async function storeReflectionInsights(reflectionId: string, insights: Insight[]): Promise<void> {
   try {
     const supabaseClient = createSupabaseClient();
     
@@ -103,6 +115,36 @@ async function storeReflectionInsights(reflectionId: string, insights: any[]): P
     }
   } catch (error) {
     console.error("Failed to store reflection insights:", error);
+  }
+}
+
+/**
+ * Track API usage for analytics and billing
+ */
+async function trackUsage(
+  model: string,
+  tokensUsed: number,
+  reflectionId: string | null,
+  processingTime: number,
+  insightsCount: number,
+  responseLength: number
+): Promise<void> {
+  try {
+    const supabaseClient = createSupabaseClient();
+    
+    await supabaseClient
+      .from("ai_interaction_logs")
+      .insert({
+        model,
+        tokens_used: tokensUsed,
+        query_type: reflectionId ? "reflection_analysis" : "general_query",
+        processing_time: processingTime,
+        insights_generated: insightsCount,
+        response_length: responseLength,
+        reflection_id: reflectionId
+      });
+  } catch (error) {
+    console.error("Failed to track usage:", error);
   }
 }
 

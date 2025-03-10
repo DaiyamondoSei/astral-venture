@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
 import { 
   corsHeaders, 
@@ -9,16 +8,15 @@ import {
   createErrorResponse, 
   ErrorCode,
   handleCorsRequest,
-  validateRequiredParameters,
-  validateParameterTypes
+  validateRequiredParameters
 } from "../shared/responseUtils.ts";
 
 import { withAuth, createAdminClient } from "../shared/authUtils.ts";
-import { fetchUserContext, buildContextualizedPrompt } from "./handlers/contextHandler.ts";
-import { createInsightPrompt, createEmotionalAnalysisPrompt } from "./utils/promptUtils.ts";
-import { generateChatResponse, selectOptimalModel } from "./services/openai/index.ts";
+import { fetchContextData, buildRichContext } from "./handlers/contextHandler.ts";
+import { callOpenAI, processOpenAIResponse } from "./handlers/openaiHandler.ts";
 import { processAIResponse } from "./handlers/aiResponseHandler.ts";
 import { getCachedResponse, cacheResponse } from "./handlers/cacheHandler.ts";
+import { createCacheKey } from "../shared/cacheUtils.ts";
 
 // Main entry point for edge function
 serve(async (req: Request) => {
@@ -56,12 +54,25 @@ async function handleRequest(user: any, req: Request): Promise<Response> {
     }
     
     // Extract optional parameters
-    const { reflectionId, reflectionContent, cacheKey } = requestData;
+    const { 
+      reflectionId, 
+      reflectionContent, 
+      model = "gpt-4o-mini",
+      temperature = 0.7,
+      maxTokens = 1000,
+      stream = false,
+      useCache = true,
+      cacheKey: userProvidedCacheKey
+    } = requestData;
 
-    // Check if we have a cached response
-    if (cacheKey) {
+    // Generate cache key if not provided
+    const cacheKey = userProvidedCacheKey || 
+      createCacheKey(query, reflectionContent || null, model);
+
+    // Check cache if enabled
+    if (useCache) {
       console.log(`Checking cache for key: ${cacheKey}`);
-      const cachedResponse = await getCachedResponse(cacheKey, false);
+      const cachedResponse = await getCachedResponse(cacheKey, stream);
       if (cachedResponse) {
         console.log(`Cache hit for key: ${cacheKey}`);
         return cachedResponse;
@@ -69,74 +80,130 @@ async function handleRequest(user: any, req: Request): Promise<Response> {
       console.log(`Cache miss for key: ${cacheKey}`);
     }
 
-    // Fetch user context
+    // Get OpenAI API key
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      return createErrorResponse(
+        ErrorCode.CONFIGURATION_ERROR,
+        "OpenAI API key is not configured",
+        { detail: "Missing API key in environment" },
+        500
+      );
+    }
+
+    // Fetch user context for more relevant responses
     console.log(`Fetching context for user: ${user.id}`);
-    const userContext = await fetchUserContext(user.id);
+    const userContext = await fetchContextData(
+      createAdminClient(),
+      user.id,
+      reflectionId
+    );
     
     // Build the prompt based on the query type
-    let prompt = query;
-    let systemPrompt = "You are a helpful AI assistant specialized in consciousness, meditation, and personal growth.";
+    let contextualizedPrompt = query;
     
-    // If this is a reflection analysis
+    // If this is a reflection analysis, we need special handling
     if (reflectionContent) {
-      console.log("Building emotional analysis prompt");
-      prompt = createEmotionalAnalysisPrompt(reflectionContent);
-      systemPrompt += " You provide empathetic, insightful analysis of emotional reflections.";
-    } else {
-      // For general queries, build a contextualized prompt
-      console.log("Building contextualized prompt");
-      prompt = buildContextualizedPrompt(query, userContext);
+      console.log("Building analysis prompt for reflection");
+      contextualizedPrompt = `Please analyze this personal reflection: "${reflectionContent}"`;
     }
     
-    // Determine the optimal model for this query
-    const model = selectOptimalModel(prompt);
-    console.log(`Selected model: ${model} for query`);
-    
-    // Generate response from OpenAI
-    console.log("Generating OpenAI response");
-    const { content: aiResponse, metrics } = await generateChatResponse(
-      prompt,
-      systemPrompt,
-      { model }
+    // Create rich context for the AI request
+    const richContext = buildRichContext(
+      reflectionContent ? "This is a reflection analysis request" : undefined,
+      userContext
     );
     
-    // Process the AI response
-    console.log("Processing AI response");
-    const response = await processAIResponse(
-      aiResponse,
-      reflectionId,
-      startTime,
-      model,
-      metrics.totalTokens
-    );
-    
-    // Cache the response if we have a cache key
-    if (cacheKey) {
-      console.log(`Caching response with key: ${cacheKey}`);
-      await cacheResponse(cacheKey, response.clone(), false);
-    }
-    
-    // Record analytics in the background
-    const recordAnalytics = async () => {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('ai_interaction_logs').insert({
-          user_id: user.id,
-          query_type: reflectionContent ? 'reflection_analysis' : 'general_query',
-          model: model,
-          tokens_used: metrics.totalTokens,
-          processing_time: Date.now() - startTime,
-          query_text: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
-          reflection_id: reflectionId
-        });
-      } catch (error) {
-        console.error("Failed to record analytics:", error);
+    // Make request to OpenAI
+    console.log(`Calling OpenAI with model: ${model}`);
+    const openAIResponse = await callOpenAI(
+      contextualizedPrompt, 
+      richContext, 
+      {
+        model,
+        temperature,
+        maxTokens,
+        stream,
+        apiKey: OPENAI_API_KEY
       }
-    };
+    );
     
-    EdgeRuntime.waitUntil(recordAnalytics());
+    // Handle streaming response
+    if (stream) {
+      console.log("Processing streaming response");
+      const streamResponse = new Response(openAIResponse.body, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream"
+        }
+      });
+      
+      // Cache the streaming response if caching is enabled
+      if (useCache) {
+        console.log(`Caching streaming response with key: ${cacheKey}`);
+        await cacheResponse(cacheKey, streamResponse.clone(), true);
+      }
+      
+      return streamResponse;
+    }
     
-    return response;
+    // For non-streaming responses, process and format the data
+    console.log("Processing non-streaming response");
+    
+    // Check if the response is an error from OpenAI
+    if (!openAIResponse.ok || openAIResponse.headers.get("Content-Type")?.includes("application/json")) {
+      const responseData = await openAIResponse.json();
+      
+      if (responseData.error) {
+        return createErrorResponse(
+          ErrorCode.EXTERNAL_API_ERROR,
+          `OpenAI API error: ${responseData.error}`,
+          { openaiError: responseData.error },
+          responseData.status || 500
+        );
+      }
+      
+      // Process the AI response data
+      const aiContent = responseData.choices?.[0]?.message?.content || "";
+      const tokensUsed = responseData.usage?.total_tokens || 0;
+      
+      // Process the AI response
+      const response = await processAIResponse(
+        aiContent,
+        reflectionId,
+        startTime,
+        model,
+        tokensUsed
+      );
+      
+      // Cache the response if caching is enabled
+      if (useCache) {
+        console.log(`Caching response with key: ${cacheKey}`);
+        await cacheResponse(cacheKey, response.clone(), false);
+      }
+      
+      return response;
+    } else {
+      // Process the OpenAI response
+      const { content, usage } = await processOpenAIResponse(openAIResponse);
+      
+      // Process the AI response
+      const response = await processAIResponse(
+        content,
+        reflectionId,
+        startTime,
+        model,
+        usage.totalTokens
+      );
+      
+      // Cache the response if caching is enabled
+      if (useCache) {
+        console.log(`Caching response with key: ${cacheKey}`);
+        await cacheResponse(cacheKey, response.clone(), false);
+      }
+      
+      return response;
+    }
   } catch (error) {
     console.error("Error in process-ai-query:", error);
     

@@ -1,74 +1,94 @@
 
-import { createInsightPrompt, createEmotionalAnalysisPrompt } from "../utils/promptUtils.ts";
-import { ContextData } from "../types.ts";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * Fetch user context data to enhance AI responses
+ * Rich context data for AI queries
  */
-export async function fetchUserContext(userId: string) {
-  try {
-    // In a production app, we would fetch user profile, preferences,
-    // and history from the database to personalize responses
-    return {
-      userId,
-      interactionHistory: [],
-      preferences: {},
-      practiceLevel: "beginner"
-    };
-  } catch (error) {
-    console.error("Error fetching user context:", error);
-    return {
-      userId,
-      practiceLevel: "beginner"
-    };
-  }
+interface UserContextData {
+  username?: string;
+  consciousnessLevel?: number;
+  interests?: string[];
+  recentReflections?: {
+    id: string;
+    text: string;
+    createdAt: string;
+  }[];
+  chakraData?: Record<string, any>;
 }
 
 /**
- * Fetch additional context data from the database
+ * Fetch context data for the AI query
+ * 
+ * @param supabase Supabase client
+ * @param userId User ID to fetch context for
+ * @param reflectionId Optional reflection ID for more specific context
  */
 export async function fetchContextData(
-  supabase: SupabaseClient,
-  userId?: string,
+  supabase: any,
+  userId?: string, 
   reflectionId?: string
-): Promise<ContextData> {
-  const contextData: ContextData = {};
-  
-  if (!userId) return contextData;
+): Promise<UserContextData> {
+  const contextData: UserContextData = {};
   
   try {
-    // Get user profile data
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('astral_level, energy_points, username')
-      .eq('id', userId)
+    // Skip if no user ID provided
+    if (!userId) return contextData;
+    
+    // Fetch user profile data (in parallel)
+    const userProfilePromise = supabase
+      .from("user_profiles")
+      .select("username, astral_level, interests")
+      .eq("id", userId)
       .single();
-      
-    if (profile) {
-      contextData.userProfile = {
-        userLevel: profile.astral_level,
-        energyPoints: profile.energy_points,
-        username: profile.username
-      };
+    
+    // Fetch reflection data if ID is provided
+    const reflectionPromise = reflectionId 
+      ? supabase
+          .from("energy_reflections")
+          .select("*")
+          .eq("id", reflectionId)
+          .single()
+      : Promise.resolve({ data: null });
+    
+    // Fetch recent reflections regardless
+    const recentReflectionsPromise = supabase
+      .from("energy_reflections")
+      .select("id, content, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(3);
+    
+    // Wait for all requests to complete
+    const [
+      { data: userProfile, error: userProfileError },
+      { data: reflection, error: reflectionError },
+      { data: recentReflections, error: recentReflectionsError }
+    ] = await Promise.all([
+      userProfilePromise,
+      reflectionPromise,
+      recentReflectionsPromise
+    ]);
+    
+    // Add user profile data
+    if (userProfile && !userProfileError) {
+      contextData.username = userProfile.username;
+      contextData.consciousnessLevel = userProfile.astral_level;
+      contextData.interests = userProfile.interests;
     }
     
-    // If reflection ID is provided, get that specific reflection
-    if (reflectionId) {
-      const { data: reflection } = await supabase
-        .from('energy_reflections')
-        .select('content, dominant_emotion, emotional_depth, chakras_activated')
-        .eq('id', reflectionId)
-        .single();
-        
-      if (reflection) {
-        contextData.reflection = {
-          content: reflection.content,
-          dominantEmotion: reflection.dominant_emotion,
-          emotionalDepth: reflection.emotional_depth,
-          chakrasActivated: reflection.chakras_activated
-        };
-      }
+    // Add reflection data
+    if (reflection && !reflectionError) {
+      // Specific reflection data would be added here
+      // This could be structured differently based on needs
+    }
+    
+    // Add recent reflections
+    if (recentReflections && !recentReflectionsError) {
+      contextData.recentReflections = recentReflections.map(r => ({
+        id: r.id,
+        text: r.content,
+        createdAt: r.created_at
+      }));
     }
     
     return contextData;
@@ -79,58 +99,45 @@ export async function fetchContextData(
 }
 
 /**
- * Build a contextualized prompt with user information
+ * Build a rich context string for the AI model based on available data
+ * 
+ * @param userProvidedContext Context provided by the user in their request
+ * @param contextData Context data fetched from the database
  */
-export function buildContextualizedPrompt(
-  query: string,
-  userContext: any,
-  reflectionContent?: string
+export function buildRichContext(
+  userProvidedContext?: string,
+  contextData: UserContextData = {}
 ): string {
-  // If reflection content is provided, focus on analyzing it
-  if (reflectionContent) {
-    return createEmotionalAnalysisPrompt(reflectionContent);
-  }
-
-  // For regular queries, add user context
-  const practiceLevel = userContext?.practiceLevel || 'beginner';
-  const contextPrefix = `[Context: User is a ${practiceLevel} practitioner]`;
+  const contextParts: string[] = [];
   
-  return `${contextPrefix}\n\nQuestion: ${query}`;
-}
-
-/**
- * Build rich context for the AI request
- */
-export function buildRichContext(context: string | undefined, contextData: ContextData): string {
-  const parts: string[] = [];
-  
-  // Add provided context if available
-  if (context) {
-    parts.push(context);
+  // Add user-provided context if available
+  if (userProvidedContext) {
+    contextParts.push(`User context: ${userProvidedContext.trim()}`);
   }
   
-  // Add user profile context
-  if (contextData.userProfile) {
-    parts.push(`User Level: ${contextData.userProfile.userLevel}`);
-    parts.push(`Energy Points: ${contextData.userProfile.energyPoints}`);
-    if (contextData.userProfile.username) {
-      parts.push(`Username: ${contextData.userProfile.username}`);
-    }
+  // Add user profile context if available
+  if (contextData.username || contextData.consciousnessLevel) {
+    contextParts.push(
+      "User profile information:" +
+      (contextData.username ? ` Name: ${contextData.username}.` : "") +
+      (contextData.consciousnessLevel ? ` Consciousness level: ${contextData.consciousnessLevel}.` : "")
+    );
   }
   
-  // Add reflection context
-  if (contextData.reflection) {
-    parts.push(`Reflection Content: ${contextData.reflection.content}`);
-    if (contextData.reflection.dominantEmotion) {
-      parts.push(`Dominant Emotion: ${contextData.reflection.dominantEmotion}`);
-    }
-    if (contextData.reflection.emotionalDepth) {
-      parts.push(`Emotional Depth: ${contextData.reflection.emotionalDepth}`);
-    }
-    if (contextData.reflection.chakrasActivated) {
-      parts.push(`Chakras Activated: ${contextData.reflection.chakrasActivated}`);
-    }
+  // Add interests if available
+  if (contextData.interests && contextData.interests.length > 0) {
+    contextParts.push(`User interests: ${contextData.interests.join(", ")}.`);
   }
   
-  return parts.join('\n');
+  // Add recent reflections if available
+  if (contextData.recentReflections && contextData.recentReflections.length > 0) {
+    contextParts.push("Recent reflections from the user:");
+    
+    contextData.recentReflections.forEach((reflection) => {
+      const shortText = reflection.text.substring(0, 150) + (reflection.text.length > 150 ? "..." : "");
+      contextParts.push(`- ${shortText} (${new Date(reflection.createdAt).toLocaleDateString()})`);
+    });
+  }
+  
+  return contextParts.join("\n\n");
 }

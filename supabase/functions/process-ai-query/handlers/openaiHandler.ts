@@ -1,14 +1,25 @@
 
+import { corsHeaders } from "../../shared/responseUtils.ts";
+
 /**
  * Call the OpenAI API with improved error handling and logging
+ * 
+ * @param query User query text
+ * @param context Additional context to aid the model
+ * @param options Configuration options for the API call
+ * @returns OpenAI API response
  */
-export async function callOpenAI(query: string, context: string, options: {
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  stream: boolean;
-  apiKey: string;
-}): Promise<Response> {
+export async function callOpenAI(
+  query: string, 
+  context: string, 
+  options: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    stream: boolean;
+    apiKey: string;
+  }
+): Promise<Response> {
   // Prepare messages for the AI request
   const messages = [
     {
@@ -58,13 +69,69 @@ export async function callOpenAI(query: string, context: string, options: {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: { message: "Unknown error" } }));
       console.error("OpenAI API error:", errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || "Unknown error"}`);
+      
+      // Create a formatted error response
+      return new Response(
+        JSON.stringify({
+          error: errorData.error?.message || "Unknown error",
+          type: "openai_api_error",
+          status: response.status
+        }),
+        { 
+          status: response.status,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      );
     }
     
     return response;
   } catch (error) {
-    // Log and rethrow any errors
+    // Log and format network or runtime errors
     console.error("Error calling OpenAI:", error);
-    throw error;
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message || "Failed to communicate with OpenAI API",
+        type: "network_error"
+      }),
+      { 
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      }
+    );
   }
+}
+
+/**
+ * Process a raw OpenAI response for non-streaming requests
+ * 
+ * @param response OpenAI API response
+ * @returns Processed response with extracted content and metadata
+ */
+export async function processOpenAIResponse(response: Response): Promise<{
+  content: string;
+  model: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}> {
+  const responseData = await response.json();
+  
+  return {
+    content: responseData.choices[0]?.message?.content || "",
+    model: responseData.model || "unknown",
+    usage: {
+      promptTokens: responseData.usage?.prompt_tokens || 0,
+      completionTokens: responseData.usage?.completion_tokens || 0,
+      totalTokens: responseData.usage?.total_tokens || 0
+    }
+  };
 }
