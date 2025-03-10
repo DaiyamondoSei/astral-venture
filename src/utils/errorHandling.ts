@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { ValidationError, isValidationError } from './validation/ValidationError';
 
@@ -78,13 +77,15 @@ export function handleError(
     ? { ...defaultOptions, context: options }
     : { ...defaultOptions, ...options };
   
-  // Extract error message
+  // Extract error details
   let errorMessage = 'An unknown error occurred';
   let errorDetails: string | undefined;
+  let statusCode = 500;
   
   if (isValidationError(error)) {
     errorMessage = error.message;
     errorDetails = error.toString();
+    statusCode = error.statusCode || 400;
   } else if (error instanceof Error) {
     errorMessage = error.message;
     errorDetails = error.stack;

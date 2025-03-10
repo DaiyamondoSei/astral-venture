@@ -13,12 +13,11 @@ export class ValidationError extends Error {
   metadata?: Record<string, unknown>;
   /** Error details for displaying to the user */
   details?: string;
+  /** HTTP status code for API responses */
+  statusCode?: number;
 
   /**
    * Create a new validation error
-   * 
-   * @param message Error message
-   * @param details Additional error details
    */
   constructor(
     message: string, 
@@ -28,6 +27,7 @@ export class ValidationError extends Error {
       rule?: string;
       metadata?: Record<string, unknown>;
       details?: string;
+      statusCode?: number;
     }
   ) {
     super(message);
@@ -37,14 +37,11 @@ export class ValidationError extends Error {
     this.rule = details?.rule;
     this.metadata = details?.metadata;
     this.details = details?.details;
+    this.statusCode = details?.statusCode;
     
-    // This is needed for instanceof to work in ES5
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
 
-  /**
-   * Convert validation error to string
-   */
   toString(): string {
     return `ValidationError: ${this.message} (field: ${this.field}, expected: ${this.expectedType || 'valid value'})`;
   }
@@ -52,9 +49,6 @@ export class ValidationError extends Error {
 
 /**
  * Type guard to check if an error is a ValidationError
- * 
- * @param error Error to check
- * @returns Whether the error is a ValidationError
  */
 export function isValidationError(error: unknown): error is ValidationError {
   return error instanceof ValidationError;
