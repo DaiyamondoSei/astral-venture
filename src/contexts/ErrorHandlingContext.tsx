@@ -1,86 +1,77 @@
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { captureException } from '@/utils/errorHandling/errorReporter';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { ErrorReportOptions, reportError } from '@/utils/errorHandling/errorReporter';
+import { useAuth } from '@/hooks/auth';
+import { toast } from '@/hooks/use-toast';
 
-export interface ErrorDetails {
-  message: string;
-  code?: string;
-  componentName?: string;
-  originalError?: unknown;
-  recoverable?: boolean;
+interface ErrorHandlingContextType {
+  handleError: (error: Error | unknown, options?: ErrorReportOptions) => void;
+  showErrorToast: (message: string, error?: Error | unknown) => void;
+  clearErrors: () => void;
+  lastError: Error | null;
 }
 
-interface ErrorAction {
-  type: string;
-  label: string;
-  handler: () => void;
-}
+const ErrorHandlingContext = createContext<ErrorHandlingContextType | undefined>(undefined);
 
-export interface ErrorHandlingContextType {
-  hasError: boolean;
-  error: ErrorDetails | null;
-  errorActions: ErrorAction[];
-  reportError: (error: unknown, details?: Partial<ErrorDetails>) => void;
-  clearError: () => void;
-  addErrorAction: (action: ErrorAction) => void;
-  removeErrorAction: (type: string) => void;
-}
+export const ErrorHandlingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [lastError, setLastError] = useState<Error | null>(null);
+  const { user } = useAuth();
 
-const ErrorHandlingContext = createContext<ErrorHandlingContextType | null>(null);
-
-interface ErrorHandlingProviderProps {
-  children: ReactNode;
-}
-
-export const ErrorHandlingProvider: React.FC<ErrorHandlingProviderProps> = ({ children }) => {
-  const [error, setError] = useState<ErrorDetails | null>(null);
-  const [errorActions, setErrorActions] = useState<ErrorAction[]>([]);
-  
-  const reportError = useCallback((err: unknown, details?: Partial<ErrorDetails>) => {
-    // Create standardized error details
-    const errorDetails: ErrorDetails = {
-      message: err instanceof Error ? err.message : String(err),
-      code: details?.code || 'UNKNOWN_ERROR',
-      componentName: details?.componentName,
-      originalError: err,
-      recoverable: details?.recoverable ?? true,
-    };
+  // Main error handler
+  const handleError = useCallback((
+    error: Error | unknown, 
+    options?: ErrorReportOptions
+  ) => {
+    // Convert to Error object if not already
+    const errorObject = error instanceof Error ? error : new Error(String(error));
     
-    // Set the current error
-    setError(errorDetails);
+    // Store the last error
+    setLastError(errorObject);
     
-    // Report to monitoring system
-    captureException(err, undefined, {
-      componentName: details?.componentName,
-      additionalContext: details,
+    // Report error with user context
+    reportError(errorObject, {
+      ...options,
+      userId: user?.id || options?.userId,
     });
     
-    return errorDetails;
+    // Log for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Error Handled]', errorObject);
+    }
+  }, [user?.id]);
+
+  // Show error toast with optional error reporting
+  const showErrorToast = useCallback((
+    message: string, 
+    error?: Error | unknown
+  ) => {
+    // Show toast
+    toast({
+      title: 'Error',
+      description: message,
+      variant: 'destructive',
+    });
+    
+    // Report error if provided
+    if (error) {
+      handleError(error, {
+        metadata: { toastMessage: message }
+      });
+    }
+  }, [handleError]);
+
+  // Clear any stored errors
+  const clearErrors = useCallback(() => {
+    setLastError(null);
   }, []);
-  
-  const clearError = useCallback(() => {
-    setError(null);
-    setErrorActions([]);
-  }, []);
-  
-  const addErrorAction = useCallback((action: ErrorAction) => {
-    setErrorActions(prev => [...prev.filter(a => a.type !== action.type), action]);
-  }, []);
-  
-  const removeErrorAction = useCallback((type: string) => {
-    setErrorActions(prev => prev.filter(action => action.type !== type));
-  }, []);
-  
-  const value: ErrorHandlingContextType = {
-    hasError: error !== null,
-    error,
-    errorActions,
-    reportError,
-    clearError,
-    addErrorAction,
-    removeErrorAction,
+
+  const value = {
+    handleError,
+    showErrorToast,
+    clearErrors,
+    lastError,
   };
-  
+
   return (
     <ErrorHandlingContext.Provider value={value}>
       {children}
@@ -88,14 +79,12 @@ export const ErrorHandlingProvider: React.FC<ErrorHandlingProviderProps> = ({ ch
   );
 };
 
-/**
- * Hook to access the error handling context
- */
-export function useErrorHandlingContext(): ErrorHandlingContextType {
+// Hook to use the error handling context
+export function useErrorHandling() {
   const context = useContext(ErrorHandlingContext);
   
-  if (!context) {
-    throw new Error('useErrorHandlingContext must be used within an ErrorHandlingProvider');
+  if (context === undefined) {
+    throw new Error('useErrorHandling must be used within an ErrorHandlingProvider');
   }
   
   return context;

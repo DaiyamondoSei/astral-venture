@@ -1,266 +1,172 @@
 
 /**
- * Performance monitoring singleton for tracking component render times
- * and other performance metrics across the application.
+ * Central performance monitoring system
+ * Tracks component render times, interactions, and web vitals
  */
-import { ComponentMetrics, ComponentMetric, PerformanceMetric } from './types';
 
+// Type definitions
+export interface ComponentMetrics {
+  component: string;
+  averageRenderTime: number;
+  totalRenders: number;
+  slowRenders: number;
+  lastRenderTime?: number;
+  totalRenderTime: number;
+}
+
+export interface PerformanceEvent {
+  id: string;
+  timestamp: number;
+  duration: number;
+  category: 'render' | 'interaction' | 'load' | 'api';
+  component?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface PerformanceMetric {
+  component_name: string;
+  average_render_time: number;
+  total_renders: number;
+  slow_renders: number;
+  created_at: string;
+}
+
+// The actual performance monitor implementation
 class PerformanceMonitor {
-  private metricsMap: Map<string, ComponentMetrics> = new Map();
-  private isMonitoring: boolean = false;
-  private startTime: number = 0;
-  private eventListeners: Map<string, Array<(data: any) => void>> = new Map();
-  private config = {
-    slowThreshold: 16, // 16ms = ~60fps
-    logToConsole: false,
-    logSlowRenders: true,
-    trackMemory: false,
-    deviceCapability: 'medium' as 'low' | 'medium' | 'high',
-  };
+  private metrics: Map<string, ComponentMetrics> = new Map();
+  private events: PerformanceEvent[] = [];
+  private isMonitoring: boolean = true;
+  private slowRenderThreshold: number = 16; // 16ms = 60fps
+  private metricsLimit: number = 100; // Maximum number of events to store
 
-  /**
-   * Record a component render event
-   * 
-   * @param componentName Name of the component
-   * @param renderTime Time taken to render in ms
-   */
+  // Record a component render
   recordRender(componentName: string, renderTime: number): void {
     if (!this.isMonitoring) return;
     
-    const now = performance.now();
-    const isSlow = renderTime > this.config.slowThreshold;
+    const existingMetrics = this.metrics.get(componentName) || {
+      component: componentName,
+      averageRenderTime: 0,
+      totalRenders: 0,
+      slowRenders: 0,
+      totalRenderTime: 0
+    };
     
-    // Log slow renders if enabled
-    if (isSlow && this.config.logSlowRenders) {
-      console.warn(`Slow render detected: ${componentName} took ${renderTime.toFixed(2)}ms to render`);
+    // Update metrics
+    existingMetrics.totalRenders += 1;
+    existingMetrics.totalRenderTime += renderTime;
+    existingMetrics.lastRenderTime = renderTime;
+    existingMetrics.averageRenderTime = existingMetrics.totalRenderTime / existingMetrics.totalRenders;
+    
+    // Count slow renders
+    if (renderTime > this.slowRenderThreshold) {
+      existingMetrics.slowRenders += 1;
+      
+      // Log slow renders in development
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`);
+      }
     }
     
-    this.recordMetric(componentName, {
-      renderTime,
-      timestamp: now,
-      type: 'render'
-    });
+    // Store updated metrics
+    this.metrics.set(componentName, existingMetrics);
     
-    // Emit render event
-    this.emit('render', { componentName, renderTime, timestamp: now });
+    // Record event
+    this.recordEvent('render', componentName, renderTime);
   }
-
-  /**
-   * Record a component unmount event
-   * 
-   * @param componentName Name of the component
-   */
+  
+  // Record an unmount event
   recordUnmount(componentName: string): void {
     if (!this.isMonitoring) return;
-    this.emit('unmount', { componentName, timestamp: performance.now() });
+    
+    // Add a marker for component unmount (useful for debugging memory leaks)
+    this.events.push({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      duration: 0,
+      category: 'render',
+      component: componentName,
+      details: { type: 'unmount' }
+    });
   }
-
-  /**
-   * Record a generic performance event
-   * 
-   * @param type Type of event
-   * @param name Name of the event
-   * @param duration Duration of the event in ms
-   * @param metadata Additional metadata
-   */
+  
+  // Record any performance event
   recordEvent(
-    type: 'interaction' | 'load' | 'render',
-    name: string,
+    category: 'render' | 'interaction' | 'load' | 'api', 
+    name: string, 
     duration: number,
-    metadata?: Record<string, unknown>
+    details?: Record<string, unknown>
   ): void {
     if (!this.isMonitoring) return;
     
-    this.recordMetric(name, {
-      renderTime: duration,
-      timestamp: performance.now(),
-      type,
-      metadata
-    });
+    const event: PerformanceEvent = {
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      duration,
+      category,
+      component: name,
+      details
+    };
     
-    this.emit('event', { type, name, duration, metadata });
+    this.events.push(event);
+    
+    // Limit the number of stored events to prevent memory issues
+    if (this.events.length > this.metricsLimit) {
+      this.events.shift();
+    }
   }
-
-  /**
-   * Start performance monitoring
-   */
+  
+  // Start monitoring
   startMonitoring(): void {
     this.isMonitoring = true;
-    this.startTime = performance.now();
-    this.emit('start', { timestamp: this.startTime });
-    
-    if (this.config.logToConsole) {
-      console.info('Performance monitoring started');
-    }
   }
-
-  /**
-   * Stop performance monitoring
-   */
+  
+  // Stop monitoring
   stopMonitoring(): void {
     this.isMonitoring = false;
-    const endTime = performance.now();
-    const duration = endTime - this.startTime;
-    
-    this.emit('stop', { 
-      timestamp: endTime,
-      duration,
-      metrics: this.getMetricsSnapshot()
-    });
-    
-    if (this.config.logToConsole) {
-      console.info(`Performance monitoring stopped (ran for ${duration.toFixed(2)}ms)`);
-    }
   }
-
-  /**
-   * Reset all metrics
-   */
+  
+  // Reset all metrics
   resetMetrics(): void {
-    this.metricsMap.clear();
-    this.emit('reset', { timestamp: performance.now() });
-    
-    if (this.config.logToConsole) {
-      console.info('Performance metrics reset');
-    }
+    this.metrics.clear();
+    this.events = [];
   }
-
-  /**
-   * Get metrics for a specific component
-   * 
-   * @param componentName Name of the component
-   */
-  getComponentMetrics(componentName: string): ComponentMetrics | null {
-    return this.metricsMap.get(componentName) || null;
-  }
-
-  /**
-   * Get all component metrics
-   */
-  getAllMetrics(): Map<string, ComponentMetrics> {
-    return new Map(this.metricsMap);
-  }
-
-  /**
-   * Get metrics in a format suitable for visualization or storage
-   */
-  getMetricsSnapshot(): ComponentMetrics[] {
-    return Array.from(this.metricsMap.values());
-  }
-
-  /**
-   * Get the slowest components sorted by average render time
-   * 
-   * @param limit Maximum number of components to return
-   */
-  getSortedComponents(limit: number = 5): ComponentMetrics[] {
-    return this.getMetricsSnapshot()
-      .sort((a, b) => b.averageRenderTime - a.averageRenderTime)
-      .slice(0, limit);
-  }
-
-  /**
-   * Register an event listener
-   * 
-   * @param eventType Event type to listen for
-   * @param callback Callback function
-   */
-  subscribe(eventType: string, callback: (data: any) => void): () => void {
-    if (!this.eventListeners.has(eventType)) {
-      this.eventListeners.set(eventType, []);
-    }
-    
-    this.eventListeners.get(eventType)!.push(callback);
-    
-    // Return unsubscribe function
-    return () => {
-      const listeners = this.eventListeners.get(eventType) || [];
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
+  
+  // Get metrics for a specific component
+  getComponentMetrics(componentName: string): ComponentMetrics {
+    return this.metrics.get(componentName) || {
+      component: componentName,
+      averageRenderTime: 0,
+      totalRenders: 0,
+      slowRenders: 0,
+      totalRenderTime: 0
     };
   }
-
-  /**
-   * Update configuration options
-   * 
-   * @param options Configuration options to update
-   */
-  updateConfig(options: Partial<typeof this.config>): void {
-    this.config = { ...this.config, ...options };
-    this.emit('configUpdate', { config: this.config });
+  
+  // Get all component metrics
+  getAllComponentMetrics(): ComponentMetrics[] {
+    return Array.from(this.metrics.values());
   }
-
-  /**
-   * Get current configuration
-   */
-  getConfig() {
-    return { ...this.config };
+  
+  // Get recent events
+  getRecentEvents(limit: number = 20): PerformanceEvent[] {
+    return this.events.slice(-limit);
   }
-
-  /**
-   * Convert component metrics to database-compatible format
-   */
-  getMetricsForDatabase(): PerformanceMetric[] {
-    return this.getMetricsSnapshot().map(metrics => ({
-      component_name: metrics.componentName,
-      average_render_time: metrics.averageRenderTime,
-      total_renders: metrics.renderCount,
-      slow_renders: metrics.slowRenderCount,
-      last_render: new Date(metrics.lastRenderTimestamp).toISOString()
-    }));
+  
+  // Get slow components (those with higher than threshold average render time)
+  getSlowComponents(threshold: number = this.slowRenderThreshold): ComponentMetrics[] {
+    return this.getAllComponentMetrics()
+      .filter(metric => metric.averageRenderTime > threshold)
+      .sort((a, b) => b.averageRenderTime - a.averageRenderTime);
   }
-
-  /**
-   * Private: Record a metric for a component
-   */
-  private recordMetric(componentName: string, metric: ComponentMetric): void {
-    let componentMetrics = this.metricsMap.get(componentName);
-    
-    if (!componentMetrics) {
-      componentMetrics = {
-        componentName,
-        metrics: [],
-        averageRenderTime: 0,
-        renderCount: 0,
-        slowRenderCount: 0,
-        lastRenderTimestamp: 0
-      };
-      
-      this.metricsMap.set(componentName, componentMetrics);
-    }
-    
-    // Add the new metric
-    componentMetrics.metrics.push(metric);
-    componentMetrics.renderCount++;
-    componentMetrics.lastRenderTimestamp = metric.timestamp;
-    
-    // Check if it's a slow render
-    if (metric.renderTime > this.config.slowThreshold) {
-      componentMetrics.slowRenderCount++;
-    }
-    
-    // Recalculate average
-    const totalTime = componentMetrics.metrics.reduce(
-      (sum, m) => sum + m.renderTime, 0
-    );
-    
-    componentMetrics.averageRenderTime = totalTime / componentMetrics.metrics.length;
+  
+  // Configure the slow render threshold
+  setSlowRenderThreshold(threshold: number): void {
+    this.slowRenderThreshold = threshold;
   }
-
-  /**
-   * Private: Emit an event to all listeners
-   */
-  private emit(eventType: string, data: any): void {
-    const listeners = this.eventListeners.get(eventType) || [];
-    listeners.forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error(`Error in performance monitor event listener (${eventType}):`, error);
-      }
-    });
+  
+  // Get all events for a specific component
+  getComponentEvents(componentName: string): PerformanceEvent[] {
+    return this.events.filter(event => event.component === componentName);
   }
 }
 

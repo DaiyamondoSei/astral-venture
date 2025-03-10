@@ -1,492 +1,199 @@
 
-/**
- * Runtime validation utilities for type checking
- */
-import { ValidationError, isValidationError } from './ValidationError';
+import { ValidationError } from './ValidationError';
 
 /**
- * Options for validation functions
+ * Validates that a value is a string
+ * @param value The value to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated string
+ * @throws ValidationError if validation fails
  */
-export interface ValidationOptions {
-  /** Whether to throw an error on validation failure */
-  throwOnError?: boolean;
-  /** Custom error message */
-  customMessage?: string;
-  /** Optional parent field name for nested validations */
-  parentField?: string;
-}
-
-/**
- * Default validation options
- */
-const defaultOptions: ValidationOptions = {
-  throwOnError: true
-};
-
-/**
- * Get the full field name including parent
- */
-function getFullFieldName(field: string, options?: ValidationOptions): string {
-  return options?.parentField ? `${options.parentField}.${field}` : field;
-}
-
-/**
- * Validate that a value is defined (not undefined or null)
- */
-export function validateDefined<T>(
-  value: T | null | undefined,
-  field: string,
-  options?: ValidationOptions
-): T {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  if (value === undefined || value === null) {
-    const errorMessage = opts.customMessage || `${fullField} is required but was not provided`;
-    const error = ValidationError.requiredError(fullField);
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
-    
-    return undefined as unknown as T;
-  }
-  
-  return value;
-}
-
-/**
- * Validate that a value is a string
- */
-export function validateString(
-  value: unknown,
-  field: string,
-  options?: ValidationOptions
-): string {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate that the value is defined
-  if (value === undefined || value === null) {
-    if (!opts.throwOnError) {
-      return '' as string;
-    }
-    
-    throw ValidationError.requiredError(fullField);
-  }
-  
+export function validateString(value: unknown, fieldName: string): string {
   if (typeof value !== 'string') {
-    const errorMessage = opts.customMessage || 
-      `Expected ${fullField} to be a string, but got ${typeof value}`;
-    const error = ValidationError.typeError(value, 'string', fullField);
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
-    
-    return String(value);
+    throw ValidationError.typeError(value, 'string', fieldName);
   }
-  
   return value;
 }
 
 /**
- * Validate that a value is a number
+ * Validates that a value is a number
+ * @param value The value to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated number
+ * @throws ValidationError if validation fails
  */
-export function validateNumber(
-  value: unknown,
-  field: string,
-  options?: ValidationOptions
-): number {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate that the value is defined
-  if (value === undefined || value === null) {
-    if (!opts.throwOnError) {
-      return 0;
-    }
-    
-    throw ValidationError.requiredError(fullField);
-  }
-  
-  // Handle string numbers by converting
-  if (typeof value === 'string') {
-    const num = Number(value);
-    if (!isNaN(num)) {
-      return num;
-    }
-  }
-  
+export function validateNumber(value: unknown, fieldName: string): number {
   if (typeof value !== 'number' || isNaN(value)) {
-    const errorMessage = opts.customMessage || 
-      `Expected ${fullField} to be a number, but got ${typeof value}`;
-    const error = ValidationError.typeError(value, 'number', fullField);
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
-    
-    return 0;
+    throw ValidationError.typeError(value, 'number', fieldName);
   }
-  
   return value;
 }
 
 /**
- * Validate that a value is a boolean
+ * Validates that a value is a boolean
+ * @param value The value to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated boolean
+ * @throws ValidationError if validation fails
  */
-export function validateBoolean(
-  value: unknown,
-  field: string,
-  options?: ValidationOptions
-): boolean {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate that the value is defined
-  if (value === undefined || value === null) {
-    if (!opts.throwOnError) {
-      return false;
-    }
-    
-    throw ValidationError.requiredError(fullField);
-  }
-  
-  // Convert string 'true'/'false' to boolean
-  if (typeof value === 'string') {
-    if (value.toLowerCase() === 'true') return true;
-    if (value.toLowerCase() === 'false') return false;
-  }
-  
+export function validateBoolean(value: unknown, fieldName: string): boolean {
   if (typeof value !== 'boolean') {
-    const errorMessage = opts.customMessage || 
-      `Expected ${fullField} to be a boolean, but got ${typeof value}`;
-    const error = ValidationError.typeError(value, 'boolean', fullField);
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
-    
-    return Boolean(value);
+    throw ValidationError.typeError(value, 'boolean', fieldName);
   }
-  
   return value;
 }
 
 /**
- * Validate that a value is an array
+ * Validates that a value is an object
+ * @param value The value to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated object
+ * @throws ValidationError if validation fails
  */
-export function validateArray<T>(
-  value: unknown,
-  field: string,
-  itemValidator?: (item: unknown, index: number) => T,
-  options?: ValidationOptions
-): T[] {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate that the value is defined
-  if (value === undefined || value === null) {
-    if (!opts.throwOnError) {
-      return [];
-    }
-    
-    throw ValidationError.requiredError(fullField);
+export function validateObject(value: unknown, fieldName: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw ValidationError.typeError(value, 'object', fieldName);
   }
-  
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Validates that a value is an array
+ * @param value The value to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated array
+ * @throws ValidationError if validation fails
+ */
+export function validateArray<T = unknown>(value: unknown, fieldName: string): T[] {
   if (!Array.isArray(value)) {
-    const errorMessage = opts.customMessage || 
-      `Expected ${fullField} to be an array, but got ${typeof value}`;
-    const error = ValidationError.typeError(value, 'array', fullField);
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
-    
-    return [];
+    throw ValidationError.typeError(value, 'array', fieldName);
   }
-  
-  // If an item validator is provided, validate each item
-  if (itemValidator) {
-    try {
-      return value.map((item, index) => {
-        try {
-          return itemValidator(item, index);
-        } catch (error) {
-          if (isValidationError(error)) {
-            // Enhance error with array index
-            throw new ValidationError(
-              `${fullField}[${index}]: ${error.message}`,
-              {
-                ...error,
-                field: `${fullField}[${index}]`
-              }
-            );
-          }
-          throw error;
-        }
-      });
-    } catch (error) {
-      if (opts.throwOnError) {
-        throw error;
-      }
-      return [];
-    }
-  }
-  
   return value as T[];
 }
 
 /**
- * Validate that a value is an object
+ * Validates that a value exists (not undefined or null)
+ * @param value The value to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated value
+ * @throws ValidationError if validation fails
  */
-export function validateObject<T extends object>(
-  value: unknown,
-  field: string,
-  options?: ValidationOptions
-): T {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate that the value is defined
+export function validateExists<T>(value: T | null | undefined, fieldName: string): T {
   if (value === undefined || value === null) {
-    if (!opts.throwOnError) {
-      return {} as T;
-    }
-    
-    throw ValidationError.requiredError(fullField);
+    throw ValidationError.requiredError(fieldName);
   }
-  
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    const errorMessage = opts.customMessage || 
-      `Expected ${fullField} to be an object, but got ${Array.isArray(value) ? 'array' : typeof value}`;
-    const error = ValidationError.typeError(value, 'object', fullField);
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
-    
-    return {} as T;
+  return value;
+}
+
+/**
+ * Validates that a value is one of the allowed values
+ * @param value The value to validate
+ * @param allowedValues Array of allowed values
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated value
+ * @throws ValidationError if validation fails
+ */
+export function validateOneOf<T>(value: unknown, allowedValues: T[], fieldName: string): T {
+  if (!allowedValues.includes(value as T)) {
+    throw ValidationError.constraintError(
+      fieldName,
+      'one-of',
+      `Expected one of: ${allowedValues.join(', ')}, but got: ${String(value)}`
+    );
   }
-  
   return value as T;
 }
 
 /**
- * Validate that a value is a record (object with string keys)
+ * Validates that a string is not empty
+ * @param value The string to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated string
+ * @throws ValidationError if validation fails
  */
-export function validateRecord<T>(
-  value: unknown,
-  field: string,
-  valueValidator?: (value: unknown, key: string) => T,
-  options?: ValidationOptions
-): Record<string, T> {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate as object
-  const obj = validateObject<Record<string, unknown>>(value, field, {
-    ...opts,
-    throwOnError: false
-  });
-  
-  if (typeof obj !== 'object' || obj === null) {
-    if (opts.throwOnError) {
-      throw ValidationError.typeError(value, 'record', fullField);
-    }
-    return {} as Record<string, T>;
+export function validateNonEmptyString(value: unknown, fieldName: string): string {
+  const stringValue = validateString(value, fieldName);
+  if (stringValue.trim() === '') {
+    throw ValidationError.constraintError(fieldName, 'non-empty-string', 'String cannot be empty');
   }
-  
-  // If a value validator is provided, validate each value
-  if (valueValidator) {
-    const result: Record<string, T> = {};
-    try {
-      for (const key in obj) {
-        try {
-          result[key] = valueValidator(obj[key], key);
-        } catch (error) {
-          if (isValidationError(error)) {
-            // Enhance error with property path
-            throw new ValidationError(
-              `${fullField}.${key}: ${error.message}`,
-              {
-                ...error,
-                field: `${fullField}.${key}`
-              }
-            );
-          }
-          throw error;
-        }
-      }
-      return result;
-    } catch (error) {
-      if (opts.throwOnError) {
-        throw error;
-      }
-      return {} as Record<string, T>;
-    }
-  }
-  
-  return obj as Record<string, T>;
+  return stringValue;
 }
 
 /**
- * Validate that a value is one of the allowed values
+ * Validates an email address format
+ * @param value The email to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated email
+ * @throws ValidationError if validation fails
  */
-export function validateOneOf<T extends string | number>(
-  value: unknown,
-  allowedValues: T[],
-  field: string,
-  options?: ValidationOptions
-): T {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate that the value is defined
-  if (value === undefined || value === null) {
-    if (!opts.throwOnError) {
-      return allowedValues[0];
-    }
-    
-    throw ValidationError.requiredError(fullField);
+export function validateEmail(value: unknown, fieldName: string): string {
+  const email = validateString(value, fieldName);
+  // Simple email validation regex - production systems might need more sophisticated validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw ValidationError.constraintError(fieldName, 'email-format', 'Invalid email format');
   }
-  
-  // For string enums, convert to string and check
-  const stringValue = String(value);
-  for (const allowedValue of allowedValues) {
-    if (value === allowedValue || stringValue === String(allowedValue)) {
-      return allowedValue;
-    }
-  }
-  
-  const errorMessage = opts.customMessage || 
-    `Expected ${fullField} to be one of [${allowedValues.join(', ')}], but got ${value}`;
-  const error = ValidationError.constraintError(
-    fullField,
-    'oneOf',
-    `Expected one of: ${allowedValues.join(', ')}`
-  );
-  
-  if (opts.throwOnError) {
-    throw error;
-  }
-  
-  return allowedValues[0];
+  return email;
 }
 
 /**
- * Validate that a string matches a regex pattern
+ * Validates a UUID format
+ * @param value The UUID to validate
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The validated UUID
+ * @throws ValidationError if validation fails
  */
-export function validatePattern(
-  value: unknown,
-  pattern: RegExp,
-  field: string,
-  options?: ValidationOptions
-): string {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate as string
-  const str = validateString(value, field, {
-    ...opts,
-    throwOnError: false
-  });
-  
-  if (!pattern.test(str)) {
-    const errorMessage = opts.customMessage || 
-      `${fullField} does not match required pattern ${pattern}`;
-    const error = ValidationError.constraintError(
-      fullField,
-      'pattern',
-      `Must match pattern: ${pattern}`
-    );
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
+export function validateUUID(value: unknown, fieldName: string): string {
+  const uuid = validateString(value, fieldName);
+  // UUID v4 regex
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(uuid)) {
+    throw ValidationError.constraintError(fieldName, 'uuid-format', 'Invalid UUID format');
   }
-  
-  return str;
+  return uuid;
 }
 
 /**
- * Validate that a value is within a numeric range
+ * Safely attempts to parse JSON
+ * @param value The string to parse
+ * @param fieldName Name of the field being validated (for error messages)
+ * @returns The parsed JSON object
+ * @throws ValidationError if parsing fails
  */
-export function validateRange(
-  value: unknown,
-  min: number,
-  max: number,
-  field: string,
-  options?: ValidationOptions
-): number {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
-  // First validate as number
-  const num = validateNumber(value, field, {
-    ...opts,
-    throwOnError: false
-  });
-  
-  if (num < min || num > max) {
-    const errorMessage = opts.customMessage || 
-      `${fullField} must be between ${min} and ${max}, but got ${num}`;
-    const error = ValidationError.constraintError(
-      fullField,
-      'range',
-      `Must be between ${min} and ${max}`
-    );
-    
-    if (opts.throwOnError) {
-      throw error;
-    }
-    
-    // Return closest valid value
-    return num < min ? min : max;
-  }
-  
-  return num;
-}
-
-/**
- * Validate API response data
- */
-export function validateApiResponse<T>(
-  data: unknown,
-  field: string,
-  validator: (data: unknown) => T,
-  options?: ValidationOptions
-): T {
-  const opts = { ...defaultOptions, ...options };
-  const fullField = getFullFieldName(field, opts);
-  
+export function validateJSON<T = unknown>(value: string, fieldName: string): T {
   try {
-    return validator(data);
+    return JSON.parse(value) as T;
   } catch (error) {
-    if (error instanceof ValidationError) {
-      throw error;
-    }
-    
-    throw ValidationError.fromError(
-      `Invalid API response for ${fullField}`,
-      error,
-      fullField
+    throw ValidationError.constraintError(
+      fieldName, 
+      'json-format',
+      error instanceof Error ? error.message : 'Invalid JSON'
     );
   }
 }
 
-export default {
-  validateDefined,
-  validateString,
-  validateNumber,
-  validateBoolean,
-  validateArray,
-  validateObject,
-  validateRecord,
-  validateOneOf,
-  validatePattern,
-  validateRange,
-  validateApiResponse,
-  isValidationError
-};
+/**
+ * Validates that a value has required properties
+ * @param value The object to validate
+ * @param requiredProps Array of required property names
+ * @param objectName Name of the object being validated (for error messages)
+ * @returns The validated object
+ * @throws ValidationError if validation fails
+ */
+export function validateRequiredProps<T extends Record<string, unknown>>(
+  value: T,
+  requiredProps: string[],
+  objectName: string
+): T {
+  const missingProps = requiredProps.filter(prop => !(prop in value) || value[prop] === undefined || value[prop] === null);
+  
+  if (missingProps.length > 0) {
+    throw ValidationError.constraintError(
+      objectName,
+      'required-properties',
+      `Missing required properties: ${missingProps.join(', ')}`
+    );
+  }
+  
+  return value;
+}

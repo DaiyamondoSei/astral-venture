@@ -1,5 +1,5 @@
 
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { cn } from "@/lib/utils";
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import PerfConfigDashboard from './dev-mode/PerfConfigDashboard';

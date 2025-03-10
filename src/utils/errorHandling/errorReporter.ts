@@ -1,175 +1,164 @@
 
-import { supabase } from '@/lib/supabaseClient'; 
+import { supabase } from '@/lib/supabaseClient';
 
-interface ErrorMetadata {
-  componentName?: string;
-  operationName?: string;
+// Types for error reporting
+export interface ErrorReportOptions {
+  componentStack?: string;
   userId?: string;
-  additionalContext?: Record<string, unknown>;
-  severity?: 'error' | 'warning' | 'info';
+  source?: 'react-error-boundary' | 'try-catch' | 'promise-rejection' | 'api-error';
+  severity?: 'critical' | 'error' | 'warning' | 'info';
   tags?: string[];
+  metadata?: Record<string, unknown>;
 }
 
-interface ErrorReport {
-  message: string;
-  stack?: string;
-  componentName?: string;
-  operationName?: string;
-  userId?: string;
-  context?: Record<string, unknown>;
-  severity: 'error' | 'warning' | 'info';
-  tags: string[];
-  timestamp: string;
-  environment: string;
-  browserInfo?: Record<string, unknown>;
+// List of known error messages that should not be reported
+const ignoredErrors = [
+  'Network request failed',
+  'Failed to fetch',
+  'Load failed',
+  'The user aborted a request',
+  'User denied transaction signature',
+  'User rejected the request',
+  'Extension context invalidated',
+  'ResizeObserver loop limit exceeded'
+];
+
+/**
+ * Determines if an error should be ignored based on its message
+ */
+function shouldIgnoreError(error: Error): boolean {
+  if (!error.message) return false;
+  
+  return ignoredErrors.some(ignored => error.message.includes(ignored));
 }
 
 /**
- * Centralized error reporting system
- * 
- * Captures and reports errors to appropriate channels with context
+ * Sanitizes error data to remove sensitive information
  */
-export function captureException(
-  error: Error | unknown,
-  errorInfo?: React.ErrorInfo,
-  metadata?: ErrorMetadata
-): void {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const errorStack = error instanceof Error ? error.stack : undefined;
-  const componentStack = errorInfo?.componentStack;
-  
-  // Create structured error report
-  const errorReport: ErrorReport = {
-    message: errorMessage,
-    stack: errorStack,
-    componentName: metadata?.componentName,
-    operationName: metadata?.operationName,
-    userId: metadata?.userId || getCurrentUserId(),
-    context: {
-      ...metadata?.additionalContext,
-      componentStack,
-    },
-    severity: metadata?.severity || 'error',
-    tags: metadata?.tags || [],
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    browserInfo: getBrowserInfo(),
+function sanitizeErrorData(error: Error, options?: ErrorReportOptions): Record<string, unknown> {
+  // Basic error information
+  const sanitized: Record<string, unknown> = {
+    message: error.message,
+    name: error.name,
+    stack: error.stack,
+    ...options
   };
   
-  // Log to console in development
-  if (process.env.NODE_ENV === 'development') {
-    console.error('Error captured:', errorReport);
+  // Remove potentially sensitive data
+  if (sanitized.metadata) {
+    const metadata = { ...sanitized.metadata as Record<string, unknown> };
+    
+    // Remove known sensitive fields
+    ['password', 'token', 'secret', 'apiKey', 'authorization', 'authToken'].forEach(field => {
+      if (field in metadata) {
+        metadata[field] = '[REDACTED]';
+      }
+    });
+    
+    sanitized.metadata = metadata;
   }
   
-  // Send to error tracking service
-  void reportErrorToService(errorReport);
+  return sanitized;
 }
 
 /**
- * Get the current user ID if available
+ * Reports an error to our error tracking system
  */
-function getCurrentUserId(): string | undefined {
-  try {
-    const session = supabase.auth.session();
-    return session?.user?.id;
-  } catch (e) {
-    return undefined;
+export async function reportError(
+  error: Error | unknown,
+  options?: ErrorReportOptions
+): Promise<void> {
+  // Convert unknown errors to Error objects
+  const errorObject = error instanceof Error ? error : new Error(String(error));
+  
+  // Skip ignored errors
+  if (shouldIgnoreError(errorObject)) {
+    console.debug('[Error ignored]', errorObject.message);
+    return;
   }
-}
-
-/**
- * Get browser and environment information
- */
-function getBrowserInfo(): Record<string, unknown> {
+  
   try {
-    return {
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      },
-      url: window.location.href,
-      referrer: document.referrer,
-    };
-  } catch (e) {
-    return {};
-  }
-}
-
-/**
- * Report error to backend service
- */
-async function reportErrorToService(errorReport: ErrorReport): Promise<void> {
-  try {
-    // In a real implementation, this would send to your error tracking service
-    // For now, we'll just log it in development and store in Supabase in production
-    if (process.env.NODE_ENV === 'production') {
-      await supabase
-        .from('error_logs')
-        .insert({
-          message: errorReport.message,
-          stack: errorReport.stack,
-          component_name: errorReport.componentName,
-          operation_name: errorReport.operationName,
-          user_id: errorReport.userId,
-          context: errorReport.context,
-          severity: errorReport.severity,
-          tags: errorReport.tags,
-          browser_info: errorReport.browserInfo
-        });
+    // In development, always log to console
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Error Report]', errorObject, options);
     }
-  } catch (e) {
-    // Avoid infinite loops by not reporting errors in the error reporter
-    console.error('Failed to report error:', e);
+    
+    // Get user ID if available
+    let userId = options?.userId;
+    if (!userId) {
+      // Try to get user ID from session
+      const { data } = await supabase.auth.getSession();
+      userId = data?.session?.user?.id;
+    }
+    
+    // Prepare the error data
+    const errorData = sanitizeErrorData(errorObject, options);
+    
+    // Send to Supabase error logging table
+    await supabase
+      .from('error_logs')
+      .insert({
+        error_message: errorObject.message,
+        error_name: errorObject.name,
+        error_stack: errorObject.stack,
+        user_id: userId,
+        component_stack: options?.componentStack,
+        source: options?.source || 'unknown',
+        severity: options?.severity || 'error',
+        tags: options?.tags || [],
+        metadata: errorData.metadata || {},
+        url: typeof window !== 'undefined' ? window.location.href : undefined,
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        created_at: new Date().toISOString()
+      });
+    
+    // Here you would also send to external error tracking services if needed
+    // For example, Sentry, LogRocket, etc.
+    
+  } catch (reportingError) {
+    // Avoid infinite loops if error reporting itself fails
+    console.error('[Error Reporting Failed]', reportingError);
   }
 }
 
 /**
- * Create a function-specific error reporter
+ * Creates an error handler that can be used in catch blocks
  */
-export function createErrorReporter(defaultMetadata: ErrorMetadata) {
-  return (error: Error | unknown, additionalMetadata?: ErrorMetadata) => {
-    captureException(error, undefined, {
-      ...defaultMetadata,
-      ...additionalMetadata,
-      additionalContext: {
-        ...defaultMetadata.additionalContext,
-        ...additionalMetadata?.additionalContext,
-      },
-      tags: [
-        ...(defaultMetadata.tags || []),
-        ...(additionalMetadata?.tags || []),
-      ],
+export function createErrorHandler(
+  source: ErrorReportOptions['source'], 
+  defaultOptions?: Omit<ErrorReportOptions, 'source'>
+) {
+  return (error: Error | unknown, additionalOptions?: Omit<ErrorReportOptions, 'source'>) => {
+    return reportError(error, {
+      source,
+      ...defaultOptions,
+      ...additionalOptions
     });
   };
 }
 
-/**
- * Higher-order function that adds error reporting to any async function
- */
-export function withErrorReporting<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
-  metadata: ErrorMetadata
-): T {
-  return (async (...args: Parameters<T>) => {
-    try {
-      return await fn(...args);
-    } catch (error) {
-      captureException(error, undefined, {
-        ...metadata,
-        additionalContext: {
-          ...metadata.additionalContext,
-          functionArgs: args,
-        },
-      });
-      throw error;
-    }
-  }) as T;
+// Set up global error handlers
+export function setupGlobalErrorHandlers(): void {
+  if (typeof window === 'undefined') return;
+  
+  // Handle uncaught promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    reportError(event.reason, {
+      source: 'promise-rejection',
+      severity: 'critical'
+    });
+  });
+  
+  // Handle uncaught errors
+  window.addEventListener('error', (event) => {
+    reportError(event.error || new Error(event.message), {
+      source: 'try-catch',
+      severity: 'critical',
+      metadata: {
+        fileName: event.filename,
+        lineNumber: event.lineno,
+        columnNumber: event.colno
+      }
+    });
+  });
 }
-
-export default {
-  captureException,
-  createErrorReporter,
-  withErrorReporting,
-};

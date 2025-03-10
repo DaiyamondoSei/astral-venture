@@ -23,7 +23,7 @@ export class ValidationError extends Error {
    */
   constructor(
     message: string, 
-    details?: {
+    details: {
       field: string;
       expectedType?: string;
       rule?: string;
@@ -35,13 +35,13 @@ export class ValidationError extends Error {
   ) {
     super(message);
     this.name = 'ValidationError';
-    this.field = details?.field || 'unknown';
-    this.expectedType = details?.expectedType;
-    this.rule = details?.rule;
-    this.metadata = details?.metadata;
-    this.details = details?.details;
-    this.statusCode = details?.statusCode;
-    this.originalError = details?.originalError;
+    this.field = details.field;
+    this.expectedType = details.expectedType;
+    this.rule = details.rule;
+    this.metadata = details.metadata;
+    this.details = details.details;
+    this.statusCode = details.statusCode;
+    this.originalError = details.originalError;
     
     // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, ValidationError.prototype);
