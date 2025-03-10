@@ -11,6 +11,8 @@ export class ValidationError extends Error {
   rule?: string;
   /** Additional metadata about the validation error */
   metadata?: Record<string, unknown>;
+  /** Error details for displaying to the user */
+  details?: string;
 
   /**
    * Create a new validation error
@@ -25,6 +27,7 @@ export class ValidationError extends Error {
       expectedType?: string;
       rule?: string;
       metadata?: Record<string, unknown>;
+      details?: string;
     }
   ) {
     super(message);
@@ -33,6 +36,7 @@ export class ValidationError extends Error {
     this.expectedType = details?.expectedType;
     this.rule = details?.rule;
     this.metadata = details?.metadata;
+    this.details = details?.details;
     
     // This is needed for instanceof to work in ES5
     Object.setPrototypeOf(this, ValidationError.prototype);

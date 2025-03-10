@@ -1,6 +1,6 @@
 
 import { toast } from 'sonner';
-import { ValidationError } from './validation/ValidationError';
+import { ValidationError, isValidationError } from './validation/ValidationError';
 
 /**
  * Error severity levels
@@ -82,7 +82,7 @@ export function handleError(
   let errorMessage = 'An unknown error occurred';
   let errorDetails: string | undefined;
   
-  if (error instanceof ValidationError) {
+  if (isValidationError(error)) {
     errorMessage = error.message;
     errorDetails = error.toString();
   } else if (error instanceof Error) {

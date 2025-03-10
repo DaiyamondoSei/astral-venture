@@ -154,6 +154,44 @@ export function validateEnum<T extends string | number>(
 }
 
 /**
+ * Validate that a value matches one of the specified types
+ * 
+ * @param value Value to validate
+ * @param validators Array of validator functions to try
+ * @param fieldName Field name for error reporting
+ * @returns The validated value
+ * @throws ValidationError if the value doesn't match any of the specified types
+ */
+export function validateOneOf<T>(
+  value: unknown,
+  validators: Array<(v: unknown, f: string) => unknown>,
+  fieldName: string
+): T {
+  const errors: ValidationError[] = [];
+
+  for (const validator of validators) {
+    try {
+      return validator(value, fieldName) as T;
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        errors.push(error);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  throw new ValidationError(
+    `${fieldName} failed to validate against any of the allowed types`, 
+    {
+      field: fieldName,
+      details: errors.map(e => e.message).join('; '),
+      metadata: { errors }
+    }
+  );
+}
+
+/**
  * Check if a value is a validation error
  * 
  * @param error Error to check
@@ -172,5 +210,6 @@ export default {
   validateObject,
   validateDate,
   validateEnum,
+  validateOneOf,
   isValidationError
 };
