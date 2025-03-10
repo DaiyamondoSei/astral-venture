@@ -25,6 +25,7 @@ export type PerformanceSubscriptionCallback = (metrics: IComponentMetrics[]) => 
 
 /**
  * Performance monitoring service for tracking component render times and metrics
+ * Implements the ComponentMetrics interface from services/ai/types
  */
 export class PerformanceMonitor {
   private metrics: Map<string, IComponentMetrics> = new Map();
@@ -35,28 +36,28 @@ export class PerformanceMonitor {
   /**
    * Start performance monitoring
    */
-  startMonitoring(): void {
+  public startMonitoring(): void {
     this.isMonitoring = true;
   }
 
   /**
    * Stop performance monitoring
    */
-  stopMonitoring(): void {
+  public stopMonitoring(): void {
     this.isMonitoring = false;
   }
 
   /**
    * Check if monitoring is active
    */
-  isActive(): boolean {
+  public isActive(): boolean {
     return this.isMonitoring;
   }
 
   /**
    * Reset all metrics
    */
-  resetMetrics(): void {
+  public resetMetrics(): void {
     this.metrics.clear();
     this.notifySubscribers();
   }
@@ -66,7 +67,7 @@ export class PerformanceMonitor {
    * @param componentName Component name
    * @param renderTime Render time in milliseconds
    */
-  recordRender(componentName: string, renderTime: number): void {
+  public recordRender(componentName: string, renderTime: number): void {
     if (!this.isMonitoring) return;
     
     const metric = this.metrics.get(componentName) || {
@@ -96,7 +97,7 @@ export class PerformanceMonitor {
    * @param componentName Component name
    * @param renderTimes Array of render times
    */
-  recordRenderBatch(componentName: string, renderTimes: number[]): void {
+  public recordRenderBatch(componentName: string, renderTimes: number[]): void {
     if (!this.isMonitoring || renderTimes.length === 0) return;
     renderTimes.forEach(time => this.recordRender(componentName, time));
   }
@@ -105,14 +106,14 @@ export class PerformanceMonitor {
    * Get metrics for a specific component
    * @param componentName Component name
    */
-  getComponentMetrics(componentName: string): IComponentMetrics | undefined {
+  public getComponentMetrics(componentName: string): IComponentMetrics | undefined {
     return this.metrics.get(componentName);
   }
 
   /**
    * Get all component metrics
    */
-  getAllMetrics(): IComponentMetrics[] {
+  public getAllMetrics(): IComponentMetrics[] {
     return Array.from(this.metrics.values());
   }
 
@@ -120,7 +121,7 @@ export class PerformanceMonitor {
    * Get the slowest components
    * @param limit Maximum number of components to return
    */
-  getSlowestComponents(limit: number = 5): IComponentMetrics[] {
+  public getSlowestComponents(limit: number = 5): IComponentMetrics[] {
     return this.getAllMetrics()
       .sort((a, b) => b.averageRenderTime - a.averageRenderTime)
       .slice(0, limit);
@@ -129,7 +130,7 @@ export class PerformanceMonitor {
   /**
    * Clear all metrics
    */
-  clearMetrics(): void {
+  public clearMetrics(): void {
     this.metrics.clear();
     this.notifySubscribers();
   }
@@ -139,7 +140,7 @@ export class PerformanceMonitor {
    * @param componentName Component name
    * @param renderTime Render time in milliseconds
    */
-  reportSlowRender(componentName: string, renderTime: number): void {
+  public reportSlowRender(componentName: string, renderTime: number): void {
     console.warn(
       `Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`
     );
@@ -149,7 +150,7 @@ export class PerformanceMonitor {
    * Record component unmount
    * @param componentName Component name
    */
-  recordUnmount(componentName: string): void {
+  public recordUnmount(componentName: string): void {
     this.metrics.delete(componentName);
     this.notifySubscribers();
   }
@@ -159,7 +160,7 @@ export class PerformanceMonitor {
    * @param callback Callback function
    * @returns Unsubscribe function
    */
-  subscribe(callback: PerformanceSubscriptionCallback): () => void {
+  public subscribe(callback: PerformanceSubscriptionCallback): () => void {
     this.subscribers.add(callback);
     return () => {
       this.subscribers.delete(callback);

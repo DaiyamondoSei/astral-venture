@@ -11,4 +11,8 @@ import type { ComponentMetrics } from '@/services/ai/types';
 export { performanceMonitor, PerformanceMonitor, IComponentMetrics };
 export type { ComponentMetrics };
 
+// Type assertion to ensure compatibility between interfaces
+const _typeCheck: ComponentMetrics = {} as IComponentMetrics;
+const _reverseCheck: IComponentMetrics = {} as ComponentMetrics;
+
 export default performanceMonitor;

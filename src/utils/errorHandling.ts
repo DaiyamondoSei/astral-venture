@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { ValidationError, isValidationError } from './validation/ValidationError';
 
@@ -24,7 +25,9 @@ export enum ErrorCategory {
   UNEXPECTED = 'unexpected',
   RESOURCE = 'resource',
   VALIDATION = 'validation',
-  USER_INTERFACE = 'user_interface'
+  USER_INTERFACE = 'user_interface',
+  TYPE_ERROR = 'type_error',    // Added for type errors
+  CONSTRAINT_ERROR = 'constraint_error'  // Added for constraint violations
 }
 
 /**
@@ -51,6 +54,12 @@ export interface ErrorHandlingOptions {
   retryCount?: number;
   /** Optional retry delay in milliseconds */
   retryDelay?: number;
+  /** Whether to throw the error after handling */
+  rethrow?: boolean;
+  /** Whether this is a validation error */
+  isValidation?: boolean;
+  /** Whether to include validation details in toast */
+  includeValidationDetails?: boolean;
 }
 
 /**
@@ -61,6 +70,99 @@ const defaultOptions: ErrorHandlingOptions = {
   category: ErrorCategory.UNEXPECTED,
   showToast: true
 };
+
+/**
+ * Determine error category from error type
+ */
+function determineErrorCategory(error: unknown): ErrorCategory {
+  if (isValidationError(error)) {
+    if (error.rule === 'type-check') {
+      return ErrorCategory.TYPE_ERROR;
+    }
+    if (error.rule === 'required' || error.rule?.includes('min') || error.rule?.includes('max') || error.rule === 'pattern') {
+      return ErrorCategory.CONSTRAINT_ERROR;
+    }
+    return ErrorCategory.VALIDATION;
+  }
+  
+  if (error instanceof TypeError) {
+    return ErrorCategory.TYPE_ERROR;
+  }
+  
+  if (error instanceof SyntaxError) {
+    return ErrorCategory.DATA_PROCESSING;
+  }
+  
+  if (error instanceof ReferenceError) {
+    return ErrorCategory.UNEXPECTED;
+  }
+  
+  if (typeof error === 'object' && error !== null) {
+    // Handle fetch errors
+    if ('status' in error && 'statusText' in error) {
+      return ErrorCategory.NETWORK;
+    }
+    
+    // Handle authentication errors
+    if ('code' in error && typeof error.code === 'string' && 
+        (error.code.includes('auth') || error.code.includes('permission'))) {
+      return ErrorCategory.AUTHENTICATION;
+    }
+  }
+  
+  return ErrorCategory.UNEXPECTED;
+}
+
+/**
+ * Determine error severity based on category
+ */
+function determineErrorSeverity(category: ErrorCategory): ErrorSeverity {
+  switch (category) {
+    case ErrorCategory.AUTHENTICATION:
+    case ErrorCategory.AUTHORIZATION:
+    case ErrorCategory.NETWORK:
+      return ErrorSeverity.ERROR;
+    
+    case ErrorCategory.VALIDATION:
+    case ErrorCategory.USER_INPUT:
+    case ErrorCategory.CONSTRAINT_ERROR:
+      return ErrorSeverity.WARNING;
+    
+    case ErrorCategory.UNEXPECTED:
+    case ErrorCategory.TYPE_ERROR:
+      return ErrorSeverity.CRITICAL;
+    
+    default:
+      return ErrorSeverity.ERROR;
+  }
+}
+
+/**
+ * Format validation details for display
+ */
+function formatValidationDetails(error: ValidationError): string {
+  if (error.details) {
+    return error.details;
+  }
+  
+  if (error.rule === 'type-check') {
+    return `Expected ${error.expectedType}, received ${typeof error.originalError}`;
+  }
+  
+  if (error.rule === 'required') {
+    return 'This field is required';
+  }
+  
+  if (error.rule?.includes('min')) {
+    return `Value is below the minimum allowed`;
+  }
+  
+  if (error.rule?.includes('max')) {
+    return `Value exceeds the maximum allowed`;
+  }
+  
+  return '';
+}
 
 /**
  * Centralized error handler
@@ -77,15 +179,30 @@ export function handleError(
     ? { ...defaultOptions, context: options }
     : { ...defaultOptions, ...options };
   
+  // Determine error category if not specified
+  if (!opts.category) {
+    opts.category = determineErrorCategory(error);
+  }
+  
+  // Determine severity if not specified
+  if (!opts.severity) {
+    opts.severity = determineErrorSeverity(opts.category);
+  }
+  
   // Extract error details
   let errorMessage = 'An unknown error occurred';
   let errorDetails: string | undefined;
   let statusCode = 500;
+  let fieldName: string | undefined;
   
   if (isValidationError(error)) {
     errorMessage = error.message;
-    errorDetails = error.toString();
+    errorDetails = formatValidationDetails(error);
     statusCode = error.statusCode || 400;
+    fieldName = error.field;
+    
+    // Mark as validation error
+    opts.isValidation = true;
   } else if (error instanceof Error) {
     errorMessage = error.message;
     errorDetails = error.stack;
@@ -105,7 +222,10 @@ export function handleError(
     errorMessage,
     {
       details: errorDetails,
-      metadata: opts.metadata
+      metadata: {
+        ...opts.metadata,
+        field: fieldName
+      }
     }
   );
   
@@ -117,8 +237,14 @@ export function handleError(
         ? 'warning'
         : 'info';
     
+    const description = opts.isValidation && opts.includeValidationDetails && errorDetails
+      ? errorDetails
+      : opts.context 
+        ? `Error in ${opts.context}` 
+        : undefined;
+    
     toast[toastType](displayMessage, {
-      description: opts.context ? `Error in ${opts.context}` : undefined,
+      description,
       position: 'bottom-right'
     });
   }
@@ -126,6 +252,11 @@ export function handleError(
   // Call custom error handler if provided
   if (opts.onError) {
     opts.onError(error);
+  }
+  
+  // Rethrow the error if requested
+  if (opts.rethrow) {
+    throw error;
   }
 }
 
@@ -206,16 +337,12 @@ export async function processApiResponse<T>(
     
     const errorMessage = errorData?.error ?? errorData?.message ?? `API error: ${response.status}`;
     
-    // Create error with API details
-    const error = new Error(errorMessage);
-    
-    // Add response details to error
-    Object.assign(error, {
-      status: response.status,
-      statusText: response.statusText,
-      url: response.url,
+    // Create validation error with API details
+    const error = ValidationError.fromApiError(
+      errorMessage,
+      response.status,
       errorData
-    });
+    );
     
     // Handle the error with our error handling system
     handleError(error, {
@@ -225,13 +352,41 @@ export async function processApiResponse<T>(
         status: response.status,
         url: response.url,
         errorData
-      }
+      },
+      rethrow: true
     });
-    
-    throw error;
   }
   
   return response.json();
+}
+
+/**
+ * Validate data against a schema and handle validation errors
+ * 
+ * @param data - Data to validate
+ * @param validator - Validation function
+ * @param options - Error handling options
+ * @returns Validated data
+ */
+export function validateData<T>(
+  data: unknown,
+  validator: (data: unknown) => T,
+  options: ErrorHandlingOptions = {}
+): T {
+  try {
+    return validator(data);
+  } catch (error) {
+    handleError(error, {
+      ...options,
+      category: ErrorCategory.VALIDATION,
+      isValidation: true,
+      includeValidationDetails: true,
+      rethrow: true
+    });
+    
+    // This will never execute due to rethrow, but TypeScript requires a return
+    throw error;
+  }
 }
 
 /**
@@ -253,6 +408,7 @@ export default {
   createSafeAsyncFunction,
   createSafeFunction,
   processApiResponse,
+  validateData,
   captureException,
   ErrorSeverity,
   ErrorCategory

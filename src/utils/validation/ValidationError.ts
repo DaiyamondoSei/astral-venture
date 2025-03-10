@@ -83,6 +83,62 @@ export class ValidationError extends Error {
       details: originalError instanceof Error ? originalError.message : String(originalError)
     });
   }
+
+  /**
+   * Create a type error for when a value doesn't match the expected type
+   */
+  static typeError(value: unknown, expectedType: string, field: string): ValidationError {
+    return new ValidationError(
+      `Expected ${field} to be of type ${expectedType}, but received ${typeof value}`,
+      {
+        field,
+        expectedType,
+        rule: 'type-check'
+      }
+    );
+  }
+
+  /**
+   * Create a constraint error for when a value doesn't meet specific constraints
+   */
+  static constraintError(field: string, constraint: string, details?: string): ValidationError {
+    return new ValidationError(
+      `${field} failed constraint: ${constraint}${details ? ` (${details})` : ''}`,
+      {
+        field,
+        rule: constraint,
+        details
+      }
+    );
+  }
+
+  /**
+   * Create a required field error
+   */
+  static requiredError(field: string): ValidationError {
+    return new ValidationError(
+      `${field} is required but was not provided`,
+      {
+        field,
+        rule: 'required'
+      }
+    );
+  }
+
+  /**
+   * Create a schema validation error for object validation failures
+   */
+  static schemaError(field: string, errors: Record<string, string>): ValidationError {
+    return new ValidationError(
+      `${field} failed schema validation`,
+      {
+        field,
+        rule: 'schema',
+        details: JSON.stringify(errors),
+        metadata: { validationErrors: errors }
+      }
+    );
+  }
 }
 
 /**
