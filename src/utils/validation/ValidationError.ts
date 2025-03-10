@@ -19,6 +19,9 @@ export interface ValidationErrorDetails {
   allErrors?: ValidationError[];
   originalError?: unknown;
   path?: string;
+  rule?: string;
+  code?: string;
+  value?: unknown;
   [key: string]: unknown;
 }
 
@@ -108,6 +111,61 @@ export class ValidationError extends Error {
   static schemaError(message: string, path?: string): ValidationError {
     return new ValidationError(`Schema validation failed: ${message}`, { 
       path 
+    });
+  }
+
+  /**
+   * Create required field validation error
+   */
+  static requiredError(field: string): ValidationError {
+    return new ValidationError(`${field} is required`, { 
+      field,
+      rule: 'required' 
+    });
+  }
+
+  /**
+   * Create type validation error
+   */
+  static typeError(field: string, expectedType: string, actualValue?: unknown): ValidationError {
+    return new ValidationError(`${field} must be a ${expectedType}`, { 
+      field,
+      expectedType,
+      actualValue,
+      rule: 'type' 
+    });
+  }
+
+  /**
+   * Create format validation error
+   */
+  static formatError(field: string, format: string, actualValue?: unknown): ValidationError {
+    return new ValidationError(`${field} must be in ${format} format`, { 
+      field,
+      expectedType: format,
+      actualValue,
+      rule: 'format' 
+    });
+  }
+
+  /**
+   * Create range validation error
+   */
+  static rangeError(field: string, min?: number, max?: number, actualValue?: unknown): ValidationError {
+    let message = `${field} must be`;
+    
+    if (min !== undefined && max !== undefined) {
+      message += ` between ${min} and ${max}`;
+    } else if (min !== undefined) {
+      message += ` at least ${min}`;
+    } else if (max !== undefined) {
+      message += ` at most ${max}`;
+    }
+    
+    return new ValidationError(message, { 
+      field,
+      actualValue,
+      rule: 'range' 
     });
   }
 }

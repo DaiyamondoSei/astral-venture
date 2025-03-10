@@ -2,214 +2,196 @@
 /**
  * Performance Metrics Reporter
  * 
- * Handles reporting performance metrics to backend storage and analytics.
+ * Handles reporting performance metrics to the Supabase backend.
  */
 
-import { metricsCollector } from './metricsCollector';
+import { PerformanceMetric } from './types';
 import { supabase } from '@/lib/supabaseClient';
-import type { ComponentMetrics } from './types';
+import { ensurePerformanceMetricsTable } from '@/lib/supabaseClient';
 
-interface MetricsReporterConfig {
-  batchSize?: number;
-  reportInterval?: number;
-  enabled?: boolean;
-  autoReport?: boolean;
+// Interface for user data
+interface UserResponse {
+  id: string;
 }
 
+/**
+ * Handles the reporting of performance metrics to the server
+ */
 class MetricsReporter {
-  private batchSize: number = 50;
-  private reportInterval: number = 60000; // 1 minute
-  private enabled: boolean = true;
-  private autoReport: boolean = false;
-  private intervalId: number | null = null;
-  private lastReportTime: number = 0;
-  private pendingReport: boolean = false;
-  
-  constructor() {
-    // Start auto-reporting if configured
-    this.setupAutoReporting();
-  }
+  private isReporting = false;
+  private reportingEnabled = true;
+  private reportingInterval = 60000; // 1 minute
+  private reportingTimer: number | null = null;
+  private metricsQueue: PerformanceMetric[] = [];
+  private queueLimit = 50;
+  private initialized = false;
+  private user: UserResponse | null = null;
   
   /**
-   * Configure the metrics reporter
+   * Initialize the metrics reporter
    */
-  public configure(config: MetricsReporterConfig): void {
-    if (config.batchSize !== undefined) {
-      this.batchSize = Math.max(1, config.batchSize);
+  public async init(): Promise<boolean> {
+    if (this.initialized) {
+      return true;
     }
-    
-    if (config.reportInterval !== undefined) {
-      this.reportInterval = Math.max(5000, config.reportInterval);
-    }
-    
-    if (config.enabled !== undefined) {
-      this.enabled = config.enabled;
-    }
-    
-    if (config.autoReport !== undefined) {
-      this.autoReport = config.autoReport;
-      this.setupAutoReporting();
-    }
-  }
-  
-  /**
-   * Set up automatic reporting based on configured interval
-   */
-  private setupAutoReporting(): void {
-    // Clear any existing interval
-    if (this.intervalId !== null) {
-      window.clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-    
-    // Set up new interval if auto-reporting is enabled
-    if (this.autoReport && this.enabled) {
-      this.intervalId = window.setInterval(() => {
-        this.reportNow();
-      }, this.reportInterval);
-    }
-  }
-  
-  /**
-   * Report metrics to the backend immediately
-   */
-  public async reportNow(): Promise<boolean> {
-    if (!this.enabled || this.pendingReport) {
-      return false;
-    }
-    
-    // Check if there are any metrics to report
-    const metrics = metricsCollector.getMetrics();
-    if (metrics.size === 0) {
-      return false;
-    }
-    
-    // Ensure performance metrics table exists
-    await this.ensurePerformanceMetricsTable();
-    
-    this.pendingReport = true;
     
     try {
-      // Gather metrics to report
-      const metricsToReport = this.prepareMetricsForReporting(metrics);
-      
-      if (metricsToReport.length === 0) {
-        this.pendingReport = false;
+      if (typeof window === 'undefined') {
         return false;
       }
       
-      // Send metrics in batches
-      const result = await this.sendMetricsBatch(metricsToReport);
+      // Initialize the table if it doesn't exist
+      const tableCreated = await ensurePerformanceMetricsTable();
       
-      this.lastReportTime = Date.now();
-      this.pendingReport = false;
+      if (!tableCreated) {
+        console.warn('Failed to ensure performance metrics table exists');
+        return false;
+      }
       
-      return result;
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      this.user = user;
+      
+      // Start reporting timer
+      this.startReportingTimer();
+      
+      this.initialized = true;
+      return true;
     } catch (error) {
-      console.error('Error reporting metrics:', error);
-      this.pendingReport = false;
+      console.error('Error initializing metrics reporter:', error);
       return false;
     }
   }
   
   /**
-   * Ensure the performance_metrics table exists in the database
+   * Start the reporting timer
    */
-  private async ensurePerformanceMetricsTable(): Promise<boolean> {
+  private startReportingTimer(): void {
+    if (this.reportingTimer !== null || typeof window === 'undefined') {
+      return;
+    }
+    
+    this.reportingTimer = window.setInterval(() => {
+      this.reportMetrics();
+    }, this.reportingInterval);
+  }
+  
+  /**
+   * Stop the reporting timer
+   */
+  private stopReportingTimer(): void {
+    if (this.reportingTimer === null || typeof window === 'undefined') {
+      return;
+    }
+    
+    window.clearInterval(this.reportingTimer);
+    this.reportingTimer = null;
+  }
+  
+  /**
+   * Queue metrics for reporting
+   */
+  public queueMetrics(metrics: PerformanceMetric | PerformanceMetric[]): void {
+    if (!this.reportingEnabled) {
+      return;
+    }
+    
+    const metricsArray = Array.isArray(metrics) ? metrics : [metrics];
+    
+    // Add user ID if available
+    const metricsWithUser = metricsArray.map(metric => ({
+      ...metric,
+      user_id: this.user?.id || null
+    }));
+    
+    // Add to queue
+    this.metricsQueue.push(...metricsWithUser);
+    
+    // Trim queue if it gets too large
+    if (this.metricsQueue.length > this.queueLimit) {
+      this.metricsQueue = this.metricsQueue.slice(-this.queueLimit);
+    }
+    
+    // Auto-report if queue is getting full
+    if (this.metricsQueue.length >= this.queueLimit / 2) {
+      this.reportMetrics();
+    }
+  }
+  
+  /**
+   * Report metrics to the server
+   */
+  public async reportMetrics(): Promise<boolean> {
+    // Skip if already reporting or no metrics
+    if (this.isReporting || this.metricsQueue.length === 0 || !this.reportingEnabled) {
+      return false;
+    }
+    
     try {
-      const { data, error } = await supabase.rpc(
-        'ensure_performance_metrics_table',
-        {}
-      );
+      this.isReporting = true;
+      
+      // Make sure table exists
+      if (!this.initialized) {
+        await this.init();
+      }
+      
+      // Get metrics to report
+      const metricsToReport = [...this.metricsQueue];
+      this.metricsQueue = [];
+      
+      // Insert metrics
+      const { error } = await supabase
+        .from('performance_metrics')
+        .insert(metricsToReport);
       
       if (error) {
-        console.error('Error ensuring performance metrics table:', error);
-        return false;
-      }
-      
-      return data as boolean;
-    } catch (error) {
-      console.error('Error calling ensure_performance_metrics_table:', error);
-      return false;
-    }
-  }
-  
-  /**
-   * Prepare metrics for reporting by converting to an array of records
-   */
-  private prepareMetricsForReporting(metrics: Map<string, ComponentMetrics>): any[] {
-    const metricsArray: any[] = [];
-    const userId = supabase.auth.getUser() || null;
-    const now = new Date().toISOString();
-    
-    // Convert metrics map to array of records
-    metrics.forEach(metric => {
-      // Only report metrics with at least 5 renders
-      if (metric.renderCount < 5) {
-        return;
-      }
-      
-      metricsArray.push({
-        component_name: metric.componentName,
-        average_render_time: metric.averageRenderTime,
-        total_renders: metric.renderCount,
-        slow_renders: metric.slowRenderCount,
-        max_render_time: metric.maxRenderTime,
-        min_render_time: metric.minRenderTime,
-        collected_at: now,
-        user_id: userId?.id || null,
-        metric_type: metric.metricType || 'render',
-        context: {
-          last_render_time: metric.lastRenderTime,
-          created_at: new Date(metric.createdAt).toISOString(),
-          last_updated: new Date(metric.lastUpdated).toISOString(),
-          environment: process.env.NODE_ENV || 'unknown',
-          browser: navigator.userAgent
-        }
-      });
-    });
-    
-    return metricsArray;
-  }
-  
-  /**
-   * Send a batch of metrics to the backend
-   */
-  private async sendMetricsBatch(metrics: any[]): Promise<boolean> {
-    if (metrics.length === 0) {
-      return false;
-    }
-    
-    try {
-      // Send metrics in batches to avoid large payloads
-      const batches = [];
-      for (let i = 0; i < metrics.length; i += this.batchSize) {
-        const batch = metrics.slice(i, i + this.batchSize);
-        batches.push(batch);
-      }
-      
-      // Process each batch
-      for (const batch of batches) {
-        const { error } = await supabase
-          .from('performance_metrics')
-          .insert(batch);
+        console.error('Error reporting metrics:', error);
         
-        if (error) {
-          console.error('Error inserting performance metrics:', error);
-          return false;
-        }
+        // Put metrics back in queue to try again later
+        this.metricsQueue = [...metricsToReport, ...this.metricsQueue].slice(0, this.queueLimit);
+        
+        return false;
       }
       
       return true;
     } catch (error) {
-      console.error('Error sending metrics batch:', error);
+      console.error('Error reporting metrics:', error);
       return false;
+    } finally {
+      this.isReporting = false;
+    }
+  }
+  
+  /**
+   * Enable or disable reporting
+   */
+  public setReportingEnabled(enabled: boolean): void {
+    this.reportingEnabled = enabled;
+    
+    if (enabled) {
+      this.startReportingTimer();
+    } else {
+      this.stopReportingTimer();
+    }
+  }
+  
+  /**
+   * Dispose of the reporter
+   */
+  public dispose(): void {
+    this.stopReportingTimer();
+    
+    // Report any remaining metrics
+    if (this.metricsQueue.length > 0) {
+      this.reportMetrics().catch(error => {
+        console.error('Error reporting metrics during disposal:', error);
+      });
     }
   }
 }
 
-// Create a singleton instance
-export const metricsReporter = new MetricsReporter();
+// Create singleton instance
+const metricsReporter = new MetricsReporter();
 
-// Export the singleton instance as the default export
+// Export singleton
 export default metricsReporter;

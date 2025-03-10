@@ -91,10 +91,39 @@ export function recordWebVital(name: WebVitalName, value: number, navigationType
   // This might be extended to report to analytics in the future
 }
 
+// Performance measuring utilities
+export function markStart(markName: string): void {
+  if (typeof performance === 'undefined') return;
+  performance.mark(`${markName}-start`);
+}
+
+export function markEnd(markName: string): void {
+  if (typeof performance === 'undefined') return;
+  
+  try {
+    performance.mark(`${markName}-end`);
+    performance.measure(
+      markName,
+      `${markName}-start`,
+      `${markName}-end`
+    );
+    
+    const entries = performance.getEntriesByName(markName);
+    if (entries.length > 0) {
+      const duration = entries[0].duration;
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`%c${markName}: ${duration.toFixed(2)}ms`, 'color: blue');
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to measure ${markName}:`, error);
+  }
+}
+
 /**
  * Initialize the Web Vitals monitoring
  */
-export function initWebVitalsMonitoring(): void {
+export function initWebVitals(): void {
   // This will be expanded as needed
   if (typeof window !== 'undefined') {
     try {
@@ -120,5 +149,7 @@ export function initWebVitalsMonitoring(): void {
 // Export the monitoring utility
 export default {
   recordWebVital,
-  initWebVitalsMonitoring
+  initWebVitals,
+  markStart,
+  markEnd
 };
