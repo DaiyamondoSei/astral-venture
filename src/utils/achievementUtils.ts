@@ -1,18 +1,41 @@
 
+import { v4 as uuidv4 } from 'uuid';
+
 export interface Achievement {
   id: string;
   title: string;
   description: string;
-  category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special';
+  category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special' | 'portal' | 'chakra';
   progress?: number;
   awarded?: boolean;
-  icon?: 'star' | 'trophy' | 'award' | 'check';
+  icon?: 'star' | 'trophy' | 'award' | 'check' | 'zap' | 'sparkles';
 }
 
-/**
- * Get placeholder achievements for when the database doesn't have any yet
- */
-export function getPlaceholderAchievements(): Achievement[] {
+export const calculateProgressPercentage = (progress: number): number => {
+  return Math.min(Math.round(progress * 100), 100);
+};
+
+export const getCategoryColor = (category: string): string => {
+  switch (category) {
+    case 'meditation':
+      return 'from-blue-400 to-blue-600';
+    case 'practice':
+      return 'from-purple-400 to-purple-600';
+    case 'reflection':
+      return 'from-teal-400 to-teal-600';
+    case 'wisdom':
+      return 'from-amber-400 to-amber-600';
+    case 'portal':
+      return 'from-indigo-400 to-indigo-600';
+    case 'chakra':
+      return 'from-pink-400 to-pink-600';
+    case 'special':
+    default:
+      return 'from-green-400 to-green-600';
+  }
+};
+
+export const getPlaceholderAchievements = (): Achievement[] => {
   return [
     {
       id: 'first-meditation',
@@ -21,14 +44,14 @@ export function getPlaceholderAchievements(): Achievement[] {
       category: 'meditation',
       progress: 0,
       awarded: false,
-      icon: 'award'
+      icon: 'star'
     },
     {
       id: 'meditation-streak',
       title: 'Consistent Mind',
       description: 'Complete meditations for 3 days in a row',
       category: 'meditation',
-      progress: 0,
+      progress: 0.33,
       awarded: false,
       icon: 'star'
     },
@@ -58,33 +81,78 @@ export function getPlaceholderAchievements(): Achievement[] {
       progress: 0,
       awarded: false,
       icon: 'star'
+    },
+    {
+      id: 'portal_resonance_3',
+      title: 'Energy Resonator',
+      description: 'Reach resonance level 3 in the Seed of Life portal',
+      category: 'portal',
+      progress: 0,
+      awarded: false,
+      icon: 'zap'
+    },
+    {
+      id: 'portal_resonance_5',
+      title: 'Quantum Resonator',
+      description: 'Master the Seed of Life portal by reaching resonance level 5',
+      category: 'portal',
+      progress: 0,
+      awarded: false,
+      icon: 'sparkles'
     }
   ];
-}
+};
 
-/**
- * Calculate progress percentage from achievement progress
- */
-export function calculateProgressPercentage(progress: number): number {
-  return Math.min(100, Math.max(0, progress * 100));
-}
-
-/**
- * Get a suitable color for an achievement category
- */
-export function getCategoryColor(category: string): string {
-  switch (category) {
-    case 'meditation':
-      return 'from-blue-400 to-blue-600';
-    case 'practice':
-      return 'from-green-400 to-green-600';
-    case 'reflection':
-      return 'from-purple-400 to-purple-600';
-    case 'wisdom':
-      return 'from-amber-400 to-amber-600';
-    case 'special':
-      return 'from-pink-400 to-pink-600';
-    default:
-      return 'from-gray-400 to-gray-600';
+export const trackAchievementProgress = async (
+  achievementId: string, 
+  progress: number, 
+  autoAward = true
+): Promise<boolean> => {
+  try {
+    // First, check if we're in a browser environment
+    if (typeof window === 'undefined') return false;
+    
+    // Call the edge function to update achievement progress
+    const response = await fetch('/api/track-achievement', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        achievementId,
+        progress,
+        autoAward
+      })
+    });
+    
+    const data = await response.json();
+    return data.success;
+  } catch (error) {
+    console.error('Error tracking achievement progress:', error);
+    return false;
   }
-}
+};
+
+export const awardAchievement = async (achievementId: string): Promise<boolean> => {
+  try {
+    // First, check if we're in a browser environment
+    if (typeof window === 'undefined') return false;
+    
+    // Call the edge function to award an achievement
+    const response = await fetch('/api/award-achievement', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        achievementId
+      })
+    });
+    
+    const data = await response.json();
+    return data.success;
+  } catch (error) {
+    console.error('Error awarding achievement:', error);
+    return false;
+  }
+};

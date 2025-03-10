@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Award, Check, Star, Trophy } from 'lucide-react';
+import { Award, Check, Star, Trophy, Zap, Sparkles } from 'lucide-react';
 import { calculateProgressPercentage, getCategoryColor } from '@/utils/achievementUtils';
 
 interface AchievementProps {
@@ -9,10 +9,10 @@ interface AchievementProps {
     id: string;
     title: string;
     description: string;
-    category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special';
+    category: 'meditation' | 'practice' | 'reflection' | 'wisdom' | 'special' | 'portal' | 'chakra';
     progress?: number;
     awarded?: boolean;
-    icon?: 'star' | 'trophy' | 'award' | 'check';
+    icon?: 'star' | 'trophy' | 'award' | 'check' | 'zap' | 'sparkles';
   };
 }
 
@@ -24,7 +24,9 @@ const AchievementItem: React.FC<AchievementProps> = ({ achievement }) => {
     star: <Star className="h-5 w-5" />,
     trophy: <Trophy className="h-5 w-5" />,
     award: <Award className="h-5 w-5" />,
-    check: <Check className="h-5 w-5" />
+    check: <Check className="h-5 w-5" />,
+    zap: <Zap className="h-5 w-5" />,
+    sparkles: <Sparkles className="h-5 w-5" />
   };
   
   const icon = achievement.icon ? iconMap[achievement.icon] : <Award className="h-5 w-5" />;

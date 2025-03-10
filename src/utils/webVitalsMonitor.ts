@@ -1,358 +1,253 @@
 
-/**
- * Web Vitals Monitoring System
- * Enhanced monitoring system for collecting, analyzing and reporting web vitals metrics
- */
-import { callEdgeFunction } from './edgeFunctionClient';
-import type { 
-  ComponentMetric, 
-  WebVitalMetric, 
-  PerformanceMetricPayload,
-  DeviceInfo
-} from '@/types/edge-functions';
+import { ReportHandler } from 'web-vitals';
 
-// Performance marks storage
-const performanceMarks: Record<string, { start?: number; end?: number; duration?: number }> = {};
-
-// Web vitals storage
-const webVitalsMetrics: WebVitalMetric[] = [];
-
-// Components render time tracking
-interface ComponentRenderTiming {
-  componentName: string;
-  renderTime: number;
-  timestamp: number;
-  renderType: 'initial' | 'update' | 'effect';
+// Web Vitals configuration type
+interface WebVitalsConfig {
+  reportAllChanges?: boolean;
+  reportToAnalytics?: boolean;
+  debug?: boolean;
 }
 
-// Component metrics storage
-const componentMetrics: Record<string, ComponentRenderTiming[]> = {};
-
-// Session identifier
-const sessionId = generateSessionId();
-
-// Device information
-const deviceInfo = getDeviceInfo();
-
-// Reporting interval reference
-let reportingInterval: number | null = null;
-
-/**
- * Initialize web vitals monitoring
- * Sets up reporting intervals and listeners for web vitals
- */
-export function initWebVitals(): () => void {
-  try {
-    // Check if already initialized
-    if (reportingInterval) {
-      console.warn('Web vitals monitoring already initialized');
-      return () => {};
-    }
-
-    // Set up regular reporting interval
-    reportingInterval = window.setInterval(() => {
-      if (webVitalsMetrics.length > 0 || Object.keys(componentMetrics).length > 0) {
-        reportMetricsToServer().catch(err => {
-          console.error('Failed to report metrics:', err);
-        });
-      }
-    }, 60000); // Report every minute
-
-    // Setup listeners for browser visibility changes
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-          // Report metrics when page is being hidden/unloaded
-          reportMetricsToServer().catch(err => {
-            console.error('Failed to report metrics on page hide:', err);
-          });
-        }
-      });
-    }
-    
-    // Setup core web vitals tracking if available
-    if (typeof window !== 'undefined') {
-      import('web-vitals').then(webVitals => {
-        webVitals.onCLS(metric => {
-          trackWebVital('CLS', metric.value, 'visual_stability');
-        });
-        
-        webVitals.onFID(metric => {
-          trackWebVital('FID', metric.value, 'interaction');
-        });
-        
-        webVitals.onLCP(metric => {
-          trackWebVital('LCP', metric.value, 'loading');
-        });
-        
-        webVitals.onTTFB(metric => {
-          trackWebVital('TTFB', metric.value, 'loading');
-        });
-        
-        webVitals.onFCP(metric => {
-          trackWebVital('FCP', metric.value, 'loading');
-        });
-      }).catch(err => {
-        console.error('Failed to load web-vitals:', err);
-      });
-    }
-    
-    // Return cleanup function
-    return () => {
-      if (reportingInterval) {
-        window.clearInterval(reportingInterval);
-        reportingInterval = null;
-      }
-      document.removeEventListener('visibilitychange', () => {});
-    };
-  } catch (error) {
-    console.error('Error initializing web vitals:', error);
-    return () => {};
-  }
-}
-
-/**
- * Create a performance mark start point
- * @param markName Unique identifier for the performance mark
- */
-export function markStart(markName: string): void {
-  try {
-    const now = performance.now();
-    performanceMarks[markName] = performanceMarks[markName] || {};
-    performanceMarks[markName].start = now;
-    
-    // Also use the native Performance API if available
-    if (typeof performance !== 'undefined' && performance.mark) {
-      performance.mark(`${markName}_start`);
-    }
-  } catch (error) {
-    console.error(`Error in markStart(${markName}):`, error);
-  }
-}
-
-/**
- * End a performance mark and calculate duration
- * @param markName Identifier matching a previous markStart call
- * @returns Duration in milliseconds or undefined if no matching start mark
- */
-export function markEnd(markName: string): number | undefined {
-  try {
-    const now = performance.now();
-    const mark = performanceMarks[markName];
-    
-    if (!mark || typeof mark.start !== 'number') {
-      console.warn(`No matching start mark found for "${markName}"`);
-      return undefined;
-    }
-    
-    mark.end = now;
-    mark.duration = mark.end - mark.start;
-    
-    // Also use the native Performance API if available
-    if (typeof performance !== 'undefined' && performance.mark && performance.measure) {
-      performance.mark(`${markName}_end`);
-      try {
-        performance.measure(markName, `${markName}_start`, `${markName}_end`);
-      } catch (e) {
-        // Some browsers may throw if the marks have been cleared
-      }
-    }
-    
-    return mark.duration;
-  } catch (error) {
-    console.error(`Error in markEnd(${markName}):`, error);
-    return undefined;
-  }
-}
-
-/**
- * Track component render time
- * @param componentName Name of the component
- * @param renderTime Time taken to render in milliseconds
- * @param renderType Type of render (initial, update, effect)
- */
-export function trackComponentRender(
-  componentName: string, 
-  renderTime: number,
-  renderType: 'initial' | 'update' | 'effect' = 'update'
-): void {
-  try {
-    if (!componentMetrics[componentName]) {
-      componentMetrics[componentName] = [];
-    }
-    
-    componentMetrics[componentName].push({
-      componentName,
-      renderTime,
-      timestamp: Date.now(),
-      renderType
-    });
-    
-    // Limit stored metrics per component to prevent memory issues
-    if (componentMetrics[componentName].length > 100) {
-      componentMetrics[componentName].shift();
-    }
-  } catch (error) {
-    console.error(`Error tracking render for ${componentName}:`, error);
-  }
-}
-
-/**
- * Track web vital metrics
- * @param name Metric name
- * @param value Metric value
- * @param category Metric category (loading, interaction, visual_stability)
- */
-export function trackWebVital(
-  name: string,
-  value: number,
-  category: 'loading' | 'interaction' | 'visual_stability'
-): void {
-  try {
-    webVitalsMetrics.push({
-      name,
-      value,
-      category,
-      timestamp: Date.now()
-    });
-    
-    // Limit stored metrics to prevent memory issues
-    if (webVitalsMetrics.length > 200) {
-      webVitalsMetrics.shift();
-    }
-  } catch (error) {
-    console.error(`Error tracking web vital ${name}:`, error);
-  }
-}
-
-/**
- * Get all collected performance metrics
- * @returns Object containing all performance metrics
- */
-export function getAllMetrics() {
-  return {
-    performanceMarks,
-    componentMetrics,
-    webVitalsMetrics,
-    sessionId,
-    deviceInfo
-  };
-}
-
-/**
- * Clear collected metrics
- */
-export function clearMetrics(): void {
-  Object.keys(performanceMarks).forEach(key => delete performanceMarks[key]);
-  Object.keys(componentMetrics).forEach(key => delete componentMetrics[key]);
-  webVitalsMetrics.length = 0;
-}
-
-/**
- * Send metrics to the server using edge function
- * @returns Promise that resolves when metrics are sent
- */
-export async function reportMetricsToServer(): Promise<boolean> {
-  try {
-    // Extract component metrics for reporting
-    const metrics = Object.entries(componentMetrics).flatMap(([_, timings]) => 
-      timings.map(timing => ({
-        componentName: timing.componentName,
-        renderTime: timing.renderTime,
-        renderType: timing.renderType,
-        timestamp: timing.timestamp
-      }))
-    );
-    
-    // Skip if no metrics to report
-    if (metrics.length === 0 && webVitalsMetrics.length === 0) {
-      return false;
-    }
-    
-    // Prepare payload
-    const payload: PerformanceMetricPayload = {
-      sessionId,
-      deviceInfo,
-      appVersion: '1.0.0', // Should be dynamically derived in a real app
-      metrics,
-      webVitals: webVitalsMetrics,
-      timestamp: Date.now()
-    };
-    
-    // Use our generic edge function client
-    const response = await callEdgeFunction('track-performance', payload, {
-      handleError: true,
-      showErrorToast: false,
-    });
-    
-    if (response.success) {
-      // Clear reported metrics
-      clearMetrics();
-      return true;
-    } else {
-      console.error('Failed to report metrics:', response.error);
-      return false;
-    }
-  } catch (error) {
-    console.error('Error reporting metrics:', error);
-    return false;
-  }
-}
-
-// Helper functions
-
-/**
- * Generate a unique session ID
- */
-function generateSessionId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 12)}`;
-}
-
-/**
- * Get device information
- */
-function getDeviceInfo(): DeviceInfo {
-  try {
-    const navigatorInfo = navigator as any;
-    const isLowEndDevice = 
-      navigatorInfo.deviceMemory < 4 || 
-      navigatorInfo.hardwareConcurrency < 4;
-    
-    return {
-      userAgent: navigator.userAgent,
-      deviceCategory: isLowEndDevice ? 'low-end' : 'high-end',
-      deviceMemory: navigatorInfo.deviceMemory || 'unknown',
-      hardwareConcurrency: navigatorInfo.hardwareConcurrency || 'unknown',
-      connectionType: navigatorInfo.connection ? navigatorInfo.connection.effectiveType : 'unknown',
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight
-      },
-      screenSize: {
-        width: window.screen.width,
-        height: window.screen.height
-      },
-      pixelRatio: window.devicePixelRatio || 1
-    };
-  } catch (error) {
-    console.error('Error getting device info:', error);
-    return {
-      userAgent: 'unknown',
-      deviceCategory: 'unknown'
-    };
-  }
-}
-
-// Export additional utility functions
-export const webVitalsMonitor = {
-  markStart,
-  markEnd,
-  trackComponentRender,
-  trackWebVital,
-  getAllMetrics,
-  clearMetrics,
-  reportMetricsToServer,
-  initWebVitals
+// Default configuration
+const defaultConfig: WebVitalsConfig = {
+  reportAllChanges: false,
+  reportToAnalytics: true,
+  debug: false
 };
 
-export default webVitalsMonitor;
+// Global configuration that can be updated
+let currentConfig: WebVitalsConfig = { ...defaultConfig };
+
+/**
+ * Initialize web vitals monitoring with configuration
+ */
+export const initWebVitals = (config?: WebVitalsConfig): void => {
+  currentConfig = { ...defaultConfig, ...config };
+  
+  if (currentConfig.debug) {
+    console.log('Web Vitals initialized with config:', currentConfig);
+  }
+  
+  // Only import and run in browser environment
+  if (typeof window !== 'undefined') {
+    import('web-vitals').then(({ onCLS, onFID, onLCP, onTTFB, onFCP }) => {
+      onCLS(createReportCallback('CLS'), { reportAllChanges: currentConfig.reportAllChanges });
+      onFID(createReportCallback('FID'), { reportAllChanges: currentConfig.reportAllChanges });
+      onLCP(createReportCallback('LCP'), { reportAllChanges: currentConfig.reportAllChanges });
+      onTTFB(createReportCallback('TTFB'), { reportAllChanges: currentConfig.reportAllChanges });
+      onFCP(createReportCallback('FCP'), { reportAllChanges: currentConfig.reportAllChanges });
+    });
+  }
+};
+
+/**
+ * Update web vitals configuration
+ */
+export const updateWebVitalsConfig = (config: Partial<WebVitalsConfig>): void => {
+  currentConfig = { ...currentConfig, ...config };
+  
+  if (currentConfig.debug) {
+    console.log('Web Vitals configuration updated:', currentConfig);
+  }
+};
+
+/**
+ * Create a callback for the web-vitals library
+ */
+const createReportCallback = (metricName: string): ReportHandler => {
+  return (metric) => {
+    if (currentConfig.debug) {
+      console.log(`Web Vitals - ${metricName}:`, metric);
+    }
+    
+    // Add to metrics queue for batched reporting
+    addToMetricsQueue({
+      name: metric.name,
+      value: metric.value,
+      category: getMetricCategory(metric.name),
+      timestamp: Date.now()
+    });
+    
+    // Report to analytics if enabled
+    if (currentConfig.reportToAnalytics) {
+      reportToAnalytics(metric);
+    }
+  };
+};
+
+// Queue to batch metrics for reporting
+const metricsQueue: Array<{
+  name: string;
+  value: number;
+  category: 'loading' | 'interaction' | 'visual_stability';
+  timestamp: number;
+}> = [];
+
+/**
+ * Add a metric to the reporting queue
+ */
+export const addToMetricsQueue = (metric: {
+  name: string;
+  value: number;
+  category: 'loading' | 'interaction' | 'visual_stability';
+  timestamp: number;
+}): void => {
+  metricsQueue.push(metric);
+  
+  // If we have enough metrics or enough time has passed, report them
+  if (metricsQueue.length >= 5) {
+    flushMetricsQueue();
+  }
+};
+
+/**
+ * Report all queued metrics
+ */
+export const flushMetricsQueue = async (): Promise<void> => {
+  if (metricsQueue.length === 0) return;
+  
+  const metricsToReport = [...metricsQueue];
+  metricsQueue.length = 0; // Clear the queue
+  
+  try {
+    // In a real implementation, this would send to your analytics endpoint
+    if (currentConfig.debug) {
+      console.log('Reporting batch of metrics:', metricsToReport);
+    }
+    
+    // Example of sending to an edge function
+    // await fetch('/api/track-performance', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({
+    //     sessionId: getSessionId(),
+    //     deviceInfo: getDeviceInfo(),
+    //     appVersion: getAppVersion(),
+    //     webVitals: metricsToReport,
+    //     timestamp: Date.now()
+    //   })
+    // });
+  } catch (error) {
+    console.error('Failed to report metrics:', error);
+    // Re-add to queue for retry
+    metricsQueue.push(...metricsToReport);
+  }
+};
+
+/**
+ * Report a web vital metric to analytics
+ */
+const reportToAnalytics = (metric: { name: string; value: number }): void => {
+  // Example implementation - replace with your actual analytics
+  if (typeof window !== 'undefined' && 'gtag' in window) {
+    const gtag = (window as any).gtag;
+    gtag('event', 'web_vitals', {
+      event_category: 'Web Vitals',
+      event_label: metric.name,
+      value: Math.round(metric.value),
+      non_interaction: true,
+    });
+  }
+};
+
+/**
+ * Get a category for a web vital metric
+ */
+const getMetricCategory = (metricName: string): 'loading' | 'interaction' | 'visual_stability' => {
+  switch (metricName) {
+    case 'CLS':
+      return 'visual_stability';
+    case 'FID':
+      return 'interaction';
+    default:
+      return 'loading';
+  }
+};
+
+/**
+ * Get a unique session ID
+ */
+const getSessionId = (): string => {
+  if (typeof window === 'undefined') return 'server';
+  
+  // Try to get existing session ID
+  let sessionId = sessionStorage.getItem('performance_session_id');
+  
+  // If no session ID, create one
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    sessionStorage.setItem('performance_session_id', sessionId);
+  }
+  
+  return sessionId;
+};
+
+/**
+ * Get information about the user's device
+ */
+const getDeviceInfo = () => {
+  if (typeof window === 'undefined') {
+    return { userAgent: 'server', deviceCategory: 'server' };
+  }
+  
+  return {
+    userAgent: navigator.userAgent,
+    deviceCategory: getDeviceCategory(),
+    deviceMemory: navigator.deviceMemory || 'unknown',
+    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+    connectionType: getConnectionType(),
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight
+    },
+    screenSize: {
+      width: window.screen.width,
+      height: window.screen.height
+    },
+    pixelRatio: window.devicePixelRatio
+  };
+};
+
+/**
+ * Get the device category based on screen size
+ */
+const getDeviceCategory = (): string => {
+  if (typeof window === 'undefined') return 'unknown';
+  
+  const width = window.innerWidth;
+  
+  if (width < 576) return 'mobile';
+  if (width < 992) return 'tablet';
+  return 'desktop';
+};
+
+/**
+ * Get the connection type if available
+ */
+const getConnectionType = (): string => {
+  if (typeof navigator === 'undefined') return 'unknown';
+  if (!('connection' in navigator)) return 'unknown';
+  
+  const conn = (navigator as any).connection;
+  if (!conn) return 'unknown';
+  
+  return conn.effectiveType || 'unknown';
+};
+
+/**
+ * Get the application version
+ */
+const getAppVersion = (): string => {
+  // Replace with your version tracking mechanism
+  return '1.0.0';
+};
+
+// Set up an interval to flush metrics periodically
+if (typeof window !== 'undefined') {
+  setInterval(flushMetricsQueue, 30000); // Every 30 seconds
+  
+  // Also flush when page is being unloaded
+  window.addEventListener('beforeunload', () => {
+    flushMetricsQueue();
+  });
+}
