@@ -10,18 +10,29 @@ export class ValidationError extends Error {
   public readonly field: string;
   public readonly code: string;
   public readonly value: unknown;
+  public readonly rule?: string;
+  public readonly expectedType?: string;
+  public readonly details?: string | Record<string, unknown>;
   
   constructor(
     message: string,
     field: string,
     code: string = 'invalid_value',
-    value: unknown = undefined
+    value: unknown = undefined,
+    options: {
+      rule?: string;
+      expectedType?: string;
+      details?: string | Record<string, unknown>;
+    } = {}
   ) {
     super(message);
     this.name = 'ValidationError';
     this.field = field;
     this.code = code;
     this.value = value;
+    this.rule = options.rule;
+    this.expectedType = options.expectedType;
+    this.details = options.details;
     
     // Maintain proper stack trace for where our error was thrown
     if (Error.captureStackTrace) {
@@ -43,7 +54,9 @@ export class ValidationError extends Error {
     return new ValidationError(
       `The field '${field}' is required`,
       field,
-      'required_field'
+      'required_field',
+      undefined,
+      { rule: 'required' }
     );
   }
   
@@ -55,7 +68,8 @@ export class ValidationError extends Error {
       `The field '${field}' must be a ${expectedType}`,
       field,
       'invalid_type',
-      value
+      value,
+      { rule: 'type', expectedType }
     );
   }
   
@@ -67,7 +81,8 @@ export class ValidationError extends Error {
       `The field '${field}' must be in ${format} format`,
       field,
       'invalid_format',
-      value
+      value,
+      { rule: 'format', details: format }
     );
   }
   
@@ -85,7 +100,8 @@ export class ValidationError extends Error {
       `The field '${field}' must be ${rangeDesc}`,
       field,
       'out_of_range',
-      value
+      value,
+      { rule: 'range', details: { min, max } }
     );
   }
   
@@ -103,7 +119,34 @@ export class ValidationError extends Error {
       `The field '${field}' must be ${lengthDesc}`,
       field,
       'invalid_length',
-      value
+      value,
+      { rule: 'length', details: { minLength, maxLength } }
+    );
+  }
+
+  /**
+   * Creates a validation error from an API error
+   */
+  static fromApiError(error: any, field: string = 'api'): ValidationError {
+    return new ValidationError(
+      error.message || 'API validation error',
+      field,
+      'api_error',
+      undefined,
+      { details: error }
+    );
+  }
+
+  /**
+   * Creates a schema validation error
+   */
+  static schemaError(field: string, message: string, details?: any): ValidationError {
+    return new ValidationError(
+      message,
+      field,
+      'schema_error',
+      undefined,
+      { rule: 'schema', details }
     );
   }
 }

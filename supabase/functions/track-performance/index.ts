@@ -3,92 +3,119 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
-// Define CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Handle requests to the edge function
+interface PerformanceMetric {
+  component_name: string;
+  average_render_time: number;
+  total_renders: number;
+  slow_renders: number;
+  first_render_time: number | null;
+  client_timestamp: string;
+}
+
+interface WebVitalMetric {
+  name: string;
+  value: number;
+  category: 'interaction' | 'loading' | 'visual_stability';
+  client_timestamp: string;
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight request
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders,
+    });
   }
 
   try {
-    // Parse request body
-    const { metrics, web_vitals } = await req.json();
-    
-    // Get authorization token to identify user
-    const token = req.headers.get('Authorization')?.replace('Bearer ', '');
-    
-    // Initialize Supabase client
+    // Setup Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Get user ID if token is provided
+
+    // Get user ID from authorization header
+    const authHeader = req.headers.get("Authorization");
     let userId = null;
-    if (token) {
+
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
       const { data: { user }, error } = await supabase.auth.getUser(token);
+      
       if (!error && user) {
         userId = user.id;
       }
     }
-    
-    // Ensure performance metrics table exists
-    await supabase.rpc('ensure_performance_metrics_table');
-    
-    // Process component metrics if provided
-    if (metrics && Array.isArray(metrics) && metrics.length > 0) {
-      // Add user_id and server timestamp to each metric
-      const metricsWithUser = metrics.map(metric => ({
+
+    // Parse request body
+    const { metrics = [], web_vitals = [] } = await req.json();
+
+    // Insert metrics into database
+    if (metrics.length > 0) {
+      const metricsWithUserId = metrics.map((metric: PerformanceMetric) => ({
         ...metric,
         user_id: userId,
-        server_timestamp: new Date().toISOString()
+        recorded_at: new Date().toISOString()
       }));
-      
-      // Insert metrics into database
-      const { error: insertError } = await supabase
+
+      const { error: metricsError } = await supabase
         .from('performance_metrics')
-        .insert(metricsWithUser);
-      
-      if (insertError) {
-        console.error("Error inserting performance metrics:", insertError);
-        throw new Error(`Failed to insert metrics: ${insertError.message}`);
+        .insert(metricsWithUserId);
+
+      if (metricsError) {
+        console.error("Error inserting performance metrics:", metricsError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: metricsError.message,
+            operation: "metrics" 
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
       }
-      
-      console.log(`Inserted ${metricsWithUser.length} performance metrics`);
     }
-    
-    // Process web vitals if provided
-    if (web_vitals && Array.isArray(web_vitals) && web_vitals.length > 0) {
-      // Add user_id and server timestamp to each web vital
-      const vitalsWithUser = web_vitals.map(vital => ({
+
+    // Insert web vitals into database
+    if (web_vitals.length > 0) {
+      const vitalsWithUserId = web_vitals.map((vital: WebVitalMetric) => ({
         ...vital,
         user_id: userId,
-        server_timestamp: new Date().toISOString()
+        recorded_at: new Date().toISOString()
       }));
-      
-      // Insert web vitals into database
-      const { error: insertError } = await supabase
+
+      const { error: vitalsError } = await supabase
         .from('web_vitals')
-        .insert(vitalsWithUser);
-      
-      if (insertError) {
-        console.error("Error inserting web vitals:", insertError);
-        throw new Error(`Failed to insert web vitals: ${insertError.message}`);
+        .insert(vitalsWithUserId);
+
+      if (vitalsError) {
+        console.error("Error inserting web vitals:", vitalsError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: vitalsError.message,
+            operation: "web_vitals" 
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
       }
-      
-      console.log(`Inserted ${vitalsWithUser.length} web vitals`);
     }
-    
-    // Return successful response
+
+    // Return success response
     return new Response(
       JSON.stringify({ 
-        success: true,
-        message: "Performance data recorded successfully"
+        success: true, 
+        metrics_count: metrics.length,
+        vitals_count: web_vitals.length
       }),
       { 
         status: 200, 
@@ -96,13 +123,12 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Function error:", error);
+    console.error("Unexpected error:", error);
     
-    // Return error response
     return new Response(
       JSON.stringify({ 
-        success: false,
-        error: error.message || "Unknown error"
+        success: false, 
+        error: error.message 
       }),
       { 
         status: 500, 

@@ -61,7 +61,7 @@ export const supabaseClient = supabase;
  * Calls a Supabase RPC function with safe error handling
  */
 export async function callRpcSafely<T>(
-  functionName: 'increment_points' | 'get_user_achievements' | 'get_total_points',
+  functionName: 'increment_points' | 'get_user_achievements' | 'get_total_points' | 'get_performance_metrics' | 'ensure_performance_metrics_table',
   params: Record<string, any> = {},
   options: { showToast?: boolean; errorMessage?: string } = {}
 ): Promise<T | null> {
@@ -161,4 +161,44 @@ export const calculateFractalComplexity = (energyPoints: number) => {
   complexity += logFactor;
   
   return complexity;
+};
+
+// Function to ensure performance metrics tables exist
+export const ensurePerformanceMetricsTable = async (): Promise<boolean> => {
+  try {
+    const result = await callRpcSafely<boolean>(
+      'ensure_performance_metrics_table',
+      {},
+      { showToast: false }
+    );
+    
+    return result === true;
+  } catch (error) {
+    console.error('Error ensuring performance metrics table:', error);
+    return false;
+  }
+};
+
+// Function to get user performance metrics
+export const getPerformanceMetrics = async (
+  userId: string,
+  limit = 100,
+  offset = 0
+) => {
+  try {
+    const metrics = await callRpcSafely(
+      'get_performance_metrics',
+      {
+        user_id_param: userId,
+        limit_param: limit,
+        offset_param: offset
+      },
+      { showToast: false }
+    );
+    
+    return metrics || [];
+  } catch (error) {
+    console.error('Error fetching performance metrics:', error);
+    return [];
+  }
 };

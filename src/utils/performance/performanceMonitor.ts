@@ -1,3 +1,4 @@
+
 /**
  * Performance Monitoring Utility
  * 
@@ -180,8 +181,13 @@ class PerformanceMonitor {
           };
         });
       
-      // Ensure the performance_metrics table exists
-      await supabase.rpc('ensure_performance_metrics_table');
+      // Call RPC function to ensure the performance_metrics table exists
+      try {
+        await supabase.rpc('ensure_performance_metrics_table');
+      } catch (err) {
+        console.warn('Performance metrics table initialization skipped:', err);
+        // Continue even if RPC fails, the table might already exist
+      }
       
       // Call the edge function to track performance data
       const { error } = await supabase.functions.invoke('track-performance', {
