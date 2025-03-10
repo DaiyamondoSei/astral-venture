@@ -3,10 +3,9 @@ import { useContext } from 'react';
 import AuthContext, { IAuthContext } from '@/contexts/AuthContext';
 
 /**
- * Custom hook to access the authentication context
- * 
- * @returns The authentication context
- * @throws Error if used outside of an AuthProvider
+ * Hook for accessing auth context with type safety
+ * @returns Auth context with full typing
+ * @throws Error if used outside AuthProvider
  */
 export function useAuth(): IAuthContext {
   const context = useContext(AuthContext);

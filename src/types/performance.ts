@@ -1,4 +1,3 @@
-
 /**
  * Shared type definitions for performance monitoring
  * Used across frontend and backend systems
@@ -25,9 +24,50 @@ export interface ComponentMetrics {
 }
 
 /**
+ * Performance tracking options with strict typing
+ */
+export interface PerformanceTrackingOptions {
+  autoStart?: boolean;
+  slowRenderThreshold?: number;
+  logSlowRenders?: boolean;
+  enableDebugLogging?: boolean;
+  reportMetrics?: boolean;
+}
+
+/**
+ * Web vital categories with strict typing
+ */
+export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
+
+/**
+ * Web vital event with required fields
+ */
+export interface WebVitalEvent {
+  name: string;
+  value: number;
+  category: WebVitalCategory;
+  timestamp: number;
+}
+
+/**
+ * Component render event types
+ */
+export type RenderEventType = 'mount' | 'update' | 'unmount' | 'interaction';
+
+/**
+ * Component render metrics with strict typing
+ */
+export interface RenderMetrics {
+  componentName: string;
+  renderTime: number;
+  eventType: RenderEventType;
+  timestamp: number;
+}
+
+/**
  * Performance event types
  */
-export type PerformanceEventType = 'render' | 'update' | 'mount' | 'unmount' | 'interaction';
+export type PerformanceEventType = RenderEventType | 'web-vital' | 'error';
 
 /**
  * Web vital metric types
