@@ -1,253 +1,218 @@
 
-import { ReportHandler } from 'web-vitals';
+import { onCLS, onFID, onLCP, onFCP, onTTFB, onINP, ReportCallback } from 'web-vitals';
+import { supabase } from '@/integrations/supabase/client';
 
-// Web Vitals configuration type
-interface WebVitalsConfig {
-  reportAllChanges?: boolean;
-  reportToAnalytics?: boolean;
-  debug?: boolean;
-}
+// Define vital categories
+export type VitalCategory = 'loading' | 'interaction' | 'visual_stability';
 
-// Default configuration
-const defaultConfig: WebVitalsConfig = {
-  reportAllChanges: false,
-  reportToAnalytics: true,
-  debug: false
-};
-
-// Global configuration that can be updated
-let currentConfig: WebVitalsConfig = { ...defaultConfig };
+// Store performance marks for custom measurements
+const performanceMarks: Record<string, number> = {};
 
 /**
- * Initialize web vitals monitoring with configuration
+ * Initialize web vitals monitoring
  */
-export const initWebVitals = (config?: WebVitalsConfig): void => {
-  currentConfig = { ...defaultConfig, ...config };
-  
-  if (currentConfig.debug) {
-    console.log('Web Vitals initialized with config:', currentConfig);
-  }
-  
-  // Only import and run in browser environment
-  if (typeof window !== 'undefined') {
-    import('web-vitals').then(({ onCLS, onFID, onLCP, onTTFB, onFCP }) => {
-      onCLS(createReportCallback('CLS'), { reportAllChanges: currentConfig.reportAllChanges });
-      onFID(createReportCallback('FID'), { reportAllChanges: currentConfig.reportAllChanges });
-      onLCP(createReportCallback('LCP'), { reportAllChanges: currentConfig.reportAllChanges });
-      onTTFB(createReportCallback('TTFB'), { reportAllChanges: currentConfig.reportAllChanges });
-      onFCP(createReportCallback('FCP'), { reportAllChanges: currentConfig.reportAllChanges });
-    });
+export const initWebVitals = (): void => {
+  try {
+    if (typeof window !== 'undefined') {
+      // Core Web Vitals
+      onCLS(sendToAnalytics);
+      onFID(sendToAnalytics);
+      onLCP(sendToAnalytics);
+      
+      // Additional Web Vitals
+      onFCP(sendToAnalytics);
+      onTTFB(sendToAnalytics);
+      onINP(sendToAnalytics);
+      
+      console.log('Web Vitals monitoring initialized');
+    }
+  } catch (error) {
+    console.error('Failed to initialize web vitals:', error);
   }
 };
 
 /**
- * Update web vitals configuration
+ * Send vital metrics to analytics service
  */
-export const updateWebVitalsConfig = (config: Partial<WebVitalsConfig>): void => {
-  currentConfig = { ...currentConfig, ...config };
-  
-  if (currentConfig.debug) {
-    console.log('Web Vitals configuration updated:', currentConfig);
-  }
-};
-
-/**
- * Create a callback for the web-vitals library
- */
-const createReportCallback = (metricName: string): ReportHandler => {
-  return (metric) => {
-    if (currentConfig.debug) {
-      console.log(`Web Vitals - ${metricName}:`, metric);
+const sendToAnalytics = (metric: any): void => {
+  try {
+    const { name, value, delta, id } = metric;
+    
+    // Log to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Web Vital: ${name}`, {
+        value: Math.round(value),
+        delta: Math.round(delta)
+      });
     }
     
-    // Add to metrics queue for batched reporting
-    addToMetricsQueue({
-      name: metric.name,
-      value: metric.value,
-      category: getMetricCategory(metric.name),
-      timestamp: Date.now()
-    });
+    // Map vital to category for organization
+    let category: VitalCategory = 'loading';
     
-    // Report to analytics if enabled
-    if (currentConfig.reportToAnalytics) {
-      reportToAnalytics(metric);
+    switch (name) {
+      case 'CLS':
+        category = 'visual_stability';
+        break;
+      case 'FID':
+      case 'INP':
+        category = 'interaction';
+        break;
+      case 'LCP':
+      case 'FCP':
+      case 'TTFB':
+        category = 'loading';
+        break;
     }
-  };
+    
+    // Queue for backend reporting (rate-limited)
+    queueMetricsReport({
+      name,
+      value: Math.round(value),
+      delta: Math.round(delta),
+      category,
+      timestamp: Date.now(),
+      id
+    });
+  } catch (error) {
+    console.error('Error in sendToAnalytics:', error);
+  }
 };
 
-// Queue to batch metrics for reporting
-const metricsQueue: Array<{
-  name: string;
-  value: number;
-  category: 'loading' | 'interaction' | 'visual_stability';
-  timestamp: number;
-}> = [];
+// Queue for batched reporting
+let metricsQueue: any[] = [];
+let reportTimeout: NodeJS.Timeout | null = null;
 
 /**
- * Add a metric to the reporting queue
+ * Queue metrics to be reported in batches
  */
-export const addToMetricsQueue = (metric: {
-  name: string;
-  value: number;
-  category: 'loading' | 'interaction' | 'visual_stability';
-  timestamp: number;
-}): void => {
+const queueMetricsReport = (metric: any): void => {
   metricsQueue.push(metric);
   
-  // If we have enough metrics or enough time has passed, report them
-  if (metricsQueue.length >= 5) {
-    flushMetricsQueue();
+  // Debounce reporting to reduce API calls
+  if (reportTimeout) {
+    clearTimeout(reportTimeout);
+  }
+  
+  reportTimeout = setTimeout(() => {
+    if (metricsQueue.length > 0) {
+      reportMetricsBatch();
+    }
+  }, 5000); // Report every 5 seconds if there are metrics
+};
+
+/**
+ * Report metrics batch to the backend
+ */
+const reportMetricsBatch = async (): Promise<void> => {
+  try {
+    const metrics = [...metricsQueue];
+    metricsQueue = [];
+    
+    // Only report if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    // Report to Supabase function
+    const { error } = await supabase.functions.invoke('track-performance', {
+      body: { metrics, type: 'web_vitals' }
+    });
+    
+    if (error) {
+      console.error('Failed to report metrics:', error);
+    }
+  } catch (error) {
+    console.error('Error in reportMetricsBatch:', error);
   }
 };
 
 /**
- * Report all queued metrics
+ * Create a performance mark for custom timing
  */
-export const flushMetricsQueue = async (): Promise<void> => {
-  if (metricsQueue.length === 0) return;
-  
-  const metricsToReport = [...metricsQueue];
-  metricsQueue.length = 0; // Clear the queue
-  
+export const markStart = (label: string): void => {
   try {
-    // In a real implementation, this would send to your analytics endpoint
-    if (currentConfig.debug) {
-      console.log('Reporting batch of metrics:', metricsToReport);
+    performanceMarks[`${label}_start`] = performance.now();
+  } catch (error) {
+    console.error('Error in markStart:', error);
+  }
+};
+
+/**
+ * End a performance mark and get the duration
+ */
+export const markEnd = (label: string): number => {
+  try {
+    const endTime = performance.now();
+    const startTime = performanceMarks[`${label}_start`] || endTime;
+    const duration = endTime - startTime;
+    
+    // Clean up the mark
+    delete performanceMarks[`${label}_start`];
+    
+    // Report if it's a significant operation (> 100ms)
+    if (duration > 100) {
+      queueMetricsReport({
+        name: `custom_${label}`,
+        value: Math.round(duration),
+        category: 'interaction',
+        timestamp: Date.now()
+      });
     }
     
-    // Example of sending to an edge function
-    // await fetch('/api/track-performance', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     sessionId: getSessionId(),
-    //     deviceInfo: getDeviceInfo(),
-    //     appVersion: getAppVersion(),
-    //     webVitals: metricsToReport,
-    //     timestamp: Date.now()
-    //   })
-    // });
+    return duration;
   } catch (error) {
-    console.error('Failed to report metrics:', error);
-    // Re-add to queue for retry
-    metricsQueue.push(...metricsToReport);
+    console.error('Error in markEnd:', error);
+    return 0;
   }
 };
 
 /**
- * Report a web vital metric to analytics
+ * Track component render time
  */
-const reportToAnalytics = (metric: { name: string; value: number }): void => {
-  // Example implementation - replace with your actual analytics
-  if (typeof window !== 'undefined' && 'gtag' in window) {
-    const gtag = (window as any).gtag;
-    gtag('event', 'web_vitals', {
-      event_category: 'Web Vitals',
-      event_label: metric.name,
-      value: Math.round(metric.value),
-      non_interaction: true,
+export const trackComponentRender = (
+  componentName: string, 
+  renderTime: number
+): void => {
+  try {
+    queueMetricsReport({
+      name: `render_${componentName}`,
+      value: Math.round(renderTime),
+      category: 'interaction',
+      timestamp: Date.now()
     });
+  } catch (error) {
+    console.error('Error in trackComponentRender:', error);
   }
 };
 
 /**
- * Get a category for a web vital metric
+ * Track a web vital manually
  */
-const getMetricCategory = (metricName: string): 'loading' | 'interaction' | 'visual_stability' => {
-  switch (metricName) {
-    case 'CLS':
-      return 'visual_stability';
-    case 'FID':
-      return 'interaction';
-    default:
-      return 'loading';
+export const trackWebVital = (
+  name: string,
+  value: number,
+  category: VitalCategory = 'interaction'
+): void => {
+  try {
+    queueMetricsReport({
+      name,
+      value: Math.round(value),
+      category,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Error in trackWebVital:', error);
   }
 };
 
 /**
- * Get a unique session ID
+ * Force report all queued metrics
  */
-const getSessionId = (): string => {
-  if (typeof window === 'undefined') return 'server';
-  
-  // Try to get existing session ID
-  let sessionId = sessionStorage.getItem('performance_session_id');
-  
-  // If no session ID, create one
-  if (!sessionId) {
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    sessionStorage.setItem('performance_session_id', sessionId);
+export const reportMetricsToServer = async (): Promise<void> => {
+  if (metricsQueue.length > 0) {
+    if (reportTimeout) {
+      clearTimeout(reportTimeout);
+      reportTimeout = null;
+    }
+    await reportMetricsBatch();
   }
-  
-  return sessionId;
 };
-
-/**
- * Get information about the user's device
- */
-const getDeviceInfo = () => {
-  if (typeof window === 'undefined') {
-    return { userAgent: 'server', deviceCategory: 'server' };
-  }
-  
-  return {
-    userAgent: navigator.userAgent,
-    deviceCategory: getDeviceCategory(),
-    deviceMemory: navigator.deviceMemory || 'unknown',
-    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
-    connectionType: getConnectionType(),
-    viewport: {
-      width: window.innerWidth,
-      height: window.innerHeight
-    },
-    screenSize: {
-      width: window.screen.width,
-      height: window.screen.height
-    },
-    pixelRatio: window.devicePixelRatio
-  };
-};
-
-/**
- * Get the device category based on screen size
- */
-const getDeviceCategory = (): string => {
-  if (typeof window === 'undefined') return 'unknown';
-  
-  const width = window.innerWidth;
-  
-  if (width < 576) return 'mobile';
-  if (width < 992) return 'tablet';
-  return 'desktop';
-};
-
-/**
- * Get the connection type if available
- */
-const getConnectionType = (): string => {
-  if (typeof navigator === 'undefined') return 'unknown';
-  if (!('connection' in navigator)) return 'unknown';
-  
-  const conn = (navigator as any).connection;
-  if (!conn) return 'unknown';
-  
-  return conn.effectiveType || 'unknown';
-};
-
-/**
- * Get the application version
- */
-const getAppVersion = (): string => {
-  // Replace with your version tracking mechanism
-  return '1.0.0';
-};
-
-// Set up an interval to flush metrics periodically
-if (typeof window !== 'undefined') {
-  setInterval(flushMetricsQueue, 30000); // Every 30 seconds
-  
-  // Also flush when page is being unloaded
-  window.addEventListener('beforeunload', () => {
-    flushMetricsQueue();
-  });
-}

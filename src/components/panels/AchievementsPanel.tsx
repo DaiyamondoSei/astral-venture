@@ -3,12 +3,11 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import AchievementHeader from './achievement/AchievementHeader';
 import AchievementFilter from './achievement/AchievementFilter';
 import AchievementItem from './achievement/AchievementItem';
 import EmptyAchievementList from './achievement/EmptyAchievementList';
-import { getPlaceholderAchievements, Achievement } from '@/utils/achievementUtils';
+import { getUserAchievements, Achievement } from '@/utils/achievementUtils';
 
 interface AchievementsPanelProps {
   className?: string;
@@ -20,37 +19,7 @@ const AchievementsPanel: React.FC<AchievementsPanelProps> = ({ className }) => {
   // Get user achievements from Supabase
   const { data: achievements = [], isLoading } = useQuery({
     queryKey: ['achievements'],
-    queryFn: async () => {
-      try {
-        // First check if the user_achievements table exists using our function
-        const { data: userAchievements, error } = await supabase
-          .rpc('get_user_achievements', { 
-            user_id_param: (await supabase.auth.getUser()).data.user?.id 
-          });
-        
-        if (error) throw error;
-        
-        // If we don't have actual achievements yet, return placeholder data
-        if (!userAchievements || userAchievements.length === 0) {
-          return getPlaceholderAchievements();
-        }
-        
-        // Transform data to match our Achievement interface
-        return userAchievements.map((a: any) => ({
-          id: a.achievement_id,
-          title: a.achievement_data?.title || 'Unknown Achievement',
-          description: a.achievement_data?.description || 'Description not available',
-          category: a.achievement_data?.category || 'special',
-          progress: a.progress,
-          awarded: a.awarded,
-          icon: a.achievement_data?.icon || 'award'
-        })) as Achievement[];
-      } catch (error) {
-        console.error('Error fetching achievements:', error);
-        // Return placeholder data if there's an error
-        return getPlaceholderAchievements();
-      }
-    },
+    queryFn: getUserAchievements,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
   

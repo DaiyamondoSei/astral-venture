@@ -1,5 +1,6 @@
 
-import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface Achievement {
   id: string;
@@ -11,148 +12,141 @@ export interface Achievement {
   icon?: 'star' | 'trophy' | 'award' | 'check' | 'zap' | 'sparkles';
 }
 
+/**
+ * Calculate percentage of progress for an achievement
+ */
 export const calculateProgressPercentage = (progress: number): number => {
-  return Math.min(Math.round(progress * 100), 100);
+  // For achievements that don't track progress, show 100% if progress > 0
+  if (progress >= 1 && progress < 10) return 100;
+  // Cap progress at 100%
+  if (progress >= 100) return 100;
+  // Round to the nearest integer
+  return Math.round(progress);
 };
 
+/**
+ * Get category color gradient for achievements
+ */
 export const getCategoryColor = (category: string): string => {
   switch (category) {
     case 'meditation':
       return 'from-blue-400 to-blue-600';
     case 'practice':
-      return 'from-purple-400 to-purple-600';
+      return 'from-green-400 to-green-600';
     case 'reflection':
-      return 'from-teal-400 to-teal-600';
+      return 'from-purple-400 to-purple-600';
     case 'wisdom':
       return 'from-amber-400 to-amber-600';
     case 'portal':
-      return 'from-indigo-400 to-indigo-600';
+      return 'from-cyan-400 to-cyan-600';
     case 'chakra':
-      return 'from-pink-400 to-pink-600';
+      return 'from-rose-400 to-rose-600';
     case 'special':
     default:
-      return 'from-green-400 to-green-600';
+      return 'from-indigo-400 to-indigo-600';
   }
 };
 
-export const getPlaceholderAchievements = (): Achievement[] => {
-  return [
-    {
-      id: 'first-meditation',
-      title: 'First Meditation',
-      description: 'Complete your first meditation session',
-      category: 'meditation',
-      progress: 0,
-      awarded: false,
-      icon: 'star'
-    },
-    {
-      id: 'meditation-streak',
-      title: 'Consistent Mind',
-      description: 'Complete meditations for 3 days in a row',
-      category: 'meditation',
-      progress: 0.33,
-      awarded: false,
-      icon: 'star'
-    },
-    {
-      id: 'first-reflection',
-      title: 'Soul Searcher',
-      description: 'Write your first reflection',
-      category: 'reflection',
-      progress: 0,
-      awarded: false,
-      icon: 'check'
-    },
-    {
-      id: 'chakra-activation',
-      title: 'Energy Awakening',
-      description: 'Activate your first chakra',
-      category: 'practice',
-      progress: 0,
-      awarded: false,
-      icon: 'trophy'
-    },
-    {
-      id: 'wisdom-unlock',
-      title: 'Ancient Knowledge',
-      description: 'Unlock your first wisdom insight',
-      category: 'wisdom',
-      progress: 0,
-      awarded: false,
-      icon: 'star'
-    },
-    {
-      id: 'portal_resonance_3',
-      title: 'Energy Resonator',
-      description: 'Reach resonance level 3 in the Seed of Life portal',
-      category: 'portal',
-      progress: 0,
-      awarded: false,
-      icon: 'zap'
-    },
-    {
-      id: 'portal_resonance_5',
-      title: 'Quantum Resonator',
-      description: 'Master the Seed of Life portal by reaching resonance level 5',
-      category: 'portal',
-      progress: 0,
-      awarded: false,
-      icon: 'sparkles'
-    }
-  ];
-};
+/**
+ * Get placeholder achievements for loading/empty states
+ */
+export const getPlaceholderAchievements = (): Achievement[] => [
+  {
+    id: 'first_meditation',
+    title: 'Meditation Beginner',
+    description: 'Complete your first meditation session',
+    category: 'meditation',
+    progress: 0,
+    awarded: false,
+    icon: 'star'
+  },
+  {
+    id: 'first_reflection',
+    title: 'Self-Reflection',
+    description: 'Complete your first reflection entry',
+    category: 'reflection',
+    progress: 0,
+    awarded: false,
+    icon: 'check'
+  },
+  {
+    id: 'energy_milestone_100',
+    title: 'Energy Novice',
+    description: 'Reach 100 energy points',
+    category: 'special',
+    progress: 0,
+    awarded: false,
+    icon: 'trophy'
+  }
+];
 
+/**
+ * Track achievement progress in Supabase
+ */
 export const trackAchievementProgress = async (
-  achievementId: string, 
-  progress: number, 
-  autoAward = true
-): Promise<boolean> => {
+  achievementId: string,
+  progress: number = 1,
+  autoAward: boolean = true
+): Promise<{ success: boolean; error?: string }> => {
   try {
-    // First, check if we're in a browser environment
-    if (typeof window === 'undefined') return false;
-    
-    // Call the edge function to update achievement progress
-    const response = await fetch('/api/track-achievement', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('track-achievement', {
+      body: {
         achievementId,
         progress,
         autoAward
-      })
+      }
     });
-    
-    const data = await response.json();
-    return data.success;
-  } catch (error) {
-    console.error('Error tracking achievement progress:', error);
-    return false;
+
+    if (error) {
+      console.error('Error tracking achievement:', error);
+      return { success: false, error: error.message };
+    }
+
+    // If the achievement was awarded, show a toast notification
+    if (data?.awarded) {
+      toast.success(`Achievement unlocked: ${data.title || achievementId}`, {
+        description: data.description || 'You\'ve unlocked a new achievement!',
+        duration: 5000
+      });
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in trackAchievementProgress:', error);
+    return { success: false, error: error.message };
   }
 };
 
-export const awardAchievement = async (achievementId: string): Promise<boolean> => {
+/**
+ * Get user achievements from Supabase
+ */
+export const getUserAchievements = async (): Promise<Achievement[]> => {
   try {
-    // First, check if we're in a browser environment
-    if (typeof window === 'undefined') return false;
+    const { data: userAchievements, error } = await supabase
+      .rpc('get_user_achievements', { 
+        user_id_param: (await supabase.auth.getUser()).data.user?.id 
+      });
     
-    // Call the edge function to award an achievement
-    const response = await fetch('/api/award-achievement', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        achievementId
-      })
-    });
+    if (error) throw error;
     
-    const data = await response.json();
-    return data.success;
+    // If we don't have actual achievements yet, return placeholder data
+    if (!userAchievements || userAchievements.length === 0) {
+      return getPlaceholderAchievements();
+    }
+    
+    // Transform data to match our Achievement interface
+    return userAchievements.map((a: any) => ({
+      id: a.achievement_id,
+      title: a.achievement_data?.title || 'Unknown Achievement',
+      description: a.achievement_data?.description || 'Description not available',
+      category: a.achievement_data?.category || 'special',
+      progress: a.progress,
+      awarded: a.awarded,
+      icon: a.achievement_data?.icon || 'award'
+    })) as Achievement[];
   } catch (error) {
-    console.error('Error awarding achievement:', error);
-    return false;
+    console.error('Error fetching achievements:', error);
+    // Return placeholder data if there's an error
+    return getPlaceholderAchievements();
   }
 };
