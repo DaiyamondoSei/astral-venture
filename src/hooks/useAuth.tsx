@@ -4,7 +4,7 @@
  * This file is kept for backward compatibility and will be removed in a future version.
  */
 
-import { useAuth as useAuthHook } from './auth';
+import { useAuth as useAuthHook } from './auth/useAuth';
 import type { IAuthContext } from '@/contexts/AuthContext';
 
 /**

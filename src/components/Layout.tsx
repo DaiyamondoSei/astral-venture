@@ -24,8 +24,7 @@ const Layout = ({
 }: LayoutProps) => {
   // Use performance tracking with minimal options
   usePerformanceTracking('Layout', { 
-    logSlowRenders: true,
-    reportToAnalytics: false
+    logSlowRenders: true
   });
   
   // Map content width options to appropriate max-width classes

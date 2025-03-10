@@ -53,7 +53,7 @@ export function useAuthState() {
     login: handleLogin,
     logout: handleLogout,
     register: handleRegister,
-    handleLogout: handleLogout,
+    handleLogout,
     
     // Profile actions
     updateUserProfile,

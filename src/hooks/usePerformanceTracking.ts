@@ -11,8 +11,26 @@ export interface PerformanceTrackingOptions {
   slowRenderThreshold?: number;
 }
 
+// Consistent interface for performance monitoring
+export interface PerformanceMonitor {
+  recordRender: (componentName: string, renderTime: number) => void;
+  recordUnmount: (componentName: string) => void;
+  recordEvent: (category: string, name: string, duration: number) => void;
+  startMonitoring: () => void;
+  stopMonitoring: () => void;
+  resetMetrics: () => void;
+  getComponentMetrics: (componentName: string) => ComponentMetrics;
+}
+
+export interface ComponentMetrics {
+  component: string;
+  averageRenderTime: number;
+  totalRenders: number;
+  slowRenders: number;
+}
+
 // Placeholder for performance monitor functions until we implement them fully
-const performanceMonitor = {
+const performanceMonitor: PerformanceMonitor = {
   recordRender: (componentName: string, renderTime: number) => {
     console.debug(`[Performance] ${componentName} rendered in ${renderTime.toFixed(2)}ms`);
   },
@@ -37,7 +55,7 @@ const performanceMonitor = {
     console.debug('[Performance] Metrics reset');
   },
   
-  getComponentMetrics: (componentName: string) => {
+  getComponentMetrics: (componentName: string): ComponentMetrics => {
     return {
       component: componentName,
       averageRenderTime: 0,

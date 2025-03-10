@@ -1,21 +1,15 @@
 
 /**
- * Authentication Hooks Module
+ * Authentication hooks for managing user state and authentication
  * 
- * This module provides a centralized export point for all authentication-related
- * hooks to prevent circular dependencies and ensure consistent usage patterns.
+ * These hooks provide type-safe access to authentication state and operations.
  */
 
-// Export the primary useAuth hook
 export { useAuth } from './useAuth';
+export { useAuthState } from './useAuthState';
 
-// Re-export types
-export type { 
-  IAuthContext, 
-  IUserProfile, 
-  IUserStreak 
-} from '@/contexts/AuthContext';
+// For backward compatibility with existing code
+import { useAuth } from './useAuth';
+import { useAuthState } from './useAuthState';
 
-// Advanced auth hooks
-export { default as useAuthSession } from './useAuthSession';
-export { default as useAuthState } from './useAuthState';
+export default useAuth;
