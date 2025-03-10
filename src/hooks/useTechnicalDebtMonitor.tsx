@@ -1,67 +1,108 @@
 
-import { useState, useEffect } from 'react';
-import { technicalDebtMonitor, ITechnicalDebtMetrics, ITechnicalDebtEntry } from '@/services/technical-debt/TechnicalDebtMonitor';
+import { useState, useEffect, useCallback } from 'react';
+import { 
+  technicalDebtMonitor, 
+  TechnicalDebtIssue, 
+  TechnicalDebtReport, 
+  TechnicalDebtType, 
+  TechnicalDebtSeverity 
+} from '@/services/technical-debt/TechnicalDebtMonitor';
 
 interface UseTechnicalDebtMonitorProps {
-  enableAutoReporting?: boolean;
+  autoScan?: boolean;
+  scanInterval?: number;
 }
 
-interface UseTechnicalDebtMonitorResult {
-  metrics: ITechnicalDebtMetrics;
-  entries: ITechnicalDebtEntry[];
-  updateEntryStatus: (
-    id: string, 
-    status: 'identified' | 'investigating' | 'fixing' | 'resolved',
-    resolution?: string
-  ) => void;
-  initialize: () => void;
+interface UseTechnicalDebtMonitorReturn {
+  issues: TechnicalDebtIssue[];
+  report: TechnicalDebtReport | null;
+  generateReport: () => TechnicalDebtReport;
+  getIssuesByType: (type: TechnicalDebtType) => TechnicalDebtIssue[];
+  getIssuesBySeverity: (severity: TechnicalDebtSeverity) => TechnicalDebtIssue[];
+  addIssue: (issue: Omit<TechnicalDebtIssue, 'detectedAt'>) => void;
+  clearIssues: () => void;
+  scanForIssues: () => void;
 }
 
 /**
- * Hook to interact with the technical debt monitor
+ * Hook for using the technical debt monitor
  * 
- * @param props Configuration props
- * @returns Technical debt monitor state and methods
+ * @param props Hook props
+ * @returns Hook return object
  */
-export function useTechnicalDebtMonitor(
-  props: UseTechnicalDebtMonitorProps = {}
-): UseTechnicalDebtMonitorResult {
-  const { enableAutoReporting = true } = props;
-  
-  const [metrics, setMetrics] = useState<ITechnicalDebtMetrics>(technicalDebtMonitor.getMetrics());
-  const [entries, setEntries] = useState<ITechnicalDebtEntry[]>(technicalDebtMonitor.getAllEntries());
-  
+export function useTechnicalDebtMonitor({
+  autoScan = false,
+  scanInterval = 60000 // 1 minute
+}: UseTechnicalDebtMonitorProps = {}): UseTechnicalDebtMonitorReturn {
+  const [issues, setIssues] = useState<TechnicalDebtIssue[]>([]);
+  const [report, setReport] = useState<TechnicalDebtReport | null>(null);
+
+  // Update issues from the monitor
+  const updateIssues = useCallback(() => {
+    setIssues(technicalDebtMonitor.getIssues());
+  }, []);
+
+  // Generate a technical debt report
+  const generateReport = useCallback(() => {
+    const newReport = technicalDebtMonitor.generateReport();
+    setReport(newReport);
+    return newReport;
+  }, []);
+
+  // Get issues by type
+  const getIssuesByType = useCallback((type: TechnicalDebtType) => {
+    return technicalDebtMonitor.getIssuesByType(type);
+  }, []);
+
+  // Get issues by severity
+  const getIssuesBySeverity = useCallback((severity: TechnicalDebtSeverity) => {
+    return technicalDebtMonitor.getIssuesBySeverity(severity);
+  }, []);
+
+  // Add an issue
+  const addIssue = useCallback((issue: Omit<TechnicalDebtIssue, 'detectedAt'>) => {
+    technicalDebtMonitor.addIssue(issue);
+    updateIssues();
+  }, [updateIssues]);
+
+  // Clear issues
+  const clearIssues = useCallback(() => {
+    technicalDebtMonitor.clearIssues();
+    updateIssues();
+  }, [updateIssues]);
+
+  // Scan for issues in the application
+  const scanForIssues = useCallback(() => {
+    // Get performance metrics from the performance monitor
+    // (This would be expanded in a real implementation)
+    updateIssues();
+  }, [updateIssues]);
+
+  // Run auto-scan if enabled
   useEffect(() => {
-    if (enableAutoReporting) {
-      technicalDebtMonitor.initialize();
-    }
-    
-    // Subscribe to metrics updates
-    const unsubscribe = technicalDebtMonitor.subscribe((updatedMetrics) => {
-      setMetrics(updatedMetrics);
-      setEntries(technicalDebtMonitor.getAllEntries());
-    });
-    
-    return unsubscribe;
-  }, [enableAutoReporting]);
-  
-  const updateEntryStatus = (
-    id: string, 
-    status: 'identified' | 'investigating' | 'fixing' | 'resolved',
-    resolution?: string
-  ): void => {
-    technicalDebtMonitor.updateEntryStatus(id, status, resolution);
-  };
-  
-  const initialize = (): void => {
-    technicalDebtMonitor.initialize();
-  };
-  
+    if (!autoScan) return;
+
+    // Initial scan
+    scanForIssues();
+
+    // Set up interval for regular scanning
+    const intervalId = setInterval(scanForIssues, scanInterval);
+
+    // Clean up interval on unmount
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [autoScan, scanInterval, scanForIssues]);
+
   return {
-    metrics,
-    entries,
-    updateEntryStatus,
-    initialize
+    issues,
+    report,
+    generateReport,
+    getIssuesByType,
+    getIssuesBySeverity,
+    addIssue,
+    clearIssues,
+    scanForIssues
   };
 }
 
