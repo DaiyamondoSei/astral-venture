@@ -1,266 +1,158 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js';
-import { ValidationError } from '../generate-insights/services/validationService.ts';
+import { createErrorResponse, ErrorCode } from "./responseUtils.ts";
 
 /**
- * Standard CORS headers for Edge Functions
+ * CORS headers for Edge Functions
  */
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
 /**
- * Success response type
+ * Function types for request handlers
  */
-export interface SuccessResponse<T> {
-  success: true;
-  data: T;
-  timestamp: string;
+export type RequestHandler = (req: Request, ctx: Record<string, any>) => Promise<Response>;
+export type AuthenticatedRequestHandler = (user: any, req: Request, ctx: Record<string, any>) => Promise<Response>;
+
+/**
+ * Create a standard error handler
+ */
+export function handleRequestError(error: unknown): Response {
+  console.error("Function error:", error);
+  
+  // Determine error code and message
+  let errorCode = ErrorCode.INTERNAL_ERROR;
+  let errorMessage = "An unexpected error occurred";
+  let status = 500;
+  
+  if (error instanceof Error) {
+    errorMessage = error.message;
+    
+    // Check for common error patterns
+    if (errorMessage.includes("not found") || errorMessage.includes("does not exist")) {
+      errorCode = ErrorCode.NOT_FOUND;
+      status = 404;
+    } else if (errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
+      errorCode = ErrorCode.UNAUTHORIZED;
+      status = 401;
+    } else if (errorMessage.includes("invalid") || errorMessage.includes("validation")) {
+      errorCode = ErrorCode.VALIDATION_FAILED;
+      status = 400;
+    }
+  }
+  
+  return createErrorResponse(
+    errorCode,
+    errorMessage,
+    { timestamp: new Date().toISOString() },
+    status,
+    corsHeaders
+  );
 }
 
 /**
- * Error response type
+ * Create middleware for handling CORS
  */
-export interface ErrorResponse {
-  success: false;
-  error: string;
-  code?: string;
-  details?: unknown;
-  timestamp: string;
-  status: number;
-}
-
-/**
- * Response wrapper for Edge Functions
- */
-export type EdgeFunctionResponse<T> = SuccessResponse<T> | ErrorResponse;
-
-/**
- * Request handler options
- */
-export interface RequestHandlerOptions {
-  /**
-   * Whether the endpoint requires authentication
-   */
-  requireAuth?: boolean;
-  
-  /**
-   * Custom error handler function
-   */
-  errorHandler?: (error: Error) => ErrorResponse;
-  
-  /**
-   * Whether to enable detailed logging
-   */
-  enableLogging?: boolean;
-}
-
-/**
- * Creates a Supabase client for Edge Functions
- * 
- * @returns Supabase client
- */
-export function createSupabaseClient() {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  
-  if (!supabaseUrl || !supabaseKey) {
-    throw new ValidationError('Missing Supabase environment variables', {
-      code: 'CONFIGURATION_ERROR',
-      statusCode: 500
+export function withCors(handler: RequestHandler): RequestHandler {
+  return async (req: Request, ctx: Record<string, any>) => {
+    // Handle CORS preflight requests
+    if (req.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      });
+    }
+    
+    // Call the handler
+    const response = await handler(req, ctx);
+    
+    // Add CORS headers to the response
+    const responseHeaders = new Headers(response.headers);
+    
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      responseHeaders.set(key, value);
     });
-  }
-  
-  return createClient(supabaseUrl, supabaseKey);
-}
-
-/**
- * Structured logging helper
- * 
- * @param level - Log level
- * @param message - Log message
- * @param data - Additional data to log
- */
-export function logMessage(
-  level: 'info' | 'error' | 'warn' | 'debug',
-  message: string,
-  data?: unknown
-) {
-  const timestamp = new Date().toISOString();
-  const logData = {
-    level,
-    timestamp,
-    message,
-    ...(data ? { data } : {})
+    
+    // Return response with CORS headers
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders
+    });
   };
-  
-  switch (level) {
-    case 'error':
-      console.error(JSON.stringify(logData));
-      break;
-    case 'warn':
-      console.warn(JSON.stringify(logData));
-      break;
-    case 'debug':
-      console.debug(JSON.stringify(logData));
-      break;
-    default:
-      console.log(JSON.stringify(logData));
-  }
 }
 
 /**
- * Handler function for Edge Function requests
- * 
- * @param req - Request object
- * @param handler - Handler function for the request
- * @param options - Request handler options
- * @returns Response object
+ * Create middleware for error handling
  */
-export async function handleRequest<T>(
-  req: Request,
-  handler: (
-    req: Request,
-    supabase: ReturnType<typeof createSupabaseClient>,
-    userId?: string
-  ) => Promise<T>,
-  options: RequestHandlerOptions = {}
-): Promise<Response> {
-  const { requireAuth = true, enableLogging = true } = options;
-  
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-  
-  try {
-    // Create Supabase client
-    const supabase = createSupabaseClient();
-    
-    // Authenticate user if required
-    let userId: string | undefined;
-    
-    if (requireAuth) {
-      const authorization = req.headers.get('Authorization');
+export function withErrorHandling(handler: RequestHandler): RequestHandler {
+  return async (req: Request, ctx: Record<string, any>) => {
+    try {
+      return await handler(req, ctx);
+    } catch (error) {
+      return handleRequestError(error);
+    }
+  };
+}
+
+/**
+ * Create middleware for authentication
+ */
+export function withAuth(handler: AuthenticatedRequestHandler): RequestHandler {
+  return async (req: Request, ctx: Record<string, any>) => {
+    try {
+      // Check for authorization header
+      const authHeader = req.headers.get("authorization");
       
-      if (!authorization) {
-        throw new ValidationError('Missing authorization header', {
-          code: 'UNAUTHORIZED',
-          statusCode: 401
-        });
+      if (!authHeader) {
+        return createErrorResponse(
+          ErrorCode.UNAUTHORIZED,
+          "Missing authorization header",
+          null,
+          401,
+          corsHeaders
+        );
       }
       
-      const token = authorization.replace('Bearer ', '');
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      // Parse JWT and get user
+      const token = authHeader.replace("Bearer ", "");
       
-      if (authError || !user) {
-        throw new ValidationError('Invalid token', {
-          code: 'UNAUTHORIZED',
-          statusCode: 401,
-          details: { message: authError?.message }
-        });
+      // Create Supabase client
+      const supabaseClient = ctx.supabaseClient;
+      
+      // Verify the token
+      const { data: { user }, error } = await supabaseClient.auth.getUser(token);
+      
+      if (error || !user) {
+        return createErrorResponse(
+          ErrorCode.UNAUTHORIZED,
+          "Invalid or expired token",
+          { error: error?.message },
+          401,
+          corsHeaders
+        );
       }
       
-      userId = user.id;
-      
-      if (enableLogging) {
-        logMessage('info', 'Authenticated request', { userId });
-      }
+      // Call handler with authenticated user
+      return await handler(user, req, ctx);
+    } catch (error) {
+      return handleRequestError(error);
     }
-    
-    // Log request if enabled
-    if (enableLogging) {
-      logMessage('info', `Processing ${req.method} request`, {
-        path: new URL(req.url).pathname,
-        authenticated: !!userId
-      });
-    }
-    
-    // Call the handler function
-    const result = await handler(req, supabase, userId);
-    
-    // Return successful response
-    const response: SuccessResponse<T> = {
-      success: true,
-      data: result,
-      timestamp: new Date().toISOString()
-    };
-    
-    return new Response(
-      JSON.stringify(response),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-  } catch (error) {
-    // Log error if enabled
-    if (enableLogging) {
-      logMessage('error', 'Request handler error', {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-    }
-    
-    // Handle ValidationError specially
-    if (error instanceof ValidationError) {
-      const errorResponse: ErrorResponse = {
-        success: false,
-        error: error.message,
-        code: error.code,
-        details: error.details,
-        timestamp: new Date().toISOString(),
-        status: error.statusCode
-      };
-      
-      return new Response(
-        JSON.stringify(errorResponse),
-        {
-          status: error.statusCode,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-    }
-    
-    // Handle custom error handling if provided
-    if (options.errorHandler && error instanceof Error) {
-      const errorResponse = options.errorHandler(error);
-      
-      return new Response(
-        JSON.stringify(errorResponse),
-        {
-          status: errorResponse.status,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-    }
-    
-    // Default error response
-    const errorResponse: ErrorResponse = {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
-      status: 500
-    };
-    
-    return new Response(
-      JSON.stringify(errorResponse),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-  }
+  };
+}
+
+/**
+ * Create a complete request handler with CORS, error handling, and authentication
+ */
+export function createRequestHandler(handler: AuthenticatedRequestHandler): RequestHandler {
+  return withCors(withErrorHandling(withAuth(handler)));
+}
+
+/**
+ * Create a public request handler with CORS and error handling
+ */
+export function createPublicRequestHandler(handler: RequestHandler): RequestHandler {
+  return withCors(withErrorHandling(handler));
 }

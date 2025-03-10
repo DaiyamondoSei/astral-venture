@@ -1,147 +1,147 @@
 
 import { toast } from 'sonner';
-import { ErrorCategory, ErrorSeverity, ErrorHandlingOptions } from './errorHandling';
+import { ErrorSeverity, ErrorCategory } from './errorHandling';
 
 /**
- * Standard error context options
+ * Interface for error handling options
  */
-export interface ErrorContextOptions {
-  /** Component or function name where error occurred */
-  component?: string;
-  /** Operation being performed when error occurred */
-  operation?: string;
-  /** User action that triggered the error */
-  userAction?: string;
-  /** Technical details for debugging */
-  details?: Record<string, unknown>;
-  /** Error category for classification */
-  category?: ErrorCategory;
+export interface ErrorHandlingOptions {
   /** Error severity level */
   severity?: ErrorSeverity;
+  /** Error category */
+  category?: ErrorCategory;
+  /** Context where the error occurred */
+  context?: string;
+  /** Custom error message to display */
+  customMessage?: string;
+  /** Whether to show a toast notification */
+  showToast?: boolean;
+  /** Additional metadata for logging */
+  metadata?: Record<string, unknown>;
+  /** Optional callback for custom error handling */
+  onError?: (error: unknown) => void;
+  /** Whether to retry the operation */
+  retry?: boolean;
+  /** Optional retry count */
+  retryCount?: number;
+  /** Optional retry delay in milliseconds */
+  retryDelay?: number;
 }
 
 /**
- * Creates a standardized error context string
+ * Display an error toast with consistent styling
  * 
- * @param options - Error context options
- * @returns Formatted error context string
+ * @param message - Error message to display
+ * @param description - Optional error description
  */
-export function createErrorContext(options: ErrorContextOptions): string {
-  const parts: string[] = [];
-  
-  if (options.component) {
-    parts.push(options.component);
-  }
-  
-  if (options.operation) {
-    parts.push(options.operation);
-  }
-  
-  if (options.userAction) {
-    parts.push(`during ${options.userAction}`);
-  }
-  
-  return parts.join(' - ');
+export function showErrorToast(message: string, description?: string): void {
+  toast.error(message, {
+    description,
+    position: 'bottom-right',
+    duration: 5000
+  });
 }
 
 /**
- * Converts error context options to error handling options
+ * Format error details for logging
  * 
- * @param options - Error context options
- * @returns Error handling options
+ * @param error - The error object
+ * @param context - Optional context information
+ * @returns Formatted error details
  */
-export function createErrorOptions(options: ErrorContextOptions): ErrorHandlingOptions {
+export function formatErrorDetails(error: unknown, context?: string): Record<string, unknown> {
+  let errorMessage = 'Unknown error';
+  let errorStack: string | undefined;
+  const errorType = error instanceof Error ? error.constructor.name : typeof error;
+  
+  if (error instanceof Error) {
+    errorMessage = error.message;
+    errorStack = error.stack;
+  } else if (typeof error === 'string') {
+    errorMessage = error;
+  } else if (error && typeof error === 'object' && 'message' in error) {
+    errorMessage = String(error.message);
+  }
+  
   return {
-    context: createErrorContext(options),
-    category: options.category,
-    severity: options.severity,
-    metadata: options.details,
-    // Default to showing toast for errors and critical issues
-    showToast: options.severity !== ErrorSeverity.INFO
+    errorType,
+    errorMessage,
+    errorStack,
+    context,
+    timestamp: new Date().toISOString()
   };
 }
 
 /**
- * Creates a standardized error with context
+ * Convert any value to a string for error reporting
  * 
- * @param message - Error message
- * @param options - Error context options
- * @returns Error with enhanced properties
+ * @param value - The value to stringify
+ * @returns String representation of the value
  */
-export function createContextualError(
-  message: string,
-  options: ErrorContextOptions
-): Error {
-  const error = new Error(message);
-  const context = createErrorContext(options);
-  
-  // Enhance error with additional properties
-  Object.assign(error, {
-    context,
-    details: options.details,
-    category: options.category,
-    severity: options.severity
-  });
-  
-  return error;
+export function safeStringify(value: unknown): string {
+  try {
+    if (typeof value === 'string') return value;
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'function') return '[Function]';
+    if (typeof value === 'object') {
+      return JSON.stringify(value, (key, val) => {
+        if (typeof val === 'function') return '[Function]';
+        if (val instanceof Error) return { message: val.message, stack: val.stack };
+        return val;
+      }, 2);
+    }
+    return String(value);
+  } catch (e) {
+    return '[Error during stringification]';
+  }
 }
 
 /**
- * Shows a user-friendly error message
+ * Check if an object is an HTTP response
  * 
- * @param message - User-friendly error message
- * @param options - Toast options
+ * @param obj - Object to check
+ * @returns Whether the object is an HTTP response
  */
-export function showErrorMessage(
-  message: string,
-  options?: {
-    description?: string;
-    severity?: ErrorSeverity;
-    action?: { label: string; onClick: () => void };
-  }
-): void {
-  const toastType = options?.severity === ErrorSeverity.CRITICAL 
-    ? 'error' 
-    : options?.severity === ErrorSeverity.WARNING 
-      ? 'warning' 
-      : 'error';
-  
-  toast[toastType](message, {
-    description: options?.description,
-    action: options?.action && {
-      label: options.action.label,
-      onClick: options.action.onClick
+export function isResponse(obj: unknown): obj is Response {
+  return (
+    obj !== null &&
+    typeof obj === 'object' &&
+    'status' in obj &&
+    'headers' in obj &&
+    typeof (obj as Response).status === 'number' &&
+    typeof (obj as Response).headers === 'object'
+  );
+}
+
+/**
+ * Extract details from a Response object for error reporting
+ * 
+ * @param response - The Response object
+ * @returns Extracted response details
+ */
+export function extractResponseDetails(response: Response): Record<string, unknown> {
+  return {
+    status: response.status,
+    statusText: response.statusText,
+    url: response.url,
+    headers: Object.fromEntries(response.headers.entries())
+  };
+}
+
+/**
+ * String representation of the current environment
+ * Useful for debugging
+ */
+export function getEnvironmentInfo(): Record<string, unknown> {
+  return {
+    userAgent: navigator.userAgent,
+    language: navigator.language,
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight
     },
-    position: 'bottom-right'
-  });
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timestamp: new Date().toISOString()
+  };
 }
-
-/**
- * Extracts a user-friendly error message from various error types
- * 
- * @param error - The error to process
- * @returns User-friendly error message
- */
-export function getUserFriendlyErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  
-  if (typeof error === 'string') {
-    return error;
-  }
-  
-  if (error && typeof error === 'object' && 'message' in error) {
-    return String(error.message);
-  }
-  
-  return 'An unexpected error occurred';
-}
-
-export default {
-  createErrorContext,
-  createErrorOptions,
-  createContextualError,
-  showErrorMessage,
-  getUserFriendlyErrorMessage
-};

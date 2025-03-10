@@ -10,6 +10,15 @@ import { handleError } from "./errorHandler.ts";
 import { getCachedResponse, cacheResponse, cleanupCache } from "./cacheHandler.ts";
 import { logEvent } from "../../shared/responseUtils.ts";
 
+// Define interface for request parameters
+interface AIRequestParams {
+  message: string;
+  reflectionId?: string;
+  reflectionContent?: string;
+  stream?: boolean;
+  cacheKey?: string;
+}
+
 /**
  * Main request handler for AI assistant requests
  * Optimized for better error handling and caching
@@ -17,13 +26,14 @@ import { logEvent } from "../../shared/responseUtils.ts";
 export async function handleAIRequest(user: any, req: Request): Promise<Response> {
   try {
     // Parse request body
+    const params = await req.json() as AIRequestParams;
     const { 
-      message, 
-      reflectionId, 
-      reflectionContent, 
+      message = "", 
+      reflectionId = "", 
+      reflectionContent = "", 
       stream = false,
       cacheKey = "" 
-    } = await req.json();
+    } = params;
     
     // Validate required parameters
     const validation = validateRequiredParameters(

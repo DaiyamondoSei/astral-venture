@@ -27,14 +27,24 @@ interface ComponentRenderMetric {
   timestamp: number;
 }
 
+// Performance marks for tracking specific operations
+interface PerformanceMark {
+  name: string;
+  startTime?: number;
+  endTime?: number;
+  duration?: number;
+}
+
 // Collected metrics storage
 const metrics: {
   webVitals: WebVitalMetric[];
   componentRenders: ComponentRenderMetric[];
+  performanceMarks: Record<string, PerformanceMark>;
   lastReportTime: number;
 } = {
   webVitals: [],
   componentRenders: [],
+  performanceMarks: {},
   lastReportTime: 0
 };
 
@@ -116,6 +126,60 @@ export function trackComponentRender(
 }
 
 /**
+ * Mark the start of a performance measurement
+ * 
+ * @param name - Name of the mark
+ * @returns Current timestamp
+ */
+export function markStart(name: string): number {
+  try {
+    validateString(name, 'name');
+    const startTime = performance.now();
+    
+    metrics.performanceMarks[name] = {
+      name,
+      startTime
+    };
+    
+    return startTime;
+  } catch (error) {
+    console.error('Error marking start:', error);
+    return performance.now();
+  }
+}
+
+/**
+ * Mark the end of a performance measurement and calculate duration
+ * 
+ * @param name - Name of the mark (must match a previous markStart call)
+ * @returns Duration in milliseconds
+ */
+export function markEnd(name: string): number {
+  try {
+    validateString(name, 'name');
+    const endTime = performance.now();
+    
+    if (!metrics.performanceMarks[name] || !metrics.performanceMarks[name].startTime) {
+      console.error(`No start mark found for "${name}"`);
+      return 0;
+    }
+    
+    const mark = metrics.performanceMarks[name];
+    mark.endTime = endTime;
+    mark.duration = endTime - (mark.startTime || 0);
+    
+    if (import.meta.env.DEV) {
+      console.debug(`Performance mark: ${name} = ${mark.duration?.toFixed(2)}ms`);
+    }
+    
+    return mark.duration || 0;
+  } catch (error) {
+    console.error('Error marking end:', error);
+    return 0;
+  }
+}
+
+/**
  * Initialize web vitals monitoring
  * 
  * @returns Cleanup function
@@ -146,6 +210,7 @@ export function initWebVitals(): () => void {
       // Clear collected metrics
       metrics.webVitals = [];
       metrics.componentRenders = [];
+      metrics.performanceMarks = {};
     };
   } catch (error) {
     console.error('Error initializing web vitals monitoring:', error);
@@ -168,6 +233,7 @@ export async function reportMetricsToServer(): Promise<boolean> {
   const metricsToReport = {
     webVitals: [...metrics.webVitals],
     componentRenders: [...metrics.componentRenders],
+    performanceMarks: { ...metrics.performanceMarks },
     userAgent: navigator.userAgent,
     url: window.location.href,
     timestamp: Date.now()
@@ -196,6 +262,7 @@ export async function reportMetricsToServer(): Promise<boolean> {
     // Clear reported metrics
     metrics.webVitals = [];
     metrics.componentRenders = [];
+    metrics.performanceMarks = {};
     metrics.lastReportTime = Date.now();
     
     return true;
@@ -254,9 +321,11 @@ function setupCoreWebVitalsMonitoring(): void {
     let clsValue = 0;
     const observer = new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries()) {
-        if (!entry.hadRecentInput) {
-          // @ts-ignore - TypeScript doesn't know about this property
-          clsValue += entry.value;
+        // TypeScript doesn't know about the layout shift properties
+        // We need to check if the property exists at runtime
+        const layoutShift = entry as unknown as { value: number; hadRecentInput: boolean };
+        if (layoutShift && typeof layoutShift.hadRecentInput === 'boolean' && !layoutShift.hadRecentInput) {
+          clsValue += layoutShift.value || 0;
           trackWebVital('CLS', clsValue, 'visual_stability');
         }
       }

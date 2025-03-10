@@ -1,65 +1,77 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 /**
- * Standard props for the error fallback component
+ * Props for the ErrorFallback component
  */
-export interface StandardErrorFallbackProps {
-  error: Error;
-  resetErrorBoundary?: () => void;
-  showDetails?: boolean;
-  title?: string;
-  description?: string;
-  actionLabel?: string;
+interface ErrorFallbackProps {
+  /** The error that occurred */
+  error: Error | null;
+  /** Additional information about the error */
+  errorInfo: React.ErrorInfo | null;
+  /** Function to reset the error state */
+  resetError: () => void;
+  /** Optional error message to display */
+  message?: string;
 }
 
 /**
- * Standard error fallback component to display when an error boundary catches an error
- * 
- * @param props - The component props
- * @returns The error fallback component
+ * A fallback UI component to display when an error occurs
  */
-const ErrorFallback: React.FC<StandardErrorFallbackProps> = ({
+export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
   error,
-  resetErrorBoundary,
-  showDetails = false,
-  title = "Something went wrong",
-  description,
-  actionLabel = "Try again"
+  errorInfo,
+  resetError,
+  message = 'Something went wrong'
 }) => {
+  const [showDetails, setShowDetails] = useState(false);
+
   return (
-    <div className="flex flex-col items-center justify-center p-6 text-center bg-background rounded-lg border border-border shadow-sm space-y-4">
-      <div className="rounded-full bg-red-100 p-3 mb-2">
-        <AlertTriangle className="h-6 w-6 text-red-600" />
-      </div>
-      
-      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-      
-      <p className="text-muted-foreground">
-        {description || error.message || "An unexpected error occurred. Please try again later."}
-      </p>
-      
-      {showDetails && (
-        <div className="w-full mt-4 px-3 py-2 bg-muted rounded text-left overflow-auto max-h-40">
-          <pre className="text-xs text-muted-foreground">
-            {error.stack || error.message}
-          </pre>
+    <Card className="max-w-full p-6 m-4 bg-white bg-opacity-90 dark:bg-gray-900 dark:bg-opacity-90 rounded-lg shadow-lg">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-red-600 mb-4">{message}</h2>
+        
+        <p className="text-gray-700 dark:text-gray-300 mb-4">
+          {error?.message || 'An unexpected error occurred.'}
+        </p>
+        
+        <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3 mb-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? 'Hide Details' : 'Show Details'}
+          </Button>
+          
+          <Button 
+            onClick={resetError}
+          >
+            Try Again
+          </Button>
         </div>
-      )}
-      
-      {resetErrorBoundary && (
-        <Button 
-          onClick={resetErrorBoundary}
-          variant="default"
-          className="mt-4"
-        >
-          {actionLabel}
-        </Button>
-      )}
-    </div>
+        
+        {showDetails && (
+          <div className="mt-4 text-left">
+            <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-auto max-h-64">
+              <h3 className="font-bold mb-2">Error Details:</h3>
+              <p className="font-mono text-sm whitespace-pre-wrap break-words">
+                {error?.stack || 'No stack trace available'}
+              </p>
+              
+              {errorInfo && (
+                <div className="mt-4">
+                  <h3 className="font-bold mb-2">Component Stack:</h3>
+                  <p className="font-mono text-sm whitespace-pre-wrap break-words">
+                    {errorInfo.componentStack}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 };
-
-export default ErrorFallback;

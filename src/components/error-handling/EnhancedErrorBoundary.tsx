@@ -1,7 +1,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { handleError, ErrorCategory, ErrorSeverity } from '@/utils/errorHandling';
-import ErrorFallback from './ErrorFallback';
+import { ErrorFallback } from './ErrorFallback';
+import { handleError, ErrorSeverity, ErrorCategory } from '@/utils/errorHandling';
 
 /**
  * Props for the enhanced error boundary component
@@ -9,30 +9,14 @@ import ErrorFallback from './ErrorFallback';
 export interface EnhancedErrorBoundaryProps {
   /** Child components to render */
   children: ReactNode;
-  
-  /** Error boundary configuration options */
-  options?: {
-    /** Custom fallback component to render when an error occurs */
-    fallback?: ReactNode | ((props: { error: Error; resetErrorBoundary: () => void }) => ReactNode);
-    
-    /** Whether to show error details in the fallback */
-    showErrorDetails?: boolean;
-    
-    /** Error category for logging and metrics */
-    errorCategory?: ErrorCategory;
-    
-    /** Error severity level */
-    errorSeverity?: ErrorSeverity;
-    
-    /** Custom error handler called when an error is caught */
-    onError?: (error: Error, info: ErrorInfo) => void;
-    
-    /** Whether to reset the error boundary when props change */
-    resetOnPropsChange?: boolean;
-    
-    /** Context label for error logging */
-    contextLabel?: string;
-  };
+  /** Custom fallback component to render when an error occurs */
+  fallback?: ReactNode;
+  /** Callback function called when an error is caught */
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  /** Whether to reset the error state when props change */
+  resetOnPropsChange?: boolean;
+  /** Optional error context for better error tracking */
+  errorContext?: string;
 }
 
 /**
@@ -41,89 +25,98 @@ export interface EnhancedErrorBoundaryProps {
 interface EnhancedErrorBoundaryState {
   /** Whether an error has occurred */
   hasError: boolean;
-  
   /** The error that occurred */
-  error?: Error;
+  error: Error | null;
+  /** Additional information about the error */
+  errorInfo: ErrorInfo | null;
 }
 
 /**
- * Enhanced error boundary component with more options and better error reporting
+ * Enhanced error boundary component with additional features
+ * Catches JavaScript errors in its child component tree and displays a fallback UI
  */
 class EnhancedErrorBoundary extends Component<EnhancedErrorBoundaryProps, EnhancedErrorBoundaryState> {
   constructor(props: EnhancedErrorBoundaryProps) {
     super(props);
     this.state = {
-      hasError: false
+      hasError: false,
+      error: null,
+      errorInfo: null
     };
   }
 
-  static getDerivedStateFromError(error: Error): EnhancedErrorBoundaryState {
-    // Update state so the next render will show the fallback UI
-    return {
-      hasError: true,
-      error
-    };
+  /**
+   * Update state when errors are caught
+   */
+  static getDerivedStateFromError(error: Error): Partial<EnhancedErrorBoundaryState> {
+    return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Report the error to our error handling system
+  /**
+   * Called when an error is caught
+   */
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    this.setState({ errorInfo });
+
+    // Log the error to our error handling system
     handleError(error, {
-      category: this.props.options?.errorCategory || ErrorCategory.USER_INTERFACE,
-      severity: this.props.options?.errorSeverity || ErrorSeverity.ERROR,
-      context: this.props.options?.contextLabel || 'ErrorBoundary',
+      severity: ErrorSeverity.ERROR,
+      category: ErrorCategory.USER_INTERFACE,
+      context: this.props.errorContext || 'EnhancedErrorBoundary',
       metadata: {
-        componentStack: info.componentStack,
+        componentStack: errorInfo.componentStack,
+        errorInfo
       }
     });
-    
-    // Call the custom error handler if provided
-    if (this.props.options?.onError) {
-      this.props.options.onError(error, info);
+
+    // Call the onError prop if provided
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
     }
   }
 
+  /**
+   * Reset error state when props change if resetOnPropsChange is true
+   */
   componentDidUpdate(prevProps: EnhancedErrorBoundaryProps): void {
-    // Reset the error boundary when props change if enabled
     if (
       this.state.hasError &&
-      this.props.options?.resetOnPropsChange &&
-      prevProps !== this.props
+      this.props.resetOnPropsChange &&
+      this.props.children !== prevProps.children
     ) {
-      this.resetErrorBoundary();
+      this.setState({
+        hasError: false,
+        error: null,
+        errorInfo: null
+      });
     }
   }
 
-  resetErrorBoundary = (): void => {
-    this.setState({
-      hasError: false,
-      error: undefined
-    });
-  };
-
+  /**
+   * Render the error fallback or children
+   */
   render(): ReactNode {
-    if (this.state.hasError && this.state.error) {
-      // Render the custom fallback component if provided
-      if (this.props.options?.fallback) {
-        if (typeof this.props.options.fallback === 'function') {
-          return this.props.options.fallback({
-            error: this.state.error,
-            resetErrorBoundary: this.resetErrorBoundary
-          });
-        }
-        return this.props.options.fallback;
+    if (this.state.hasError) {
+      // Render custom fallback if provided, otherwise use default fallback
+      if (this.props.fallback) {
+        return this.props.fallback;
       }
-      
-      // Render the default error fallback
+
       return (
         <ErrorFallback
           error={this.state.error}
-          resetErrorBoundary={this.resetErrorBoundary}
-          showDetails={this.props.options?.showErrorDetails}
+          errorInfo={this.state.errorInfo}
+          resetError={() => {
+            this.setState({
+              hasError: false,
+              error: null,
+              errorInfo: null
+            });
+          }}
         />
       );
     }
 
-    // Render children if no error occurred
     return this.props.children;
   }
 }

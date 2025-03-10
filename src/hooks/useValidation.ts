@@ -1,234 +1,134 @@
 
 import { useState, useCallback } from 'react';
-import * as validators from '@/utils/validation/runtimeValidation';
 import { ValidationError } from '@/utils/validation/runtimeValidation';
-import { handleError, ErrorCategory } from '@/utils/errorHandling';
+import { usePerfConfig } from './usePerfConfig';
 
 /**
  * Validation result interface
  */
-export interface ValidationResult<T> {
+export interface ValidationState<T = unknown> {
+  /** Whether the validation is in progress */
+  isValidating: boolean;
+  /** Whether the data is valid */
   isValid: boolean;
-  value: T | undefined;
-  error: string | null;
+  /** Validation errors (if any) */
+  errors: ValidationError[];
+  /** Validated data (if valid) */
+  validData: T | null;
 }
 
 /**
- * Options for the useValidation hook
+ * Validation options interface
  */
-export interface UseValidationOptions {
-  /** Whether to show toast notifications for validation errors */
-  showToasts?: boolean;
-  
-  /** Context name for error handling */
-  context?: string;
+export interface ValidationOptions {
+  /** Whether to validate on mount */
+  validateOnMount?: boolean;
+  /** Whether to validate on change */
+  validateOnChange?: boolean;
+  /** Initial data to validate */
+  initialData?: unknown;
 }
 
 /**
- * Custom hook for validating form values and other user inputs
+ * Custom hook for data validation
  * 
+ * @param validator - Validation function that throws ValidationError on invalid data
  * @param options - Validation options
- * @returns Validation utility functions
+ * @returns Validation state and functions
  */
-export function useValidation(options: UseValidationOptions = {}) {
-  const [errors, setErrors] = useState<Record<string, string>>({});
+export function useValidation<T>(
+  validator: (data: unknown) => T,
+  options: ValidationOptions = {}
+) {
+  const { 
+    validateOnMount = false, 
+    validateOnChange = true,
+    initialData = null
+  } = options;
+  
+  const perfConfig = usePerfConfig();
+  const enableValidation = perfConfig.config.enableValidation !== false;
+  
+  const [validationState, setValidationState] = useState<ValidationState<T>>({
+    isValidating: validateOnMount,
+    isValid: false,
+    errors: [],
+    validData: null
+  });
   
   /**
-   * Validate a value using a validation function
-   * 
-   * @param value - The value to validate
-   * @param validator - The validation function to use
-   * @param fieldName - The name of the field being validated
-   * @returns Validation result
+   * Validate data using the provided validator
    */
-  const validate = useCallback(<T>(
-    value: unknown,
-    validator: (value: unknown, name: string) => T,
-    fieldName: string
-  ): ValidationResult<T> => {
+  const validate = useCallback((data: unknown) => {
+    if (!enableValidation) {
+      // If validation is disabled, just return the data as valid
+      setValidationState({
+        isValidating: false,
+        isValid: true,
+        errors: [],
+        validData: data as T
+      });
+      return true;
+    }
+    
+    setValidationState(prev => ({ ...prev, isValidating: true }));
+    
     try {
-      // Run the validator
-      const validatedValue = validator(value, fieldName);
+      const validData = validator(data);
       
-      // Clear any existing error for this field
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[fieldName];
-        return newErrors;
+      setValidationState({
+        isValidating: false,
+        isValid: true,
+        errors: [],
+        validData
       });
       
-      // Return successful result
-      return {
-        isValid: true,
-        value: validatedValue,
-        error: null
-      };
+      return true;
     } catch (error) {
-      // Get error message
-      let errorMessage = 'Invalid value';
+      const errors = [];
       
       if (error instanceof ValidationError) {
-        errorMessage = error.message;
+        errors.push(error);
       } else if (error instanceof Error) {
-        errorMessage = error.message;
+        errors.push(new ValidationError(error.message));
+      } else {
+        errors.push(new ValidationError('Unknown validation error'));
       }
       
-      // Update errors state
-      setErrors(prev => ({
-        ...prev,
-        [fieldName]: errorMessage
-      }));
-      
-      // Log the validation error
-      handleError(error, {
-        category: ErrorCategory.VALIDATION,
-        context: options.context || 'Validation',
-        showToast: options.showToasts,
-        customMessage: errorMessage
+      setValidationState({
+        isValidating: false,
+        isValid: false,
+        errors,
+        validData: null
       });
       
-      // Return error result
-      return {
-        isValid: false,
-        value: undefined,
-        error: errorMessage
-      };
+      return false;
     }
-  }, [options.context, options.showToasts]);
+  }, [validator, enableValidation]);
   
   /**
-   * Validate a required string
-   * 
-   * @param value - The value to validate
-   * @param fieldName - The name of the field being validated
-   * @returns Validation result
+   * Reset validation state
    */
-  const validateRequiredString = useCallback((
-    value: unknown,
-    fieldName: string
-  ): ValidationResult<string> => {
-    return validate(value, validators.validateString, fieldName);
-  }, [validate]);
-  
-  /**
-   * Validate a required number
-   * 
-   * @param value - The value to validate
-   * @param fieldName - The name of the field being validated
-   * @returns Validation result
-   */
-  const validateRequiredNumber = useCallback((
-    value: unknown,
-    fieldName: string
-  ): ValidationResult<number> => {
-    return validate(value, validators.validateNumber, fieldName);
-  }, [validate]);
-  
-  /**
-   * Validate a required boolean
-   * 
-   * @param value - The value to validate
-   * @param fieldName - The name of the field being validated
-   * @returns Validation result
-   */
-  const validateRequiredBoolean = useCallback((
-    value: unknown,
-    fieldName: string
-  ): ValidationResult<boolean> => {
-    return validate(value, validators.validateBoolean, fieldName);
-  }, [validate]);
-  
-  /**
-   * Validate a number within a range
-   * 
-   * @param value - The value to validate
-   * @param min - The minimum allowed value
-   * @param max - The maximum allowed value
-   * @param fieldName - The name of the field being validated
-   * @returns Validation result
-   */
-  const validateNumberRange = useCallback((
-    value: unknown,
-    min: number,
-    max: number,
-    fieldName: string
-  ): ValidationResult<number> => {
-    return validate(
-      value,
-      (val, name) => validators.validateRange(val, min, max, name),
-      fieldName
-    );
-  }, [validate]);
-  
-  /**
-   * Validate an email address
-   * 
-   * @param value - The value to validate
-   * @param fieldName - The name of the field being validated
-   * @returns Validation result
-   */
-  const validateEmailAddress = useCallback((
-    value: unknown,
-    fieldName: string
-  ): ValidationResult<string> => {
-    return validate(
-      value,
-      validators.validateEmail,
-      fieldName
-    );
-  }, [validate]);
-  
-  /**
-   * Validate a URL
-   * 
-   * @param value - The value to validate
-   * @param fieldName - The name of the field being validated
-   * @returns Validation result
-   */
-  const validateURL = useCallback((
-    value: unknown,
-    fieldName: string
-  ): ValidationResult<string> => {
-    return validate(
-      value,
-      validators.validateUrl,
-      fieldName
-    );
-  }, [validate]);
-  
-  /**
-   * Clear all validation errors
-   */
-  const clearErrors = useCallback(() => {
-    setErrors({});
-  }, []);
-  
-  /**
-   * Clear a specific validation error
-   * 
-   * @param fieldName - The name of the field to clear errors for
-   */
-  const clearError = useCallback((fieldName: string) => {
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[fieldName];
-      return newErrors;
+  const reset = useCallback(() => {
+    setValidationState({
+      isValidating: false,
+      isValid: false,
+      errors: [],
+      validData: null
     });
   }, []);
   
-  // Return the validation utility functions and current errors
+  // Validate initial data if requested
+  useState(() => {
+    if (validateOnMount && initialData !== null) {
+      validate(initialData);
+    }
+  });
+  
   return {
-    errors,
-    hasErrors: Object.keys(errors).length > 0,
+    ...validationState,
     validate,
-    validateRequiredString,
-    validateRequiredNumber,
-    validateRequiredBoolean,
-    validateNumberRange,
-    validateEmailAddress,
-    validateURL,
-    clearErrors,
-    clearError
+    reset
   };
 }
 

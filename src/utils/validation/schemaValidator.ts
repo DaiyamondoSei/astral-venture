@@ -1,148 +1,153 @@
+
 import { ValidationError } from './runtimeValidation';
 
 /**
- * Type for a schema validator function
+ * Result of schema validation
  */
-export type SchemaValidator<T> = (value: unknown, name: string) => T;
-
-/**
- * Type for a validation schema object
- */
-export type ValidationSchema<T> = {
-  [K in keyof T]: SchemaValidator<T[K]>;
-};
-
-/**
- * Options for schema validation
- */
-export interface SchemaValidationOptions {
-  /** Whether to allow unknown properties */
-  allowUnknown?: boolean;
-  
-  /** Whether to strip unknown properties */
-  stripUnknown?: boolean;
-  
-  /** Whether to abort early on first error */
-  abortEarly?: boolean;
+export interface ValidationResult<T> {
+  /** Whether the validation was successful */
+  isValid: boolean;
+  /** The validated data (if validation was successful) */
+  data?: T;
+  /** Validation errors (if validation failed) */
+  errors?: ValidationError[];
 }
 
 /**
- * Validate an object against a schema
- * 
- * @param value - The value to validate
- * @param schema - The validation schema
- * @param options - Validation options
- * @returns The validated object
- * @throws ValidationError if validation fails
+ * Interface for schema validator
  */
-export function validateSchema<T>(
-  value: unknown,
-  schema: ValidationSchema<T>,
-  options: SchemaValidationOptions = {}
-): T {
-  // Make sure value is an object
-  if (typeof value !== 'object' || value === null) {
-    throw new ValidationError('Value must be an object', {
-      code: 'VALIDATION_TYPE',
-      details: { 
-        expectedType: 'object', 
-        actualType: value === null ? 'null' : typeof value
-      }
-    });
-  }
-  
-  const { allowUnknown = false, stripUnknown = false, abortEarly = true } = options;
-  
-  const obj = value as Record<string, unknown>;
-  const result: Partial<T> = {};
-  const errors: Error[] = [];
-  
-  // Validate each field in the schema
-  for (const key in schema) {
-    if (Object.prototype.hasOwnProperty.call(schema, key)) {
-      try {
-        const validator = schema[key];
-        const fieldValue = obj[key];
-        
-        // Validate the field
-        result[key] = validator(fieldValue, key) as T[Extract<keyof T, string>];
-      } catch (error) {
-        if (abortEarly) {
-          throw error;
-        }
-        
-        errors.push(error as Error);
-      }
-    }
-  }
-  
-  // Check for unknown properties
-  if (!allowUnknown && !stripUnknown) {
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key) && !Object.prototype.hasOwnProperty.call(schema, key)) {
-        const error = new ValidationError(`Unknown property: ${key}`, {
-          code: 'VALIDATION_UNKNOWN',
-          details: { unknownProperty: key }
-        });
-        
-        if (abortEarly) {
-          throw error;
-        }
-        
-        errors.push(error);
-      }
-    }
-  }
-  
-  // If we have errors and didn't abort early, throw a combined error
-  if (errors.length > 0) {
-    throw new ValidationError('Validation failed', {
-      code: 'VALIDATION_FAILED',
-      details: { errors: errors.map(e => e.message) }
-    });
-  }
-  
-  // If stripUnknown is true, only include properties in the schema
-  if (stripUnknown) {
-    return result as T;
-  }
-  
-  // Otherwise, include all properties from the original object
-  if (allowUnknown) {
-    return { ...obj, ...result } as unknown as T;
-  }
-  
-  return result as T;
+export interface SchemaValidator<T> {
+  /** Validate data against schema */
+  validate: (data: unknown) => ValidationResult<T>;
+  /** Parse data and throw if invalid */
+  parse: (data: unknown) => T;
+  /** Check if data matches schema without returning the data */
+  check: (data: unknown) => boolean;
 }
 
 /**
- * Create a validation function for an object schema
+ * Create a schema validator for type validation
  * 
- * @param schema - The validation schema
+ * @param schema - Schema to validate against
  * @param options - Validation options
- * @returns A validation function that validates objects against the schema
+ * @returns Schema validator
  */
 export function createSchemaValidator<T>(
-  schema: ValidationSchema<T>,
-  options: SchemaValidationOptions = {}
-): (value: unknown, name?: string) => T {
-  return (value: unknown, name = 'value'): T => {
-    try {
-      return validateSchema(value, schema, options);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw new ValidationError(`${name}: ${error.message}`, {
-          code: error.code,
-          details: error.details,
-          statusCode: error.statusCode
+  validationFn: (data: unknown) => T,
+  schemaName: string
+): SchemaValidator<T> {
+  return {
+    validate: (data: unknown): ValidationResult<T> => {
+      try {
+        const validData = validationFn(data);
+        return {
+          isValid: true,
+          data: validData
+        };
+      } catch (error) {
+        let validationErrors: ValidationError[] = [];
+        
+        if (error instanceof ValidationError) {
+          validationErrors = [error];
+        } else if (error instanceof Error) {
+          validationErrors = [
+            new ValidationError(error.message, {
+              code: 'VALIDATION_ERROR',
+              details: { schema: schemaName }
+            })
+          ];
+        } else {
+          validationErrors = [
+            new ValidationError('Unknown validation error', {
+              code: 'VALIDATION_ERROR',
+              details: { schema: schemaName }
+            })
+          ];
+        }
+        
+        return {
+          isValid: false,
+          errors: validationErrors
+        };
+      }
+    },
+    
+    parse: (data: unknown): T => {
+      try {
+        return validationFn(data);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          throw error;
+        }
+        
+        if (error instanceof Error) {
+          throw new ValidationError(error.message, {
+            code: 'VALIDATION_ERROR',
+            details: { schema: schemaName }
+          });
+        }
+        
+        throw new ValidationError('Unknown validation error', {
+          code: 'VALIDATION_ERROR',
+          details: { schema: schemaName }
         });
       }
-      throw error;
+    },
+    
+    check: (data: unknown): boolean => {
+      try {
+        validationFn(data);
+        return true;
+      } catch (error) {
+        return false;
+      }
     }
   };
 }
 
-export default {
-  validateSchema,
-  createSchemaValidator
-};
+/**
+ * Create an API validator for specific endpoints
+ * 
+ * @param endpointValidators - Object mapping endpoint paths to their validators
+ * @returns API validator
+ */
+export function createApiValidator<
+  T extends Record<string, SchemaValidator<unknown>>
+>(endpointValidators: T): T & {
+  validateRequest: (endpoint: keyof T, data: unknown) => ValidationResult<unknown>;
+  validateResponse: (endpoint: keyof T, data: unknown) => ValidationResult<unknown>;
+} {
+  return {
+    ...endpointValidators,
+    validateRequest: (endpoint: keyof T, data: unknown): ValidationResult<unknown> => {
+      const validator = endpointValidators[endpoint];
+      if (!validator) {
+        return {
+          isValid: false,
+          errors: [new ValidationError(`No validator found for endpoint: ${String(endpoint)}`, {
+            code: 'MISSING_VALIDATOR',
+            details: { endpoint: String(endpoint) }
+          })]
+        };
+      }
+      
+      return validator.validate(data);
+    },
+    validateResponse: (endpoint: keyof T, data: unknown): ValidationResult<unknown> => {
+      const validator = endpointValidators[endpoint];
+      if (!validator) {
+        return {
+          isValid: false,
+          errors: [new ValidationError(`No validator found for endpoint: ${String(endpoint)}`, {
+            code: 'MISSING_VALIDATOR',
+            details: { endpoint: String(endpoint) }
+          })]
+        };
+      }
+      
+      return validator.validate(data);
+    }
+  };
+}
+
+export default createSchemaValidator;

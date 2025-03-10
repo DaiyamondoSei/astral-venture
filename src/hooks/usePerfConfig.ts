@@ -1,6 +1,6 @@
 
 import { useContext } from 'react';
-import PerfConfigContext, { PerfConfigContextType } from '@/contexts/PerfConfigContext';
+import PerfConfigContext, { PerfConfigContextType, defaultConfigs } from '@/contexts/PerfConfigContext';
 
 /**
  * Custom hook to use the performance configuration context
@@ -27,8 +27,6 @@ export const usePerfConfig = (): PerfConfigContextType => {
 export const getPerfConfigForCapability = (
   deviceCapability: 'low' | 'medium' | 'high'
 ): PerfConfigContextType['config'] => {
-  // Import directly from the context to avoid circular dependencies
-  const { defaultConfigs } = require('@/contexts/PerfConfigContext');
   return defaultConfigs[deviceCapability];
 };
 
@@ -39,8 +37,6 @@ export const getPerfConfigForCapability = (
  * @returns Performance configuration safe for all device capabilities
  */
 export const getSafeConfig = (): PerfConfigContextType['config'] => {
-  // Import directly from the context to avoid circular dependencies
-  const { defaultConfigs } = require('@/contexts/PerfConfigContext');
   return defaultConfigs.low;
 };
 

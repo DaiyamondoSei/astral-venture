@@ -1,146 +1,199 @@
 
-import { ValidationError, validateObject } from './runtimeValidation';
-import { createSchemaValidator, ValidationSchema } from './schemaValidator';
-import { handleError, ErrorCategory } from '@/utils/errorHandling';
+import { ValidationError } from './runtimeValidation';
+import { createSchemaValidator } from './schemaValidator';
+import { validateObject, validateString, validateArray } from './runtimeValidation';
 
 /**
- * API validation result
+ * Interface for API request validation
  */
-export interface ApiValidationResult<T> {
-  /** Whether the validation was successful */
-  isValid: boolean;
-  
-  /** The validated data */
-  data?: T;
-  
-  /** Error message if validation failed */
-  error?: string;
+export interface APIRequestValidation<T> {
+  /** Validate API request parameters */
+  validateRequest: (data: unknown) => T;
+  /** Create validation errors for invalid requests */
+  createValidationError: (message: string, details?: unknown) => ValidationError;
 }
 
 /**
- * Validate an API response using a schema
+ * Create a validator for API requests
  * 
- * @param response - The API response to validate
- * @param schema - The validation schema to use
- * @param context - Context name for error handling
- * @returns Validation result with data if valid
+ * @param endpointName - Name of the API endpoint
+ * @param validator - Validation function for the request
+ * @returns API request validation object
  */
-export async function validateApiResponse<T>(
-  response: Response,
-  schema: ValidationSchema<T>,
-  context = 'API'
-): Promise<ApiValidationResult<T>> {
-  try {
-    // Check if response is OK
-    if (!response.ok) {
-      let errorData = null;
-      
+export function createAPIRequestValidator<T>(
+  endpointName: string,
+  validator: (data: unknown) => T
+): APIRequestValidation<T> {
+  const schemaValidator = createSchemaValidator(validator, endpointName);
+  
+  return {
+    validateRequest: (data: unknown): T => {
       try {
-        errorData = await response.json();
-      } catch (e) {
-        // If we can't parse the error, just use the status text
-        errorData = { error: response.statusText };
+        return schemaValidator.parse(data);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          throw error;
+        }
+        
+        throw new ValidationError(`Invalid request parameters for ${endpointName}`, {
+          code: 'API_VALIDATION_ERROR',
+          details: { endpoint: endpointName, error: error instanceof Error ? error.message : 'Unknown error' }
+        });
       }
-      
-      const errorMessage = errorData?.error || errorData?.message || `API error: ${response.status}`;
-      
-      throw new ValidationError(errorMessage, {
-        code: 'API_ERROR',
-        details: {
-          status: response.status,
-          url: response.url,
-          errorData
-        },
-        statusCode: response.status
+    },
+    
+    createValidationError: (message: string, details?: unknown): ValidationError => {
+      return new ValidationError(message, {
+        code: 'API_VALIDATION_ERROR',
+        details: { endpoint: endpointName, ...details }
       });
-    }
-    
-    // Parse the response
-    const data = await response.json();
-    
-    // Create a validator from the schema
-    const validator = createSchemaValidator(schema, {
-      allowUnknown: true
-    });
-    
-    // Validate the data
-    const validatedData = validator(data, 'response');
-    
-    // Return successful result
-    return {
-      isValid: true,
-      data: validatedData
-    };
-  } catch (error) {
-    // Handle the error
-    handleError(error, {
-      category: ErrorCategory.VALIDATION,
-      context,
-      showToast: true
-    });
-    
-    // Return error result
-    return {
-      isValid: false,
-      error: error instanceof Error ? error.message : String(error)
-    };
-  }
-}
-
-/**
- * Options for the API validator
- */
-export interface ApiValidatorOptions {
-  /** Context name for error handling */
-  context?: string;
-  
-  /** Whether to throw on validation errors */
-  throwOnError?: boolean;
-  
-  /** Custom error handler */
-  onError?: (error: unknown) => void;
-}
-
-/**
- * Create an API response validator function for a specific schema
- * 
- * @param schema - The validation schema to use
- * @param options - Validator options
- * @returns A function that validates API responses against the schema
- */
-export function createApiValidator<T>(
-  schema: ValidationSchema<T>,
-  options: ApiValidatorOptions = {}
-): (response: Response) => Promise<ApiValidationResult<T>> {
-  const { context = 'API', throwOnError = false, onError } = options;
-  
-  return async (response: Response): Promise<ApiValidationResult<T>> => {
-    try {
-      const result = await validateApiResponse(response, schema, context);
-      
-      if (!result.isValid && throwOnError) {
-        throw new Error(result.error);
-      }
-      
-      return result;
-    } catch (error) {
-      if (onError) {
-        onError(error);
-      }
-      
-      if (throwOnError) {
-        throw error;
-      }
-      
-      return {
-        isValid: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
     }
   };
 }
 
-export default {
-  validateApiResponse,
-  createApiValidator
-};
+/**
+ * Validate pagination parameters
+ * 
+ * @param params - Pagination parameters
+ * @returns Validated pagination parameters
+ */
+export function validatePaginationParams(params: unknown): { page: number; limit: number } {
+  const obj = validateObject(params, 'paginationParams');
+  
+  let page = 1;
+  if ('page' in obj) {
+    const pageParam = Number(obj.page);
+    if (!isNaN(pageParam) && pageParam > 0) {
+      page = pageParam;
+    }
+  }
+  
+  let limit = 10;
+  if ('limit' in obj) {
+    const limitParam = Number(obj.limit);
+    if (!isNaN(limitParam) && limitParam > 0 && limitParam <= 100) {
+      limit = limitParam;
+    }
+  }
+  
+  return { page, limit };
+}
+
+/**
+ * Validate sorting parameters
+ * 
+ * @param params - Sorting parameters
+ * @param allowedFields - Allowed fields to sort by
+ * @returns Validated sorting parameters
+ */
+export function validateSortingParams(
+  params: unknown,
+  allowedFields: string[]
+): { sortBy: string; sortOrder: 'asc' | 'desc' } {
+  const obj = validateObject(params, 'sortingParams');
+  
+  let sortBy = allowedFields[0];
+  if ('sortBy' in obj && typeof obj.sortBy === 'string') {
+    if (allowedFields.includes(obj.sortBy)) {
+      sortBy = obj.sortBy;
+    } else {
+      throw new ValidationError(`Invalid sort field. Allowed fields: ${allowedFields.join(', ')}`, {
+        code: 'INVALID_SORT_FIELD',
+        details: { provided: obj.sortBy, allowed: allowedFields }
+      });
+    }
+  }
+  
+  let sortOrder: 'asc' | 'desc' = 'desc';
+  if ('sortOrder' in obj && typeof obj.sortOrder === 'string') {
+    if (obj.sortOrder === 'asc' || obj.sortOrder === 'desc') {
+      sortOrder = obj.sortOrder;
+    } else {
+      throw new ValidationError('Sort order must be either "asc" or "desc"', {
+        code: 'INVALID_SORT_ORDER',
+        details: { provided: obj.sortOrder }
+      });
+    }
+  }
+  
+  return { sortBy, sortOrder };
+}
+
+/**
+ * Validate filtering parameters
+ * 
+ * @param params - Filtering parameters
+ * @param allowedFilters - Configuration of allowed filters
+ * @returns Validated filter object
+ */
+export function validateFilterParams(
+  params: unknown,
+  allowedFilters: Record<string, { type: 'string' | 'number' | 'boolean' | 'array' }>
+): Record<string, unknown> {
+  const obj = validateObject(params, 'filterParams');
+  const filters: Record<string, unknown> = {};
+  
+  for (const [key, value] of Object.entries(obj)) {
+    if (key in allowedFilters) {
+      const filterConfig = allowedFilters[key];
+      
+      switch (filterConfig.type) {
+        case 'string':
+          filters[key] = validateString(value, key);
+          break;
+        case 'number':
+          if (typeof value === 'string') {
+            const num = Number(value);
+            if (isNaN(num)) {
+              throw new ValidationError(`Filter ${key} must be a number`, {
+                code: 'INVALID_FILTER_VALUE',
+                details: { filter: key, value }
+              });
+            }
+            filters[key] = num;
+          } else if (typeof value === 'number') {
+            filters[key] = value;
+          } else {
+            throw new ValidationError(`Filter ${key} must be a number`, {
+              code: 'INVALID_FILTER_VALUE',
+              details: { filter: key, value }
+            });
+          }
+          break;
+        case 'boolean':
+          if (typeof value === 'string') {
+            if (value === 'true') filters[key] = true;
+            else if (value === 'false') filters[key] = false;
+            else {
+              throw new ValidationError(`Filter ${key} must be a boolean`, {
+                code: 'INVALID_FILTER_VALUE',
+                details: { filter: key, value }
+              });
+            }
+          } else if (typeof value === 'boolean') {
+            filters[key] = value;
+          } else {
+            throw new ValidationError(`Filter ${key} must be a boolean`, {
+              code: 'INVALID_FILTER_VALUE',
+              details: { filter: key, value }
+            });
+          }
+          break;
+        case 'array':
+          if (typeof value === 'string') {
+            filters[key] = value.split(',').map(item => item.trim());
+          } else if (Array.isArray(value)) {
+            filters[key] = validateArray(value, key);
+          } else {
+            throw new ValidationError(`Filter ${key} must be an array or comma-separated string`, {
+              code: 'INVALID_FILTER_VALUE',
+              details: { filter: key, value }
+            });
+          }
+          break;
+      }
+    }
+  }
+  
+  return filters;
+}
