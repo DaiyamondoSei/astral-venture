@@ -36,6 +36,36 @@ export enum ErrorCode {
 }
 
 /**
+ * Log levels for structured logging
+ */
+export enum LogLevel {
+  DEBUG = 'debug',
+  INFO = 'info',
+  WARN = 'warn',
+  ERROR = 'error'
+}
+
+/**
+ * Structured log entry
+ */
+export interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  context?: string;
+  requestId?: string;
+  userId?: string;
+  duration?: number;
+  data?: Record<string, unknown>;
+  error?: {
+    message: string;
+    stack?: string;
+    code?: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+/**
  * Handle CORS preflight requests
  * @param req Request object
  * @returns Response or null if not a preflight request
@@ -73,13 +103,19 @@ export function createSuccessResponse<T>(data: T): Response {
  * @returns Formatted Response
  */
 export function createErrorResponse(
-  error: { code: string; message: string; details?: any },
+  code: ErrorCode | string,
+  message: string,
+  details?: Record<string, unknown>,
   status: number = 400
 ): Response {
   return new Response(
     JSON.stringify({
       success: false,
-      error,
+      error: {
+        code,
+        message,
+        details
+      },
       timestamp: new Date().toISOString()
     }),
     {
@@ -109,30 +145,50 @@ export function getAuthToken(req: Request): string | null {
  * @param data Additional data
  */
 export function logMessage(
-  level: 'debug' | 'info' | 'warn' | 'error',
+  level: LogLevel = LogLevel.INFO,
   message: string,
-  data?: any
+  options: {
+    context?: string;
+    requestId?: string;
+    userId?: string;
+    duration?: number;
+    data?: Record<string, unknown>;
+    error?: Error;
+  } = {}
 ): void {
-  const timestamp = new Date().toISOString();
-  const logData = {
-    timestamp,
+  const logEntry: LogEntry = {
+    timestamp: new Date().toISOString(),
     level,
     message,
-    ...(data && { data })
+    ...options
   };
   
+  // Add error details if provided
+  if (options.error) {
+    logEntry.error = {
+      message: options.error.message,
+      stack: options.error.stack,
+      ...(options.error as any).code && { code: (options.error as any).code },
+      ...(options.error as any).details && { details: (options.error as any).details }
+    };
+  }
+  
+  // Stringify the log entry
+  const logString = JSON.stringify(logEntry);
+  
+  // Output to appropriate console method
   switch (level) {
-    case 'debug':
-      console.debug(JSON.stringify(logData));
+    case LogLevel.DEBUG:
+      console.debug(logString);
       break;
-    case 'info':
-      console.info(JSON.stringify(logData));
+    case LogLevel.INFO:
+      console.info(logString);
       break;
-    case 'warn':
-      console.warn(JSON.stringify(logData));
+    case LogLevel.WARN:
+      console.warn(logString);
       break;
-    case 'error':
-      console.error(JSON.stringify(logData));
+    case LogLevel.ERROR:
+      console.error(logString);
       break;
   }
 }
@@ -145,17 +201,210 @@ export function logMessage(
  */
 export async function measureExecutionTime<T>(
   fn: () => Promise<T>,
-  fnName: string
+  fnName: string,
+  options: {
+    context?: string;
+    requestId?: string;
+    userId?: string;
+    logLevel?: LogLevel;
+    includeResult?: boolean;
+  } = {}
 ): Promise<T> {
   const start = Date.now();
+  let result: T;
+  
   try {
-    const result = await fn();
+    result = await fn();
     const duration = Date.now() - start;
-    logMessage('debug', `Function ${fnName} executed in ${duration}ms`);
+    
+    logMessage(
+      options.logLevel || LogLevel.DEBUG,
+      `Function ${fnName} executed in ${duration}ms`,
+      {
+        context: options.context,
+        requestId: options.requestId,
+        userId: options.userId,
+        duration,
+        data: options.includeResult ? { result } : undefined
+      }
+    );
+    
     return result;
   } catch (error) {
     const duration = Date.now() - start;
-    logMessage('error', `Function ${fnName} failed after ${duration}ms`, { error });
+    
+    logMessage(
+      LogLevel.ERROR,
+      `Function ${fnName} failed after ${duration}ms`,
+      {
+        context: options.context,
+        requestId: options.requestId,
+        userId: options.userId,
+        duration,
+        error: error instanceof Error ? error : new Error(String(error))
+      }
+    );
+    
     throw error;
+  }
+}
+
+/**
+ * Validate request data with error handling
+ * @param validator Function that validates data
+ * @param data Data to validate
+ * @param context Context for error logging
+ * @returns Validated data
+ */
+export function validateRequest<T>(
+  validator: (data: unknown) => T,
+  data: unknown,
+  context: string
+): T {
+  try {
+    return validator(data);
+  } catch (error) {
+    logMessage(LogLevel.ERROR, `Validation error in ${context}`, { error: error as Error });
+    
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    throw new Error(`Validation error: ${String(error)}`);
+  }
+}
+
+/**
+ * Process a request with standard error handling
+ * @param fn Request handler function
+ * @param requestId Optional request identifier
+ * @returns Response object
+ */
+export async function processRequest(
+  fn: () => Promise<Response>,
+  requestId?: string
+): Promise<Response> {
+  try {
+    return await fn();
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Log the error
+    logMessage(LogLevel.ERROR, 'Error processing request', {
+      requestId,
+      error: error instanceof Error ? error : new Error(errorMessage)
+    });
+    
+    // Determine error type for response
+    if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+      return createErrorResponse(
+        ErrorCode.AUTHENTICATION_ERROR,
+        'Authentication failed',
+        { message: errorMessage },
+        401
+      );
+    }
+    
+    if (errorMessage.includes('permission') || errorMessage.includes('forbidden')) {
+      return createErrorResponse(
+        ErrorCode.AUTHORIZATION_ERROR,
+        'You do not have permission to perform this action',
+        { message: errorMessage },
+        403
+      );
+    }
+    
+    if (errorMessage.includes('not found') || errorMessage.includes('missing')) {
+      return createErrorResponse(
+        ErrorCode.NOT_FOUND,
+        'The requested resource was not found',
+        { message: errorMessage },
+        404
+      );
+    }
+    
+    if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+      return createErrorResponse(
+        ErrorCode.VALIDATION_ERROR,
+        'Invalid request data',
+        { message: errorMessage },
+        400
+      );
+    }
+    
+    if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+      return createErrorResponse(
+        ErrorCode.RATE_LIMIT_EXCEEDED,
+        'Rate limit exceeded, please try again later',
+        { message: errorMessage },
+        429
+      );
+    }
+    
+    // Default to internal server error
+    return createErrorResponse(
+      ErrorCode.INTERNAL_SERVER_ERROR,
+      'An unexpected error occurred',
+      { message: errorMessage },
+      500
+    );
+  }
+}
+
+/**
+ * Standard handler for processing API requests
+ * @param req Request object
+ * @param handler Function to handle the request
+ * @returns Response object
+ */
+export async function handleApiRequest(
+  req: Request,
+  handler: (body: unknown, headers: Headers) => Promise<Response>
+): Promise<Response> {
+  // Generate request ID for tracking
+  const requestId = crypto.randomUUID();
+  
+  // Handle CORS preflight requests
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+  
+  try {
+    // Parse request body
+    let body: unknown;
+    const contentType = req.headers.get('content-type');
+    
+    if (contentType?.includes('application/json')) {
+      body = await req.json();
+    } else if (contentType?.includes('multipart/form-data')) {
+      // For form data, we'd need proper form data parsing
+      body = await req.formData();
+    } else if (contentType?.includes('text/plain')) {
+      body = await req.text();
+    } else {
+      // Default to trying JSON
+      try {
+        body = await req.json();
+      } catch {
+        body = null;
+      }
+    }
+    
+    // Process the request
+    return await processRequest(
+      async () => handler(body, req.headers),
+      requestId
+    );
+  } catch (error) {
+    logMessage(LogLevel.ERROR, 'Error processing API request', {
+      requestId,
+      error: error instanceof Error ? error : new Error(String(error))
+    });
+    
+    return createErrorResponse(
+      ErrorCode.INTERNAL_SERVER_ERROR,
+      'Failed to process request',
+      { message: error instanceof Error ? error.message : String(error) },
+      500
+    );
   }
 }
