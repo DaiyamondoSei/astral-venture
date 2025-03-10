@@ -9,6 +9,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Cache for reducing API calls
+const responseCache = new Map<string, {
+  response: any,
+  timestamp: number,
+  expiresAt: number
+}>();
+
 // Handle CORS preflight requests
 const handleCors = (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -24,7 +31,7 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { message, userId, context, intentType = "general" } = await req.json();
+    const { message, userId, context, intentType = "general", cacheResponse = true } = await req.json();
     
     if (!message) {
       return new Response(
@@ -32,6 +39,25 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    // Generate cache key based on user, message and intent
+    const cacheKey = `${userId || 'anonymous'}-${intentType}-${hashString(message)}`;
+    
+    // Check cache first if enabled
+    if (cacheResponse) {
+      const cachedResponse = getCachedResponse(cacheKey);
+      if (cachedResponse) {
+        console.log(`Cache hit for key: ${cacheKey}`);
+        return new Response(
+          JSON.stringify(cachedResponse),
+          { headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT" } }
+        );
+      }
+      console.log(`Cache miss for key: ${cacheKey}`);
+    }
+    
+    // Start tracking performance
+    const startTime = performance.now();
     
     // Get OpenAI API key
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
@@ -56,33 +82,34 @@ serve(async (req) => {
           auth: { persistSession: false }
         });
         
-        // Fetch user profile for personalization
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('astral_level, energy_points')
-          .eq('id', userId)
-          .single();
+        // Fetch user data in parallel for better performance
+        const [profileResult, chakrasResult, reflectionsResult] = await Promise.all([
+          // Fetch user profile
+          supabase
+            .from('user_profiles')
+            .select('astral_level, energy_points')
+            .eq('id', userId)
+            .single(),
+          
+          // Fetch chakra data
+          supabase
+            .from('chakra_systems')
+            .select('chakras, dominant_chakra')
+            .eq('user_id', userId)
+            .single(),
+          
+          // Fetch recent reflections
+          supabase
+            .from('energy_reflections')
+            .select('content, dominant_emotion, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(3)
+        ]);
         
-        userProfile = profile;
-        
-        // Fetch chakra data if available
-        const { data: chakras } = await supabase
-          .from('chakra_systems')
-          .select('chakras, dominant_chakra')
-          .eq('user_id', userId)
-          .single();
-        
-        userChakras = chakras;
-        
-        // Fetch recent reflections for context
-        const { data: reflections } = await supabase
-          .from('energy_reflections')
-          .select('content, dominant_emotion, created_at')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(3);
-        
-        recentReflections = reflections;
+        userProfile = profileResult.data;
+        userChakras = chakrasResult.data;
+        recentReflections = reflectionsResult.data;
       }
     }
     
@@ -92,6 +119,13 @@ serve(async (req) => {
     // Build the user message with additional context
     const enhancedMessage = buildEnhancedMessage(message, context, recentReflections);
     
+    // Select appropriate model based on complexity and user level
+    const model = selectModel(userProfile, message);
+    
+    // Calculate token estimate to avoid exceeding limits
+    const estimatedTokens = estimateTokenCount(systemPrompt) + estimateTokenCount(enhancedMessage);
+    const maxTokens = Math.min(1000, 4000 - estimatedTokens);
+    
     // Call OpenAI API
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -100,13 +134,15 @@ serve(async (req) => {
         "Authorization": `Bearer ${openAiKey}`
       },
       body: JSON.stringify({
-        model: selectModel(userProfile, message),
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: enhancedMessage }
         ],
         temperature: 0.7,
-        max_tokens: 1000
+        max_tokens: maxTokens,
+        // Add some frequency penalty to reduce repetition
+        frequency_penalty: 0.5
       })
     });
     
@@ -119,35 +155,35 @@ serve(async (req) => {
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
     
-    // Process the response to extract insights and other structured data
+    // Process the response to extract structured information
     const processedResponse = processAIResponse(aiResponse, intentType);
     
-    // Log this interaction for analytics
+    // Add performance metrics
+    const endTime = performance.now();
+    processedResponse.metrics = {
+      processingTime: endTime - startTime,
+      tokenUsage: data.usage || {
+        prompt_tokens: estimatedTokens,
+        completion_tokens: estimateTokenCount(aiResponse),
+        total_tokens: estimatedTokens + estimateTokenCount(aiResponse)
+      },
+      model,
+      cached: false
+    };
+    
+    // Store in cache if enabled
+    if (cacheResponse) {
+      setCachedResponse(cacheKey, processedResponse);
+    }
+    
+    // Log this interaction for analytics in the background
     if (userId) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      
-      if (supabaseUrl && supabaseServiceKey) {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-          auth: { persistSession: false }
-        });
-        
-        await supabase.from('user_activities').insert({
-          user_id: userId,
-          activity_type: 'divine_guidance',
-          metadata: {
-            intent_type: intentType,
-            message_length: message.length,
-            response_length: aiResponse.length,
-            response_processed: true
-          }
-        });
-      }
+      EdgeRuntime.waitUntil(trackInteraction(userId, intentType, message, processedResponse, model));
     }
     
     return new Response(
       JSON.stringify(processedResponse),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS" } }
     );
   } catch (error) {
     console.error("Error in divine intelligence processing:", error);
@@ -161,6 +197,119 @@ serve(async (req) => {
     );
   }
 });
+
+// Cache management functions
+function getCachedResponse(key: string): any | null {
+  const cached = responseCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.response;
+  }
+  // Clean up expired entries occasionally
+  if (Math.random() < 0.1) cleanCache();
+  return null;
+}
+
+function setCachedResponse(key: string, response: any, ttl = 30 * 60 * 1000): void {
+  // Limit cache size to prevent memory issues
+  if (responseCache.size > 100) {
+    // Delete oldest entries
+    const entries = Array.from(responseCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp)
+      .slice(0, 20);
+    
+    entries.forEach(([key]) => responseCache.delete(key));
+  }
+  
+  responseCache.set(key, {
+    response,
+    timestamp: Date.now(),
+    expiresAt: Date.now() + ttl
+  });
+}
+
+function cleanCache(): void {
+  const now = Date.now();
+  for (const [key, value] of responseCache.entries()) {
+    if (now > value.expiresAt) {
+      responseCache.delete(key);
+    }
+  }
+}
+
+// Track user interaction in the database
+async function trackInteraction(
+  userId: string, 
+  intentType: string, 
+  message: string, 
+  response: any,
+  model: string
+): Promise<void> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!supabaseUrl || !supabaseServiceKey) return;
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    });
+    
+    // Track in user activities table
+    await supabase.from('user_activities').insert({
+      user_id: userId,
+      activity_type: 'divine_guidance',
+      duration: response.metrics?.processingTime || 0,
+      chakras_activated: response.chakraFocus || [],
+      emotional_response: response.emotionalGuidance ? true : false,
+      metadata: {
+        intent_type: intentType,
+        message_length: message.length,
+        response_length: response.message.length,
+        insights_count: response.insights.length,
+        practices_count: response.suggestedPractices.length,
+        model,
+        token_usage: response.metrics?.tokenUsage?.total_tokens
+      }
+    });
+    
+    // Optionally update personalization metrics
+    const { data: metrics } = await supabase
+      .from('personalization_metrics')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+      
+    if (metrics) {
+      // Update metrics based on interaction
+      await supabase
+        .from('personalization_metrics')
+        .update({
+          engagement_score: Math.min(100, (metrics.engagement_score || 0) + 2),
+          content_relevance_rating: Math.min(100, (metrics.content_relevance_rating || 0) + 1)
+        })
+        .eq('user_id', userId);
+    }
+  } catch (error) {
+    console.error("Error tracking interaction:", error);
+    // Don't throw, this is a background task
+  }
+}
+
+// Helper functions
+function hashString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16);
+}
+
+function estimateTokenCount(text: string): number {
+  // Rough estimate: 1 token ≈ 4 characters for English text
+  return Math.ceil(text.length / 4);
+}
 
 // Build a personalized system prompt based on user profile
 function buildSystemPrompt(userProfile: any, chakraData: any, intentType: string): string {
@@ -250,6 +399,7 @@ function buildEnhancedMessage(message: string, context: any, reflections: any[])
     enhancedMessage += "\n\nRecent reflections:\n";
     
     reflections.forEach((reflection, index) => {
+      // Only include short summaries to save tokens
       enhancedMessage += `Reflection ${index + 1}: ${reflection.content.substring(0, 100)}...\n`;
       if (reflection.dominant_emotion) {
         enhancedMessage += `Dominant emotion: ${reflection.dominant_emotion}\n`;
@@ -266,12 +416,12 @@ function selectModel(userProfile: any, message: string): string {
   const messageLength = message.length;
   const containsComplexConcepts = /chakra|consciousness|quantum|meditation|spiritual|energy/i.test(message);
   
-  // Use more powerful model for advanced users or complex queries
-  if (astralLevel >= 5 || messageLength > 100 || containsComplexConcepts) {
+  // Use more powerful model for specific cases to save costs
+  if (astralLevel >= 5 || messageLength > 200 || containsComplexConcepts) {
     return "gpt-4o";
   }
   
-  // Use standard model for most interactions
+  // Use more economical model for most interactions
   return "gpt-4o-mini";
 }
 
@@ -364,7 +514,7 @@ function extractPractices(text: string): Array<{id: string, title: string, descr
       
       if (titleMatch && titleMatch[1] && descriptionMatch && descriptionMatch[1]) {
         practices.push({
-          id: `practice-${index}`,
+          id: `practice-${Date.now()}-${index}`,
           title: titleMatch[1].trim(),
           description: descriptionMatch[1].trim()
         });
@@ -381,7 +531,7 @@ function extractPractices(text: string): Array<{id: string, title: string, descr
       
       if (descriptionText) {
         practices.push({
-          id: `labeled-practice-${index}`,
+          id: `labeled-practice-${Date.now()}-${index}`,
           title: `${labelMatch?.[0].replace(':', '') || 'Practice'} ${index + 1}`,
           description: descriptionText
         });

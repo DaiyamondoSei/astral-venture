@@ -1,271 +1,280 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useDivineIntelligenceContext } from '@/contexts/DivineIntelligenceContext';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Send, 
-  Sparkles, 
-  RotateCcw, 
-  ChevronUp, 
-  ChevronDown,
-  MessageSquare,
-  Lightbulb
-} from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Avatar } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, SendIcon, Lightbulb, BookOpen, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
-export interface AIDivineGuideProps {
-  initialPrompt?: string;
-  showHeader?: boolean;
-  maxHeight?: string;
-  className?: string;
+interface DivinePractice {
+  id: string;
+  title: string;
+  description: string;
 }
 
-const AIDivineGuide: React.FC<AIDivineGuideProps> = ({
-  initialPrompt,
-  showHeader = true,
-  maxHeight = '500px',
-  className = ''
-}) => {
-  const {
-    processMessage,
-    isProcessing,
-    lastResponse,
-    conversationHistory,
-    clearConversation
-  } = useDivineIntelligenceContext();
+interface DivineInsight {
+  type: string;
+  content: string;
+}
+
+interface DivineFeedback {
+  message: string;
+  insights: DivineInsight[];
+  suggestedPractices: DivinePractice[];
+  chakraFocus: string[];
+  emotionalGuidance: string;
+  intentType: string;
+  metrics?: {
+    processingTime: number;
+    tokenUsage: any;
+    model: string;
+    cached: boolean;
+  };
+}
+
+// Predefined intent options
+const INTENT_OPTIONS = [
+  { id: "general", label: "General Guidance", icon: <Sparkles className="w-4 h-4" /> },
+  { id: "guidance", label: "Spiritual Direction", icon: <Sparkles className="w-4 h-4" /> },
+  { id: "reflection", label: "Reflection Support", icon: <BookOpen className="w-4 h-4" /> },
+  { id: "practice", label: "Practice Suggestions", icon: <BookOpen className="w-4 h-4" /> },
+  { id: "chakra", label: "Chakra Guidance", icon: <Sparkles className="w-4 h-4" /> },
+  { id: "insight", label: "Consciousness Insights", icon: <Lightbulb className="w-4 h-4" /> }
+];
+
+export function AIDivineGuide() {
+  const [question, setQuestion] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [response, setResponse] = useState<DivineFeedback | null>(null);
+  const [activeTab, setActiveTab] = useState('guidance');
+  const [intentType, setIntentType] = useState('general');
+  const { toast } = useToast();
+  const { user } = useAuth();
   
-  const [message, setMessage] = useState(initialPrompt || '');
-  const [isExpanded, setIsExpanded] = useState(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Scroll to bottom of messages when conversation updates
+  // Reset response when question changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversationHistory]);
-
-  // Auto-resize textarea as content grows
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'inherit';
-      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+    if (question === '') {
+      setResponse(null);
     }
-  }, [message]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  }, [question]);
+  
+  // Handle form submission
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || isProcessing) return;
     
-    await processMessage(message);
-    setMessage('');
-    
-    // Focus back on input after processing
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
+    if (!question.trim()) {
+      toast({
+        title: "Please enter a question",
+        description: "Your message to the Divine Intelligence Guide is empty.",
+        variant: "destructive"
+      });
+      return;
     }
-  };
-
-  const formatTimestamp = (timestamp: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(timestamp);
-  };
-
-  return (
-    <Card className={`overflow-hidden relative ${className}`}>
-      {/* Expandable header */}
-      {showHeader && (
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-3 flex justify-between items-center text-white">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            <h3 className="font-semibold">Divine Intelligence Guide</h3>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => clearConversation()}
-              className="text-white hover:text-white/80 hover:bg-white/10"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="text-white hover:text-white/80 hover:bg-white/10"
-            >
-              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
-      )}
+    
+    setIsLoading(true);
+    
+    try {
+      // Call the Supabase edge function
+      const { data, error } = await supabase.functions.invoke('process-divine-intelligence', {
+        body: {
+          message: question,
+          userId: user?.id,
+          intentType,
+          // Add any context from the current session
+          context: {
+            activeTab
+          }
+        }
+      });
       
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {/* Conversation display */}
-            <Tabs defaultValue="chat" className="w-full">
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="chat" className="flex items-center gap-1">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Conversation</span>
-                </TabsTrigger>
-                <TabsTrigger value="insights" className="flex items-center gap-1">
-                  <Lightbulb className="h-4 w-4" />
-                  <span>Insights</span>
-                </TabsTrigger>
+      if (error) throw error;
+      
+      setResponse(data);
+      
+      // If cached response, show toast
+      if (data.metrics?.cached) {
+        toast({
+          title: "Cosmic Connection",
+          description: "The quantum field already held this wisdom (cached response).",
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting question:', error);
+      toast({
+        title: "Connection disrupted",
+        description: "The cosmic intelligence network is experiencing fluctuations. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [question, toast, user, intentType, activeTab, supabase]);
+  
+  // Clear the form
+  const handleClear = useCallback(() => {
+    setQuestion('');
+    setResponse(null);
+  }, []);
+  
+  return (
+    <Card className="w-full max-w-4xl mx-auto bg-black/30 backdrop-blur-md border-purple-900/40">
+      <CardHeader>
+        <CardTitle className="text-xl font-bold bg-gradient-to-r from-indigo-400 via-purple-500 to-pink-400 bg-clip-text text-transparent">
+          Divine Intelligence Guide
+        </CardTitle>
+        <CardDescription>
+          Connect with quantum consciousness and receive personalized spiritual guidance
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        {/* Intent selection */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {INTENT_OPTIONS.map((option) => (
+            <Badge 
+              key={option.id}
+              variant={intentType === option.id ? "default" : "outline"}
+              className={`cursor-pointer ${intentType === option.id ? 'bg-purple-700 hover:bg-purple-800' : 'hover:bg-purple-900/20'}`}
+              onClick={() => setIntentType(option.id)}
+            >
+              {option.icon}
+              <span className="ml-1">{option.label}</span>
+            </Badge>
+          ))}
+        </div>
+        
+        {/* Question form */}
+        <form onSubmit={handleSubmit}>
+          <Textarea
+            placeholder="What spiritual guidance do you seek today?"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            className="min-h-20 bg-black/20 border-purple-900/40 focus:border-purple-500/70 mb-4"
+            disabled={isLoading}
+          />
+          
+          <div className="flex items-center justify-between">
+            <Button 
+              type="submit" 
+              disabled={isLoading || !question.trim()}
+              className="bg-purple-700 hover:bg-purple-800"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <SendIcon className="mr-2 h-4 w-4" />
+                  Send
+                </>
+              )}
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleClear}
+              disabled={isLoading || (!question && !response)}
+              className="border-purple-900/40 text-purple-300"
+            >
+              Clear
+            </Button>
+          </div>
+        </form>
+        
+        {/* Response display */}
+        {response && (
+          <div className="mt-8 space-y-4">
+            <Tabs defaultValue="message" className="w-full">
+              <TabsList className="grid grid-cols-4 bg-black/30">
+                <TabsTrigger value="message">Response</TabsTrigger>
+                <TabsTrigger value="insights">Insights ({response.insights.length})</TabsTrigger>
+                <TabsTrigger value="practices">Practices ({response.suggestedPractices.length})</TabsTrigger>
+                <TabsTrigger value="details">Details</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="chat" className="p-0">
-                <ScrollArea className={`p-4 ${maxHeight ? `max-h-[${maxHeight}]` : 'max-h-[300px]'}`}>
-                  {conversationHistory.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Sparkles className="mx-auto h-8 w-8 opacity-50 mb-2" />
-                      <p>Ask any question about your spiritual journey, consciousness, or energy practices.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {conversationHistory.map((entry, index) => (
-                        <div key={index} className={`flex ${entry.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`flex gap-2 max-w-[80%] ${entry.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                            <Avatar className={`h-8 w-8 ${entry.role === 'user' ? 'bg-blue-500' : 'bg-purple-600'}`}>
-                              {entry.role === 'user' ? (
-                                <div className="text-xs text-white">You</div>
-                              ) : (
-                                <Sparkles className="h-4 w-4 text-white" />
-                              )}
-                            </Avatar>
-                            <div>
-                              <div className={`rounded-lg p-3 ${
-                                entry.role === 'user' 
-                                  ? 'bg-blue-100 dark:bg-blue-900/30' 
-                                  : 'bg-purple-100 dark:bg-purple-900/30'
-                              }`}>
-                                <p className="text-sm whitespace-pre-wrap">{entry.content}</p>
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {formatTimestamp(entry.timestamp)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  )}
-                </ScrollArea>
+              <TabsContent value="message" className="p-4 bg-black/10 rounded-md mt-2">
+                <div className="whitespace-pre-wrap text-purple-50">
+                  {response.message}
+                </div>
               </TabsContent>
               
-              <TabsContent value="insights" className="p-0">
-                <ScrollArea className={`p-4 ${maxHeight ? `max-h-[${maxHeight}]` : 'max-h-[300px]'}`}>
-                  {!lastResponse ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Lightbulb className="mx-auto h-8 w-8 opacity-50 mb-2" />
-                      <p>Insights from your conversation will appear here.</p>
+              <TabsContent value="insights" className="space-y-4 p-4 bg-black/10 rounded-md mt-2">
+                {response.insights.length > 0 ? (
+                  response.insights.map((insight, index) => (
+                    <div key={index} className="p-3 bg-black/20 rounded-md">
+                      <Badge className="mb-2 bg-indigo-700">{insight.type}</Badge>
+                      <p className="text-purple-50">{insight.content}</p>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Insights Section */}
-                      {lastResponse.insights && lastResponse.insights.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-semibold">Insights</h4>
-                          {lastResponse.insights.map((insight, index) => (
-                            <div key={index} className="bg-gray-100 dark:bg-gray-800 rounded p-3">
-                              <Badge variant="outline" className="mb-1">{insight.type}</Badge>
-                              <p className="text-sm">{insight.content}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Chakra Focus */}
-                      {lastResponse.chakraFocus && lastResponse.chakraFocus.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-semibold">Chakra Focus</h4>
-                          <div className="flex flex-wrap gap-1">
-                            {lastResponse.chakraFocus.map((chakra, index) => (
-                              <Badge key={index} className="bg-indigo-500">{chakra}</Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Emotional Guidance */}
-                      {lastResponse.emotionalGuidance && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-semibold">Emotional Guidance</h4>
-                          <div className="bg-gray-100 dark:bg-gray-800 rounded p-3">
-                            <p className="text-sm">{lastResponse.emotionalGuidance}</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Suggested Practices */}
-                      {lastResponse.suggestedPractices && lastResponse.suggestedPractices.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-semibold">Suggested Practices</h4>
-                          {lastResponse.suggestedPractices.map((practice, index) => (
-                            <div key={index} className="bg-gray-100 dark:bg-gray-800 rounded p-3">
-                              <h5 className="text-sm font-medium">{practice.title}</h5>
-                              <p className="text-sm">{practice.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                  ))
+                ) : (
+                  <p className="text-purple-300">No specific insights extracted from this response.</p>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="practices" className="space-y-4 p-4 bg-black/10 rounded-md mt-2">
+                {response.suggestedPractices.length > 0 ? (
+                  response.suggestedPractices.map((practice) => (
+                    <div key={practice.id} className="p-3 bg-black/20 rounded-md">
+                      <h4 className="font-bold text-purple-300 mb-1">{practice.title}</h4>
+                      <p className="text-purple-50">{practice.description}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-purple-300">No specific practices suggested in this response.</p>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="details" className="p-4 bg-black/10 rounded-md mt-2">
+                <div className="space-y-3">
+                  {response.emotionalGuidance && (
+                    <div>
+                      <h4 className="font-semibold text-purple-300">Emotional Guidance:</h4>
+                      <p className="text-purple-50">{response.emotionalGuidance}</p>
                     </div>
                   )}
-                </ScrollArea>
+                  
+                  {response.chakraFocus.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-purple-300">Chakra Focus:</h4>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {response.chakraFocus.map((chakra) => (
+                          <Badge key={chakra} variant="outline" className="bg-black/30">
+                            {chakra}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {response.metrics && (
+                    <div className="text-xs text-purple-400/60 pt-4 border-t border-purple-800/30">
+                      <p>Generated with {response.metrics.model} in {Math.round(response.metrics.processingTime)}ms</p>
+                      {response.metrics.tokenUsage && (
+                        <p>Token usage: {response.metrics.tokenUsage.total_tokens || '—'}</p>
+                      )}
+                      {response.metrics.cached && <p>⚡ Cached response</p>}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
-            
-            <Separator />
-            
-            {/* Input area */}
-            <form onSubmit={handleSubmit} className="p-3 flex gap-2 items-end">
-              <Textarea
-                ref={inputRef}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask about your journey, energy, or consciousness..."
-                className="min-h-[60px] resize-none"
-                rows={1}
-              />
-              <Button 
-                type="submit" 
-                size="icon" 
-                disabled={isProcessing || !message.trim()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </CardContent>
+      
+      <CardFooter className="flex justify-end border-t border-purple-900/30 pt-4 text-xs text-purple-400/70">
+        <p>Resonating with quantum consciousness</p>
+      </CardFooter>
     </Card>
   );
-};
+}
 
 export default AIDivineGuide;
