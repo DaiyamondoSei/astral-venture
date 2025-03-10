@@ -1,42 +1,16 @@
 
-import type { ComponentMetrics } from '@/services/ai/types';
-
-/**
- * Interface for component performance metrics
- */
-export interface IComponentMetrics {
-  /** Component name */
-  componentName: string;
-  /** Number of times the component has rendered */
-  renderCount: number;
-  /** Total time spent rendering the component (ms) */
-  totalRenderTime: number;
-  /** Average render time (ms) */
-  averageRenderTime: number;
-  /** Time taken for the last render (ms) */
-  lastRenderTime: number;
-  /** Number of renders that exceeded threshold */
-  slowRenderCount: number;
-  /** Time taken for first render (ms) */
-  firstRenderTime?: number;
-}
-
-/**
- * Event types for performance monitoring
- */
-export type PerformanceEventType = 'render' | 'update' | 'mount' | 'unmount' | 'interaction';
+import type { ComponentMetrics, PerformanceEventType } from '@/types/performance';
 
 /**
  * Subscription callback type
  */
-export type PerformanceSubscriptionCallback = (metrics: IComponentMetrics[]) => void;
+export type PerformanceSubscriptionCallback = (metrics: ComponentMetrics[]) => void;
 
 /**
  * Performance monitoring service for tracking component render times and metrics
- * Implements the ComponentMetrics interface from services/ai/types
  */
 export class PerformanceMonitor {
-  private metrics: Map<string, IComponentMetrics> = new Map();
+  private metrics: Map<string, ComponentMetrics> = new Map();
   private readonly slowRenderThreshold: number = 16; // 1 frame at 60fps
   private subscribers: Set<PerformanceSubscriptionCallback> = new Set();
   private isMonitoring: boolean = false;
@@ -44,38 +18,41 @@ export class PerformanceMonitor {
   /**
    * Start performance monitoring
    */
-  public startMonitoring(): void {
+  public startMonitoring = (): void => {
     this.isMonitoring = true;
-  }
+    console.log('Performance monitoring started');
+  };
 
   /**
    * Stop performance monitoring
    */
-  public stopMonitoring(): void {
+  public stopMonitoring = (): void => {
     this.isMonitoring = false;
-  }
+    console.log('Performance monitoring stopped');
+  };
 
   /**
    * Check if monitoring is active
    */
-  public isActive(): boolean {
+  public isActive = (): boolean => {
     return this.isMonitoring;
-  }
+  };
 
   /**
    * Reset all metrics
    */
-  public resetMetrics(): void {
+  public resetMetrics = (): void => {
     this.metrics.clear();
     this.notifySubscribers();
-  }
+    console.log('Performance metrics reset');
+  };
 
   /**
    * Record a render event for a component
    * @param componentName Component name
    * @param renderTime Render time in milliseconds
    */
-  public recordRender(componentName: string, renderTime: number): void {
+  public recordRender = (componentName: string, renderTime: number): void => {
     if (!this.isMonitoring) return;
     
     const metric = this.metrics.get(componentName) || {
@@ -103,82 +80,82 @@ export class PerformanceMonitor {
 
     this.metrics.set(componentName, metric);
     this.notifySubscribers();
-  }
+  };
 
   /**
    * Record multiple render times for a component
    * @param componentName Component name
    * @param renderTimes Array of render times
    */
-  public recordRenderBatch(componentName: string, renderTimes: number[]): void {
+  public recordRenderBatch = (componentName: string, renderTimes: number[]): void => {
     if (!this.isMonitoring || renderTimes.length === 0) return;
     renderTimes.forEach(time => this.recordRender(componentName, time));
-  }
+  };
 
   /**
    * Get metrics for a specific component
    * @param componentName Component name
    */
-  public getComponentMetrics(componentName: string): IComponentMetrics | undefined {
+  public getComponentMetrics = (componentName: string): ComponentMetrics | undefined => {
     return this.metrics.get(componentName);
-  }
+  };
 
   /**
    * Get all component metrics
    */
-  public getAllMetrics(): IComponentMetrics[] {
+  public getAllMetrics = (): ComponentMetrics[] => {
     return Array.from(this.metrics.values());
-  }
+  };
 
   /**
    * Get the slowest components
    * @param limit Maximum number of components to return
    */
-  public getSlowestComponents(limit: number = 5): IComponentMetrics[] {
+  public getSlowestComponents = (limit: number = 5): ComponentMetrics[] => {
     return this.getAllMetrics()
       .sort((a, b) => b.averageRenderTime - a.averageRenderTime)
       .slice(0, limit);
-  }
+  };
 
   /**
    * Clear all metrics
    */
-  public clearMetrics(): void {
+  public clearMetrics = (): void => {
     this.metrics.clear();
     this.notifySubscribers();
-  }
+  };
 
   /**
    * Report a slow render
    * @param componentName Component name
    * @param renderTime Render time in milliseconds
    */
-  public reportSlowRender(componentName: string, renderTime: number): void {
+  public reportSlowRender = (componentName: string, renderTime: number): void => {
     console.warn(
       `Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`
     );
-  }
+  };
 
   /**
    * Record component unmount
    * @param componentName Component name
    */
-  public recordUnmount(componentName: string): void {
+  public recordUnmount = (componentName: string): void => {
     this.metrics.delete(componentName);
     this.notifySubscribers();
-  }
+  };
 
   /**
    * Subscribe to metric updates
    * @param callback Callback function
    * @returns Unsubscribe function
    */
-  public subscribe(callback: PerformanceSubscriptionCallback): () => void {
+  public subscribe = (callback: PerformanceSubscriptionCallback): () => void => {
     this.subscribers.add(callback);
     return () => {
       this.subscribers.delete(callback);
     };
-  }
+  };
 
   /**
    * Notify all subscribers of metric updates

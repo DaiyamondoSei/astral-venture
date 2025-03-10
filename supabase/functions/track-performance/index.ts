@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
 // Import shared utilities
 import { 
@@ -15,7 +14,7 @@ import {
 import { withAuth, getSupabaseAdmin } from "../shared/authUtils.ts";
 import { executeQuery } from "../shared/databaseUtils.ts";
 
-// Performance metric types
+// Define performance metric types matching frontend types
 interface ComponentMetric {
   componentName: string;
   renderTime: number;
@@ -73,20 +72,33 @@ async function handleTrackPerformance(user: any, req: Request): Promise<Response
   try {
     logEvent("info", "Processing performance metrics", { userId: user.id });
     
-    // Parse request body
-    const payload: PerformanceMetricPayload = await req.json();
-    
-    // Validate payload
-    const validation = validateRequiredParameters(
-      { sessionId: payload.sessionId, timestamp: payload.timestamp },
-      ["sessionId", "timestamp"]
-    );
-    
-    if (!validation.isValid) {
+    // Parse and validate request body
+    let payload: PerformanceMetricPayload;
+    try {
+      payload = await req.json();
+      
+      // Validate required fields
+      const validation = validateRequiredParameters(
+        { 
+          sessionId: payload.sessionId, 
+          timestamp: payload.timestamp,
+          deviceInfo: payload.deviceInfo 
+        },
+        ["sessionId", "timestamp", "deviceInfo"]
+      );
+      
+      if (!validation.isValid) {
+        return createErrorResponse(
+          ErrorCode.MISSING_PARAMETERS,
+          "Missing required parameters",
+          { missingParams: validation.missingParams }
+        );
+      }
+    } catch (error) {
       return createErrorResponse(
-        ErrorCode.MISSING_PARAMETERS,
-        "Missing required parameters",
-        { missingParams: validation.missingParams }
+        ErrorCode.VALIDATION_FAILED,
+        "Invalid request format",
+        { details: error.message }
       );
     }
     

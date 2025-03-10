@@ -1,38 +1,37 @@
 
 /**
- * Performance monitoring types
+ * Shared type definitions for performance monitoring
+ * Used across frontend and backend systems
  */
 
-// Performance monitoring level
-export type PerformanceMonitoringLevel = 'high' | 'medium' | 'low' | 'debug';
-
-// Component metric
-export interface ComponentMetric {
-  componentName: string;
-  renderCount: number;
-  averageRenderTime: number;
-  minRenderTime: number;
-  maxRenderTime: number;
-  lastRenderTime: number;
-  totalRenderTime: number;
-  slowRenders: number;
-  timestamp: number;
-}
-
-// Collection of component metrics
+/**
+ * Component performance metrics interface
+ */
 export interface ComponentMetrics {
-  [componentName: string]: ComponentMetric;
+  /** Component name */
+  componentName: string;
+  /** Number of times the component has rendered */
+  renderCount: number;
+  /** Total time spent rendering the component (ms) */
+  totalRenderTime: number;
+  /** Average render time (ms) */
+  averageRenderTime: number;
+  /** Time taken for the last render (ms) */
+  lastRenderTime: number;
+  /** Number of renders that exceeded threshold */
+  slowRenderCount: number;
+  /** Time taken for first render (ms) */
+  firstRenderTime?: number;
 }
 
-// Performance mark for measuring specific operations
-export interface PerformanceMark {
-  name: string;
-  startTime?: number;
-  endTime?: number;
-  duration?: number;
-}
+/**
+ * Performance event types
+ */
+export type PerformanceEventType = 'render' | 'update' | 'mount' | 'unmount' | 'interaction';
 
-// Web vital metric data
+/**
+ * Web vital metric types
+ */
 export interface WebVitalMetric {
   name: string;
   value: number;
@@ -40,27 +39,12 @@ export interface WebVitalMetric {
   timestamp: number;
 }
 
-// Component render timing data
-export interface ComponentRenderTiming {
-  componentName: string;
-  renderTime: number;
-  renderType: 'initial' | 'update' | 'effect';
-  timestamp: number;
-}
-
-// Session data for performance tracking
-export interface PerformanceSession {
-  sessionId: string;
-  userId: string;
-  deviceInfo: DeviceInfo;
-  appVersion: string;
-  startTime: number;
-}
-
-// Device information for context
+/**
+ * Device information for performance context
+ */
 export interface DeviceInfo {
   userAgent: string;
-  deviceCategory: string;
+  deviceCategory: 'low' | 'medium' | 'high';
   deviceMemory?: number;
   hardwareConcurrency?: number;
   connectionType?: string;
@@ -73,50 +57,4 @@ export interface DeviceInfo {
     height: number;
   };
   pixelRatio?: number;
-}
-
-// Performance metric for database
-export interface PerformanceMetric {
-  component_name: string;
-  average_render_time: number;
-  total_renders: number;
-  slow_renders: number;
-  created_at: string;
-}
-
-// Monitoring status
-export interface MonitoringStatus {
-  isActive: boolean;
-  lastReportTime: number;
-  metricsCollected: number;
-  sessionsTracked: number;
-}
-
-// Config state for performance monitoring
-export interface PerformanceConfigState {
-  monitoringLevel: PerformanceMonitoringLevel;
-  autoOptimize: boolean;
-  trackInteractions: boolean;
-  reportToServer: boolean;
-  debugMode: boolean;
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  deviceCapability: 'high' | 'medium' | 'low';
-  manualPerformanceMode: 'auto' | 'high' | 'balanced' | 'low';
-  features: {
-    animations: boolean;
-    particleEffects: boolean;
-    backgroundEffects: boolean;
-    highQualityRendering: boolean;
-  };
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  webVitals: Record<string, number>;
 }

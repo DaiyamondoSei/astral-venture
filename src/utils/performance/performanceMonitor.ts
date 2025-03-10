@@ -5,15 +5,10 @@
  */
 
 import { PerformanceMonitor, performanceMonitor } from './PerformanceMonitor';
-import type { IComponentMetrics } from './PerformanceMonitor';
-import type { ComponentMetrics } from '@/services/ai/types';
+import type { ComponentMetrics } from '@/types/performance';
 
 // Re-export the singleton instance, class and types
 export { performanceMonitor, PerformanceMonitor };
-export type { IComponentMetrics, ComponentMetrics };
-
-// Type assertion to ensure compatibility between interfaces
-const _typeCheck: ComponentMetrics = {} as IComponentMetrics;
-const _reverseCheck: IComponentMetrics = {} as ComponentMetrics;
+export type { ComponentMetrics };
 
 export default performanceMonitor;
