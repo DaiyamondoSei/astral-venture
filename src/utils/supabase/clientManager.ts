@@ -1,22 +1,39 @@
 
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
-import type { ValidationError } from '@/utils/validation/errorBridge';
-import { handleDatabaseError, handleNetworkError } from '@/utils/validation/errorBridge';
+/**
+ * Centralized Supabase client manager
+ * Provides a single source of truth for Supabase clients 
+ */
 
-class SupabaseClientManager {
-  private static instance: SupabaseClientManager;
-  private client: ReturnType<typeof createClient<Database>>;
-  
-  private constructor() {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    
-    this.client = createClient<Database>(supabaseUrl, supabaseKey, {
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
+import { toast } from '@/components/ui/use-toast';
+
+// Configuration variables
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://wkmyvthtyjcdzhzvfyji.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbXl2dGh0eWpjZHpoenZmeWppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExMDM5OTMsImV4cCI6MjA1NjY3OTk5M30.iOgl9X2mcl-eQi5CzhluFYqVal1Qevk4kTav4zVfeMU';
+
+// Client instances
+let publicClient: SupabaseClient<Database> | null = null;
+let authClient: SupabaseClient<Database> | null = null;
+
+/**
+ * Get the public Supabase client
+ * This client is for unauthenticated operations
+ */
+export function getPublicClient(): SupabaseClient<Database> {
+  if (!publicClient) {
+    publicClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return publicClient;
+}
+
+/**
+ * Get the authenticated Supabase client
+ * This client is for authenticated operations with auth state persistence
+ */
+export function getAuthClient(): SupabaseClient<Database> {
+  if (!authClient) {
+    authClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: true,
         storageKey: 'cosmic-app-auth',
@@ -25,43 +42,49 @@ class SupabaseClientManager {
       }
     });
   }
+  return authClient;
+}
 
-  public static getInstance(): SupabaseClientManager {
-    if (!SupabaseClientManager.instance) {
-      SupabaseClientManager.instance = new SupabaseClientManager();
+/**
+ * Reset clients (useful for testing)
+ */
+export function resetClients(): void {
+  publicClient = null;
+  authClient = null;
+}
+
+/**
+ * Error handling wrapper for database operations
+ */
+export async function safeQueryHandler<T>(
+  queryFn: () => Promise<{ data: T | null; error: any }>,
+  errorMessage: string = 'Database operation failed'
+): Promise<T | null> {
+  try {
+    const { data, error } = await queryFn();
+    
+    if (error) {
+      console.error('Supabase error:', error);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+      return null;
     }
-    return SupabaseClientManager.instance;
-  }
-
-  public getClient() {
-    return this.client;
-  }
-
-  public async safeQuery<T>(
-    queryFn: () => Promise<{ data: T | null; error: Error | null }>
-  ): Promise<T> {
-    try {
-      const { data, error } = await queryFn();
-      
-      if (error) {
-        throw handleDatabaseError(error);
-      }
-      
-      if (!data) {
-        throw new Error('No data returned from query');
-      }
-      
-      return data;
-    } catch (error) {
-      if (error instanceof Error) {
-        throw handleNetworkError(error);
-      }
-      throw error;
-    }
+    
+    return data;
+  } catch (err) {
+    console.error('Unexpected error in Supabase operation:', err);
+    toast({
+      title: 'Error',
+      description: errorMessage,
+      variant: 'destructive'
+    });
+    return null;
   }
 }
 
-export const supabase = SupabaseClientManager.getInstance().getClient();
-export const safeQuery = SupabaseClientManager.getInstance().safeQuery.bind(
-  SupabaseClientManager.getInstance()
-);
+// For backward compatibility, export the auth client as default
+export const supabase = getAuthClient();
+export default supabase;

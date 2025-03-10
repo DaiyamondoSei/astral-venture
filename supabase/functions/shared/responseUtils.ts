@@ -137,6 +137,69 @@ function getHttpStatusFromErrorCode(code: ErrorCode | string): number {
   }
 }
 
+/**
+ * Validates that required parameters are present
+ */
+export function validateRequiredParameters(
+  params: Record<string, unknown>,
+  requiredParams: string[]
+): { isValid: boolean; missingParams: string[] } {
+  const missingParams = requiredParams.filter(param => 
+    params[param] === undefined || params[param] === null
+  );
+  
+  return {
+    isValid: missingParams.length === 0,
+    missingParams
+  };
+}
+
+/**
+ * Log an event for debugging
+ */
+export function logEvent(
+  level: 'debug' | 'info' | 'warn' | 'error',
+  message: string,
+  data?: Record<string, unknown>
+): void {
+  const logData = {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    data
+  };
+  
+  switch (level) {
+    case 'debug':
+      console.debug(JSON.stringify(logData));
+      break;
+    case 'info':
+      console.log(JSON.stringify(logData));
+      break;
+    case 'warn':
+      console.warn(JSON.stringify(logData));
+      break;
+    case 'error':
+      console.error(JSON.stringify(logData));
+      break;
+  }
+}
+
+/**
+ * Handle CORS preflight requests
+ */
+export function handleCorsRequest(): Response {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+  };
+  
+  return new Response(null, {
+    headers: corsHeaders
+  });
+}
+
 export default {
   createSuccessResponse,
   createErrorResponse,
