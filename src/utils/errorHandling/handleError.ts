@@ -1,22 +1,15 @@
 
-import { toast } from 'sonner';
-import { AppError, ErrorSeverity, createAppError } from './AppError';
-import { ValidationError, isValidationError } from '../validation/ValidationError';
-
 /**
- * Error handling configuration options
+ * Centralized Error Handler
+ * 
+ * This module provides a centralized error handling system for the application.
  */
-export interface ErrorHandlingOptions {
-  showToast?: boolean;                 // Whether to show a toast notification
-  logToConsole?: boolean;              // Whether to log to console
-  logToServer?: boolean;               // Whether to log to server
-  throwError?: boolean;                // Whether to rethrow the error
-  context?: Record<string, unknown>;   // Additional context information
-  severity?: ErrorSeverity;            // Error severity
-  captureUser?: boolean;               // Whether to capture user info in logs
-  onError?: (error: AppError) => void; // Custom error handler callback
-  customMessage?: string;              // Custom message to display
-}
+
+import { ErrorHandlingOptions, ErrorSeverity, ErrorCategory } from './types';
+import { determineErrorCategory, determineErrorSeverity, extractErrorMessage } from './errorClassification';
+import { displayErrorToast, formatValidationDetails, logErrorToConsole } from './errorDisplay';
+import { isValidationError } from '../validation/ValidationError';
+import { AppError, createAppError } from './AppError';
 
 /**
  * Default error handling options
@@ -25,63 +18,79 @@ const defaultOptions: ErrorHandlingOptions = {
   showToast: true,
   logToConsole: true,
   logToServer: false,
-  throwError: false,
+  rethrow: false,
   captureUser: true
 };
+
+/**
+ * Stub function for server-side error logging
+ * This would be implemented with your actual backend service
+ */
+async function logErrorToServer(appError: AppError): Promise<void> {
+  // This is a placeholder for actual server logging implementation
+  // In a real app, this would send the error to your logging service
+  console.log('Would log to server:', appError);
+}
 
 /**
  * Centralized error handler for consistent error handling across the app
  */
 export async function handleError(
   error: unknown,
-  options: ErrorHandlingOptions = {}
+  options: ErrorHandlingOptions | string = {}
 ): Promise<AppError> {
-  // Combine default options with provided options
-  const opts = { ...defaultOptions, ...options };
+  // Convert string context to options object
+  const opts: ErrorHandlingOptions = typeof options === 'string' 
+    ? { ...defaultOptions, context: options }
+    : { ...defaultOptions, ...options };
+  
+  // Determine error category if not specified
+  if (!opts.category) {
+    opts.category = determineErrorCategory(error);
+  }
+  
+  // Determine severity if not specified
+  if (!opts.severity) {
+    opts.severity = determineErrorSeverity(opts.category);
+  }
   
   // Convert to AppError for consistent processing
   const appError = createAppError(error, { 
     context: { 
-      ...opts.context,
+      ...opts.metadata,
+      context: opts.context,
       timestamp: new Date().toISOString() 
     },
-    severity: opts.severity
+    severity: opts.severity,
+    category: opts.category
   });
   
   // Log to console if enabled
   if (opts.logToConsole) {
-    const { severity } = appError;
-    
-    if (severity === ErrorSeverity.CRITICAL) {
-      console.error('CRITICAL ERROR:', appError);
-    } else if (severity === ErrorSeverity.ERROR) {
-      console.error('ERROR:', appError);
-    } else if (severity === ErrorSeverity.WARNING) {
-      console.warn('WARNING:', appError);
-    } else {
-      console.info('INFO:', appError);
-    }
+    logErrorToConsole(
+      error,
+      appError.severity,
+      appError.category,
+      opts.context,
+      opts.metadata
+    );
   }
   
   // Show toast notification if enabled
   if (opts.showToast) {
-    const { severity } = appError;
     const message = opts.customMessage || appError.userMessage;
+    const details = opts.isValidation && opts.includeValidationDetails && isValidationError(error)
+      ? formatValidationDetails(error)
+      : opts.context 
+        ? `Error in ${opts.context}` 
+        : undefined;
     
-    if (severity === ErrorSeverity.CRITICAL || severity === ErrorSeverity.ERROR) {
-      toast.error(message);
-    } else if (severity === ErrorSeverity.WARNING) {
-      toast.warning(message);
-    } else {
-      toast.info(message);
-    }
+    displayErrorToast(message, appError.severity, details);
   }
   
   // Log to server if enabled
   if (opts.logToServer) {
     try {
-      // This would be implemented with your backend logging service
-      // For now, we'll just stub this functionality
       await logErrorToServer(appError);
     } catch (loggingError) {
       // Don't let logging errors cause more problems
@@ -99,7 +108,7 @@ export async function handleError(
   }
   
   // Rethrow if requested
-  if (opts.throwError) {
+  if (opts.rethrow) {
     throw error;
   }
   
@@ -107,26 +116,19 @@ export async function handleError(
 }
 
 /**
- * Stub function for server-side error logging
- * This would be implemented with your actual backend service
- */
-async function logErrorToServer(appError: AppError): Promise<void> {
-  // This is a placeholder for actual server logging implementation
-  // In a real app, this would send the error to your logging service
-  console.log('Would log to server:', appError);
-}
-
-/**
  * Helper for handling validation errors consistently
  */
 export function handleValidationError(
-  error: ValidationError,
+  error: unknown,
   options: ErrorHandlingOptions = {}
 ): AppError {
   return handleError(error, {
     showToast: true,
     logToServer: false, // Usually don't need to log validation errors to server
-    throwError: false,
+    rethrow: false,
+    category: ErrorCategory.VALIDATION,
+    isValidation: true,
+    includeValidationDetails: true,
     ...options
   });
 }
@@ -141,7 +143,8 @@ export function handleApiError(
   return handleError(error, {
     showToast: true,
     logToServer: true,
-    throwError: false,
+    rethrow: false,
+    category: ErrorCategory.NETWORK,
     ...options
   });
 }

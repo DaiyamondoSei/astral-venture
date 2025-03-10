@@ -1,10 +1,15 @@
 
-// Export all error handling utilities for easy importing
+/**
+ * Error Handling System
+ * 
+ * This module re-exports the error handling utilities for easier imports.
+ */
+
+export * from './types';
 export * from './AppError';
 export * from './handleError';
-export * from './handlers/apiErrorHandler';
-export * from './handlers/validationErrorHandler';
-export * from './handlers/networkErrorHandler';
+export * from './errorClassification';
+export * from './errorDisplay';
 
-// Export the ErrorBoundary component
-export { default as ErrorBoundary } from '../../components/error-handling/ErrorBoundary';
+// Convenience exports from external validation utilities
+export { isValidationError } from '../validation/ValidationError';

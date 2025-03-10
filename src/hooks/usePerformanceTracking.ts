@@ -1,7 +1,8 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { usePerfConfig } from '@/contexts/PerfConfigContext';
-import performanceMonitor, { MetricType } from '@/utils/performance/performanceMonitor';
+import performanceMonitor from '@/utils/performance/performanceMonitor';
+import type { MetricType } from '@/utils/performance/types';
 
 export interface UsePerformanceTrackingOptions {
   componentName?: string;

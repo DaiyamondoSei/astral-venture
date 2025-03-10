@@ -13,6 +13,8 @@ export class ValidationError extends Error {
   public readonly rule?: string;
   public readonly expectedType?: string;
   public readonly details?: string | Record<string, unknown>;
+  public readonly statusCode?: number;
+  public readonly originalError?: unknown;
   
   constructor(
     message: string,
@@ -23,6 +25,8 @@ export class ValidationError extends Error {
       rule?: string;
       expectedType?: string;
       details?: string | Record<string, unknown>;
+      statusCode?: number;
+      originalError?: unknown;
     } = {}
   ) {
     super(message);
@@ -33,6 +37,8 @@ export class ValidationError extends Error {
     this.rule = options.rule;
     this.expectedType = options.expectedType;
     this.details = options.details;
+    this.statusCode = options.statusCode;
+    this.originalError = options.originalError;
     
     // Maintain proper stack trace for where our error was thrown
     if (Error.captureStackTrace) {
@@ -149,6 +155,15 @@ export class ValidationError extends Error {
       { rule: 'schema', details }
     );
   }
+}
+
+/**
+ * Type guard to check if an error is a ValidationError
+ * @param error - The error to check
+ * @returns True if the error is a ValidationError
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  return ValidationError.isValidationError(error);
 }
 
 export default ValidationError;

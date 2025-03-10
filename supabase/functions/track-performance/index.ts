@@ -24,6 +24,11 @@ interface WebVitalMetric {
   client_timestamp: string;
 }
 
+interface PerformancePayload {
+  metrics?: PerformanceMetric[];
+  web_vitals?: WebVitalMetric[];
+}
+
 serve(async (req) => {
   // Handle CORS preflight request
   if (req.method === "OPTIONS") {
@@ -52,7 +57,10 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { metrics = [], web_vitals = [] } = await req.json();
+    const payload: PerformancePayload = await req.json();
+    const { metrics = [], web_vitals = [] } = payload;
+
+    console.log(`Received performance data: ${metrics.length} metrics, ${web_vitals.length} web vitals`);
 
     // Insert metrics into database
     if (metrics.length > 0) {
@@ -80,6 +88,8 @@ serve(async (req) => {
           }
         );
       }
+      
+      console.log(`Successfully inserted ${metricsWithUserId.length} performance metrics`);
     }
 
     // Insert web vitals into database
@@ -108,6 +118,8 @@ serve(async (req) => {
           }
         );
       }
+      
+      console.log(`Successfully inserted ${vitalsWithUserId.length} web vitals`);
     }
 
     // Return success response
