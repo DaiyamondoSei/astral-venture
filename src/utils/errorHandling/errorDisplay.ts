@@ -2,93 +2,47 @@
 /**
  * Error Display Utilities
  * 
- * Utilities for displaying and logging errors in a consistent way
+ * Utilities for displaying errors to the user and logging them to the console.
  */
 
 import { toast } from 'sonner';
-import { ErrorCategory, ErrorSeverity } from './AppError';
-import { isValidationError } from '../validation/ValidationError';
+import { ErrorSeverity, ErrorCategory } from './types';
+import { isValidationError, ValidationError } from '../validation/ValidationError';
 
 /**
- * Format validation details for display
- */
-export function formatValidationDetails(error: unknown): string {
-  if (isValidationError(error)) {
-    if (error.details) {
-      let details = '';
-      if (typeof error.details === 'object') {
-        const entries = Object.entries(error.details);
-        details = entries.map(([key, value]) => `${key}: ${value}`).join(', ');
-      }
-      return details;
-    }
-    
-    if (error.rule) {
-      if (error.expectedType) {
-        return `Expected ${error.expectedType}, got ${typeof error.value}`;
-      }
-      
-      if (error.rule === 'minLength') {
-        return 'Input is too short';
-      }
-      
-      if (error.rule === 'maxLength') {
-        return 'Input is too long';
-      }
-      
-      return `Rule violation: ${error.rule}`;
-    }
-    
-    return error.message;
-  }
-  
-  return '';
-}
-
-/**
- * Display an error using toast notifications
+ * Display an error toast with the appropriate severity styling
  */
 export function displayErrorToast(
   message: string,
   severity: ErrorSeverity = ErrorSeverity.ERROR,
   details?: string
 ): void {
-  // Map severity to the appropriate toast function
+  const options = {
+    description: details,
+    duration: getSeverityDuration(severity),
+    className: getSeverityClass(severity),
+  };
+
   switch (severity) {
-    case ErrorSeverity.DEBUG:
     case ErrorSeverity.INFO:
-      toast.info(message, {
-        description: details,
-        duration: 3000
-      });
+      toast.info(message, options);
       break;
-      
     case ErrorSeverity.WARNING:
-      toast.warning(message, {
-        description: details,
-        duration: 5000
-      });
+      toast.warning(message, options);
       break;
-      
-    case ErrorSeverity.CRITICAL:
-      toast.error(message, {
-        description: details,
-        duration: 8000
-      });
-      break;
-      
     case ErrorSeverity.ERROR:
+    case ErrorSeverity.CRITICAL:
+      toast.error(message, options);
+      break;
+    case ErrorSeverity.DEBUG:
     default:
-      toast.error(message, {
-        description: details,
-        duration: 6000
-      });
+      toast(message, options);
       break;
   }
 }
 
 /**
- * Log an error to the console with consistent formatting
+ * Log an error to the console with appropriate formatting
  */
 export function logErrorToConsole(
   error: unknown,
@@ -97,57 +51,98 @@ export function logErrorToConsole(
   context?: string,
   metadata?: Record<string, unknown>
 ): void {
-  // Format prefixes for the log message
-  const severityPrefix = `[${severity.toUpperCase()}]`;
-  const categoryPrefix = `[${category}]`;
-  const contextPrefix = context ? `(${context})` : '';
+  const prefix = `[${severity.toUpperCase()}][${category}]`;
+  const contextStr = context ? ` (${context})` : '';
+  const message = getErrorMessage(error);
   
-  // Format the main message
-  let message: string;
-  if (error instanceof Error) {
-    message = error.message;
-  } else if (typeof error === 'string') {
-    message = error;
-  } else {
-    message = 'Unknown error';
-  }
+  // Create a formatted message
+  const formattedMessage = `${prefix}${contextStr}: ${message}`;
   
-  // Log with appropriate level and formatting
-  const formattedMessage = `${severityPrefix} ${categoryPrefix} ${contextPrefix} ${message}`;
-  
+  // Determine logging level based on severity
   switch (severity) {
     case ErrorSeverity.DEBUG:
       console.debug(formattedMessage, error, metadata);
       break;
-      
     case ErrorSeverity.INFO:
       console.info(formattedMessage, error, metadata);
       break;
-      
     case ErrorSeverity.WARNING:
       console.warn(formattedMessage, error, metadata);
       break;
-      
     case ErrorSeverity.CRITICAL:
-      console.error('%c' + formattedMessage, 'color: red; font-weight: bold', error, metadata);
-      break;
-      
     case ErrorSeverity.ERROR:
     default:
       console.error(formattedMessage, error, metadata);
       break;
   }
+}
+
+/**
+ * Format validation error details for display
+ */
+export function formatValidationDetails(error: unknown): string | undefined {
+  if (!isValidationError(error)) {
+    return undefined;
+  }
   
-  // Log stack trace for Error objects
-  if (error instanceof Error && error.stack) {
-    console.groupCollapsed('Stack trace');
-    console.log(error.stack);
-    console.groupEnd();
+  return error.getFormattedMessage();
+}
+
+/**
+ * Extract an error message from any error type
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  
+  if (typeof error === 'string') {
+    return error;
+  }
+  
+  return String(error);
+}
+
+/**
+ * Get appropriate CSS class for severity level
+ */
+function getSeverityClass(severity: ErrorSeverity): string {
+  switch (severity) {
+    case ErrorSeverity.INFO:
+      return 'toast-info';
+    case ErrorSeverity.WARNING:
+      return 'toast-warning';
+    case ErrorSeverity.ERROR:
+      return 'toast-error';
+    case ErrorSeverity.CRITICAL:
+      return 'toast-critical';
+    case ErrorSeverity.DEBUG:
+    default:
+      return 'toast-default';
+  }
+}
+
+/**
+ * Get appropriate duration for severity level
+ */
+function getSeverityDuration(severity: ErrorSeverity): number {
+  switch (severity) {
+    case ErrorSeverity.INFO:
+      return 3000;
+    case ErrorSeverity.WARNING:
+      return 5000;
+    case ErrorSeverity.ERROR:
+      return 7000;
+    case ErrorSeverity.CRITICAL:
+      return 10000;
+    case ErrorSeverity.DEBUG:
+    default:
+      return 5000;
   }
 }
 
 export default {
-  formatValidationDetails,
   displayErrorToast,
-  logErrorToConsole
+  logErrorToConsole,
+  formatValidationDetails
 };

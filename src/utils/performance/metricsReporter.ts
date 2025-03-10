@@ -2,80 +2,56 @@
 /**
  * Performance Metrics Reporter
  * 
- * Reports performance metrics to the server for analytics
+ * Handles reporting and persisting performance metrics to the server.
  */
 
-import { ComponentMetrics, DeviceInfo, PerformanceReportPayload, WebVitalMetric } from './types';
 import { supabase } from '@/lib/supabaseClient';
+import { ComponentMetrics, WebVitalMetric, PerformanceMetric, DeviceInfo } from './types';
 
 /**
- * Determines device category based on user agent
+ * Configuration for the metrics reporter
  */
-function getDeviceCategory(userAgent: string): 'mobile' | 'tablet' | 'desktop' | 'unknown' {
-  const ua = userAgent.toLowerCase();
+interface MetricsReporterConfig {
+  /** Whether metrics collection is enabled */
+  enabled: boolean;
   
-  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
-    return 'tablet';
-  }
+  /** How frequently to report batched metrics (in ms) */
+  reportInterval: number;
   
-  if (
-    /Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(
-      ua
-    )
-  ) {
-    return 'mobile';
-  }
+  /** Maximum number of metrics to batch before sending */
+  batchSize: number;
   
-  if (/Macintosh|Windows|Linux|Mac OS|X11/.test(ua)) {
-    return 'desktop';
-  }
-  
-  return 'unknown';
+  /** Sampling rate for metrics (0.0 to 1.0) */
+  samplingRate: number;
 }
 
 /**
- * Gets device information
+ * Class for reporting performance metrics to the server
  */
-function getDeviceInfo(): DeviceInfo {
-  if (typeof navigator === 'undefined') {
-    return {
-      userAgent: 'unknown',
-      deviceCategory: 'unknown'
-    };
-  }
-  
-  const userAgent = navigator.userAgent;
-  const deviceCategory = getDeviceCategory(userAgent);
-  
-  return {
-    userAgent,
-    deviceCategory
-  };
-}
-
 class MetricsReporter {
-  private componentMetricsQueue: ComponentMetrics[] = [];
-  private webVitalsQueue: WebVitalMetric[] = [];
-  private enabled = true;
-  private debounceTimeout: number | null = null;
-  private lastReportTime = 0;
-  private reportInterval = 30000; // 30 seconds
+  private config: MetricsReporterConfig;
+  private isReporting: boolean = false;
+  private pendingMetrics: PerformanceMetric[] = [];
+  private pendingVitals: WebVitalMetric[] = [];
+  private reportTimer: NodeJS.Timeout | null = null;
+  private deviceInfo: DeviceInfo;
   
-  constructor() {
-    if (typeof window !== 'undefined') {
-      // Report metrics when the page is about to unload
-      window.addEventListener('beforeunload', () => {
-        if (this.enabled && (this.componentMetricsQueue.length > 0 || this.webVitalsQueue.length > 0)) {
-          this.reportMetrics();
-        }
-      });
-      
-      // Set up periodic reporting
-      setInterval(() => {
-        if (this.enabled && (this.componentMetricsQueue.length > 0 || this.webVitalsQueue.length > 0)) {
-          this.reportMetrics();
-        }
-      }, this.reportInterval);
+  constructor(config?: Partial<MetricsReporterConfig>) {
+    // Default configuration
+    this.config = {
+      enabled: true,
+      reportInterval: 60000, // 1 minute
+      batchSize: 10,
+      samplingRate: 0.1, // Only record 10% of metrics
+      ...config
+    };
+    
+    // Get device info
+    this.deviceInfo = this.getDeviceInfo();
+    
+    // Start reporting timer if enabled
+    if (this.config.enabled) {
+      this.startReportingTimer();
     }
   }
   
@@ -83,143 +59,224 @@ class MetricsReporter {
    * Add a component metric to the queue
    */
   public addComponentMetric(metric: ComponentMetrics): void {
-    if (!this.enabled) return;
-    
-    this.componentMetricsQueue.push(metric);
-    this.debouncedReport();
-  }
-  
-  /**
-   * Add a Web Vital metric to the queue
-   */
-  public addWebVital(
-    name: string,
-    value: number,
-    category: 'interaction' | 'loading' | 'visual_stability'
-  ): void {
-    if (!this.enabled) return;
-    
-    const webVital: WebVitalMetric = {
-      name,
-      value,
-      timestamp: Date.now(),
-      category
-    };
-    
-    this.webVitalsQueue.push(webVital);
-    this.debouncedReport();
-  }
-  
-  /**
-   * Set whether metrics collection is enabled
-   */
-  public setEnabled(enabled: boolean): void {
-    this.enabled = enabled;
-  }
-  
-  /**
-   * Debounce the report to avoid too many requests
-   */
-  private debouncedReport(): void {
-    if (this.debounceTimeout) {
-      clearTimeout(this.debounceTimeout);
+    if (!this.config.enabled || !this.shouldSample()) {
+      return;
     }
     
-    this.debounceTimeout = window.setTimeout(() => {
+    // Transform ComponentMetrics to PerformanceMetric
+    const performanceMetric: PerformanceMetric = {
+      component_name: metric.componentName,
+      average_render_time: metric.averageRenderTime,
+      total_renders: metric.renderCount,
+      slow_renders: metric.slowRenderCount,
+      created_at: new Date().toISOString(),
+      metric_type: metric.metricType,
+      device_info: this.deviceInfo,
+      metric_data: {
+        renderTimes: metric.renderTimes,
+        maxRenderTime: metric.maxRenderTime,
+        minRenderTime: metric.minRenderTime,
+        lastRenderTime: metric.lastRenderTime
+      }
+    };
+    
+    // Add to pending metrics
+    this.pendingMetrics.push(performanceMetric);
+    
+    // Report immediately if batch size is reached
+    if (this.pendingMetrics.length >= this.config.batchSize) {
       this.reportMetrics();
-    }, 5000); // Debounce for 5 seconds
+    }
   }
   
   /**
-   * Report metrics to the server
+   * Add a Web Vitals metric to the queue
+   */
+  public addWebVital(metric: WebVitalMetric): void {
+    if (!this.config.enabled) {
+      return;
+    }
+    
+    // Always report Core Web Vitals
+    this.pendingVitals.push(metric);
+    
+    // Report immediately if batch size is reached
+    if (this.pendingVitals.length >= this.config.batchSize) {
+      this.reportWebVitals();
+    }
+  }
+  
+  /**
+   * Report all pending metrics to the server
    */
   public async reportMetrics(): Promise<boolean> {
-    if (!this.enabled) return false;
-    
-    // Skip if no metrics to report
-    if (this.componentMetricsQueue.length === 0 && this.webVitalsQueue.length === 0) {
+    if (this.isReporting || this.pendingMetrics.length === 0) {
       return false;
     }
     
-    // Skip if we reported recently
-    const now = Date.now();
-    if (now - this.lastReportTime < 5000) {
-      return false; // Throttle to once every 5 seconds
-    }
-    
-    this.lastReportTime = now;
+    this.isReporting = true;
     
     try {
-      const userId = supabase.auth.getUser()
-        .then(response => response?.data?.user?.id)
-        .catch(() => null);
+      // Get metrics to report
+      const metricsToReport = [...this.pendingMetrics];
+      this.pendingMetrics = [];
       
-      const payload: PerformanceReportPayload = {
-        componentMetrics: [...this.componentMetricsQueue],
-        webVitals: [...this.webVitalsQueue],
-        deviceInfo: getDeviceInfo(),
-        timestamp: new Date().toISOString(),
-        userId: await userId
-      };
+      // Get user ID if authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
       
-      // Empty the queues
-      this.componentMetricsQueue = [];
-      this.webVitalsQueue = [];
-      
-      // Submit metrics to Supabase
-      for (const metric of payload.componentMetrics) {
-        await supabase.from('performance_metrics').insert({
-          component_name: metric.componentName,
-          average_render_time: metric.averageRenderTime,
-          total_renders: metric.renderCount,
-          slow_renders: metric.slowRenderCount,
-          metric_type: metric.metricType,
-          user_id: payload.userId,
-          metric_data: {
-            maxRenderTime: metric.maxRenderTime,
-            minRenderTime: metric.minRenderTime,
-            renderTimes: metric.renderTimes,
-            lastRenderTime: metric.lastRenderTime
-          },
-          device_info: payload.deviceInfo
-        });
+      // Add user ID to metrics if available
+      if (userId) {
+        metricsToReport.forEach(metric => metric.user_id = userId);
       }
       
-      // Submit web vitals to Supabase
-      for (const vital of payload.webVitals) {
-        await supabase.from('web_vitals').insert({
-          name: vital.name,
-          value: vital.value,
-          category: vital.category,
-          user_id: payload.userId,
-          device_info: payload.deviceInfo
-        });
+      // Insert into database
+      const { error } = await supabase
+        .from('performance_metrics')
+        .insert(metricsToReport);
+      
+      if (error) {
+        console.error('Error reporting metrics:', error);
+        // Put metrics back in queue
+        this.pendingMetrics = [...metricsToReport, ...this.pendingMetrics];
+        return false;
       }
       
       return true;
     } catch (error) {
-      console.error('Failed to report performance metrics:', error);
+      console.error('Error in reportMetrics:', error);
+      return false;
+    } finally {
+      this.isReporting = false;
+    }
+  }
+  
+  /**
+   * Report all pending Web Vitals to the server
+   */
+  private async reportWebVitals(): Promise<boolean> {
+    if (this.pendingVitals.length === 0) {
+      return false;
+    }
+    
+    try {
+      // Get vitals to report
+      const vitalsToReport = [...this.pendingVitals];
+      this.pendingVitals = [];
       
-      // Put the metrics back in the queue for next time
-      this.componentMetricsQueue = [...payload.componentMetrics, ...this.componentMetricsQueue];
-      this.webVitalsQueue = [...payload.webVitals, ...this.webVitalsQueue];
+      // Get user ID if authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
       
+      // Create payload
+      const webVitalsToInsert = vitalsToReport.map(vital => ({
+        name: vital.name,
+        value: vital.value,
+        category: vital.category,
+        timestamp: new Date(vital.timestamp).toISOString(),
+        user_id: userId || null,
+        device_info: this.deviceInfo
+      }));
+      
+      // Insert into database
+      const { error } = await supabase
+        .from('web_vitals')
+        .insert(webVitalsToInsert);
+      
+      if (error) {
+        console.error('Error reporting web vitals:', error);
+        // Put vitals back in queue
+        this.pendingVitals = [...vitalsToReport, ...this.pendingVitals];
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in reportWebVitals:', error);
       return false;
     }
   }
   
   /**
-   * Clean up any resources
+   * Enable or disable metrics collection
    */
-  public dispose(): void {
-    if (this.debounceTimeout) {
-      clearTimeout(this.debounceTimeout);
+  public setEnabled(enabled: boolean): void {
+    this.config.enabled = enabled;
+    
+    if (enabled && !this.reportTimer) {
+      this.startReportingTimer();
+    } else if (!enabled && this.reportTimer) {
+      this.stopReportingTimer();
+    }
+  }
+  
+  /**
+   * Start the reporting timer
+   */
+  private startReportingTimer(): void {
+    if (this.reportTimer) {
+      clearInterval(this.reportTimer);
     }
     
-    // Attempt to report any remaining metrics
-    if (this.componentMetricsQueue.length > 0 || this.webVitalsQueue.length > 0) {
+    this.reportTimer = setInterval(() => {
       this.reportMetrics();
+      this.reportWebVitals();
+    }, this.config.reportInterval);
+  }
+  
+  /**
+   * Stop the reporting timer
+   */
+  private stopReportingTimer(): void {
+    if (this.reportTimer) {
+      clearInterval(this.reportTimer);
+      this.reportTimer = null;
     }
+  }
+  
+  /**
+   * Clean up when the component is unmounted
+   */
+  public dispose(): void {
+    this.stopReportingTimer();
+    
+    // Report any remaining metrics
+    if (this.pendingMetrics.length > 0 || this.pendingVitals.length > 0) {
+      this.reportMetrics();
+      this.reportWebVitals();
+    }
+  }
+  
+  /**
+   * Determine if we should sample this metric based on sampling rate
+   */
+  private shouldSample(): boolean {
+    return Math.random() < this.config.samplingRate;
+  }
+  
+  /**
+   * Get information about the user's device
+   */
+  private getDeviceInfo(): DeviceInfo {
+    const userAgent = navigator.userAgent;
+    let deviceCategory: 'mobile' | 'tablet' | 'desktop' | 'unknown' = 'unknown';
+    
+    // Simple device detection
+    if (/Mobi|Android|iPhone|iPad|iPod/i.test(userAgent)) {
+      if (/iPad|TabletPC/i.test(userAgent) || 
+          (navigator.maxTouchPoints > 0 && screen.width > 768)) {
+        deviceCategory = 'tablet';
+      } else {
+        deviceCategory = 'mobile';
+      }
+    } else {
+      deviceCategory = 'desktop';
+    }
+    
+    return {
+      userAgent,
+      deviceCategory
+    };
   }
 }
 

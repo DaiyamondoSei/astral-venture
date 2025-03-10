@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
 const corsHeaders = {
@@ -8,29 +7,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface PerformanceMetric {
-  component_name: string;
-  average_render_time: number;
-  total_renders: number;
-  slow_renders: number;
-  first_render_time: number | null;
-  client_timestamp: string;
-}
+// Create a Supabase client with the service role key
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-interface WebVitalMetric {
-  name: string;
-  value: number;
-  category: 'interaction' | 'loading' | 'visual_stability';
-  client_timestamp: string;
-}
-
-interface PerformancePayload {
-  metrics?: PerformanceMetric[];
-  web_vitals?: WebVitalMetric[];
-}
-
-serve(async (req) => {
-  // Handle CORS preflight request
+serve(async (req: Request) => {
+  // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: corsHeaders,
@@ -38,113 +21,107 @@ serve(async (req) => {
   }
 
   try {
-    // Setup Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Get user ID from authorization header
+    // Verify authentication
     const authHeader = req.headers.get("Authorization");
-    let userId = null;
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      
-      if (!error && user) {
-        userId = user.id;
-      }
+    // Extract JWT token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token", details: authError }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Parse request body
-    const payload: PerformancePayload = await req.json();
-    const { metrics = [], web_vitals = [] } = payload;
+    const { metrics, vitals } = await req.json();
+    const userId = user.id;
+    const timestamp = new Date().toISOString();
 
-    console.log(`Received performance data: ${metrics.length} metrics, ${web_vitals.length} web vitals`);
-
-    // Insert metrics into database
-    if (metrics.length > 0) {
-      const metricsWithUserId = metrics.map((metric: PerformanceMetric) => ({
+    // Process metrics if present
+    if (metrics && Array.isArray(metrics) && metrics.length > 0) {
+      const metricsWithUser = metrics.map((metric) => ({
         ...metric,
         user_id: userId,
-        recorded_at: new Date().toISOString()
+        created_at: timestamp,
       }));
 
       const { error: metricsError } = await supabase
-        .from('performance_metrics')
-        .insert(metricsWithUserId);
+        .from("performance_metrics")
+        .insert(metricsWithUser);
 
       if (metricsError) {
-        console.error("Error inserting performance metrics:", metricsError);
+        console.error("Error inserting metrics:", metricsError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: metricsError.message,
-            operation: "metrics" 
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          JSON.stringify({ error: "Failed to save metrics", details: metricsError }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
       }
-      
-      console.log(`Successfully inserted ${metricsWithUserId.length} performance metrics`);
     }
 
-    // Insert web vitals into database
-    if (web_vitals.length > 0) {
-      const vitalsWithUserId = web_vitals.map((vital: WebVitalMetric) => ({
+    // Process web vitals if present
+    if (vitals && Array.isArray(vitals) && vitals.length > 0) {
+      const vitalsWithUser = vitals.map((vital) => ({
         ...vital,
         user_id: userId,
-        recorded_at: new Date().toISOString()
+        timestamp: vital.timestamp || timestamp,
       }));
 
       const { error: vitalsError } = await supabase
-        .from('web_vitals')
-        .insert(vitalsWithUserId);
+        .from("web_vitals")
+        .insert(vitalsWithUser);
 
       if (vitalsError) {
         console.error("Error inserting web vitals:", vitalsError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: vitalsError.message,
-            operation: "web_vitals" 
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          JSON.stringify({ error: "Failed to save web vitals", details: vitalsError }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
       }
-      
-      console.log(`Successfully inserted ${vitalsWithUserId.length} web vitals`);
     }
 
     // Return success response
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        metrics_count: metrics.length,
-        vitals_count: web_vitals.length
+      JSON.stringify({
+        success: true,
+        message: "Performance data recorded successfully",
+        timestamp,
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (error) {
-    console.error("Unexpected error:", error);
+    console.error("Error in track-performance function:", error);
     
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
+      JSON.stringify({
+        error: "Internal server error",
+        message: error.message || "Unknown error occurred",
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }

@@ -6,7 +6,6 @@ import App from './App.tsx';
 import './index.css';
 import { initWebVitals } from './utils/webVitalsMonitor';
 import { ensurePerformanceMetricsTable } from './lib/supabaseClient';
-import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/toaster';
 
 // Initialize web vitals monitoring

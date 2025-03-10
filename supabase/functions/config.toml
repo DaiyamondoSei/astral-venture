@@ -1,38 +1,31 @@
 
-# project_id is required.
 project_id = "wkmyvthtyjcdzhzvfyji"
-# This is a list of functions that will be deployed.
+
+[api]
+enabled = true
+custom_api_port = 54321
+insecure_port = 54325
+port = 54324
+uri = "http://127.0.0.1:54325"
+
+[auth]
+require_emails_on_signup = false
+
+[compiler]
+watch = true
+
 [functions.ask-assistant]
 verify_jwt = true
+import_map = "import_map.json"
+
 [functions.generate-insights]
 verify_jwt = true
-[functions.get-navigation-nodes]
-verify_jwt = true
-[functions.get-practice-progress]
-verify_jwt = true
-[functions.get-recommendations]
-verify_jwt = true
-[functions.handle-portal-interaction]
-verify_jwt = true
-[functions.increment-energy-points]
-verify_jwt = true
-[functions.process-ai-query]
-verify_jwt = true
-[functions.refresh-session]
-verify_jwt = true
+import_map = "import_map.json"
+
 [functions.sync-user-data]
 verify_jwt = true
-[functions.track-achievement]
-verify_jwt = true
+import_map = "import_map.json"
+
 [functions.track-performance]
 verify_jwt = true
-[functions.track-practice-completion]
-verify_jwt = true
-[functions.update-chakra-system]
-verify_jwt = true
-[functions.update-portal-interaction]
-verify_jwt = true
-[functions.process-divine-intelligence]
-verify_jwt = true
-[functions.track-activity]
-verify_jwt = true
+import_map = "import_map.json"

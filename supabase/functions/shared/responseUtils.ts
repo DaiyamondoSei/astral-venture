@@ -3,123 +3,136 @@
  * Shared response utilities for edge functions
  */
 
-// CORS headers for all responses
+// CORS Headers for edge functions
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Standard content type headers
-export const jsonHeaders = {
-  ...corsHeaders,
-  "Content-Type": "application/json"
-};
-
-// Error codes for consistent error responses
+// Error codes for consistent error handling
 export enum ErrorCode {
-  // Generic errors
-  UNKNOWN_ERROR = "unknown_error",
-  SERVER_ERROR = "server_error",
-  
-  // Authentication/Authorization errors
-  UNAUTHORIZED = "unauthorized",
-  FORBIDDEN = "forbidden",
-  
-  // Input errors
-  MISSING_PARAMETERS = "missing_parameters",
-  INVALID_PARAMETERS = "invalid_parameters",
-  VALIDATION_FAILED = "validation_failed",
-  
-  // Resource errors
-  NOT_FOUND = "not_found",
-  ALREADY_EXISTS = "already_exists",
-  
-  // Rate limiting
-  RATE_LIMITED = "rate_limited",
+  UNAUTHORIZED = 'unauthorized',
+  FORBIDDEN = 'forbidden',
+  NOT_FOUND = 'not_found',
+  VALIDATION_FAILED = 'validation_failed',
+  MISSING_PARAMETERS = 'missing_parameters',
+  RATE_LIMITED = 'rate_limited',
+  SERVICE_UNAVAILABLE = 'service_unavailable',
+  INTERNAL_ERROR = 'internal_error',
+  BAD_REQUEST = 'bad_request',
 }
 
-// Interface for error handling options
+// Options for error handling
 export interface ErrorHandlingOptions {
+  showInResponse?: boolean;
   logToConsole?: boolean;
-  showDetails?: boolean;
-  context?: Record<string, unknown>;
+  context?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
- * Create a preflight response for CORS
- */
-export function createPreflightResponse(): Response {
-  return new Response(null, {
-    headers: corsHeaders,
-    status: 204, // No content for OPTIONS requests
-  });
-}
-
-/**
- * Create a success response with standard format
- * 
- * @param data Response data
- * @param meta Optional metadata
- * @param status HTTP status code
- * @returns Formatted success response
+ * Create a standardized success response
  */
 export function createSuccessResponse(
-  data: unknown,
-  meta: Record<string, unknown> = {},
-  status = 200
+  data: any,
+  metadata: Record<string, any> = {}
 ): Response {
+  const responseBody = {
+    success: true,
+    data,
+    ...metadata,
+  };
+
   return new Response(
-    JSON.stringify({
-      success: true,
-      data,
-      meta: {
-        timestamp: new Date().toISOString(),
-        ...meta
-      }
-    }),
+    JSON.stringify(responseBody),
     {
-      headers: jsonHeaders,
-      status
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
     }
   );
 }
 
 /**
- * Create an error response with standard format
- * 
- * @param code Error code
- * @param message User-friendly error message
- * @param details Optional error details
- * @param status HTTP status code
- * @returns Formatted error response
+ * Create a standardized error response
  */
 export function createErrorResponse(
   code: ErrorCode,
   message: string,
-  details?: Record<string, unknown>,
-  status = getStatusForErrorCode(code)
+  details?: any,
+  status: number = getStatusCodeForError(code)
 ): Response {
+  const responseBody = {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(details ? { details } : {}),
+    },
+  };
+
   return new Response(
-    JSON.stringify({
-      success: false,
-      error: {
-        code,
-        message,
-        details,
-        timestamp: new Date().toISOString()
-      }
-    }),
+    JSON.stringify(responseBody),
     {
-      headers: jsonHeaders,
-      status
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status,
     }
   );
+}
+
+/**
+ * Log an event for monitoring
+ */
+export function logEvent(
+  level: 'debug' | 'info' | 'warn' | 'error',
+  message: string,
+  data?: Record<string, any>
+): void {
+  const timestamp = new Date().toISOString();
+  const logData = {
+    timestamp,
+    level,
+    message,
+    ...data,
+  };
+
+  switch (level) {
+    case 'debug':
+      console.debug(JSON.stringify(logData));
+      break;
+    case 'info':
+      console.info(JSON.stringify(logData));
+      break;
+    case 'warn':
+      console.warn(JSON.stringify(logData));
+      break;
+    case 'error':
+      console.error(JSON.stringify(logData));
+      break;
+  }
+}
+
+/**
+ * Validate required parameters in a request
+ */
+export function validateRequiredParameters(
+  params: Record<string, any>,
+  requiredParams: string[]
+): { isValid: boolean; missingParams: string[] } {
+  const missingParams = requiredParams.filter(param => {
+    const value = params[param];
+    return value === undefined || value === null || value === '';
+  });
+
+  return {
+    isValid: missingParams.length === 0,
+    missingParams,
+  };
 }
 
 /**
  * Map error codes to HTTP status codes
  */
-function getStatusForErrorCode(code: ErrorCode): number {
+function getStatusCodeForError(code: ErrorCode): number {
   switch (code) {
     case ErrorCode.UNAUTHORIZED:
       return 401;
@@ -128,57 +141,86 @@ function getStatusForErrorCode(code: ErrorCode): number {
     case ErrorCode.NOT_FOUND:
       return 404;
     case ErrorCode.VALIDATION_FAILED:
-    case ErrorCode.INVALID_PARAMETERS:
     case ErrorCode.MISSING_PARAMETERS:
+    case ErrorCode.BAD_REQUEST:
       return 400;
-    case ErrorCode.ALREADY_EXISTS:
-      return 409;
     case ErrorCode.RATE_LIMITED:
       return 429;
-    case ErrorCode.SERVER_ERROR:
-      return 500;
+    case ErrorCode.SERVICE_UNAVAILABLE:
+      return 503;
+    case ErrorCode.INTERNAL_ERROR:
     default:
       return 500;
   }
 }
 
 /**
- * Validate required parameters
- * 
- * @param params Parameters to validate
- * @param requiredKeys Array of required keys
- * @returns Validation result
+ * Handle errors in edge functions
  */
-export function validateRequiredParameters(
-  params: Record<string, unknown>,
-  requiredKeys: string[]
-): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredKeys.filter(key => {
-    const value = params[key];
-    return value === undefined || value === null || value === '';
-  });
+export function handleError(
+  error: any,
+  options: ErrorHandlingOptions = {}
+): Response {
+  const { showInResponse = true, logToConsole = true, context, metadata } = options;
   
-  return {
-    isValid: missingParams.length === 0,
-    missingParams
-  };
+  // Default error information
+  let code = ErrorCode.INTERNAL_ERROR;
+  let message = 'An unexpected error occurred';
+  let status = 500;
+  
+  // Extract error details if possible
+  if (error.code) {
+    code = error.code;
+  }
+  
+  if (error.message) {
+    message = error.message;
+  }
+  
+  if (error.status) {
+    status = error.status;
+  }
+  
+  // Determine if this is a known error type
+  if (error.response) {
+    // API error
+    message = error.response.data?.message || message;
+    status = error.response.status || status;
+  }
+  
+  // Log the error
+  if (logToConsole) {
+    const contextStr = context ? ` (${context})` : '';
+    logEvent('error', `${message}${contextStr}`, {
+      error: {
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+      },
+      ...metadata
+    });
+  }
+  
+  // Create the error response
+  if (showInResponse) {
+    return createErrorResponse(code, message, undefined, status);
+  } else {
+    // Generic error response for sensitive errors
+    return createErrorResponse(
+      ErrorCode.INTERNAL_ERROR,
+      'An internal error occurred',
+      undefined,
+      500
+    );
+  }
 }
 
-/**
- * Log an event for monitoring and debugging
- * 
- * @param level Log level
- * @param message Event message
- * @param data Additional event data
- */
-export function logEvent(
-  level: "info" | "warn" | "error" | "debug",
-  message: string,
-  data?: Record<string, unknown>
-): void {
-  const timestamp = new Date().toISOString();
-  const logData = { level, message, timestamp, ...data };
-  
-  // In production, this could send to a logging service
-  console.log(JSON.stringify(logData));
-}
+export default {
+  corsHeaders,
+  createSuccessResponse,
+  createErrorResponse,
+  logEvent,
+  validateRequiredParameters,
+  handleError,
+  ErrorCode,
+};

@@ -5,7 +5,8 @@
  * This module provides a centralized error handling system for the application.
  */
 
-import { ErrorHandlingOptions, ErrorSeverity, ErrorCategory } from './types';
+import { ErrorHandlingOptions } from './types';
+import { ErrorSeverity, ErrorCategory } from './types';
 import { determineErrorCategory, determineErrorSeverity, extractErrorMessage } from './errorClassification';
 import { displayErrorToast, formatValidationDetails, logErrorToConsole } from './errorDisplay';
 import { isValidationError } from '../validation/ValidationError';

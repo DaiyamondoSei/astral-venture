@@ -1,131 +1,113 @@
 
 /**
- * Shared authentication utilities for edge functions
+ * Authentication utilities for edge functions
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
-import { createErrorResponse, ErrorCode } from "./responseUtils.ts";
 
-export interface ErrorHandlingOptions {
-  logToConsole?: boolean;
-  showDetails?: boolean;
-  context?: Record<string, unknown>;
-}
+import { createClient } from 'https://esm.sh/@supabase/supabase-js';
+import { ErrorCode, createErrorResponse, corsHeaders } from './responseUtils.ts';
+
+// Create a Supabase client for the edge function
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
- * Get authenticated user from request
- * 
- * @param req Request object
- * @returns User object or null if unauthorized
+ * Extract user from JWT token in Authorization header
  */
-export async function getAuthenticatedUser(req: Request): Promise<any> {
-  // Get authorization header
-  const authHeader = req.headers.get('Authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  
+export async function getUserFromToken(req: Request): Promise<any> {
   try {
-    // Get token
+    // Get the authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return null;
+    }
+    
+    // Extract JWT token
     const token = authHeader.replace('Bearer ', '');
+    if (!token) {
+      return null;
+    }
     
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Verify token
+    // Verify the token
     const { data: { user }, error } = await supabase.auth.getUser(token);
-    
     if (error || !user) {
-      console.error("Auth error:", error?.message);
       return null;
     }
     
     return user;
   } catch (error) {
-    console.error("Error getting authenticated user:", error);
+    console.error('Error extracting user from token:', error);
     return null;
   }
 }
 
 /**
- * Check if user has admin role
- * 
- * @param user User object
- * @returns Boolean indicating if user is admin
+ * Require authentication for a request
+ */
+export async function requireAuth(req: Request): Promise<{ user: any } | Response> {
+  try {
+    // CORS preflight request
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+    
+    // Get user from token
+    const user = await getUserFromToken(req);
+    if (!user) {
+      return createErrorResponse(
+        ErrorCode.UNAUTHORIZED,
+        'Authentication required',
+        undefined,
+        401
+      );
+    }
+    
+    return { user };
+  } catch (error) {
+    console.error('Auth error:', error);
+    return createErrorResponse(
+      ErrorCode.INTERNAL_ERROR,
+      'Authentication error',
+      undefined,
+      500
+    );
+  }
+}
+
+/**
+ * Check if a user has admin role
  */
 export function isAdmin(user: any): boolean {
-  if (!user) return false;
+  // Check user metadata for admin role
+  if (!user || !user.app_metadata) {
+    return false;
+  }
   
-  // Check for admin role in app_metadata
-  return user.app_metadata && 
-    (user.app_metadata.role === 'admin' || 
-     user.app_metadata.roles?.includes('admin'));
+  // Admin role from app_metadata
+  return user.app_metadata.role === 'admin';
 }
 
 /**
- * Higher-order function to require authentication
- * 
- * @param req Request object
- * @param handler Handler function that receives authenticated user
- * @param options Error handling options
- * @returns Response from handler or error response
+ * Get user profile data
  */
-export async function withAuth(
-  req: Request,
-  handler: (user: any, req: Request, options?: ErrorHandlingOptions) => Promise<Response>,
-  options: ErrorHandlingOptions = {}
-): Promise<Response> {
-  // Get user from request
-  const user = await getAuthenticatedUser(req);
+export async function getUserProfile(userId: string): Promise<any> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
   
-  // Check if user is authenticated
-  if (!user) {
-    return createErrorResponse(
-      ErrorCode.UNAUTHORIZED,
-      "Authentication required",
-      options.showDetails ? { headers: { 'auth-header': req.headers.get('Authorization') } } : undefined
-    );
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
   }
   
-  // Call handler with user
-  return handler(user, req, options);
+  return data;
 }
 
-/**
- * Higher-order function to require admin role
- * 
- * @param req Request object
- * @param handler Handler function that receives authenticated user
- * @param options Error handling options
- * @returns Response from handler or error response
- */
-export async function withAdmin(
-  req: Request,
-  handler: (user: any, req: Request, options?: ErrorHandlingOptions) => Promise<Response>,
-  options: ErrorHandlingOptions = {}
-): Promise<Response> {
-  // Get user from request
-  const user = await getAuthenticatedUser(req);
-  
-  // Check if user is authenticated
-  if (!user) {
-    return createErrorResponse(
-      ErrorCode.UNAUTHORIZED,
-      "Authentication required"
-    );
-  }
-  
-  // Check if user is admin
-  if (!isAdmin(user)) {
-    return createErrorResponse(
-      ErrorCode.FORBIDDEN,
-      "Admin privileges required",
-      options.showDetails ? { userId: user.id } : undefined
-    );
-  }
-  
-  // Call handler with user
-  return handler(user, req, options);
-}
+export default {
+  getUserFromToken,
+  requireAuth,
+  isAdmin,
+  getUserProfile,
+};

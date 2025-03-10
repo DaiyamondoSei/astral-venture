@@ -1,39 +1,57 @@
 
 /**
- * Validation Utilities
+ * Validation Module Index
  * 
- * Re-exports validation utilities for easy access
+ * Central export point for all validation utilities.
  */
 
-import ValidationError, { isValidationError } from './ValidationError';
-import * as runtimeValidation from './runtimeValidation';
+// Export ValidationError class and utilities
+export { default as ValidationError, isValidationError } from './ValidationError';
 
-export {
-  ValidationError,
-  isValidationError,
-  runtimeValidation
-};
-
-// Re-export common validation functions for convenient access
-export const {
-  validateRequired,
-  validateString,
-  validateNumber,
+// Runtime validation utilities
+export { 
+  validateString, 
+  validateNumber, 
   validateBoolean,
-  validateObject,
   validateArray,
-  validateDate,
+  validateObject,
   validateOneOf,
-  isOneOf,
-  validatePattern,
-  validateRange,
-  validateMinLength,
-  validateMaxLength,
-  validateEmail
-} = runtimeValidation;
+  validateEmail,
+  validateUrl
+} from './runtimeValidation';
 
-export default {
-  ValidationError,
-  isValidationError,
-  ...runtimeValidation
-};
+// Validation middleware
+export { default as createValidationMiddleware } from './validationMiddleware';
+
+// Parameter validators
+export { 
+  validateRequiredParams,
+  validateOptionalParams,
+  validateObjectSchema
+} from './paramValidator';
+
+// API validators
+export { default as createApiValidator } from './apiValidator';
+
+// Schema validators
+export { default as createSchemaValidator } from './schemaValidator';
+
+// Performance validators
+export {
+  validateComponentMetric,
+  validateWebVitalMetric,
+  validateDeviceInfo
+} from './performanceValidator';
+
+// Type validators
+export {
+  isString,
+  isNumber,
+  isBoolean,
+  isArray,
+  isObject,
+  isFunction,
+  isUndefined,
+  isNull,
+  isEmpty
+} from './typeValidation';

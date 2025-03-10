@@ -5,7 +5,33 @@
  * Common type definitions for the error handling system
  */
 
-import { ErrorCategory, ErrorSeverity } from './AppError';
+/**
+ * Severity levels for errors
+ */
+export enum ErrorSeverity {
+  DEBUG = 'debug',
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
+}
+
+/**
+ * Categories of errors for better organization and handling
+ */
+export enum ErrorCategory {
+  VALIDATION = 'validation',
+  NETWORK = 'network',
+  API = 'api',
+  AUTHENTICATION = 'authentication',
+  AUTHORIZATION = 'authorization',
+  DATABASE = 'database',
+  UNEXPECTED = 'unexpected',
+  BUSINESS_LOGIC = 'business_logic',
+  UI = 'ui',
+  DATA_PROCESSING = 'data_processing',
+  EXTERNAL_SERVICE = 'external_service'
+}
 
 /**
  * Options for error handling
