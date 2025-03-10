@@ -1,31 +1,22 @@
 
 /**
- * Performance Monitoring System - Central Export
+ * Performance Monitoring Module
  * 
- * This file provides a unified entry point for all performance monitoring utilities,
- * resolving case-sensitivity issues and providing a consistent import pattern.
- * 
- * USAGE:
- * import { performanceMonitor, type ComponentMetrics } from '@/utils/performance';
+ * This module provides a centralized export point for all performance monitoring 
+ * utilities to prevent case sensitivity issues and ensure consistent imports.
  */
 
-import { performanceMonitor, PerformanceMonitor } from './PerformanceMonitor';
-import type { 
-  ComponentMetrics, 
-  PerformanceTrackingOptions,
-  RenderEventType,
-  DeviceInfo 
-} from '@/types/performance';
+// Re-export the performanceMonitor singleton instance
+export { default as performanceMonitor } from './performanceMonitor';
 
-// Re-export the main monitor instance
-export { performanceMonitor, PerformanceMonitor };
-
-// Re-export all types
+// Re-export component metrics types
 export type { 
-  ComponentMetrics, 
-  PerformanceTrackingOptions,
-  RenderEventType,
-  DeviceInfo 
-};
+  ComponentMetrics,
+  ComponentMetric,
+  PerformanceMetric,
+  PerformanceTrackingOptions
+} from './types';
 
-export default performanceMonitor;
+// Re-export other performance utilities
+export { default as RenderAnalyzer } from './RenderAnalyzer';
+export { withPerformanceTracking } from './withPerformanceTracking';

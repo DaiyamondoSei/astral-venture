@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { performanceMonitor } from '@/utils/performance';
-import type { PerformanceTrackingOptions } from '@/types/performance';
+import type { PerformanceTrackingOptions } from '@/utils/performance';
 
 /**
  * Hook for tracking component performance

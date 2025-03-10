@@ -1,17 +1,21 @@
 
 /**
- * Authentication Hooks - Central Export
+ * Authentication Hooks Module
  * 
- * This file provides a unified entry point for all authentication-related hooks,
- * ensuring consistent import patterns across the application.
- * 
- * USAGE:
- * import { useAuth, useLogout } from '@/hooks/auth';
+ * This module provides a centralized export point for all authentication-related
+ * hooks to prevent circular dependencies and ensure consistent usage patterns.
  */
 
+// Export the primary useAuth hook
 export { useAuth } from './useAuth';
-export { useLogout } from './useLogout';
-export { useUser } from './useUser';
 
-// Re-export types for easier access
-export type { IAuthContext, IUserProfile, IUserStreak } from '@/contexts/AuthContext';
+// Re-export types
+export type { 
+  IAuthContext, 
+  IUserProfile, 
+  IUserStreak 
+} from '@/contexts/AuthContext';
+
+// Advanced auth hooks
+export { default as useAuthSession } from './useAuthSession';
+export { default as useAuthState } from './useAuthState';
