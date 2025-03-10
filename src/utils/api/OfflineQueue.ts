@@ -1,235 +1,342 @@
 
-import { ApiError, ErrorCategory } from './ApiError';
-import { isOnline, registerConnectivityListeners } from './networkUtils';
+import { isOnline } from './networkUtils';
 
 /**
- * OfflineQueue manages API requests when offline
- * and processes them when online connectivity is restored
+ * Operation to be queued for offline execution
+ */
+export interface QueuedOperation<T = any> {
+  id: string;
+  type: 'create' | 'update' | 'delete' | 'custom';
+  resource: string;
+  payload: T;
+  timestamp: number;
+  retryCount: number;
+  maxRetries: number;
+  priority: number;
+}
+
+/**
+ * Offline queue configuration
+ */
+export interface OfflineQueueConfig {
+  maxQueueSize?: number;
+  retryInterval?: number;
+  maxRetries?: number;
+  storageKey?: string;
+  autoSync?: boolean;
+}
+
+/**
+ * Queue system for handling operations during offline periods
  */
 export class OfflineQueue {
-  private queue: QueuedRequest[];
-  private processing: boolean;
+  private queue: QueuedOperation[] = [];
+  private maxQueueSize: number;
+  private retryInterval: number;
   private maxRetries: number;
-  private autoRetryOnReconnect: boolean;
-  private persistQueue: boolean;
-  private listeners: Set<(status: OfflineQueueStatus) => void>;
-  private cleanupListener: (() => void) | null;
   private storageKey: string;
+  private autoSync: boolean;
+  private retryTimeoutId: number | null = null;
+  private isSyncing: boolean = false;
   
-  constructor(options: OfflineQueueOptions = {}) {
-    this.queue = [];
-    this.processing = false;
-    this.maxRetries = options.maxRetries || 3;
-    this.autoRetryOnReconnect = options.autoRetryOnReconnect !== false;
-    this.persistQueue = options.persistQueue !== false;
-    this.listeners = new Set();
-    this.cleanupListener = null;
-    this.storageKey = options.storageKey || 'offline_request_queue';
+  // Event callbacks
+  private onSyncStart: (() => void) | null = null;
+  private onSyncComplete: ((success: boolean) => void) | null = null;
+  private onOperationProcessed: ((op: QueuedOperation, success: boolean) => void) | null = null;
+  private onQueueChange: ((queue: QueuedOperation[]) => void) | null = null;
+  private processOperation: ((op: QueuedOperation) => Promise<boolean>) | null = null;
+  
+  constructor(config: OfflineQueueConfig = {}) {
+    this.maxQueueSize = config.maxQueueSize || 100;
+    this.retryInterval = config.retryInterval || 30000; // 30 seconds
+    this.maxRetries = config.maxRetries || 5;
+    this.storageKey = config.storageKey || 'offline-operations-queue';
+    this.autoSync = config.autoSync !== undefined ? config.autoSync : true;
     
-    // Load queue from storage
-    if (this.persistQueue) {
-      this.loadQueue();
-    }
+    // Restore queue from storage
+    this.restoreQueue();
     
     // Set up online/offline listeners
-    if (this.autoRetryOnReconnect) {
-      this.setupConnectivityListeners();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.handleOnline);
+      window.addEventListener('offline', this.handleOffline);
+    }
+    
+    // If auto-sync is enabled and we're online, start syncing
+    if (this.autoSync && isOnline()) {
+      this.sync();
     }
   }
   
   /**
-   * Add a request to the queue
+   * Enqueue an operation for execution
    */
-  async addToQueue<T>(request: QueueableRequest<T>): Promise<T> {
-    // If online and queue is empty, try immediately
-    if (isOnline() && this.queue.length === 0) {
-      try {
-        return await request.execute();
-      } catch (error) {
-        // If it's not a network error, rethrow
-        if (!(error instanceof ApiError) || error.category !== ErrorCategory.NETWORK) {
-          throw error;
-        }
-        
-        console.info('Network request failed, queuing for later', request);
-      }
-    }
+  enqueue<T = any>(
+    type: 'create' | 'update' | 'delete' | 'custom',
+    resource: string,
+    payload: T,
+    options: {
+      id?: string;
+      priority?: number;
+      maxRetries?: number;
+    } = {}
+  ): string {
+    // Generate a unique ID if not provided
+    const id = options.id || `${type}-${resource}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     
-    // Create a deferred promise
-    let resolve: (value: T) => void;
-    let reject: (reason: unknown) => void;
-    
-    const promise = new Promise<T>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    
-    // Create queue item
-    const queueItem: QueuedRequest = {
-      id: this.generateId(),
-      request,
-      resolve,
-      reject,
-      retries: 0,
-      added: Date.now(),
-      lastAttempt: null
+    // Create the operation
+    const operation: QueuedOperation<T> = {
+      id,
+      type,
+      resource,
+      payload,
+      timestamp: Date.now(),
+      retryCount: 0,
+      maxRetries: options.maxRetries !== undefined ? options.maxRetries : this.maxRetries,
+      priority: options.priority !== undefined ? options.priority : 1
     };
     
     // Add to queue
-    this.queue.push(queueItem);
+    this.queue.push(operation);
     
-    // Save queue
-    if (this.persistQueue) {
-      this.saveQueue();
+    // Sort by priority (higher number = higher priority)
+    this.queue.sort((a, b) => b.priority - a.priority);
+    
+    // Enforce max queue size
+    if (this.queue.length > this.maxQueueSize) {
+      // Remove lowest priority items first
+      this.queue.pop();
     }
     
-    // Notify listeners
-    this.notifyListeners();
+    // Save queue to storage
+    this.saveQueue();
     
-    return promise;
+    // Notify about queue change
+    if (this.onQueueChange) {
+      this.onQueueChange([...this.queue]);
+    }
+    
+    // If auto-sync is enabled and we're online, start syncing
+    if (this.autoSync && isOnline() && !this.isSyncing) {
+      this.sync();
+    }
+    
+    return id;
   }
   
   /**
-   * Process all queued requests
+   * Remove an operation from the queue by ID
    */
-  async processQueue(): Promise<void> {
-    // If already processing or offline, skip
-    if (this.processing || !isOnline()) {
-      return;
-    }
+  remove(id: string): boolean {
+    const initialLength = this.queue.length;
+    this.queue = this.queue.filter(op => op.id !== id);
     
-    this.processing = true;
-    this.notifyListeners();
-    
-    try {
-      // Process each item in the queue
-      while (this.queue.length > 0 && isOnline()) {
-        const item = this.queue[0];
-        
-        try {
-          const result = await item.request.execute();
-          item.resolve(result);
-          
-          // Remove from queue
-          this.queue.shift();
-        } catch (error) {
-          // Handle failure
-          item.lastAttempt = Date.now();
-          
-          if (item.retries >= this.maxRetries) {
-            // Max retries reached, reject and remove
-            item.reject(error);
-            this.queue.shift();
-          } else if (
-            error instanceof ApiError && 
-            error.category === ErrorCategory.NETWORK
-          ) {
-            // Network error - retry later
-            item.retries++;
-            
-            // Move to the end of the queue
-            this.queue.push(this.queue.shift()!);
-          } else {
-            // Non-network error - reject and remove
-            item.reject(error);
-            this.queue.shift();
-          }
-        }
-        
-        // Update persisted queue
-        if (this.persistQueue) {
-          this.saveQueue();
-        }
-        
-        // Notify listeners after each processed item
-        this.notifyListeners();
+    // If something was removed
+    if (initialLength !== this.queue.length) {
+      this.saveQueue();
+      
+      // Notify about queue change
+      if (this.onQueueChange) {
+        this.onQueueChange([...this.queue]);
       }
-    } finally {
-      this.processing = false;
-      this.notifyListeners();
+      
+      return true;
     }
+    
+    return false;
   }
   
   /**
    * Clear the entire queue
    */
-  clearQueue(): void {
-    // Reject all pending requests
-    this.queue.forEach(item => {
-      item.reject(new Error('Queue was cleared'));
-    });
-    
+  clear(): void {
     this.queue = [];
+    this.saveQueue();
     
-    if (this.persistQueue) {
-      this.saveQueue();
+    // Notify about queue change
+    if (this.onQueueChange) {
+      this.onQueueChange([]);
+    }
+  }
+  
+  /**
+   * Get the current queue
+   */
+  getQueue(): QueuedOperation[] {
+    return [...this.queue];
+  }
+  
+  /**
+   * Start manual sync process
+   */
+  async sync(): Promise<boolean> {
+    // If already syncing or no operations to process, do nothing
+    if (this.isSyncing || this.queue.length === 0 || !isOnline()) {
+      return false;
     }
     
-    this.notifyListeners();
-  }
-  
-  /**
-   * Get the current queue status
-   */
-  getStatus(): OfflineQueueStatus {
-    return {
-      queueLength: this.queue.length,
-      processing: this.processing,
-      isOnline: isOnline()
-    };
-  }
-  
-  /**
-   * Subscribe to queue status changes
-   */
-  subscribe(listener: (status: OfflineQueueStatus) => void): () => void {
-    this.listeners.add(listener);
+    this.isSyncing = true;
     
-    // Immediately notify with current status
-    listener(this.getStatus());
+    // Notify sync start
+    if (this.onSyncStart) {
+      this.onSyncStart();
+    }
     
-    // Return unsubscribe function
-    return () => {
-      this.listeners.delete(listener);
-    };
-  }
-  
-  /**
-   * Set up online/offline event listeners
-   */
-  private setupConnectivityListeners(): void {
-    const handleOnline = () => {
-      console.info('Online status detected, processing queue...');
-      this.processQueue();
-    };
+    let success = true;
     
-    const handleOffline = () => {
-      console.info('Offline status detected');
-      this.notifyListeners();
-    };
-    
-    this.cleanupListener = registerConnectivityListeners(handleOnline, handleOffline);
-  }
-  
-  /**
-   * Notify all listeners of status changes
-   */
-  private notifyListeners(): void {
-    const status = this.getStatus();
-    this.listeners.forEach(listener => {
-      try {
-        listener(status);
-      } catch (error) {
-        console.error('Error in queue status listener:', error);
+    // Process each operation in order (already sorted by priority)
+    for (let i = 0; i < this.queue.length; i++) {
+      const operation = this.queue[i];
+      
+      // Skip if already at max retries
+      if (operation.retryCount >= operation.maxRetries) {
+        continue;
       }
-    });
+      
+      try {
+        let operationSuccess = false;
+        
+        // Process the operation
+        if (this.processOperation) {
+          operationSuccess = await this.processOperation(operation);
+        } else {
+          // Default implementation just marks it as successful
+          // This should be overridden in real usage
+          console.warn(`No processOperation handler defined for offline queue operation: ${operation.id}`);
+          operationSuccess = true;
+        }
+        
+        // If successful, remove from queue
+        if (operationSuccess) {
+          this.queue.splice(i, 1);
+          i--; // Adjust index
+          
+          // Notify about operation processed
+          if (this.onOperationProcessed) {
+            this.onOperationProcessed(operation, true);
+          }
+        } else {
+          // Increment retry count
+          operation.retryCount++;
+          success = false;
+          
+          // Notify about operation failure
+          if (this.onOperationProcessed) {
+            this.onOperationProcessed(operation, false);
+          }
+        }
+      } catch (error) {
+        // Increment retry count
+        operation.retryCount++;
+        success = false;
+        
+        // Notify about operation failure
+        if (this.onOperationProcessed) {
+          this.onOperationProcessed(operation, false);
+        }
+        
+        console.error(`Error processing offline operation ${operation.id}:`, error);
+      }
+    }
+    
+    // Save updated queue
+    this.saveQueue();
+    
+    // Notify queue change
+    if (this.onQueueChange) {
+      this.onQueueChange([...this.queue]);
+    }
+    
+    this.isSyncing = false;
+    
+    // Notify sync complete
+    if (this.onSyncComplete) {
+      this.onSyncComplete(success);
+    }
+    
+    // Schedule retry if needed and not empty
+    if (!success && this.queue.length > 0) {
+      this.scheduleRetry();
+    }
+    
+    return success;
   }
   
   /**
-   * Generate a unique ID for queue items
+   * Set handler for processing operations
    */
-  private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  setProcessHandler(handler: (op: QueuedOperation) => Promise<boolean>): void {
+    this.processOperation = handler;
+  }
+  
+  /**
+   * Set event handlers
+   */
+  setEventHandlers(handlers: {
+    onSyncStart?: () => void;
+    onSyncComplete?: (success: boolean) => void;
+    onOperationProcessed?: (op: QueuedOperation, success: boolean) => void;
+    onQueueChange?: (queue: QueuedOperation[]) => void;
+  }): void {
+    if (handlers.onSyncStart) this.onSyncStart = handlers.onSyncStart;
+    if (handlers.onSyncComplete) this.onSyncComplete = handlers.onSyncComplete;
+    if (handlers.onOperationProcessed) this.onOperationProcessed = handlers.onOperationProcessed;
+    if (handlers.onQueueChange) this.onQueueChange = handlers.onQueueChange;
+  }
+  
+  /**
+   * Clean up resources when no longer needed
+   */
+  destroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.handleOnline);
+      window.removeEventListener('offline', this.handleOffline);
+    }
+    
+    if (this.retryTimeoutId) {
+      clearTimeout(this.retryTimeoutId);
+      this.retryTimeoutId = null;
+    }
+  }
+  
+  /**
+   * Handle device coming online
+   */
+  private handleOnline = () => {
+    if (this.autoSync && !this.isSyncing && this.queue.length > 0) {
+      this.sync();
+    }
+  };
+  
+  /**
+   * Handle device going offline
+   */
+  private handleOffline = () => {
+    // Cancel any pending retries
+    if (this.retryTimeoutId) {
+      clearTimeout(this.retryTimeoutId);
+      this.retryTimeoutId = null;
+    }
+  };
+  
+  /**
+   * Schedule retry for failed operations
+   */
+  private scheduleRetry(): void {
+    // Cancel any existing retry
+    if (this.retryTimeoutId) {
+      clearTimeout(this.retryTimeoutId);
+    }
+    
+    // Schedule new retry
+    this.retryTimeoutId = window.setTimeout(() => {
+      this.retryTimeoutId = null;
+      
+      // Only sync if online
+      if (isOnline()) {
+        this.sync();
+      }
+    }, this.retryInterval);
   }
   
   /**
@@ -237,126 +344,33 @@ export class OfflineQueue {
    */
   private saveQueue(): void {
     try {
-      // Serialize queue (without promises, which can't be serialized)
-      const serializedQueue = this.queue.map(item => ({
-        id: item.id,
-        request: item.request.serialize(),
-        retries: item.retries,
-        added: item.added,
-        lastAttempt: item.lastAttempt
-      }));
-      
-      localStorage.setItem(this.storageKey, JSON.stringify(serializedQueue));
-    } catch (error) {
-      console.warn('Failed to save offline queue:', error);
+      localStorage.setItem(this.storageKey, JSON.stringify(this.queue));
+    } catch (e) {
+      console.error('Failed to save offline queue to storage:', e);
     }
   }
   
   /**
-   * Load queue from localStorage
+   * Restore queue from localStorage
    */
-  private loadQueue(): void {
+  private restoreQueue(): void {
     try {
       const saved = localStorage.getItem(this.storageKey);
       
-      if (!saved) return;
-      
-      const serializedQueue = JSON.parse(saved);
-      
-      // Recreate queue items from serialized data
-      this.queue = serializedQueue.map((item: any) => {
-        // Create a deferred promise for each item
-        let resolve: (value: any) => void;
-        let reject: (reason: unknown) => void;
+      if (saved) {
+        this.queue = JSON.parse(saved);
         
-        const promise = new Promise((res, rej) => {
-          resolve = res;
-          reject = rej;
-        });
-        
-        return {
-          id: item.id,
-          request: this.deserializeRequest(item.request),
-          resolve,
-          reject,
-          retries: item.retries,
-          added: item.added,
-          lastAttempt: item.lastAttempt
-        };
-      });
-    } catch (error) {
-      console.warn('Failed to load offline queue:', error);
-      // Reset queue if loading fails
+        // Re-sort by priority
+        this.queue.sort((a, b) => b.priority - a.priority);
+      }
+    } catch (e) {
+      console.error('Failed to restore offline queue from storage:', e);
       this.queue = [];
     }
   }
-  
-  /**
-   * Deserialize a request (implementation depends on serialization format)
-   */
-  private deserializeRequest(serialized: any): QueueableRequest<any> {
-    // This is a stub - actual implementation would depend on
-    // how requests are serialized and what QueueableRequest looks like
-    return {
-      execute: () => Promise.reject(new Error('Deserialized request cannot be executed')),
-      serialize: () => serialized
-    };
-  }
-  
-  /**
-   * Clean up resources
-   */
-  destroy(): void {
-    if (this.cleanupListener) {
-      this.cleanupListener();
-      this.cleanupListener = null;
-    }
-    
-    this.listeners.clear();
-  }
 }
 
-/**
- * Queued request with metadata
- */
-interface QueuedRequest {
-  id: string;
-  request: QueueableRequest<any>;
-  resolve: (value: any) => void;
-  reject: (reason: unknown) => void;
-  retries: number;
-  added: number;
-  lastAttempt: number | null;
-}
-
-/**
- * Queue status information
- */
-export interface OfflineQueueStatus {
-  queueLength: number;
-  processing: boolean;
-  isOnline: boolean;
-}
-
-/**
- * Options for creating an offline queue
- */
-export interface OfflineQueueOptions {
-  maxRetries?: number;
-  autoRetryOnReconnect?: boolean;
-  persistQueue?: boolean;
-  storageKey?: string;
-}
-
-/**
- * Interface for queueable requests
- */
-export interface QueueableRequest<T> {
-  execute: () => Promise<T>;
-  serialize: () => any;
-}
-
-// Export singleton instance
+// Export singleton instance for app-wide use
 export const offlineQueue = new OfflineQueue();
 
 export default offlineQueue;

@@ -1,161 +1,181 @@
 
-import { ApiError } from './ApiError';
-
-// Default timeouts in milliseconds
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
-const DEFAULT_RETRY_COUNT = 3;
-const DEFAULT_RETRY_DELAY = 1000; // 1 second
+import { ApiError, ApiErrorType } from '@/utils/api/ApiError';
 
 /**
- * Enhanced fetch with timeout and error handling
+ * Options for network requests
  */
-export async function fetchWithTimeout(
-  url: string, 
-  options: RequestInit & { timeout?: number } = {}
-): Promise<Response> {
-  const { timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
-  
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, {
-      ...fetchOptions,
-      signal: controller.signal
-    });
-    
-    return response;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw ApiError.timeout(`Request to ${url} timed out after ${timeout}ms`);
-    }
-    
-    throw ApiError.network(`Failed to fetch from ${url}: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    clearTimeout(id);
-  }
+export interface NetworkRequestOptions extends RequestInit {
+  timeout?: number;
+  retries?: number;
+  retryDelay?: number;
+  priorityLevel?: 'high' | 'medium' | 'low';
+  cacheStrategy?: 'no-cache' | 'cache-first' | 'network-first' | 'stale-while-revalidate';
 }
 
 /**
- * Fetch with retry logic
+ * Make a fetch request with enhanced error handling, timeouts, and retries
  */
-export async function fetchWithRetry(
+export async function enhancedFetch(
   url: string,
-  options: RequestInit & { 
-    timeout?: number; 
-    retries?: number;
-    retryDelay?: number;
-    shouldRetry?: (error: unknown, attemptCount: number) => boolean;
-  } = {}
+  options: NetworkRequestOptions = {}
 ): Promise<Response> {
-  const { 
-    retries = DEFAULT_RETRY_COUNT,
-    retryDelay = DEFAULT_RETRY_DELAY,
-    shouldRetry = defaultShouldRetry,
-    ...fetchOptions 
+  const {
+    timeout = 30000,
+    retries = 1,
+    retryDelay = 1000,
+    priorityLevel = 'medium',
+    cacheStrategy = 'no-cache',
+    ...fetchOptions
   } = options;
-  
-  let lastError: unknown;
-  
-  for (let attempt = 0; attempt <= retries; attempt++) {
+
+  // Default headers
+  const headers = new Headers(fetchOptions.headers || {});
+  if (!headers.has('Content-Type') && !options.body) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  // Default options with timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  // Apply high-priority hints for critical resources if supported
+  if (priorityLevel === 'high' && 'fetchPriority' in HTMLImageElement.prototype) {
+    (fetchOptions as any).priority = 'high';
+  }
+
+  // Cache management based on strategy
+  if (cacheStrategy !== 'no-cache') {
+    fetchOptions.cache = cacheStrategy === 'cache-first' ? 'force-cache' : 'default';
+  }
+
+  // Set up optimized fetch options
+  const optimizedOptions: RequestInit = {
+    ...fetchOptions,
+    headers,
+    signal: controller.signal,
+  };
+
+  // Try to fetch with retries
+  let lastError: Error | null = null;
+  let attemptCount = 0;
+
+  while (attemptCount <= retries) {
     try {
-      return await fetchWithTimeout(url, fetchOptions);
-    } catch (error) {
+      const response = await fetch(url, optimizedOptions);
+      clearTimeout(timeoutId);
+
+      // If not ok, convert to custom ApiError
+      if (!response.ok) {
+        throw ApiError.fromResponse(response, url);
+      }
+
+      return response;
+    } catch (error: any) {
       lastError = error;
-      
-      // Last attempt, don't retry
-      if (attempt === retries) {
+
+      // Handle abort errors (timeouts)
+      if (error.name === 'AbortError') {
+        clearTimeout(timeoutId);
+        throw new ApiError(
+          'Request timed out',
+          ApiErrorType.TIMEOUT_ERROR,
+          { endpoint: url, retry: true }
+        );
+      }
+
+      // Don't retry if we've reached the limit
+      if (attemptCount >= retries) {
         break;
       }
+
+      // Add progressive delay between retries
+      const delay = retryDelay * Math.pow(1.5, attemptCount);
+      await new Promise(resolve => setTimeout(resolve, delay));
       
-      // Check if we should retry
-      if (!shouldRetry(error, attempt)) {
-        break;
-      }
-      
-      // Wait before retrying - can be linear or exponential
-      const delay = getRetryDelay(retryDelay, attempt);
-      await sleep(delay);
-      
-      console.info(`Retrying request to ${url} (Attempt ${attempt + 1}/${retries})`);
+      attemptCount++;
     }
   }
-  
+
+  // Clear timeout if we exit the loop
+  clearTimeout(timeoutId);
+
   // If we get here, all retries failed
   if (lastError instanceof ApiError) {
     throw lastError;
+  } else if (lastError) {
+    throw ApiError.fromNetworkError(lastError, url);
+  } else {
+    throw new ApiError('Unknown network error', ApiErrorType.UNKNOWN_ERROR, { endpoint: url });
   }
-  
-  throw ApiError.network(`Failed to fetch from ${url} after ${retries} retries: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
 /**
- * Sleep function for delay
+ * Helper to make a GET request with enhanced options
  */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+export async function get<T>(url: string, options: NetworkRequestOptions = {}): Promise<T> {
+  const response = await enhancedFetch(url, {
+    method: 'GET',
+    ...options
+  });
+  return await response.json();
 }
 
 /**
- * Calculate retry delay with exponential backoff
+ * Helper to make a POST request with enhanced options
  */
-function getRetryDelay(baseDelay: number, attempt: number): number {
-  // Exponential backoff with jitter
-  const exponentialDelay = baseDelay * Math.pow(2, attempt);
-  const jitter = Math.random() * 0.3 * exponentialDelay; // Add up to 30% randomness
-  
-  return exponentialDelay + jitter;
+export async function post<T>(url: string, data: any, options: NetworkRequestOptions = {}): Promise<T> {
+  const response = await enhancedFetch(url, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    ...options
+  });
+  return await response.json();
 }
 
 /**
- * Default logic for determining if a request should be retried
+ * Helper to make a PUT request with enhanced options
  */
-function defaultShouldRetry(error: unknown, attemptCount: number): boolean {
-  // Don't retry if we've exceeded retry count
-  if (attemptCount >= DEFAULT_RETRY_COUNT) {
-    return false;
-  }
-  
-  // Retry network and timeout errors
-  if (error instanceof ApiError) {
-    return error.retryable;
-  }
-  
-  // Retry network errors and timeouts
-  if (error instanceof Error) {
-    return /network|internet|connection|timeout|time out/i.test(error.message);
-  }
-  
-  return false;
+export async function put<T>(url: string, data: any, options: NetworkRequestOptions = {}): Promise<T> {
+  const response = await enhancedFetch(url, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+    ...options
+  });
+  return await response.json();
 }
 
 /**
- * Check if the device is currently online
+ * Helper to make a DELETE request with enhanced options
+ */
+export async function del<T>(url: string, options: NetworkRequestOptions = {}): Promise<T> {
+  const response = await enhancedFetch(url, {
+    method: 'DELETE',
+    ...options
+  });
+  return await response.json();
+}
+
+/**
+ * Check if the current browser is online
  */
 export function isOnline(): boolean {
-  return navigator.onLine !== false;
+  return typeof navigator !== 'undefined' && navigator.onLine;
 }
 
 /**
- * Register online/offline event listeners
+ * Create an AbortController with timeout
  */
-export function registerConnectivityListeners(
-  onOnline: () => void,
-  onOffline: () => void
-): () => void {
-  window.addEventListener('online', onOnline);
-  window.addEventListener('offline', onOffline);
+export function createTimeoutController(timeoutMs: number): {
+  controller: AbortController;
+  timeoutId: number;
+  clear: () => void;
+} {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   
-  // Return cleanup function
-  return () => {
-    window.removeEventListener('online', onOnline);
-    window.removeEventListener('offline', onOffline);
+  return {
+    controller,
+    timeoutId,
+    clear: () => clearTimeout(timeoutId)
   };
 }
-
-export default {
-  fetchWithTimeout,
-  fetchWithRetry,
-  isOnline,
-  registerConnectivityListeners
-};

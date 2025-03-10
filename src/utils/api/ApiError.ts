@@ -1,252 +1,146 @@
 
 /**
- * Custom error class for API errors with enhanced metadata
+ * Standard API error types for consistent error handling
+ */
+export enum ApiErrorType {
+  // Network related errors
+  NETWORK_ERROR = 'network_error',
+  TIMEOUT_ERROR = 'timeout_error',
+  CONNECTION_ERROR = 'connection_error',
+  
+  // Authentication errors
+  UNAUTHORIZED = 'unauthorized',
+  FORBIDDEN = 'forbidden',
+  
+  // Data errors
+  NOT_FOUND = 'not_found',
+  VALIDATION_ERROR = 'validation_error',
+  CONFLICT_ERROR = 'conflict_error',
+  
+  // Server errors
+  SERVER_ERROR = 'server_error',
+  SERVICE_UNAVAILABLE = 'service_unavailable',
+  
+  // Client errors
+  BAD_REQUEST = 'bad_request',
+  RATE_LIMITED = 'rate_limited',
+  
+  // Unknown/other errors
+  UNKNOWN_ERROR = 'unknown_error'
+}
+
+/**
+ * Standardized API error for consistent error handling
  */
 export class ApiError extends Error {
-  public readonly statusCode: number;
-  public readonly category: ErrorCategory;
-  public readonly severity: ErrorSeverity;
-  public readonly userMessage: string;
-  public readonly recoverable: boolean;
-  public readonly requestId?: string;
-  public readonly retryable: boolean;
-  public readonly originalError?: unknown;
-  public readonly context?: Record<string, unknown>;
-
-  constructor(options: ApiErrorOptions) {
-    super(options.message);
-    
+  public readonly type: ApiErrorType;
+  public readonly statusCode?: number;
+  public readonly endpoint?: string;
+  public readonly details?: any;
+  public readonly retry?: boolean;
+  public readonly originalError?: any;
+  
+  constructor(
+    message: string,
+    type: ApiErrorType = ApiErrorType.UNKNOWN_ERROR,
+    options: {
+      statusCode?: number;
+      endpoint?: string;
+      details?: any;
+      retry?: boolean;
+      originalError?: any;
+    } = {}
+  ) {
+    super(message);
     this.name = 'ApiError';
-    this.statusCode = options.statusCode || 500;
-    this.category = options.category || ErrorCategory.UNKNOWN;
-    this.severity = options.severity || ErrorSeverity.ERROR;
-    this.userMessage = options.userMessage || 'An error occurred while processing your request';
-    this.recoverable = options.recoverable ?? true;
-    this.requestId = options.requestId;
-    this.retryable = options.retryable ?? false;
+    this.type = type;
+    this.statusCode = options.statusCode;
+    this.endpoint = options.endpoint;
+    this.details = options.details;
+    this.retry = options.retry;
     this.originalError = options.originalError;
-    this.context = options.context;
     
-    // Ensure stack trace is captured properly
+    // Ensure stack trace works correctly
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, ApiError);
     }
   }
-
+  
   /**
-   * Create a network error instance
+   * Create an error from a network or API response
    */
-  static network(message: string, originalError?: unknown): ApiError {
-    return new ApiError({
-      message: message || 'Network error occurred',
-      userMessage: 'Unable to connect to the server. Please check your internet connection.',
-      statusCode: 0,
-      category: ErrorCategory.NETWORK,
-      severity: ErrorSeverity.ERROR,
-      recoverable: true,
-      retryable: true,
-      originalError
-    });
-  }
-
-  /**
-   * Create an unauthorized error instance
-   */
-  static unauthorized(message?: string, originalError?: unknown): ApiError {
-    return new ApiError({
-      message: message || 'Authentication required',
-      userMessage: 'Please log in to continue',
-      statusCode: 401,
-      category: ErrorCategory.AUTH,
-      severity: ErrorSeverity.WARNING,
-      recoverable: true,
-      retryable: false,
-      originalError
-    });
-  }
-
-  /**
-   * Create a forbidden error instance
-   */
-  static forbidden(message?: string, originalError?: unknown): ApiError {
-    return new ApiError({
-      message: message || 'Access denied',
-      userMessage: 'You do not have permission to perform this action',
-      statusCode: 403,
-      category: ErrorCategory.AUTH,
-      severity: ErrorSeverity.WARNING,
-      recoverable: false,
-      retryable: false,
-      originalError
-    });
-  }
-
-  /**
-   * Create a not found error instance
-   */
-  static notFound(message?: string, originalError?: unknown): ApiError {
-    return new ApiError({
-      message: message || 'Resource not found',
-      userMessage: 'The requested resource could not be found',
-      statusCode: 404,
-      category: ErrorCategory.NOT_FOUND,
-      severity: ErrorSeverity.WARNING,
-      recoverable: true,
-      retryable: false,
-      originalError
-    });
-  }
-
-  /**
-   * Create a validation error instance
-   */
-  static validation(message: string, context?: Record<string, unknown>, originalError?: unknown): ApiError {
-    return new ApiError({
-      message: message || 'Validation error',
-      userMessage: 'Please check your input and try again',
-      statusCode: 400,
-      category: ErrorCategory.VALIDATION,
-      severity: ErrorSeverity.WARNING,
-      recoverable: true,
-      retryable: false,
-      originalError,
-      context
-    });
-  }
-
-  /**
-   * Create a server error instance
-   */
-  static server(message?: string, originalError?: unknown): ApiError {
-    return new ApiError({
-      message: message || 'Server error',
-      userMessage: 'An unexpected error occurred. Please try again later.',
-      statusCode: 500,
-      category: ErrorCategory.SERVER,
-      severity: ErrorSeverity.ERROR,
-      recoverable: false,
-      retryable: true,
-      originalError
-    });
-  }
-
-  /**
-   * Create a timeout error instance
-   */
-  static timeout(message?: string, originalError?: unknown): ApiError {
-    return new ApiError({
-      message: message || 'Request timeout',
-      userMessage: 'The request took too long to complete. Please try again.',
-      statusCode: 408,
-      category: ErrorCategory.TIMEOUT,
-      severity: ErrorSeverity.WARNING,
-      recoverable: true,
-      retryable: true,
-      originalError
-    });
-  }
-
-  /**
-   * Check if an error is an instance of ApiError
-   */
-  static isApiError(error: unknown): error is ApiError {
-    return error instanceof ApiError;
-  }
-
-  /**
-   * Convert any error to an ApiError
-   */
-  static from(error: unknown): ApiError {
-    if (error instanceof ApiError) {
-      return error;
+  static fromResponse(response: Response, endpoint?: string): ApiError {
+    const statusCode = response.status;
+    
+    // Map status code to appropriate error type
+    let type = ApiErrorType.UNKNOWN_ERROR;
+    let message = `API error: ${statusCode}`;
+    
+    switch (statusCode) {
+      case 400:
+        type = ApiErrorType.BAD_REQUEST;
+        message = 'Bad request';
+        break;
+      case 401:
+        type = ApiErrorType.UNAUTHORIZED;
+        message = 'Unauthorized';
+        break;
+      case 403:
+        type = ApiErrorType.FORBIDDEN;
+        message = 'Forbidden';
+        break;
+      case 404:
+        type = ApiErrorType.NOT_FOUND;
+        message = 'Resource not found';
+        break;
+      case 409:
+        type = ApiErrorType.CONFLICT_ERROR;
+        message = 'Resource conflict';
+        break;
+      case 429:
+        type = ApiErrorType.RATE_LIMITED;
+        message = 'Too many requests';
+        break;
+      case 500:
+        type = ApiErrorType.SERVER_ERROR;
+        message = 'Internal server error';
+        break;
+      case 503:
+        type = ApiErrorType.SERVICE_UNAVAILABLE;
+        message = 'Service unavailable';
+        break;
     }
-
-    if (error instanceof Error) {
-      // Handle network errors
-      if (
-        /network|failed to fetch|internet|connection/i.test(error.message) ||
-        error.name === 'NetworkError'
-      ) {
-        return ApiError.network(error.message, error);
-      }
-
-      // Handle timeout errors
-      if (/timeout|timed out/i.test(error.message)) {
-        return ApiError.timeout(error.message, error);
-      }
-
-      return new ApiError({
-        message: error.message,
-        userMessage: 'An unexpected error occurred. Please try again later.',
-        statusCode: 500,
-        category: ErrorCategory.UNKNOWN,
-        severity: ErrorSeverity.ERROR,
-        recoverable: true,
-        retryable: true,
-        originalError: error
-      });
-    }
-
-    // Handle non-Error objects
-    return new ApiError({
-      message: String(error),
-      userMessage: 'An unexpected error occurred. Please try again later.',
-      statusCode: 500,
-      category: ErrorCategory.UNKNOWN,
-      severity: ErrorSeverity.ERROR,
-      recoverable: true,
-      retryable: true,
-      originalError: error
+    
+    return new ApiError(message, type, { 
+      statusCode, 
+      endpoint,
+      retry: statusCode === 429 || statusCode >= 500
     });
+  }
+  
+  /**
+   * Create an error from a network exception
+   */
+  static fromNetworkError(error: Error, endpoint?: string): ApiError {
+    // Determine if this is a timeout error
+    const isTimeout = error.name === 'TimeoutError' || 
+                      error.message.includes('timeout') || 
+                      error.message.includes('timed out');
+    
+    const type = isTimeout ? 
+      ApiErrorType.TIMEOUT_ERROR : 
+      ApiErrorType.NETWORK_ERROR;
+    
+    return new ApiError(
+      isTimeout ? 'Request timed out' : 'Network error',
+      type,
+      { 
+        endpoint, 
+        originalError: error,
+        retry: true 
+      }
+    );
   }
 }
 
-/**
- * Error categories
- */
-export enum ErrorCategory {
-  NETWORK = 'network',
-  AUTH = 'auth',
-  VALIDATION = 'validation',
-  NOT_FOUND = 'not_found',
-  SERVER = 'server',
-  TIMEOUT = 'timeout',
-  UNKNOWN = 'unknown',
-  CONNECTIVITY = 'connectivity'
-}
-
-/**
- * Error severity levels
- */
-export enum ErrorSeverity {
-  INFO = 'info',
-  WARNING = 'warning',
-  ERROR = 'error',
-  CRITICAL = 'critical'
-}
-
-/**
- * Options for the ApiError constructor
- */
-export interface ApiErrorOptions {
-  message: string;
-  userMessage?: string;
-  statusCode?: number;
-  category?: ErrorCategory;
-  severity?: ErrorSeverity;
-  recoverable?: boolean;
-  requestId?: string;
-  retryable?: boolean;
-  originalError?: unknown;
-  context?: Record<string, unknown>;
-}
-
-/**
- * Error handling options
- */
-export interface ErrorHandlingOptions {
-  retry?: boolean;
-  fallbackData?: unknown;
-  rethrow?: boolean;
-  logLevel?: 'debug' | 'info' | 'warn' | 'error';
-}
+export default ApiError;

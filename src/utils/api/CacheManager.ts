@@ -1,269 +1,325 @@
 
 /**
- * Cache manager for API responses and data
- * Supports memory and persistence caching with TTL
+ * Cache entry with metadata and expiration
  */
-export class CacheManager {
-  private cache: Map<string, CacheEntry>;
-  private storagePrefix: string;
+interface CacheEntry<T> {
+  value: T;
+  timestamp: number;
+  expiry: number | null;
+}
+
+/**
+ * Cache configuration options
+ */
+interface CacheOptions {
+  maxEntries?: number;
+  defaultTTL?: number;
+  namespace?: string;
+  storageType?: 'memory' | 'local' | 'session';
+}
+
+/**
+ * Efficient data caching system with multiple storage strategies
+ */
+export class CacheManager<T = any> {
+  private cache: Map<string, CacheEntry<T>> = new Map();
+  private maxEntries: number;
   private defaultTTL: number;
-  private persistenceEnabled: boolean;
+  private namespace: string;
+  private storageType: 'memory' | 'local' | 'session';
   
-  constructor(options: CacheManagerOptions = {}) {
-    this.cache = new Map();
-    this.storagePrefix = options.storagePrefix || 'app_cache:';
-    this.defaultTTL = options.defaultTTL || 5 * 60 * 1000; // 5 minutes
-    this.persistenceEnabled = options.persistenceEnabled !== false;
+  constructor(options: CacheOptions = {}) {
+    this.maxEntries = options.maxEntries || 100;
+    this.defaultTTL = options.defaultTTL || 5 * 60 * 1000; // 5 minutes default
+    this.namespace = options.namespace || 'app-cache';
+    this.storageType = options.storageType || 'memory';
     
-    // Initialize cache from storage if persistence is enabled
-    if (this.persistenceEnabled) {
-      this.loadFromStorage();
+    // Initial restoration from persistent storage if needed
+    if (this.storageType !== 'memory') {
+      this.restoreFromStorage();
     }
   }
   
   /**
-   * Set a cache entry with optional TTL
+   * Get a cached value by key
    */
-  set<T>(key: string, value: T, options: CacheEntryOptions = {}): void {
-    const ttl = options.ttl || this.defaultTTL;
-    const expires = ttl > 0 ? Date.now() + ttl : 0;
-    const persistent = options.persistent !== false && this.persistenceEnabled;
+  get(key: string): T | null {
+    const normalizedKey = this.normalizeKey(key);
     
-    const entry: CacheEntry = {
+    // Try memory cache first
+    const entry = this.cache.get(normalizedKey);
+    
+    if (entry) {
+      // Check if expired
+      if (entry.expiry && Date.now() > entry.expiry) {
+        this.delete(key);
+        return null;
+      }
+      
+      return entry.value;
+    }
+    
+    // Try persistent storage if configured
+    if (this.storageType !== 'memory') {
+      return this.getFromStorage(normalizedKey);
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Store a value in cache
+   */
+  set(key: string, value: T, ttl: number = this.defaultTTL): void {
+    const normalizedKey = this.normalizeKey(key);
+    
+    const entry: CacheEntry<T> = {
       value,
-      expires,
-      created: Date.now(),
-      persistent
+      timestamp: Date.now(),
+      expiry: ttl > 0 ? Date.now() + ttl : null
     };
     
-    // Store in memory cache
-    this.cache.set(key, entry);
+    // Add to memory cache
+    this.cache.set(normalizedKey, entry);
     
-    // Store in persistent storage if enabled
-    if (persistent) {
-      this.saveEntryToStorage(key, entry);
+    // Enforce maximum entries limit
+    if (this.cache.size > this.maxEntries) {
+      this.evictOldest();
+    }
+    
+    // Save to persistent storage if configured
+    if (this.storageType !== 'memory') {
+      this.saveToStorage(normalizedKey, entry);
     }
   }
   
   /**
-   * Get a cache entry
-   * Returns undefined if not found or expired
+   * Delete a cached value
    */
-  get<T>(key: string): T | undefined {
-    const entry = this.cache.get(key);
+  delete(key: string): boolean {
+    const normalizedKey = this.normalizeKey(key);
     
-    // No entry found
-    if (!entry) {
-      return undefined;
+    // Remove from memory cache
+    const result = this.cache.delete(normalizedKey);
+    
+    // Remove from persistent storage if configured
+    if (this.storageType !== 'memory') {
+      try {
+        const storage = this.getStorageAdapter();
+        storage.removeItem(`${this.namespace}:${normalizedKey}`);
+      } catch (e) {
+        console.error('Failed to delete from storage:', e);
+      }
     }
     
-    // Check if expired
-    if (this.isExpired(entry)) {
-      this.delete(key);
-      return undefined;
-    }
-    
-    return entry.value as T;
+    return result;
   }
   
   /**
    * Check if a key exists and is not expired
    */
   has(key: string): boolean {
-    const entry = this.cache.get(key);
-    
-    if (!entry) {
-      return false;
-    }
-    
-    if (this.isExpired(entry)) {
-      this.delete(key);
-      return false;
-    }
-    
-    return true;
+    return this.get(key) !== null;
   }
   
   /**
-   * Delete a cache entry
-   */
-  delete(key: string): boolean {
-    const entry = this.cache.get(key);
-    
-    if (entry && entry.persistent) {
-      try {
-        localStorage.removeItem(this.storagePrefix + key);
-      } catch (error) {
-        console.warn('Failed to remove item from localStorage:', error);
-      }
-    }
-    
-    return this.cache.delete(key);
-  }
-  
-  /**
-   * Clear all cache entries
+   * Clear all cached values
    */
   clear(): void {
-    // Clear persistent entries
-    if (this.persistenceEnabled) {
+    this.cache.clear();
+    
+    // Clear from persistent storage if configured
+    if (this.storageType !== 'memory') {
       try {
-        this.cache.forEach((entry, key) => {
-          if (entry.persistent) {
-            localStorage.removeItem(this.storagePrefix + key);
+        const storage = this.getStorageAdapter();
+        const keysToRemove: string[] = [];
+        
+        // Find all keys for this namespace
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i);
+          if (key?.startsWith(`${this.namespace}:`)) {
+            keysToRemove.push(key);
           }
-        });
-      } catch (error) {
-        console.warn('Failed to clear items from localStorage:', error);
+        }
+        
+        // Remove them
+        keysToRemove.forEach(key => storage.removeItem(key));
+      } catch (e) {
+        console.error('Failed to clear storage:', e);
       }
     }
-    
-    // Clear memory cache
-    this.cache.clear();
   }
   
   /**
-   * Delete expired entries
+   * Get all cached keys
+   */
+  keys(): string[] {
+    return Array.from(this.cache.keys());
+  }
+  
+  /**
+   * Get the number of cached entries
+   */
+  size(): number {
+    return this.cache.size;
+  }
+  
+  /**
+   * Remove expired entries
    */
   cleanup(): number {
-    let count = 0;
     const now = Date.now();
+    let removedCount = 0;
     
-    this.cache.forEach((entry, key) => {
-      if (entry.expires > 0 && entry.expires < now) {
-        this.delete(key);
-        count++;
+    // Check memory cache
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.expiry && now > entry.expiry) {
+        this.cache.delete(key);
+        removedCount++;
       }
-    });
+    }
     
-    return count;
+    // No easy way to check persistent storage without reading everything
+    // so we'll skip that for performance reasons
+    
+    return removedCount;
   }
   
   /**
-   * Check if an entry is expired
+   * Normalize cache key
    */
-  private isExpired(entry: CacheEntry): boolean {
-    return entry.expires > 0 && entry.expires < Date.now();
+  private normalizeKey(key: string): string {
+    return key.trim().toLowerCase();
   }
   
   /**
-   * Save an entry to localStorage
+   * Get the appropriate storage adapter
    */
-  private saveEntryToStorage(key: string, entry: CacheEntry): void {
-    if (!this.persistenceEnabled) return;
+  private getStorageAdapter(): Storage {
+    if (this.storageType === 'local') {
+      return localStorage;
+    } else if (this.storageType === 'session') {
+      return sessionStorage;
+    }
     
-    try {
-      localStorage.setItem(
-        this.storagePrefix + key,
-        JSON.stringify({
-          value: entry.value,
-          expires: entry.expires,
-          created: entry.created
-        })
-      );
-    } catch (error) {
-      console.warn('Failed to save cache entry to localStorage:', error);
-      
-      // If storage is full, clear some space
-      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-        this.clearOldestPersistentEntries(5);
+    throw new Error('Invalid storage type');
+  }
+  
+  /**
+   * Remove oldest entries when cache is full
+   */
+  private evictOldest(): void {
+    if (this.cache.size <= this.maxEntries) return;
+    
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+    
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.timestamp < oldestTime) {
+        oldestTime = entry.timestamp;
+        oldestKey = key;
       }
+    }
+    
+    if (oldestKey) {
+      this.delete(oldestKey);
     }
   }
   
   /**
-   * Load cache entries from localStorage
+   * Save entry to persistent storage
    */
-  private loadFromStorage(): void {
-    if (!this.persistenceEnabled) return;
-    
+  private saveToStorage(key: string, entry: CacheEntry<T>): void {
     try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const storageKey = localStorage.key(i);
+      const storage = this.getStorageAdapter();
+      storage.setItem(
+        `${this.namespace}:${key}`,
+        JSON.stringify(entry)
+      );
+    } catch (e) {
+      console.error('Failed to save to storage:', e);
+    }
+  }
+  
+  /**
+   * Get entry from persistent storage
+   */
+  private getFromStorage(key: string): T | null {
+    try {
+      const storage = this.getStorageAdapter();
+      const data = storage.getItem(`${this.namespace}:${key}`);
+      
+      if (!data) return null;
+      
+      const entry = JSON.parse(data) as CacheEntry<T>;
+      
+      // Check if expired
+      if (entry.expiry && Date.now() > entry.expiry) {
+        storage.removeItem(`${this.namespace}:${key}`);
+        return null;
+      }
+      
+      // Add to memory cache
+      this.cache.set(key, entry);
+      
+      return entry.value;
+    } catch (e) {
+      console.error('Failed to get from storage:', e);
+      return null;
+    }
+  }
+  
+  /**
+   * Restore cache from persistent storage
+   */
+  private restoreFromStorage(): void {
+    try {
+      const storage = this.getStorageAdapter();
+      const now = Date.now();
+      
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
         
-        if (storageKey && storageKey.startsWith(this.storagePrefix)) {
-          const key = storageKey.slice(this.storagePrefix.length);
-          const json = localStorage.getItem(storageKey);
+        if (key?.startsWith(`${this.namespace}:`)) {
+          const normalizedKey = key.slice(this.namespace.length + 1);
+          const data = storage.getItem(key);
           
-          if (json) {
+          if (data) {
             try {
-              const parsed = JSON.parse(json);
+              const entry = JSON.parse(data) as CacheEntry<T>;
               
-              // Only load if not expired
-              if (parsed.expires === 0 || parsed.expires > Date.now()) {
-                this.cache.set(key, {
-                  value: parsed.value,
-                  expires: parsed.expires,
-                  created: parsed.created,
-                  persistent: true
-                });
-              } else {
-                // Clean up expired entries
-                localStorage.removeItem(storageKey);
+              // Skip if expired
+              if (entry.expiry && now > entry.expiry) {
+                storage.removeItem(key);
+                continue;
               }
-            } catch (parseError) {
-              console.warn(`Failed to parse cache entry: ${key}`, parseError);
-              localStorage.removeItem(storageKey);
+              
+              // Add to memory cache
+              this.cache.set(normalizedKey, entry);
+            } catch (e) {
+              // Invalid JSON, remove the entry
+              storage.removeItem(key);
             }
           }
         }
       }
-    } catch (error) {
-      console.warn('Failed to load cache from localStorage:', error);
+    } catch (e) {
+      console.error('Failed to restore from storage:', e);
     }
   }
+}
+
+// Create default export with common cache instances
+export default {
+  // Default memory cache for general use
+  memory: new CacheManager<any>({ storageType: 'memory', namespace: 'app-memory' }),
   
-  /**
-   * Clear oldest persistent entries to free up space
-   */
-  private clearOldestPersistentEntries(count: number): void {
-    const persistentEntries: [string, CacheEntry][] = [];
-    
-    // Find all persistent entries
-    this.cache.forEach((entry, key) => {
-      if (entry.persistent) {
-        persistentEntries.push([key, entry]);
-      }
-    });
-    
-    // Sort by creation time (oldest first)
-    persistentEntries.sort((a, b) => a[1].created - b[1].created);
-    
-    // Remove oldest entries
-    for (let i = 0; i < Math.min(count, persistentEntries.length); i++) {
-      this.delete(persistentEntries[i][0]);
-    }
-  }
-}
-
-/**
- * Cache entry with metadata
- */
-interface CacheEntry {
-  value: unknown;
-  expires: number;
-  created: number;
-  persistent: boolean;
-}
-
-/**
- * Options for creating a cache manager
- */
-interface CacheManagerOptions {
-  storagePrefix?: string;
-  defaultTTL?: number;
-  persistenceEnabled?: boolean;
-}
-
-/**
- * Options for cache entries
- */
-interface CacheEntryOptions {
-  ttl?: number;
-  persistent?: boolean;
-}
-
-// Export singleton instance
-export const cacheManager = new CacheManager();
-
-export default cacheManager;
+  // Persistent cache for important data
+  persistent: new CacheManager<any>({ storageType: 'local', namespace: 'app-persistent' }),
+  
+  // Session cache for current session only
+  session: new CacheManager<any>({ storageType: 'session', namespace: 'app-session' }),
+  
+  // Create a new cache with custom options
+  create: <T = any>(options: CacheOptions = {}) => new CacheManager<T>(options)
+};
