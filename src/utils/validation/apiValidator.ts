@@ -1,154 +1,146 @@
 
-import { ValidationError, isValidationError } from './runtimeValidation';
-import { ValidationSchema, validateSchema } from './schemaValidator';
-import { ErrorCategory, ErrorSeverity, handleError } from '../errorHandling';
+import { ValidationError, validateObject } from './runtimeValidation';
+import { createSchemaValidator, ValidationSchema } from './schemaValidator';
+import { handleError, ErrorCategory } from '@/utils/errorHandling';
 
 /**
- * Options for API data validation
- */
-export interface ApiValidationOptions {
-  /** Field name for error reporting */
-  fieldName?: string;
-  /** Error category for classification */
-  category?: ErrorCategory;
-  /** Error severity level */
-  severity?: ErrorSeverity;
-  /** Whether to include validation errors in the response */
-  includeValidationErrors?: boolean;
-}
-
-/**
- * Result of an API data validation
+ * API validation result
  */
 export interface ApiValidationResult<T> {
   /** Whether the validation was successful */
   isValid: boolean;
-  /** The validated data (if successful) */
+  
+  /** The validated data */
   data?: T;
-  /** Error message (if unsuccessful) */
+  
+  /** Error message if validation failed */
   error?: string;
-  /** Validation errors (if unsuccessful and includeValidationErrors is true) */
-  validationErrors?: ValidationError[];
 }
 
 /**
- * Safely validates API data against a schema
+ * Validate an API response using a schema
  * 
- * @param data - Data to validate
- * @param schema - Validation schema
- * @param options - Validation options
- * @returns Validation result
+ * @param response - The API response to validate
+ * @param schema - The validation schema to use
+ * @param context - Context name for error handling
+ * @returns Validation result with data if valid
  */
-export function validateApiData<T extends Record<string, unknown>>(
-  data: unknown,
+export async function validateApiResponse<T>(
+  response: Response,
   schema: ValidationSchema<T>,
-  options: ApiValidationOptions = {}
-): ApiValidationResult<T> {
+  context = 'API'
+): Promise<ApiValidationResult<T>> {
   try {
-    const validatedData = validateSchema(data, schema);
+    // Check if response is OK
+    if (!response.ok) {
+      let errorData = null;
+      
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        // If we can't parse the error, just use the status text
+        errorData = { error: response.statusText };
+      }
+      
+      const errorMessage = errorData?.error || errorData?.message || `API error: ${response.status}`;
+      
+      throw new ValidationError(errorMessage, {
+        code: 'API_ERROR',
+        details: {
+          status: response.status,
+          url: response.url,
+          errorData
+        },
+        statusCode: response.status
+      });
+    }
+    
+    // Parse the response
+    const data = await response.json();
+    
+    // Create a validator from the schema
+    const validator = createSchemaValidator(schema, {
+      allowUnknown: true
+    });
+    
+    // Validate the data
+    const validatedData = validator(data, 'response');
+    
+    // Return successful result
     return {
       isValid: true,
       data: validatedData
     };
   } catch (error) {
-    // Handle validation errors
-    if (isValidationError(error)) {
-      // Log the error with our centralized error handling
-      handleError(error, {
-        category: options.category || ErrorCategory.VALIDATION,
-        severity: options.severity || ErrorSeverity.WARNING,
-        context: `API Validation${options.fieldName ? ` (${options.fieldName})` : ''}`,
-        showToast: false,
-        metadata: {
-          data,
-          validationError: error
-        }
-      });
-      
-      return {
-        isValid: false,
-        error: error.message,
-        ...(options.includeValidationErrors ? { validationErrors: [error] } : {})
-      };
-    }
-    
-    // Handle unexpected errors
-    const unexpectedError = error instanceof Error 
-      ? error 
-      : new Error(String(error));
-    
-    handleError(unexpectedError, {
-      category: ErrorCategory.UNEXPECTED,
-      severity: ErrorSeverity.ERROR,
-      context: `API Validation${options.fieldName ? ` (${options.fieldName})` : ''}`,
-      showToast: false,
-      metadata: { data }
+    // Handle the error
+    handleError(error, {
+      category: ErrorCategory.VALIDATION,
+      context,
+      showToast: true
     });
     
+    // Return error result
     return {
       isValid: false,
-      error: 'An unexpected error occurred during validation'
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 }
 
 /**
- * Validates API data and throws if invalid
- * 
- * @param data - Data to validate
- * @param schema - Validation schema
- * @param options - Validation options
- * @returns Validated data
- * @throws ValidationError if validation fails
+ * Options for the API validator
  */
-export function validateApiDataOrThrow<T extends Record<string, unknown>>(
-  data: unknown,
+export interface ApiValidatorOptions {
+  /** Context name for error handling */
+  context?: string;
+  
+  /** Whether to throw on validation errors */
+  throwOnError?: boolean;
+  
+  /** Custom error handler */
+  onError?: (error: unknown) => void;
+}
+
+/**
+ * Create an API response validator function for a specific schema
+ * 
+ * @param schema - The validation schema to use
+ * @param options - Validator options
+ * @returns A function that validates API responses against the schema
+ */
+export function createApiValidator<T>(
   schema: ValidationSchema<T>,
-  options: ApiValidationOptions = {}
-): T {
-  try {
-    return validateSchema(data, schema);
-  } catch (error) {
-    if (isValidationError(error)) {
-      // Add status code for API responses
-      if (!error.statusCode) {
-        error.statusCode = 400;
+  options: ApiValidatorOptions = {}
+): (response: Response) => Promise<ApiValidationResult<T>> {
+  const { context = 'API', throwOnError = false, onError } = options;
+  
+  return async (response: Response): Promise<ApiValidationResult<T>> => {
+    try {
+      const result = await validateApiResponse(response, schema, context);
+      
+      if (!result.isValid && throwOnError) {
+        throw new Error(result.error);
       }
       
-      // Log the error
-      handleError(error, {
-        category: options.category || ErrorCategory.VALIDATION,
-        severity: options.severity || ErrorSeverity.WARNING,
-        context: `API Validation${options.fieldName ? ` (${options.fieldName})` : ''}`,
-        showToast: false
-      });
+      return result;
+    } catch (error) {
+      if (onError) {
+        onError(error);
+      }
       
-      throw error;
+      if (throwOnError) {
+        throw error;
+      }
+      
+      return {
+        isValid: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
     }
-    
-    // Convert unexpected errors to ValidationError
-    const validationError = new ValidationError(
-      'Invalid data format',
-      {
-        code: 'INVALID_DATA',
-        statusCode: 400,
-        details: { error }
-      }
-    );
-    
-    // Log the error
-    handleError(validationError, {
-      category: ErrorCategory.UNEXPECTED,
-      severity: ErrorSeverity.ERROR,
-      context: `API Validation${options.fieldName ? ` (${options.fieldName})` : ''}`,
-      showToast: false
-    });
-    
-    throw validationError;
-  }
+  };
 }
 
 export default {
-  validateApiData,
-  validateApiDataOrThrow
+  validateApiResponse,
+  createApiValidator
 };

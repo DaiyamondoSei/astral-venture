@@ -1,40 +1,203 @@
 
 import { useState, useCallback } from 'react';
-import {
-  ValidationError,
-  validateDefined,
-  validateNonEmptyString,
-  validateNumber,
-  validateOneOf,
-  validatePattern,
-  validateRange,
-  validateArray,
-  validateObject,
-  validateMinLength,
-  validateMaxLength
-} from '@/utils/validation/runtimeValidation';
-import { ErrorCategory, ErrorSeverity, handleError } from '@/utils/errorHandling';
+import * as validators from '@/utils/validation/runtimeValidation';
+import { ValidationError } from '@/utils/validation/runtimeValidation';
+import { handleError, ErrorCategory } from '@/utils/errorHandling';
 
 /**
- * Validation result type
+ * Validation result interface
  */
-interface ValidationResult<T> {
-  /** Whether the validation was successful */
+export interface ValidationResult<T> {
   isValid: boolean;
-  /** Validated value (if successful) */
-  value?: T;
-  /** Error message (if unsuccessful) */
-  error?: string;
+  value: T | undefined;
+  error: string | null;
 }
 
 /**
- * Hook for form validation
+ * Options for the useValidation hook
  */
-export function useValidation() {
+export interface UseValidationOptions {
+  /** Whether to show toast notifications for validation errors */
+  showToasts?: boolean;
+  
+  /** Context name for error handling */
+  context?: string;
+}
+
+/**
+ * Custom hook for validating form values and other user inputs
+ * 
+ * @param options - Validation options
+ * @returns Validation utility functions
+ */
+export function useValidation(options: UseValidationOptions = {}) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   /**
-   * Clear validation errors
+   * Validate a value using a validation function
+   * 
+   * @param value - The value to validate
+   * @param validator - The validation function to use
+   * @param fieldName - The name of the field being validated
+   * @returns Validation result
+   */
+  const validate = useCallback(<T>(
+    value: unknown,
+    validator: (value: unknown, name: string) => T,
+    fieldName: string
+  ): ValidationResult<T> => {
+    try {
+      // Run the validator
+      const validatedValue = validator(value, fieldName);
+      
+      // Clear any existing error for this field
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+      
+      // Return successful result
+      return {
+        isValid: true,
+        value: validatedValue,
+        error: null
+      };
+    } catch (error) {
+      // Get error message
+      let errorMessage = 'Invalid value';
+      
+      if (error instanceof ValidationError) {
+        errorMessage = error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Update errors state
+      setErrors(prev => ({
+        ...prev,
+        [fieldName]: errorMessage
+      }));
+      
+      // Log the validation error
+      handleError(error, {
+        category: ErrorCategory.VALIDATION,
+        context: options.context || 'Validation',
+        showToast: options.showToasts,
+        customMessage: errorMessage
+      });
+      
+      // Return error result
+      return {
+        isValid: false,
+        value: undefined,
+        error: errorMessage
+      };
+    }
+  }, [options.context, options.showToasts]);
+  
+  /**
+   * Validate a required string
+   * 
+   * @param value - The value to validate
+   * @param fieldName - The name of the field being validated
+   * @returns Validation result
+   */
+  const validateRequiredString = useCallback((
+    value: unknown,
+    fieldName: string
+  ): ValidationResult<string> => {
+    return validate(value, validators.validateString, fieldName);
+  }, [validate]);
+  
+  /**
+   * Validate a required number
+   * 
+   * @param value - The value to validate
+   * @param fieldName - The name of the field being validated
+   * @returns Validation result
+   */
+  const validateRequiredNumber = useCallback((
+    value: unknown,
+    fieldName: string
+  ): ValidationResult<number> => {
+    return validate(value, validators.validateNumber, fieldName);
+  }, [validate]);
+  
+  /**
+   * Validate a required boolean
+   * 
+   * @param value - The value to validate
+   * @param fieldName - The name of the field being validated
+   * @returns Validation result
+   */
+  const validateRequiredBoolean = useCallback((
+    value: unknown,
+    fieldName: string
+  ): ValidationResult<boolean> => {
+    return validate(value, validators.validateBoolean, fieldName);
+  }, [validate]);
+  
+  /**
+   * Validate a number within a range
+   * 
+   * @param value - The value to validate
+   * @param min - The minimum allowed value
+   * @param max - The maximum allowed value
+   * @param fieldName - The name of the field being validated
+   * @returns Validation result
+   */
+  const validateNumberRange = useCallback((
+    value: unknown,
+    min: number,
+    max: number,
+    fieldName: string
+  ): ValidationResult<number> => {
+    return validate(
+      value,
+      (val, name) => validators.validateRange(val, min, max, name),
+      fieldName
+    );
+  }, [validate]);
+  
+  /**
+   * Validate an email address
+   * 
+   * @param value - The value to validate
+   * @param fieldName - The name of the field being validated
+   * @returns Validation result
+   */
+  const validateEmailAddress = useCallback((
+    value: unknown,
+    fieldName: string
+  ): ValidationResult<string> => {
+    return validate(
+      value,
+      validators.validateEmail,
+      fieldName
+    );
+  }, [validate]);
+  
+  /**
+   * Validate a URL
+   * 
+   * @param value - The value to validate
+   * @param fieldName - The name of the field being validated
+   * @returns Validation result
+   */
+  const validateURL = useCallback((
+    value: unknown,
+    fieldName: string
+  ): ValidationResult<string> => {
+    return validate(
+      value,
+      validators.validateUrl,
+      fieldName
+    );
+  }, [validate]);
+  
+  /**
+   * Clear all validation errors
    */
   const clearErrors = useCallback(() => {
     setErrors({});
@@ -43,274 +206,29 @@ export function useValidation() {
   /**
    * Clear a specific validation error
    * 
-   * @param field - Field name to clear error for
+   * @param fieldName - The name of the field to clear errors for
    */
-  const clearError = useCallback((field: string) => {
+  const clearError = useCallback((fieldName: string) => {
     setErrors(prev => {
       const newErrors = { ...prev };
-      delete newErrors[field];
+      delete newErrors[fieldName];
       return newErrors;
     });
   }, []);
   
-  /**
-   * Set an error for a specific field
-   * 
-   * @param field - Field name
-   * @param errorMessage - Error message
-   */
-  const setError = useCallback((field: string, errorMessage: string) => {
-    setErrors(prev => ({
-      ...prev,
-      [field]: errorMessage
-    }));
-  }, []);
-  
-  /**
-   * Run a validation function safely
-   * 
-   * @param field - Field name
-   * @param validationFn - Validation function
-   * @returns Validation result
-   */
-  const validate = useCallback(<T>(
-    field: string,
-    validationFn: () => T
-  ): ValidationResult<T> => {
-    try {
-      // Clear any existing error for this field
-      clearError(field);
-      
-      // Run the validation function
-      const value = validationFn();
-      
-      return { isValid: true, value };
-    } catch (error) {
-      // Handle validation errors
-      if (error instanceof ValidationError) {
-        const errorMessage = error.message;
-        
-        // Set the error in state
-        setError(field, errorMessage);
-        
-        // Log the error (warning level since it's expected during form validation)
-        handleError(error, {
-          category: ErrorCategory.VALIDATION,
-          severity: ErrorSeverity.WARNING,
-          context: `Field validation (${field})`,
-          showToast: false,
-          metadata: {
-            field,
-            code: error.code
-          }
-        });
-        
-        return { isValid: false, error: errorMessage };
-      }
-      
-      // Handle unexpected errors
-      const unexpectedError = error instanceof Error 
-        ? error 
-        : new Error(String(error));
-      
-      // Set a generic error message
-      const errorMessage = 'Validation failed unexpectedly';
-      setError(field, errorMessage);
-      
-      // Log the unexpected error
-      handleError(unexpectedError, {
-        category: ErrorCategory.UNEXPECTED,
-        severity: ErrorSeverity.ERROR,
-        context: `Field validation (${field})`,
-        showToast: false
-      });
-      
-      return { isValid: false, error: errorMessage };
-    }
-  }, [clearError, setError]);
-  
-  /**
-   * Validate a required field
-   * 
-   * @param value - Field value
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateRequired = useCallback(
-    <T>(value: T | null | undefined, field: string): ValidationResult<T> => {
-      return validate(field, () => validateDefined(value, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate a required string field
-   * 
-   * @param value - Field value
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateRequiredString = useCallback(
-    (value: string | null | undefined, field: string): ValidationResult<string> => {
-      return validate(field, () => validateNonEmptyString(value, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate a number field
-   * 
-   * @param value - Field value
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateNumeric = useCallback(
-    (value: unknown, field: string): ValidationResult<number> => {
-      return validate(field, () => validateNumber(value, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate a field against allowed values
-   * 
-   * @param value - Field value
-   * @param allowedValues - Array of allowed values
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateAllowed = useCallback(
-    <T extends string | number>(
-      value: T,
-      allowedValues: T[],
-      field: string
-    ): ValidationResult<T> => {
-      return validate(field, () => validateOneOf(value, allowedValues, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate a field against a pattern
-   * 
-   * @param value - Field value
-   * @param pattern - Regular expression pattern
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateRegex = useCallback(
-    (value: string, pattern: RegExp, field: string): ValidationResult<string> => {
-      return validate(field, () => validatePattern(value, pattern, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate a number within a range
-   * 
-   * @param value - Field value
-   * @param min - Minimum allowed value
-   * @param max - Maximum allowed value
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateRangeValue = useCallback(
-    (value: number, min: number, max: number, field: string): ValidationResult<number> => {
-      return validate(field, () => validateRange(value, min, max, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate string length
-   * 
-   * @param value - Field value
-   * @param options - Validation options
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateLength = useCallback(
-    (
-      value: string,
-      options: { min?: number; max?: number },
-      field: string
-    ): ValidationResult<string> => {
-      return validate(field, () => {
-        let result = value;
-        
-        if (options.min !== undefined) {
-          result = validateMinLength(result, options.min, field);
-        }
-        
-        if (options.max !== undefined) {
-          result = validateMaxLength(result, options.max, field);
-        }
-        
-        return result;
-      });
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate an array
-   * 
-   * @param value - Field value
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateArrayField = useCallback(
-    <T>(value: unknown, field: string): ValidationResult<T[]> => {
-      return validate(field, () => validateArray<T>(value, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Validate an object
-   * 
-   * @param value - Field value
-   * @param field - Field name
-   * @returns Validation result
-   */
-  const validateObjectField = useCallback(
-    <T extends Record<string, unknown>>(value: unknown, field: string): ValidationResult<T> => {
-      return validate(field, () => validateObject<T>(value, field));
-    },
-    [validate]
-  );
-  
-  /**
-   * Run multiple validations
-   * 
-   * @param validations - Array of validation functions
-   * @returns Whether all validations passed
-   */
-  const runValidations = useCallback(
-    (validations: Array<() => ValidationResult<unknown>>): boolean => {
-      const results = validations.map(validation => validation());
-      return results.every(result => result.isValid);
-    },
-    []
-  );
-  
+  // Return the validation utility functions and current errors
   return {
     errors,
-    clearErrors,
-    clearError,
-    setError,
+    hasErrors: Object.keys(errors).length > 0,
     validate,
-    validateRequired,
     validateRequiredString,
-    validateNumeric,
-    validateAllowed,
-    validateRegex,
-    validateRangeValue,
-    validateLength,
-    validateArrayField,
-    validateObjectField,
-    runValidations,
-    hasErrors: Object.keys(errors).length > 0
+    validateRequiredNumber,
+    validateRequiredBoolean,
+    validateNumberRange,
+    validateEmailAddress,
+    validateURL,
+    clearErrors,
+    clearError
   };
 }
 

@@ -1,347 +1,318 @@
 
 /**
- * Custom validation error class with improved type safety and error details
+ * Runtime validation utilities for robust error checking
  */
-export class ValidationError extends Error {
-  code?: string;
-  statusCode: number;
-  details?: unknown;
 
+// Define a custom validation error type with enhanced information
+export class ValidationError extends Error {
+  public code?: string;
+  public details?: unknown;
+  public statusCode: number;
+  
   constructor(
-    message: string,
-    options?: {
-      code?: string;
-      statusCode?: number;
-      details?: unknown;
+    message: string, 
+    options?: { 
+      code?: string; 
+      details?: unknown; 
+      statusCode?: number 
     }
   ) {
     super(message);
     this.name = 'ValidationError';
     this.code = options?.code;
-    this.statusCode = options?.statusCode || 400;
     this.details = options?.details;
-
-    // Ensure proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, ValidationError.prototype);
+    this.statusCode = options?.statusCode || 400;
+    
+    // Capture stack trace, excluding the constructor call from the stack
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ValidationError);
+    }
   }
 }
 
 /**
- * Validates that a value is defined (not null or undefined)
+ * Validates that a value is defined (not undefined or null)
  * 
  * @param value - The value to validate
- * @param fieldName - The name of the field being validated
- * @returns The value if it's defined
- * @throws ValidationError if the value is null or undefined
+ * @param name - The name of the value (for error messages)
+ * @returns The validated value
+ * @throws ValidationError if validation fails
  */
-export function validateDefined<T>(value: T | null | undefined, fieldName: string): T {
-  if (value === null || value === undefined) {
-    throw new ValidationError(`${fieldName} is required`, {
-      code: 'REQUIRED_FIELD',
-      statusCode: 400,
-      details: { field: fieldName }
-    });
-  }
-  return value;
-}
-
-/**
- * Validates that a value is one of the allowed values
- * 
- * @param value - The value to validate
- * @param allowedValues - Array of allowed values
- * @param fieldName - The name of the field being validated
- * @returns The value if it's one of the allowed values
- * @throws ValidationError if the value is not one of the allowed values
- */
-export function validateOneOf<T extends string | number>(
-  value: T,
-  allowedValues: T[],
-  fieldName: string
+export function validateDefined<T>(
+  value: T | null | undefined,
+  name: string
 ): T {
-  if (!allowedValues.includes(value)) {
-    throw new ValidationError(
-      `${fieldName} must be one of: ${allowedValues.join(', ')}`,
-      {
-        code: 'INVALID_OPTION',
-        statusCode: 400,
-        details: { field: fieldName, allowedValues, receivedValue: value }
-      }
-    );
+  if (value === undefined || value === null) {
+    throw new ValidationError(`${name} is required but was ${value === null ? 'null' : 'undefined'}`, {
+      code: 'VALIDATION_REQUIRED',
+      details: { param: name, value }
+    });
   }
   return value;
 }
 
 /**
- * Validates that a string is not empty
+ * Validates that a value is a string
  * 
- * @param value - The string to validate
- * @param fieldName - The name of the field being validated
- * @returns The string if it's not empty
- * @throws ValidationError if the string is empty
+ * @param value - The value to validate
+ * @param name - The name of the value (for error messages)
+ * @returns The validated string
+ * @throws ValidationError if validation fails
  */
-export function validateNonEmptyString(value: string | null | undefined, fieldName: string): string {
-  const stringValue = validateDefined(value, fieldName);
-  if (typeof stringValue !== 'string') {
-    throw new ValidationError(`${fieldName} must be a string`, {
-      code: 'INVALID_TYPE',
-      statusCode: 400,
-      details: { field: fieldName, expectedType: 'string', receivedType: typeof stringValue }
+export function validateString(
+  value: unknown,
+  name: string
+): string {
+  validateDefined(value, name);
+  
+  if (typeof value !== 'string') {
+    throw new ValidationError(`${name} must be a string but was ${typeof value}`, {
+      code: 'VALIDATION_TYPE',
+      details: { param: name, expectedType: 'string', actualType: typeof value, value }
     });
   }
   
-  if (stringValue.trim() === '') {
-    throw new ValidationError(`${fieldName} cannot be empty`, {
-      code: 'EMPTY_STRING',
-      statusCode: 400,
-      details: { field: fieldName }
-    });
-  }
-  
-  return stringValue;
+  return value;
 }
 
 /**
  * Validates that a value is a number
  * 
  * @param value - The value to validate
- * @param fieldName - The name of the field being validated
- * @returns The value as a number
- * @throws ValidationError if the value is not a number
+ * @param name - The name of the value (for error messages)
+ * @returns The validated number
+ * @throws ValidationError if validation fails
  */
-export function validateNumber(value: unknown, fieldName: string): number {
-  if (typeof value !== 'number' || isNaN(value)) {
-    throw new ValidationError(`${fieldName} must be a valid number`, {
-      code: 'INVALID_NUMBER',
-      statusCode: 400,
-      details: { field: fieldName, receivedValue: value }
+export function validateNumber(
+  value: unknown,
+  name: string
+): number {
+  validateDefined(value, name);
+  
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new ValidationError(`${name} must be a number but was ${typeof value}`, {
+      code: 'VALIDATION_TYPE',
+      details: { param: name, expectedType: 'number', actualType: typeof value, value }
     });
   }
+  
   return value;
 }
 
 /**
- * Validates that a value is an array
+ * Validates that a value is a boolean
  * 
  * @param value - The value to validate
- * @param fieldName - The name of the field being validated
- * @returns The value as an array
- * @throws ValidationError if the value is not an array
+ * @param name - The name of the value (for error messages)
+ * @returns The validated boolean
+ * @throws ValidationError if validation fails
  */
-export function validateArray<T>(value: unknown, fieldName: string): T[] {
-  if (!Array.isArray(value)) {
-    throw new ValidationError(`${fieldName} must be an array`, {
-      code: 'INVALID_TYPE',
-      statusCode: 400,
-      details: { field: fieldName, expectedType: 'array', receivedType: typeof value }
+export function validateBoolean(
+  value: unknown,
+  name: string
+): boolean {
+  validateDefined(value, name);
+  
+  if (typeof value !== 'boolean') {
+    throw new ValidationError(`${name} must be a boolean but was ${typeof value}`, {
+      code: 'VALIDATION_TYPE',
+      details: { param: name, expectedType: 'boolean', actualType: typeof value, value }
     });
   }
-  return value as T[];
+  
+  return value;
 }
 
 /**
  * Validates that a value is an object
  * 
  * @param value - The value to validate
- * @param fieldName - The name of the field being validated
- * @returns The value as an object
- * @throws ValidationError if the value is not an object
+ * @param name - The name of the value (for error messages)
+ * @returns The validated object
+ * @throws ValidationError if validation fails
  */
-export function validateObject<T extends Record<string, unknown>>(
+export function validateObject(
   value: unknown,
-  fieldName: string
-): T {
+  name: string
+): Record<string, unknown> {
+  validateDefined(value, name);
+  
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new ValidationError(`${fieldName} must be an object`, {
-      code: 'INVALID_TYPE',
-      statusCode: 400,
-      details: { field: fieldName, expectedType: 'object', receivedType: typeof value }
+    throw new ValidationError(`${name} must be an object but was ${Array.isArray(value) ? 'array' : typeof value}`, {
+      code: 'VALIDATION_TYPE',
+      details: { param: name, expectedType: 'object', actualType: typeof value, value }
     });
   }
+  
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Validates that a value is an array
+ * 
+ * @param value - The value to validate
+ * @param name - The name of the value (for error messages)
+ * @returns The validated array
+ * @throws ValidationError if validation fails
+ */
+export function validateArray(
+  value: unknown,
+  name: string
+): unknown[] {
+  validateDefined(value, name);
+  
+  if (!Array.isArray(value)) {
+    throw new ValidationError(`${name} must be an array but was ${typeof value}`, {
+      code: 'VALIDATION_TYPE',
+      details: { param: name, expectedType: 'array', actualType: typeof value, value }
+    });
+  }
+  
+  return value;
+}
+
+/**
+ * Validates that a value is one of a set of allowed values
+ * 
+ * @param value - The value to validate
+ * @param allowedValues - The set of allowed values
+ * @param name - The name of the value (for error messages)
+ * @returns The validated value
+ * @throws ValidationError if validation fails
+ */
+export function validateOneOf<T>(
+  value: unknown,
+  allowedValues: readonly T[],
+  name: string
+): T {
+  validateDefined(value, name);
+  
+  if (!allowedValues.includes(value as T)) {
+    throw new ValidationError(`${name} must be one of ${allowedValues.join(', ')} but was ${String(value)}`, {
+      code: 'VALIDATION_ENUM',
+      details: { param: name, allowedValues, actualValue: value }
+    });
+  }
+  
   return value as T;
 }
 
 /**
- * Validates that a value matches a regular expression
+ * Validates that a value falls within a numeric range
  * 
- * @param value - The string to validate
- * @param pattern - The regular expression pattern
- * @param fieldName - The name of the field being validated
- * @returns The string if it matches the pattern
- * @throws ValidationError if the string doesn't match the pattern
- */
-export function validatePattern(
-  value: string,
-  pattern: RegExp,
-  fieldName: string
-): string {
-  if (!pattern.test(value)) {
-    throw new ValidationError(`${fieldName} has an invalid format`, {
-      code: 'INVALID_FORMAT',
-      statusCode: 400,
-      details: { field: fieldName, pattern: pattern.toString() }
-    });
-  }
-  return value;
-}
-
-/**
- * Validates that a number is within a range
- * 
- * @param value - The number to validate
- * @param min - The minimum allowed value
- * @param max - The maximum allowed value
- * @param fieldName - The name of the field being validated
- * @returns The number if it's within the range
- * @throws ValidationError if the number is outside the range
+ * @param value - The value to validate
+ * @param min - The minimum allowed value (inclusive)
+ * @param max - The maximum allowed value (inclusive)
+ * @param name - The name of the value (for error messages)
+ * @returns The validated number
+ * @throws ValidationError if validation fails
  */
 export function validateRange(
-  value: number,
+  value: unknown,
   min: number,
   max: number,
-  fieldName: string
+  name: string
 ): number {
-  if (value < min || value > max) {
-    throw new ValidationError(
-      `${fieldName} must be between ${min} and ${max}`,
-      {
-        code: 'OUT_OF_RANGE',
-        statusCode: 400,
-        details: { field: fieldName, min, max, value }
-      }
-    );
-  }
-  return value;
-}
-
-/**
- * Validates that a string has a minimum length
- * 
- * @param value - The string to validate
- * @param minLength - The minimum allowed length
- * @param fieldName - The name of the field being validated
- * @returns The string if it meets the minimum length
- * @throws ValidationError if the string is too short
- */
-export function validateMinLength(
-  value: string,
-  minLength: number,
-  fieldName: string
-): string {
-  if (value.length < minLength) {
-    throw new ValidationError(
-      `${fieldName} must be at least ${minLength} characters`,
-      {
-        code: 'TOO_SHORT',
-        statusCode: 400,
-        details: { field: fieldName, minLength, actualLength: value.length }
-      }
-    );
-  }
-  return value;
-}
-
-/**
- * Validates that a string doesn't exceed a maximum length
- * 
- * @param value - The string to validate
- * @param maxLength - The maximum allowed length
- * @param fieldName - The name of the field being validated
- * @returns The string if it doesn't exceed the maximum length
- * @throws ValidationError if the string is too long
- */
-export function validateMaxLength(
-  value: string,
-  maxLength: number,
-  fieldName: string
-): string {
-  if (value.length > maxLength) {
-    throw new ValidationError(
-      `${fieldName} cannot exceed ${maxLength} characters`,
-      {
-        code: 'TOO_LONG',
-        statusCode: 400,
-        details: { field: fieldName, maxLength, actualLength: value.length }
-      }
-    );
-  }
-  return value;
-}
-
-/**
- * Type guard to check if a value is a ValidationError
- * 
- * @param error - The error to check
- * @returns True if the error is a ValidationError
- */
-export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
-
-/**
- * Safe parsing of JSON data with validation
- * 
- * @param data - The JSON string to parse
- * @param fieldName - The name of the field being validated
- * @returns The parsed JSON data
- * @throws ValidationError if the data cannot be parsed
- */
-export function safeParseJSON<T>(data: string, fieldName: string): T {
-  try {
-    return JSON.parse(data) as T;
-  } catch (error) {
-    throw new ValidationError(`Invalid JSON in ${fieldName}`, {
-      code: 'INVALID_JSON',
-      statusCode: 400,
-      details: { field: fieldName }
+  const num = validateNumber(value, name);
+  
+  if (num < min || num > max) {
+    throw new ValidationError(`${name} must be between ${min} and ${max} but was ${num}`, {
+      code: 'VALIDATION_RANGE',
+      details: { param: name, min, max, actualValue: num }
     });
   }
+  
+  return num;
 }
 
 /**
- * Validates and casts a value to a specific type if possible
+ * Validates that a string matches a regex pattern
  * 
- * @param value - The value to validate and cast
- * @param expectedType - The expected type
- * @param fieldName - The name of the field being validated
- * @returns The value cast to the expected type
- * @throws ValidationError if the value cannot be cast to the expected type
+ * @param value - The value to validate
+ * @param pattern - The regex pattern to match
+ * @param name - The name of the value (for error messages)
+ * @returns The validated string
+ * @throws ValidationError if validation fails
  */
-export function validateType<T>(
+export function validatePattern(
   value: unknown,
-  expectedType: 'string' | 'number' | 'boolean' | 'object' | 'array',
-  fieldName: string
-): T {
-  let isValid = false;
+  pattern: RegExp,
+  name: string
+): string {
+  const str = validateString(value, name);
   
-  switch (expectedType) {
-    case 'string':
-      isValid = typeof value === 'string';
-      break;
-    case 'number':
-      isValid = typeof value === 'number' && !isNaN(value);
-      break;
-    case 'boolean':
-      isValid = typeof value === 'boolean';
-      break;
-    case 'object':
-      isValid = typeof value === 'object' && value !== null && !Array.isArray(value);
-      break;
-    case 'array':
-      isValid = Array.isArray(value);
-      break;
+  if (!pattern.test(str)) {
+    throw new ValidationError(`${name} must match pattern ${pattern} but was "${str}"`, {
+      code: 'VALIDATION_PATTERN',
+      details: { param: name, pattern: pattern.toString(), actualValue: str }
+    });
   }
   
-  if (!isValid) {
-    throw new ValidationError(
-      `${fieldName} must be a ${expectedType}`,
-      {
-        code: 'INVALID_TYPE',
-        statusCode: 400,
-        details: { field: fieldName, expectedType, actualType: Array.isArray(value) ? 'array' : typeof value }
-      }
-    );
+  return str;
+}
+
+/**
+ * Composes multiple validators into a single validator
+ * 
+ * @param validators - Array of validator functions to apply
+ * @returns A composed validator function
+ */
+export function composeValidators<T>(
+  validators: Array<(value: unknown) => unknown>
+): (value: unknown) => T {
+  return (value: unknown): T => {
+    return validators.reduce((result, validator) => validator(result), value) as T;
+  };
+}
+
+/**
+ * Validates an email address
+ * 
+ * @param value - The value to validate
+ * @param name - The name of the value (for error messages)
+ * @returns The validated email address
+ * @throws ValidationError if validation fails
+ */
+export function validateEmail(
+  value: unknown,
+  name = 'email'
+): string {
+  const email = validateString(value, name);
+  
+  // Simple email validation pattern, could be more complex in a real app
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (!emailPattern.test(email)) {
+    throw new ValidationError(`${name} must be a valid email address but was "${email}"`, {
+      code: 'VALIDATION_EMAIL',
+      details: { param: name, actualValue: email }
+    });
   }
   
-  return value as unknown as T;
+  return email;
+}
+
+/**
+ * Validates a URL
+ * 
+ * @param value - The value to validate
+ * @param name - The name of the value (for error messages)
+ * @returns The validated URL
+ * @throws ValidationError if validation fails
+ */
+export function validateUrl(
+  value: unknown,
+  name = 'url'
+): string {
+  const url = validateString(value, name);
+  
+  try {
+    new URL(url);
+    return url;
+  } catch (error) {
+    throw new ValidationError(`${name} must be a valid URL but was "${url}"`, {
+      code: 'VALIDATION_URL',
+      details: { param: name, actualValue: url }
+    });
+  }
 }

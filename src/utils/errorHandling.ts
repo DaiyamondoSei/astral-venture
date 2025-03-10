@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { ValidationError } from './validation/runtimeValidation';
 
@@ -23,7 +24,8 @@ export enum ErrorCategory {
   PERFORMANCE = 'performance',
   UNEXPECTED = 'unexpected',
   RESOURCE = 'resource',
-  VALIDATION = 'validation'
+  VALIDATION = 'validation',
+  USER_INTERFACE = 'user_interface'
 }
 
 /**
@@ -44,6 +46,12 @@ export interface ErrorHandlingOptions {
   metadata?: Record<string, unknown>;
   /** Optional callback for custom error handling */
   onError?: (error: unknown) => void;
+  /** Whether to retry the operation */
+  retry?: boolean;
+  /** Optional retry count */
+  retryCount?: number;
+  /** Optional retry delay in milliseconds */
+  retryDelay?: number;
 }
 
 /**
@@ -208,11 +216,26 @@ export async function processApiResponse<T>(
   return response.json();
 }
 
+/**
+ * Capture and report an exception to monitoring systems
+ * 
+ * @param error - The error to capture
+ * @param context - Optional context information
+ */
+export function captureException(error: unknown, context?: string): void {
+  // In a real app, this would send to a monitoring service like Sentry
+  console.error('EXCEPTION CAPTURED:', context ? `[${context}]` : '', error);
+  
+  // Here we would integrate with external error tracking
+  // Example: Sentry.captureException(error, { extra: { context } });
+}
+
 export default {
   handleError,
   createSafeAsyncFunction,
   createSafeFunction,
   processApiResponse,
+  captureException,
   ErrorSeverity,
   ErrorCategory
 };

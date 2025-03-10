@@ -1,179 +1,115 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { ErrorCategory, ErrorSeverity, handleError } from '@/utils/errorHandling';
+import { handleError, ErrorCategory, ErrorSeverity } from '@/utils/errorHandling';
+import ErrorFallback from './ErrorFallback';
 
 /**
- * Properties for the SafeErrorBoundary component
+ * Props for the safe error boundary component
  */
-interface SafeErrorBoundaryProps {
-  /**
-   * Content to render inside the boundary
-   */
+export interface SafeErrorBoundaryProps {
+  /** Child components to render */
   children: ReactNode;
   
-  /**
-   * Component to render when an error occurs
-   */
-  fallback?: ReactNode | ((error: Error, reset: () => void) => ReactNode);
+  /** Optional custom fallback component */
+  fallback?: ReactNode | ((props: { error: Error; resetErrorBoundary: () => void }) => ReactNode);
   
-  /**
-   * Context identifier for error tracking
-   */
-  context?: string;
+  /** Whether to show error details in the fallback */
+  showErrorDetails?: boolean;
   
-  /**
-   * Error category for classification
-   */
-  category?: ErrorCategory;
+  /** Error category for logging and metrics */
+  errorCategory?: ErrorCategory;
   
-  /**
-   * Error severity level
-   */
-  severity?: ErrorSeverity;
+  /** Error severity level */
+  errorSeverity?: ErrorSeverity;
   
-  /**
-   * Whether to show a toast notification
-   */
-  showToast?: boolean;
+  /** Custom error handler called when an error is caught */
+  onError?: (error: Error, info: ErrorInfo) => void;
   
-  /**
-   * Function to call when an error occurs
-   */
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  
-  /**
-   * Additional metadata for error logging
-   */
-  metadata?: Record<string, unknown>;
+  /** Context label for error logging */
+  contextLabel?: string;
 }
 
 /**
- * State for the SafeErrorBoundary component
+ * State for the safe error boundary component
  */
 interface SafeErrorBoundaryState {
-  /**
-   * Whether an error has occurred
-   */
+  /** Whether an error has occurred */
   hasError: boolean;
   
-  /**
-   * The error that occurred
-   */
-  error: Error | null;
+  /** The error that occurred */
+  error?: Error;
 }
 
 /**
- * Enhanced error boundary component with standardized error handling
- * 
- * @example
- * <SafeErrorBoundary 
- *   context="UserDashboard" 
- *   category={ErrorCategory.USER_INTERFACE}
- *   fallback={<p>Something went wrong. <button onClick={reset}>Try again</button></p>}
- * >
- *   <UserDashboard />
- * </SafeErrorBoundary>
+ * A simple error boundary that uses our central error handling system
+ * with sensible defaults for most use cases
  */
-export class SafeErrorBoundary extends Component<SafeErrorBoundaryProps, SafeErrorBoundaryState> {
+class SafeErrorBoundary extends Component<SafeErrorBoundaryProps, SafeErrorBoundaryState> {
   constructor(props: SafeErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = {
+      hasError: false
+    };
   }
 
   static getDerivedStateFromError(error: Error): SafeErrorBoundaryState {
-    return { hasError: true, error };
+    // Update state so the next render will show the fallback UI
+    return {
+      hasError: true,
+      error
+    };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    const { 
-      context = 'UI Component', 
-      category = ErrorCategory.USER_INTERFACE,
-      severity = ErrorSeverity.ERROR,
-      showToast = true,
-      onError,
-      metadata
-    } = this.props;
-
-    // Use centralized error handling
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    // Report the error to our error handling system
     handleError(error, {
-      context,
-      category,
-      severity,
-      showToast,
+      category: this.props.errorCategory || ErrorCategory.USER_INTERFACE,
+      severity: this.props.errorSeverity || ErrorSeverity.ERROR,
+      context: this.props.contextLabel || 'Component',
       metadata: {
-        ...metadata,
-        componentStack: errorInfo.componentStack
+        componentStack: info.componentStack,
       }
     });
-
-    // Call custom error handler if provided
-    if (onError) {
-      onError(error, errorInfo);
+    
+    // Call the custom error handler if provided
+    if (this.props.onError) {
+      this.props.onError(error, info);
     }
   }
 
   resetErrorBoundary = (): void => {
-    this.setState({ hasError: false, error: null });
+    this.setState({
+      hasError: false,
+      error: undefined
+    });
   };
 
   render(): ReactNode {
-    const { children, fallback } = this.props;
-    const { hasError, error } = this.state;
-
-    if (hasError && error) {
-      if (typeof fallback === 'function') {
-        return fallback(error, this.resetErrorBoundary);
+    if (this.state.hasError && this.state.error) {
+      // Render the custom fallback component if provided
+      if (this.props.fallback) {
+        if (typeof this.props.fallback === 'function') {
+          return this.props.fallback({
+            error: this.state.error,
+            resetErrorBoundary: this.resetErrorBoundary
+          });
+        }
+        return this.props.fallback;
       }
       
-      if (fallback) {
-        return fallback;
-      }
-      
-      // Default fallback UI
+      // Render the default error fallback
       return (
-        <div className="p-4 border border-red-200 rounded bg-red-50 text-red-800">
-          <h3 className="text-lg font-semibold mb-2">Something went wrong</h3>
-          <p className="mb-3 text-sm">{error.message || 'An unexpected error occurred'}</p>
-          <button
-            onClick={this.resetErrorBoundary}
-            className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 text-sm rounded"
-          >
-            Try again
-          </button>
-        </div>
+        <ErrorFallback
+          error={this.state.error}
+          resetErrorBoundary={this.resetErrorBoundary}
+          showDetails={this.props.showErrorDetails}
+        />
       );
     }
 
-    return children;
+    // Render children if no error occurred
+    return this.props.children;
   }
-}
-
-/**
- * Hook version of the error boundary for function components
- * 
- * @param props - Error boundary props
- * @returns JSX element wrapped in error boundary
- * 
- * @example
- * const MyComponent = () => {
- *   return withErrorBoundary(
- *     <ContentComponent />,
- *     {
- *       context: 'ContentComponent',
- *       fallback: <ErrorState />
- *     }
- *   );
- * };
- */
-export function withErrorBoundary(
-  children: ReactNode,
-  props: Omit<SafeErrorBoundaryProps, 'children'>
-): JSX.Element {
-  return (
-    <SafeErrorBoundary {...props}>
-      {children}
-    </SafeErrorBoundary>
-  );
 }
 
 export default SafeErrorBoundary;
