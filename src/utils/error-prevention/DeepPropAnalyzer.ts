@@ -1,217 +1,196 @@
 
-export interface PropChange {
-  path: string;
-  oldValue: any;
-  newValue: any;
-  type: 'added' | 'removed' | 'changed';
+/**
+ * DeepPropAnalyzer - A utility for safely accessing deeply nested properties
+ * Helps prevent "Cannot read property 'x' of undefined" errors
+ */
+
+/**
+ * Safely gets a deeply nested property from an object
+ * @param obj The object to get the property from
+ * @param path The path to the property as a string (e.g., 'user.profile.name')
+ * @param defaultValue The default value to return if the property doesn't exist
+ * @returns The property value or the default value
+ */
+export function getDeepProp<T = unknown>(
+  obj: unknown,
+  path: string,
+  defaultValue: T | null = null
+): T | null {
+  if (obj === null || obj === undefined) {
+    return defaultValue;
+  }
+  
+  try {
+    // Split the path by dots
+    const keys = path.split('.');
+    let current: any = obj;
+    
+    // Traverse the object by each key in the path
+    for (const key of keys) {
+      if (current === null || current === undefined) {
+        return defaultValue;
+      }
+      
+      current = current[key];
+    }
+    
+    // Return the final value or default
+    return current !== undefined ? current as T : defaultValue;
+  } catch (error) {
+    console.warn(`Error getting deep property '${path}':`, error);
+    return defaultValue;
+  }
 }
 
-export class DeepPropAnalyzer {
-  /**
-   * Analyzes changes between old and new props objects
-   */
-  static analyzePropChanges(
-    prevProps: Record<string, any> | null, 
-    nextProps: Record<string, any>
-  ): PropChange[] {
-    if (!prevProps) {
-      return Object.keys(nextProps).map(key => ({
-        path: key,
-        oldValue: undefined,
-        newValue: nextProps[key],
-        type: 'added'
-      }));
-    }
-    
-    const changes: PropChange[] = [];
-    
-    // Find added and changed props
-    Object.keys(nextProps).forEach(key => {
-      if (!(key in prevProps)) {
-        changes.push({
-          path: key,
-          oldValue: undefined,
-          newValue: nextProps[key],
-          type: 'added'
-        });
-      } else if (!this.areEqual(prevProps[key], nextProps[key])) {
-        changes.push({
-          path: key,
-          oldValue: prevProps[key],
-          newValue: nextProps[key],
-          type: 'changed'
-        });
-        
-        // If objects, also find nested changes
-        if (
-          typeof prevProps[key] === 'object' && prevProps[key] !== null &&
-          typeof nextProps[key] === 'object' && nextProps[key] !== null &&
-          !Array.isArray(prevProps[key]) && !Array.isArray(nextProps[key])
-        ) {
-          const nestedChanges = this.analyzeNestedPropChanges(
-            prevProps[key],
-            nextProps[key],
-            key
-          );
-          changes.push(...nestedChanges);
-        }
-      }
-    });
-    
-    // Find removed props
-    Object.keys(prevProps).forEach(key => {
-      if (!(key in nextProps)) {
-        changes.push({
-          path: key,
-          oldValue: prevProps[key],
-          newValue: undefined,
-          type: 'removed'
-        });
-      }
-    });
-    
-    return changes;
-  }
-  
-  /**
-   * Analyzes changes in nested objects
-   */
-  private static analyzeNestedPropChanges(
-    prevObj: Record<string, any>,
-    nextObj: Record<string, any>,
-    basePath: string
-  ): PropChange[] {
-    const changes: PropChange[] = [];
-    
-    // Find added and changed props
-    Object.keys(nextObj).forEach(key => {
-      const path = `${basePath}.${key}`;
-      
-      if (!(key in prevObj)) {
-        changes.push({
-          path,
-          oldValue: undefined,
-          newValue: nextObj[key],
-          type: 'added'
-        });
-      } else if (!this.areEqual(prevObj[key], nextObj[key])) {
-        changes.push({
-          path,
-          oldValue: prevObj[key],
-          newValue: nextObj[key],
-          type: 'changed'
-        });
-        
-        // Recursively check nested objects
-        if (
-          typeof prevObj[key] === 'object' && prevObj[key] !== null &&
-          typeof nextObj[key] === 'object' && nextObj[key] !== null &&
-          !Array.isArray(prevObj[key]) && !Array.isArray(nextObj[key])
-        ) {
-          const nestedChanges = this.analyzeNestedPropChanges(
-            prevObj[key],
-            nextObj[key],
-            path
-          );
-          changes.push(...nestedChanges);
-        }
-      }
-    });
-    
-    // Find removed props
-    Object.keys(prevObj).forEach(key => {
-      if (!(key in nextObj)) {
-        changes.push({
-          path: `${basePath}.${key}`,
-          oldValue: prevObj[key],
-          newValue: undefined,
-          type: 'removed'
-        });
-      }
-    });
-    
-    return changes;
-  }
-  
-  /**
-   * Deep equality check for objects
-   */
-  private static areEqual(a: any, b: any): boolean {
-    if (a === b) return true;
-    
-    if (a === null || b === null) return false;
-    if (a === undefined || b === undefined) return false;
-    
-    if (typeof a !== typeof b) return false;
-    
-    if (typeof a === 'object') {
-      if (Array.isArray(a) !== Array.isArray(b)) return false;
-      
-      if (Array.isArray(a)) {
-        if (a.length !== b.length) return false;
-        for (let i = 0; i < a.length; i++) {
-          if (!this.areEqual(a[i], b[i])) return false;
-        }
-        return true;
-      }
-      
-      const keysA = Object.keys(a);
-      const keysB = Object.keys(b);
-      
-      if (keysA.length !== keysB.length) return false;
-      
-      for (const key of keysA) {
-        if (!keysB.includes(key)) return false;
-        if (!this.areEqual(a[key], b[key])) return false;
-      }
-      
-      return true;
-    }
-    
+/**
+ * Checks if a deeply nested property exists in an object
+ * @param obj The object to check
+ * @param path The path to the property as a string (e.g., 'user.profile.name')
+ * @returns True if the property exists, false otherwise
+ */
+export function hasDeepProp(obj: unknown, path: string): boolean {
+  if (obj === null || obj === undefined) {
     return false;
   }
   
-  /**
-   * Formats a prop change for display
-   */
-  static formatPropChange(change: PropChange): string {
-    const { path, oldValue, newValue, type } = change;
+  try {
+    // Split the path by dots
+    const keys = path.split('.');
+    let current: any = obj;
     
-    switch (type) {
-      case 'added':
-        return `Added prop '${path}' with value: ${this.stringifyValue(newValue)}`;
-      case 'removed':
-        return `Removed prop '${path}' (was: ${this.stringifyValue(oldValue)})`;
-      case 'changed':
-        return `Changed prop '${path}' from ${this.stringifyValue(oldValue)} to ${this.stringifyValue(newValue)}`;
-      default:
-        return `Unknown change to prop '${path}'`;
+    // Traverse the object by each key in the path
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      
+      if (current === null || current === undefined) {
+        return false;
+      }
+      
+      // If we're at the last key, check if it exists
+      if (i === keys.length - 1) {
+        return key in current;
+      }
+      
+      current = current[key];
     }
+    
+    return false;
+  } catch (error) {
+    console.warn(`Error checking deep property '${path}':`, error);
+    return false;
+  }
+}
+
+/**
+ * Sets a deeply nested property on an object, creating intermediate objects if needed
+ * @param obj The object to set the property on
+ * @param path The path to the property as a string (e.g., 'user.profile.name')
+ * @param value The value to set
+ * @returns A new object with the property set
+ */
+export function setDeepProp<T extends Record<string, any>>(
+  obj: T,
+  path: string,
+  value: unknown
+): T {
+  if (typeof obj !== 'object' || obj === null) {
+    console.warn(`Cannot set property '${path}' on non-object:`, obj);
+    return obj;
   }
   
-  /**
-   * Safely stringifies a value for display
-   */
-  private static stringifyValue(value: any): string {
-    if (value === undefined) return 'undefined';
-    if (value === null) return 'null';
+  try {
+    // Create a copy of the object to avoid mutations
+    const result = { ...obj };
+    const keys = path.split('.');
     
-    if (typeof value === 'function') {
-      return 'function() {...}';
+    // Start at the root of our copy
+    let current: any = result;
+    
+    // Traverse and create the path as needed
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      
+      // Create intermediate objects if they don't exist
+      if (!(key in current) || current[key] === null || typeof current[key] !== 'object') {
+        current[key] = {};
+      }
+      
+      current = current[key];
     }
     
-    if (typeof value === 'object') {
-      try {
-        const str = JSON.stringify(value);
-        if (str.length > 50) {
-          return str.substring(0, 47) + '...';
-        }
-        return str;
-      } catch (e) {
-        return Object.prototype.toString.call(value);
+    // Set the final property
+    const lastKey = keys[keys.length - 1];
+    current[lastKey] = value;
+    
+    return result;
+  } catch (error) {
+    console.warn(`Error setting deep property '${path}':`, error);
+    return obj;
+  }
+}
+
+/**
+ * Safely removes a deeply nested property from an object
+ * @param obj The object to remove the property from
+ * @param path The path to the property as a string (e.g., 'user.profile.name')
+ * @returns A new object with the property removed
+ */
+export function removeDeepProp<T extends Record<string, any>>(
+  obj: T,
+  path: string
+): T {
+  if (typeof obj !== 'object' || obj === null) {
+    console.warn(`Cannot remove property '${path}' from non-object:`, obj);
+    return obj;
+  }
+  
+  try {
+    // Create a copy of the object to avoid mutations
+    const result = { ...obj };
+    const keys = path.split('.');
+    
+    // Handle single-level property
+    if (keys.length === 1) {
+      const copy = { ...result };
+      delete copy[keys[0]];
+      return copy;
+    }
+    
+    // Start at the root of our copy
+    let current: any = result;
+    
+    // Traverse to the parent of the property to remove
+    for (let i = 0; i < keys.length - 1; i++) {
+      const key = keys[i];
+      
+      if (!(key in current) || current[key] === null || typeof current[key] !== 'object') {
+        // Path doesn't exist, so nothing to remove
+        return result;
+      }
+      
+      current = current[key];
+    }
+    
+    // Remove the property
+    const lastKey = keys[keys.length - 1];
+    if (current && typeof current === 'object' && lastKey in current) {
+      const currentCopy = { ...current };
+      delete currentCopy[lastKey];
+      
+      // Update the parent with the new copy
+      let parentCopy = result;
+      for (let i = 0; i < keys.length - 2; i++) {
+        parentCopy = parentCopy[keys[i]];
+      }
+      
+      if (keys.length > 1) {
+        parentCopy[keys[keys.length - 2]] = currentCopy;
       }
     }
     
-    return String(value);
+    return result;
+  } catch (error) {
+    console.warn(`Error removing deep property '${path}':`, error);
+    return obj;
   }
 }

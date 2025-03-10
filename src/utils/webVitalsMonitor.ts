@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabaseClient';
+import { handleError } from './errorHandling';
 
 // Web vitals metrics
 export type WebVitalMetric = {
@@ -25,9 +26,18 @@ export const initWebVitalsMonitoring = () => {
       onINP(sendToAnalytics, { reportAllChanges: false });
       
       console.log('Web Vitals monitoring initialized');
+    }).catch(error => {
+      handleError(error, {
+        context: 'Web Vitals',
+        severity: 'warning',
+        customMessage: 'Failed to load web-vitals library'
+      });
     });
   } catch (error) {
-    console.error('Failed to initialize web vitals monitoring:', error);
+    handleError(error, {
+      context: 'Web Vitals',
+      customMessage: 'Failed to initialize web vitals monitoring'
+    });
   }
 };
 
@@ -50,11 +60,11 @@ const sendToAnalytics = async (metric: WebVitalMetric) => {
       category = 'loading';
   }
   
-  // Only send if user is authenticated
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return;
-  
   try {
+    // Only send if user is authenticated
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    
     // Track performance metric
     await fetch(`${supabase.supabaseUrl}/functions/v1/track-performance`, {
       method: 'POST',
@@ -75,7 +85,11 @@ const sendToAnalytics = async (metric: WebVitalMetric) => {
       })
     });
   } catch (error) {
-    console.error('Error sending web vital to analytics:', error);
+    handleError(error, {
+      context: 'Web Vitals Analytics',
+      showToast: false,
+      severity: 'warning'
+    });
   }
 };
 

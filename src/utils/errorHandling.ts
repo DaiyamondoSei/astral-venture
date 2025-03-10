@@ -1,159 +1,164 @@
 
 import { toast } from '@/components/ui/use-toast';
 
+/**
+ * Error severity levels for different types of errors
+ */
 export enum ErrorSeverity {
   ERROR = 'error',
   WARNING = 'warning',
-  INFO = 'info'
-}
-
-export interface ErrorHandlingOptions {
-  context?: string;
-  severity?: ErrorSeverity;
-  showToast?: boolean;
-  truncateMessage?: boolean;
-  stackTrace?: boolean;
-  report?: boolean;
+  INFO = 'info',
 }
 
 /**
- * Handle errors with consistent logging and UI feedback
+ * Options for error handling configuration
  */
-export function handleError(
+export interface ErrorHandlingOptions {
+  /** Context where the error occurred for better tracking */
+  context: string;
+  /** Whether to show a toast notification to the user */
+  showToast?: boolean;
+  /** Severity level of the error */
+  severity?: ErrorSeverity;
+  /** Custom error message to display instead of the original one */
+  customMessage?: string;
+  /** Whether to include the stack trace in the console output */
+  includeStack?: boolean;
+}
+
+/**
+ * Centralized error handler for consistent error handling across the application
+ * @param error The error object or message string
+ * @param options Options for handling the error or a string representing the context
+ */
+export const handleError = (
   error: unknown,
-  contextOrOptions: string | ErrorHandlingOptions
-): void {
-  // Process options
-  const options: ErrorHandlingOptions = typeof contextOrOptions === 'string' 
-    ? { context: contextOrOptions } 
-    : contextOrOptions;
+  options: ErrorHandlingOptions | string
+): void => {
+  // Normalize options
+  const opts: ErrorHandlingOptions = typeof options === 'string' 
+    ? { context: options } 
+    : options;
   
   const {
-    context = 'Application',
-    severity = ErrorSeverity.ERROR,
+    context,
     showToast = true,
-    truncateMessage = true,
-    stackTrace = false,
-    report = false
-  } = options;
-  
-  // Extract error message
+    severity = ErrorSeverity.ERROR,
+    customMessage,
+    includeStack = true,
+  } = opts;
+
+  // Extract error details
   let errorMessage = 'An unknown error occurred';
-  
+  let errorStack = '';
+
   if (error instanceof Error) {
     errorMessage = error.message;
+    errorStack = error.stack || '';
   } else if (typeof error === 'string') {
     errorMessage = error;
   } else if (error !== null && typeof error === 'object') {
     errorMessage = String(error);
   }
-  
-  // Log error based on severity
-  const logPrefix = `[${severity.toUpperCase()}] Error in ${context}:`;
+
+  // Use custom message if provided
+  const displayMessage = customMessage || errorMessage;
+
+  // Log to console based on severity
+  const prefix = `[${severity.toUpperCase()}] Error in ${context}:`;
   
   switch (severity) {
     case ErrorSeverity.WARNING:
-      console.warn(logPrefix, error);
+      console.warn(prefix, includeStack && error instanceof Error ? error : errorMessage);
       break;
     case ErrorSeverity.INFO:
-      console.info(logPrefix, error);
+      console.info(prefix, includeStack && error instanceof Error ? error : errorMessage);
       break;
     default:
-      console.error(logPrefix, error);
-      if (stackTrace && error instanceof Error && error.stack) {
-        console.error('Stack trace:', error.stack);
-      }
+      console.error(prefix, includeStack && error instanceof Error ? error : errorMessage);
   }
-  
+
   // Show toast notification if enabled
   if (showToast) {
-    // Truncate very long error messages
-    const displayMessage = truncateMessage && errorMessage.length > 100
-      ? `${errorMessage.substring(0, 100)}...`
-      : errorMessage;
+    // Truncate long error messages for toast
+    const truncatedMessage = displayMessage.length > 100 
+      ? `${displayMessage.substring(0, 100)}...` 
+      : displayMessage;
     
     toast({
       title: `Error in ${context}`,
-      description: displayMessage,
+      description: truncatedMessage,
       variant: severity === ErrorSeverity.ERROR ? 'destructive' : 'default',
-      duration: severity === ErrorSeverity.ERROR ? 5000 : 3000,
+      duration: 5000,
     });
   }
-  
-  // Report error to monitoring service if enabled
-  if (report) {
-    // Implementation for error reporting would go here
-    // For example, sending to a monitoring service
-  }
-}
+};
 
 /**
- * Create a safe wrapper for async functions with error handling
+ * Create a safe async function that handles errors internally
+ * @param fn The async function to wrap
+ * @param options Error handling options or context string
+ * @returns A wrapped function that catches errors
  */
-export function createSafeAsyncFunction<Args extends any[], Result>(
-  fn: (...args: Args) => Promise<Result>,
-  contextOrOptions: string | ErrorHandlingOptions & { 
-    retry?: (error: Error, attempt: number) => Promise<void>, 
-    maxRetries?: number
-  }
-): (...args: Args) => Promise<Result | null> {
-  return async (...args: Args): Promise<Result | null> => {
-    const options = typeof contextOrOptions === 'string' 
-      ? { context: contextOrOptions } 
-      : contextOrOptions;
-    
-    const { retry, maxRetries = 0 } = options;
-    
-    let attempt = 0;
-    const maxAttempts = maxRetries + 1; // Initial attempt + retries
-    
-    while (attempt < maxAttempts) {
-      try {
-        return await fn(...args);
-      } catch (error) {
-        attempt++;
+export const createSafeAsyncFunction = <T extends (...args: any[]) => Promise<any>>(
+  fn: T,
+  options: ErrorHandlingOptions | string,
+  fallbackValue: ReturnType<T> | null = null
+): (...args: Parameters<T>) => Promise<Awaited<ReturnType<T>> | null> => {
+  // Normalize options
+  const opts: ErrorHandlingOptions & { 
+    retry?: () => Promise<void>; 
+    maxRetries?: number; 
+  } = typeof options === 'string' ? { context: options } : { ...options };
+
+  return async (...args: Parameters<T>): Promise<Awaited<ReturnType<T>> | null> => {
+    try {
+      return await fn(...args);
+    } catch (error) {
+      // Try to retry the operation if configured
+      if (opts.retry && opts.maxRetries && opts.maxRetries > 0) {
+        let retryCount = 0;
         
-        if (attempt < maxAttempts && retry) {
+        while (retryCount < opts.maxRetries) {
           try {
-            await retry(error instanceof Error ? error : new Error(String(error)), attempt);
+            retryCount++;
+            // Wait for retry operation (e.g., refreshing tokens)
+            await opts.retry();
+            // Try the original function again
+            return await fn(...args);
           } catch (retryError) {
-            handleError(retryError, {
-              ...options,
-              context: `${options.context || 'Function'} - Retry handler`
-            });
-            break; // Stop retrying if the retry function itself throws
+            // Last retry failed, give up
+            if (retryCount >= opts.maxRetries) {
+              handleError(error, opts);
+              return fallbackValue;
+            }
           }
-        } else {
-          handleError(error, options);
-          break;
         }
       }
+      
+      handleError(error, opts);
+      return fallbackValue;
     }
-    
-    return null;
   };
-}
+};
 
 /**
- * Create a safe wrapper for synchronous functions with error handling
+ * Create a safe synchronous function that handles errors internally
+ * @param fn The function to wrap
+ * @param options Error handling options or context string
+ * @returns A wrapped function that catches errors
  */
-export function createSafeFunction<Args extends any[], Result>(
-  fn: (...args: Args) => Result,
-  contextOrOptions: string | ErrorHandlingOptions
-): (...args: Args) => Result | null {
-  return (...args: Args): Result | null => {
+export const createSafeFunction = <T extends (...args: any[]) => any>(
+  fn: T,
+  options: ErrorHandlingOptions | string,
+  fallbackValue: ReturnType<T> | null = null
+): (...args: Parameters<T>) => ReturnType<T> | null => {
+  return (...args: Parameters<T>): ReturnType<T> | null => {
     try {
       return fn(...args);
     } catch (error) {
-      handleError(error, contextOrOptions);
-      return null;
+      handleError(error, options);
+      return fallbackValue;
     }
   };
-}
-
-export default {
-  handleError,
-  createSafeAsyncFunction,
-  createSafeFunction,
-  ErrorSeverity
 };

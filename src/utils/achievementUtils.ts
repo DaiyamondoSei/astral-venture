@@ -1,6 +1,8 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
+import { handleError } from './errorHandling';
+import { validateDefined, validateString, validateNumber } from './typeValidation';
 
 // Achievement types
 export interface Achievement {
@@ -47,6 +49,8 @@ export const formatProgress = (progress: number): string => {
 // Fetch user achievements
 export const fetchUserAchievements = async (userId: string): Promise<UserAchievement[]> => {
   try {
+    validateString(userId, 'userId');
+    
     const { data, error } = await supabase
       .rpc('get_user_achievements', { user_id_param: userId });
       
@@ -54,7 +58,10 @@ export const fetchUserAchievements = async (userId: string): Promise<UserAchieve
     
     return data || [];
   } catch (error) {
-    console.error('Error fetching achievements:', error);
+    handleError(error, {
+      context: 'Achievement Fetching',
+      customMessage: 'Unable to load achievements'
+    });
     return [];
   }
 };
@@ -67,6 +74,11 @@ export const trackAchievementProgress = async (
   incrementOnly = true
 ): Promise<boolean> => {
   try {
+    // Validate inputs
+    validateString(userId, 'userId');
+    validateString(achievementId, 'achievementId');
+    validateNumber(progress, 'progress');
+    
     // Fetch current progress if incrementing
     if (incrementOnly) {
       const { data: existing } = await supabase
@@ -113,7 +125,10 @@ export const trackAchievementProgress = async (
     
     return true;
   } catch (error) {
-    console.error('Error tracking achievement progress:', error);
+    handleError(error, {
+      context: 'Achievement Tracking',
+      customMessage: 'Failed to update achievement progress'
+    });
     return false;
   }
 };
@@ -125,6 +140,11 @@ export const updateCategoryAchievements = async (
   progressIncrement: number = 0.1
 ): Promise<void> => {
   try {
+    // Validate inputs
+    validateString(userId, 'userId');
+    validateString(category, 'category');
+    validateNumber(progressIncrement, 'progressIncrement');
+    
     // Get all achievements for the category
     const { data: achievements } = await supabase
       .from('achievements')
@@ -159,6 +179,11 @@ export const updateCategoryAchievements = async (
       }
     }
   } catch (error) {
-    console.error(`Error updating ${category} achievements:`, error);
+    handleError(error, {
+      context: 'Category Achievement Update',
+      customMessage: `Failed to update ${category} achievements`,
+      showToast: false,
+      severity: 'warning'
+    });
   }
 };

@@ -1,80 +1,115 @@
+/**
+ * Runtime type validation utilities to ensure data consistency
+ */
 
-import { z } from 'zod';
+import { handleError } from '../errorHandling';
+import { isMetatronsNode, isMetatronsConnection } from '../typeGuards';
+import type { MetatronsNode, MetatronsConnection } from '@/components/visual-foundation/metatrons-cube/types';
 
 /**
- * Generic type for API response validation
- * T is the expected data type, defined by a Zod schema
+ * Validates an array of MetatronsNodes
+ * @param nodes Array to validate
+ * @param context Context for error reporting
+ * @returns True if valid, false otherwise
  */
-export interface ValidationResult<T> {
-  isValid: boolean;
-  data: T | null;
-  errors: string[];
-}
-
-/**
- * Validate data against a Zod schema
- * @param schema Zod schema to validate against
- * @param data Data to validate
- * @returns ValidationResult with typed data if valid
- */
-export function validateData<T>(
-  schema: z.ZodType<T>,
-  data: unknown
-): ValidationResult<T> {
+export function validateMetatronsNodes(
+  nodes: unknown[], 
+  context = 'MetatronsNodes Validation'
+): nodes is MetatronsNode[] {
   try {
-    const validatedData = schema.parse(data);
-    return {
-      isValid: true,
-      data: validatedData,
-      errors: []
-    };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return {
-        isValid: false,
-        data: null,
-        errors: error.errors.map(err => `${err.path.join('.')}: ${err.message}`)
-      };
+    if (!Array.isArray(nodes)) {
+      handleError(`Expected nodes to be an array, got ${typeof nodes}`, { context, showToast: false });
+      return false;
     }
     
-    return {
-      isValid: false,
-      data: null,
-      errors: [error instanceof Error ? error.message : 'Unknown validation error']
-    };
-  }
-}
-
-/**
- * Validate API response data and handle errors
- * @param schema Zod schema for the expected response data
- * @param data Raw response data from API
- * @param onError Optional callback for handling validation errors
- * @returns Typed and validated data or null if invalid
- */
-export function validateApiResponse<T>(
-  schema: z.ZodType<T>,
-  data: unknown,
-  onError?: (errors: string[]) => void
-): T | null {
-  const result = validateData(schema, data);
-  
-  if (!result.isValid) {
-    console.error('API response validation failed:', result.errors);
-    if (onError) {
-      onError(result.errors);
+    // Check each node
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (!isMetatronsNode(node)) {
+        handleError(`Invalid node at index ${i}`, {
+          context,
+          showToast: false,
+          includeStack: false
+        });
+        return false;
+      }
     }
-    return null;
+    
+    return true;
+  } catch (error) {
+    handleError(error, { context, showToast: false });
+    return false;
   }
-  
-  return result.data;
 }
 
 /**
- * Create a typed validation function for a specific schema
- * @param schema Zod schema to validate against
- * @returns Function that validates data against the schema
+ * Validates an array of MetatronsConnections
+ * @param connections Array to validate
+ * @param context Context for error reporting
+ * @returns True if valid, false otherwise
  */
-export function createValidator<T>(schema: z.ZodType<T>) {
-  return (data: unknown): ValidationResult<T> => validateData(schema, data);
+export function validateMetatronsConnections(
+  connections: unknown[],
+  context = 'MetatronsConnections Validation'
+): connections is MetatronsConnection[] {
+  try {
+    if (!Array.isArray(connections)) {
+      handleError(`Expected connections to be an array, got ${typeof connections}`, { context, showToast: false });
+      return false;
+    }
+    
+    // Check each connection
+    for (let i = 0; i < connections.length; i++) {
+      const connection = connections[i];
+      if (!isMetatronsConnection(connection)) {
+        handleError(`Invalid connection at index ${i}`, {
+          context,
+          showToast: false,
+          includeStack: false
+        });
+        return false;
+      }
+      
+      // If using deprecated fields, log warning
+      const conn = connection as MetatronsConnection;
+      if ((conn.source || conn.target) && !(conn.from && conn.to)) {
+        console.warn(
+          `[DEPRECATED] Connection at index ${i} is using deprecated 'source/target' fields. ` +
+          `Please use 'from/to' fields instead.`
+        );
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    handleError(error, { context, showToast: false });
+    return false;
+  }
+}
+
+/**
+ * Normalizes MetatronsConnection objects to use the new from/to fields
+ * @param connections Array of connections to normalize
+ * @returns Normalized connections
+ */
+export function normalizeMetatronsConnections(
+  connections: MetatronsConnection[]
+): MetatronsConnection[] {
+  return connections.map(conn => {
+    const result: MetatronsConnection = {
+      from: conn.from || conn.source || '',
+      to: conn.to || conn.target || '',
+    };
+    
+    // Copy other properties
+    if (conn.animated !== undefined) result.animated = conn.animated;
+    if (conn.active !== undefined) result.active = conn.active;
+    if (conn.intensity !== undefined) result.intensity = conn.intensity;
+    
+    // Keep source/target for backward compatibility
+    if (conn.source) result.source = conn.source;
+    if (conn.target) result.target = conn.target;
+    
+    return result;
+  });
 }
