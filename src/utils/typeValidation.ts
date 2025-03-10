@@ -130,11 +130,11 @@ export function createConfigSchema<T extends Record<string, unknown>>(
   return z.object(schema);
 }
 
+// Re-export validation utilities for convenience
 export {
   validateString,
   validateNumber,
   validateBoolean,
   validateArray,
-  validateObject,
-  withDefault
+  validateObject
 };

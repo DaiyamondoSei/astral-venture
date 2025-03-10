@@ -10,6 +10,7 @@ import {
   clearExpiredCache, 
   clearAllCache 
 } from "../../shared/cacheUtils.ts";
+import { logEvent } from "../../shared/responseUtils.ts";
 
 // Cache TTL in milliseconds (default: 30 minutes)
 const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
@@ -17,76 +18,90 @@ const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
 /**
  * Get a cached response if available
  * 
- * @param key - Cache key
- * @param isStream - Whether the response is a stream
+ * @param cacheKey - The cache key
+ * @param isStreamingRequest - Whether the request expects a streaming response
  * @returns Cached response or null
  */
 export async function getCachedResponse(
-  key: string,
-  isStream = false
+  cacheKey: string, 
+  isStreamingRequest: boolean
 ): Promise<Response | null> {
   const cached = getMemoryCacheValue<{
-    response: Response;
-    isStream: boolean;
-  }>(key);
+    response: Response,
+    isStreamingResponse: boolean
+  }>(cacheKey);
   
-  if (!cached) {
-    return null;
-  }
-  
-  // We can't use streams if the types don't match
-  if (cached.isStream !== isStream) {
-    return null;
-  }
-  
-  // Clone the response for streaming or non-streaming cases
-  if (cached.isStream) {
-    // For streaming responses, we need special handling
-    const { readable, writable } = new TransformStream();
-    cached.response.body?.pipeTo(writable);
+  // Only use cache if it matches the request type (streaming vs non-streaming)
+  if (cached && cached.isStreamingResponse === isStreamingRequest) {
+    logEvent("info", "Cache hit", { cacheKey, isStreamingRequest });
     
-    return new Response(readable, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream"
-      }
-    });
+    // For streaming responses, we need special handling
+    if (cached.isStreamingResponse) {
+      const { readable, writable } = new TransformStream();
+      cached.response.body?.pipeTo(writable);
+      
+      return new Response(readable, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream"
+        }
+      });
+    }
+    
+    // For regular responses, we can just clone
+    return cached.response.clone();
   }
   
-  // For regular responses, we can just clone
-  return cached.response.clone();
+  return null;
 }
 
 /**
  * Cache a response for future use
  * 
- * @param key - Cache key
- * @param response - Response to cache
- * @param isStream - Whether the response is a stream
- * @param ttl - Cache time-to-live in milliseconds
+ * @param cacheKey - The cache key
+ * @param response - The response to cache
+ * @param isStreamingResponse - Whether this is a streaming response
+ * @param ttl - Time-to-live in milliseconds
  */
 export async function cacheResponse(
-  key: string,
-  response: Response,
-  isStream = false,
+  cacheKey: string, 
+  response: Response, 
+  isStreamingResponse: boolean,
   ttl = DEFAULT_CACHE_TTL
 ): Promise<void> {
-  setMemoryCacheValue(key, {
+  // Clean up cache first
+  await cleanupCache();
+  
+  setMemoryCacheValue(cacheKey, {
     response: response.clone(),
-    isStream
+    isStreamingResponse
   }, ttl);
+  
+  logEvent("info", "Added response to cache", { 
+    cacheKey, 
+    isStreamingResponse, 
+    ttl 
+  });
 }
 
 /**
- * Clean up expired cache entries
+ * Clean up expired cache entries and maintain cache size limits
  * 
- * @param force - Whether to force clear all cache entries
- * @returns Number of cache entries cleared
+ * @param forceCleanAll - Whether to force clean all entries
+ * @returns Number of entries cleared
  */
-export async function cleanupCache(force = false): Promise<number> {
-  if (force) {
-    return clearAllCache();
+export async function cleanupCache(forceCleanAll = false): Promise<number> {
+  if (forceCleanAll) {
+    const size = clearAllCache();
+    logEvent("info", "Cleared all cache entries", { count: size });
+    return size;
   }
   
-  return clearExpiredCache();
+  const deletionCount = clearExpiredCache();
+  
+  if (deletionCount > 0) {
+    logEvent("info", "Cleaned up expired cache entries", { count: deletionCount });
+  }
+  
+  return deletionCount;
 }

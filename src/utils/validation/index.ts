@@ -1,10 +1,29 @@
 
 /**
- * Re-export all validation functions and types for easy importing
+ * Validation utilities index
+ * Re-exports all validation utilities for convenience
  */
-export * from './runtimeValidation';
-export * from './runtimeTypeValidation';
 
-// Export validation utilities in a default object for convenience
-import * as validationUtils from './runtimeValidation';
-export default validationUtils;
+// Export runtime validation utilities
+export {
+  validateString,
+  validateNumber,
+  validateBoolean,
+  validateArray,
+  validateObject,
+  validatePattern,
+  validateRange,
+  validateDefined,
+  composeValidators,
+  isValidationError,
+  createValidator
+} from './runtimeValidation';
+
+// Export schema validation utilities
+export { default as createSchema } from './schemaValidator';
+
+// Export validation error utilities
+export { ValidationError } from './ValidationError';
+
+// Export validation types
+export type { ValidationErrorDetails } from './runtimeValidation';
