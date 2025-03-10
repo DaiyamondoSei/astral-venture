@@ -38,7 +38,22 @@ export interface IAuthContext {
   errorMessage: string;
 }
 
+/**
+ * Authentication Context
+ * 
+ * This context provides authentication state and methods throughout the application.
+ * Use the useAuth() hook from '@/hooks/auth' to consume this context.
+ */
 export const AuthContext = createContext<IAuthContext | null>(null);
+
+// Export for backward compatibility, but mark as deprecated
+// In the future, importing from '@/hooks/auth' should be preferred
+/**
+ * @deprecated Import from '@/hooks/auth' instead
+ */
+export const useAuth = () => {
+  throw new Error('Direct import of useAuth from AuthContext is deprecated. Import from "@/hooks/auth" instead.');
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

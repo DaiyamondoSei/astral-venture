@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useRef } from 'react';
-import { performanceMonitor } from '@/utils/performance/performanceMonitor';
+import { performanceMonitor } from '@/utils/performance';
 import type { PerformanceTrackingOptions } from '@/types/performance';
 
 /**

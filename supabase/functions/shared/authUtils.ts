@@ -40,6 +40,22 @@ export function getSupabaseClient(token: string) {
   });
 }
 
+// New utility to create a client from a request with proper error handling
+export function createClientFromRequest(req: Request) {
+  const token = extractToken(req);
+  
+  if (!token) {
+    return { client: null, error: "No authorization token provided" };
+  }
+  
+  try {
+    const client = getSupabaseClient(token);
+    return { client, error: null };
+  } catch (error) {
+    return { client: null, error: error.message };
+  }
+}
+
 // Extract token from request headers
 export function extractToken(req: Request): string | null {
   const authHeader = req.headers.get("Authorization");
