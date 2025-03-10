@@ -1,10 +1,19 @@
+
 /**
  * Type validation and transformation utilities
  */
 
 import { z } from 'zod';
 import { isNil, isString, isNumber, isArray, isObject, isBoolean } from 'lodash';
-import { validateBoolean, validateNumber, validateString, validateArray, validateObject, validateDefined } from './validation/runtimeValidation';
+import { 
+  validateBoolean, 
+  validateNumber, 
+  validateString, 
+  validateArray, 
+  validateObject, 
+  validateDefined,
+  validateOneOf
+} from './validation/runtimeValidation';
 
 /**
  * Ensures a value is of a specific type or returns a default
@@ -88,6 +97,26 @@ export function objectWithDefault<T extends object>(
 }
 
 /**
+ * Ensures a value is one of the allowed values or returns default
+ * 
+ * @param value - Value to validate
+ * @param allowedValues - Array of allowed values
+ * @param defaultValue - Default value to use if validation fails
+ * @returns Validated value or default
+ */
+export function oneOfWithDefault<T>(
+  value: unknown,
+  allowedValues: T[],
+  defaultValue: T
+): T {
+  try {
+    return validateOneOf(value, allowedValues, 'value');
+  } catch (error) {
+    return defaultValue;
+  }
+}
+
+/**
  * Type-safe accessor for nested object properties
  * 
  * @param obj - Object to access property from
@@ -136,5 +165,6 @@ export {
   validateBoolean,
   validateArray,
   validateObject,
-  validateDefined
+  validateDefined,
+  validateOneOf
 };

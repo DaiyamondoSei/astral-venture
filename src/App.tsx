@@ -1,5 +1,5 @@
 
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { PerfConfigProvider } from '@/contexts/PerfConfigContext';
@@ -35,8 +35,8 @@ export const queryClient = new QueryClient({
 function App() {
   // Preload panel data when the app starts
   useEffect(() => {
-    preloadPanelData()
-  }, [])
+    preloadPanelData();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -45,51 +45,49 @@ function App() {
           <QuantumThemeProvider>
             <AuthProvider>
               <PanelProvider>
-                <Router>
-                  {/* Swipeable panels controller */}
-                  <SwipeablePanelController />
-                  
-                  {/* Swipe indicators */}
-                  <Routes>
-                    <Route 
-                      path="/home" 
-                      element={
-                        <>
-                          <SwipeIndicator position="top" />
-                          <SwipeIndicator position="bottom" />
-                          <HomePage />
-                        </>
-                      } 
-                    />
-                    <Route 
-                      path="/dashboard" 
-                      element={
-                        <>
-                          <SwipeIndicator position="top" />
-                          <SwipeIndicator position="bottom" />
-                          <DashboardPage />
-                        </>
-                      } 
-                    />
-                    <Route 
-                      path="/practice" 
-                      element={
-                        <>
-                          <SwipeIndicator position="top" />
-                          <SwipeIndicator position="bottom" />
-                          <PracticePage />
-                        </>
-                      } 
-                    />
-                    <Route path="/" element={<LandingPage />} />
-                    <Route path="/entry-animation" element={<EntryAnimationPage />} />
-                    <Route path="/design-system" element={<DesignSystemDemo />} />
-                    <Route path="/onboarding" element={<OnboardingPage />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                  </Routes>
-                  
-                  <Toaster />
-                </Router>
+                {/* Swipeable panels controller */}
+                <SwipeablePanelController />
+                
+                {/* Swipe indicators */}
+                <Routes>
+                  <Route 
+                    path="/home" 
+                    element={
+                      <>
+                        <SwipeIndicator position="top" />
+                        <SwipeIndicator position="bottom" />
+                        <HomePage />
+                      </>
+                    } 
+                  />
+                  <Route 
+                    path="/dashboard" 
+                    element={
+                      <>
+                        <SwipeIndicator position="top" />
+                        <SwipeIndicator position="bottom" />
+                        <DashboardPage />
+                      </>
+                    } 
+                  />
+                  <Route 
+                    path="/practice" 
+                    element={
+                      <>
+                        <SwipeIndicator position="top" />
+                        <SwipeIndicator position="bottom" />
+                        <PracticePage />
+                      </>
+                    } 
+                  />
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/entry-animation" element={<EntryAnimationPage />} />
+                  <Route path="/design-system" element={<DesignSystemDemo />} />
+                  <Route path="/onboarding" element={<OnboardingPage />} />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+                
+                <Toaster />
               </PanelProvider>
             </AuthProvider>
           </QuantumThemeProvider>

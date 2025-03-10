@@ -15,6 +15,13 @@ import { logEvent } from "../../shared/responseUtils.ts";
 // Cache TTL in milliseconds (default: 30 minutes)
 const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
 
+// Type for cached response data
+interface CachedResponseData {
+  response: Response;
+  isStreamingResponse: boolean;
+  timestamp: number;
+}
+
 /**
  * Get a cached response if available
  * 
@@ -26,10 +33,7 @@ export async function getCachedResponse(
   cacheKey: string, 
   isStreamingRequest: boolean
 ): Promise<Response | null> {
-  const cached = getMemoryCacheValue<{
-    response: Response,
-    isStreamingResponse: boolean
-  }>(cacheKey);
+  const cached = getMemoryCacheValue<CachedResponseData>(cacheKey);
   
   // Only use cache if it matches the request type (streaming vs non-streaming)
   if (cached && cached.isStreamingResponse === isStreamingRequest) {
@@ -72,9 +76,10 @@ export async function cacheResponse(
   // Clean up cache first
   await cleanupCache();
   
-  setMemoryCacheValue(cacheKey, {
+  setMemoryCacheValue<CachedResponseData>(cacheKey, {
     response: response.clone(),
-    isStreamingResponse
+    isStreamingResponse,
+    timestamp: Date.now()
   }, ttl);
   
   logEvent("info", "Added response to cache", { 
@@ -105,3 +110,36 @@ export async function cleanupCache(forceCleanAll = false): Promise<number> {
   
   return deletionCount;
 }
+
+/**
+ * Get cache statistics for monitoring
+ */
+export function getCacheStats(): Record<string, number> {
+  const now = Date.now();
+  const cache = getMemoryCacheValue<Record<string, CachedResponseData>>("__all__") || {};
+  
+  // Count total entries, streaming vs non-streaming, and average age
+  let total = 0;
+  let streaming = 0;
+  let totalAge = 0;
+  
+  Object.values(cache).forEach(entry => {
+    total++;
+    if (entry.isStreamingResponse) streaming++;
+    totalAge += now - (entry.timestamp || 0);
+  });
+  
+  return {
+    totalEntries: total,
+    streamingEntries: streaming,
+    nonStreamingEntries: total - streaming,
+    averageAgeMs: total > 0 ? totalAge / total : 0
+  };
+}
+
+export default {
+  getCachedResponse,
+  cacheResponse,
+  cleanupCache,
+  getCacheStats
+};

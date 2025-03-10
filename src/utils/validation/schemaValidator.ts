@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { ValidationError } from './ValidationError';
+import { ValidationError } from './runtimeValidation';
 
 export interface ValidationResult<T> {
   isValid: boolean;
@@ -40,6 +40,24 @@ export function createSchemaValidator<T>(schema: z.ZodType<T>) {
 }
 
 /**
+ * Create an API validator function
+ */
+export function createApiValidator<T>(schema: z.ZodType<T>) {
+  const validator = createSchemaValidator(schema);
+  
+  return (data: unknown): ValidationResult<T> => {
+    const result = validator(data);
+    
+    if (!result.isValid && result.error) {
+      // Augment the error with API-specific context
+      result.error.code = result.error.code || 'API_VALIDATION_ERROR';
+    }
+    
+    return result;
+  };
+}
+
+/**
  * Validate data against a schema
  */
 export function validateSchema<T>(
@@ -52,5 +70,6 @@ export function validateSchema<T>(
 
 export default {
   createSchemaValidator,
+  createApiValidator,
   validateSchema
 };

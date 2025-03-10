@@ -71,10 +71,12 @@ const defaultOptions: ErrorHandlingOptions = {
  */
 export function handleError(
   error: unknown,
-  options: ErrorHandlingOptions = {}
+  options: ErrorHandlingOptions | string = {}
 ): void {
-  // Merge with default options
-  const opts = { ...defaultOptions, ...options };
+  // Convert string context to options object
+  const opts: ErrorHandlingOptions = typeof options === 'string' 
+    ? { ...defaultOptions, context: options }
+    : { ...defaultOptions, ...options };
   
   // Extract error message
   let errorMessage = 'An unknown error occurred';
@@ -132,13 +134,17 @@ export function handleError(
  */
 export function createSafeAsyncFunction<T extends any[], R>(
   fn: (...args: T) => Promise<R>,
-  options: ErrorHandlingOptions = {}
+  options: ErrorHandlingOptions | string = {}
 ): (...args: T) => Promise<R | undefined> {
+  const opts: ErrorHandlingOptions = typeof options === 'string' 
+    ? { context: options }
+    : options;
+    
   return async (...args: T): Promise<R | undefined> => {
     try {
       return await fn(...args);
     } catch (error) {
-      handleError(error, options);
+      handleError(error, opts);
       return undefined;
     }
   };
@@ -153,13 +159,17 @@ export function createSafeAsyncFunction<T extends any[], R>(
  */
 export function createSafeFunction<T extends any[], R>(
   fn: (...args: T) => R,
-  options: ErrorHandlingOptions = {}
+  options: ErrorHandlingOptions | string = {}
 ): (...args: T) => R | undefined {
+  const opts: ErrorHandlingOptions = typeof options === 'string' 
+    ? { context: options }
+    : options;
+    
   return (...args: T): R | undefined => {
     try {
       return fn(...args);
     } catch (error) {
-      handleError(error, options);
+      handleError(error, opts);
       return undefined;
     }
   };
@@ -175,8 +185,12 @@ export function createSafeFunction<T extends any[], R>(
  */
 export async function processApiResponse<T>(
   response: Response,
-  errorOptions: ErrorHandlingOptions = {}
+  errorOptions: ErrorHandlingOptions | string = {}
 ): Promise<T> {
+  const opts: ErrorHandlingOptions = typeof errorOptions === 'string' 
+    ? { context: errorOptions }
+    : errorOptions;
+    
   if (!response.ok) {
     let errorData;
     try {
@@ -201,7 +215,7 @@ export async function processApiResponse<T>(
     
     // Handle the error with our error handling system
     handleError(error, {
-      ...errorOptions,
+      ...opts,
       category: ErrorCategory.NETWORK,
       metadata: {
         status: response.status,

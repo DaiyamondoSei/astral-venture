@@ -1,3 +1,4 @@
+
 /**
  * Runtime type validation utilities
  */
@@ -191,6 +192,13 @@ export function validateDefined<T>(value: T | null | undefined, name = 'value'):
     throw new ValidationError(`${name} is required`, 'REQUIRED_VALUE');
   }
   return value;
+}
+
+/**
+ * Check if the provided value is a ValidationError
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  return error instanceof ValidationError;
 }
 
 /**

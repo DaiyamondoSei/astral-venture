@@ -1,40 +1,61 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { chakraInsightsService, ChakraInsight, ChakraInsightsOptions } from '@/services/chakra/ChakraInsightsService';
+import { chakraInsightsService } from '@/services/chakra/ChakraInsightsService';
+import { ErrorCategory, ErrorSeverity, handleError } from '@/utils/errorHandling';
+
+export interface ChakraInsight {
+  id: string;
+  chakraType: string;
+  status: string;
+  insights: string[];
+  recommendations: string[];
+  affinity: number;
+}
+
+export interface ChakraInsightsOptions {
+  includeRecommendations?: boolean;
+  chakraTypes?: string[];
+  minAffinity?: number;
+  limit?: number;
+}
 
 /**
- * Hook for fetching and managing chakra insights
+ * Hook to access chakra insights data for the user
  */
 export function useChakraInsights(options: ChakraInsightsOptions = {}) {
   const [insights, setInsights] = useState<ChakraInsight[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Load insights data
-  const loadInsights = useCallback(async () => {
+  const refreshInsights = useCallback(async () => {
     try {
       setIsLoading(true);
-      setError(null);
+      setError('');
       
-      const data = await chakraInsightsService.getChakraInsights(options);
-      setInsights(data);
+      const fetchedInsights = await chakraInsightsService.getUserChakraInsights({
+        includeRecommendations: options.includeRecommendations,
+        chakraTypes: options.chakraTypes,
+        minAffinity: options.minAffinity,
+        limit: options.limit
+      });
+      
+      setInsights(fetchedInsights);
     } catch (err) {
-      console.error('Error loading chakra insights:', err);
-      setError('Failed to load chakra insights. Please try again.');
+      handleError(err, {
+        category: ErrorCategory.DATA_PROCESSING,
+        severity: ErrorSeverity.ERROR,
+        context: 'Chakra insights',
+        customMessage: 'Unable to load chakra insights'
+      });
+      setError('Failed to load chakra insights. Please try again later.');
     } finally {
       setIsLoading(false);
     }
   }, [options]);
 
-  // Initial data loading
   useEffect(() => {
-    loadInsights();
-  }, [loadInsights]);
-
-  // Refresh insights data
-  const refreshInsights = useCallback(() => {
-    loadInsights();
-  }, [loadInsights]);
+    refreshInsights();
+  }, [refreshInsights]);
 
   return {
     insights,

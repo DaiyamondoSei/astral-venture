@@ -39,6 +39,24 @@ export interface PerfConfig {
     enabled?: boolean;
     sampleRate?: number;
   };
+  
+  // Performance tracking
+  enablePerformanceTracking?: boolean;
+  enableRenderTracking?: boolean;
+  enableVirtualization?: boolean;
+  enableMemoryMonitoring?: boolean;
+  enableDetailedLogging?: boolean;
+  enableValidation?: boolean;
+  enablePropTracking?: boolean;
+  
+  // Performance tuning
+  batchRenderUpdates?: boolean;
+  throttleInterval?: number;
+  samplingRate?: number;
+  maxTrackedComponents?: number;
+  intelligentProfiling?: boolean;
+  inactiveTabThrottling?: boolean;
+  batchUpdates?: boolean;
 }
 
 // Define default configurations for different device capabilities
@@ -54,6 +72,20 @@ export const defaultConfigs: Record<'low' | 'medium' | 'high', PerfConfig> = {
     enableHighPerformanceMode: false,
     enableAdaptiveRendering: true,
     enableMetricsCollection: false,
+    enablePerformanceTracking: false,
+    enableRenderTracking: false,
+    enableVirtualization: true,
+    enableMemoryMonitoring: false,
+    enableDetailedLogging: false,
+    enableValidation: false,
+    enablePropTracking: false,
+    batchRenderUpdates: true,
+    throttleInterval: 500,
+    samplingRate: 0.1,
+    maxTrackedComponents: 10,
+    intelligentProfiling: false,
+    inactiveTabThrottling: true,
+    batchUpdates: true,
     animations: {
       reduceMotion: true,
       enableFancyTransitions: false
@@ -78,6 +110,20 @@ export const defaultConfigs: Record<'low' | 'medium' | 'high', PerfConfig> = {
     enableHighPerformanceMode: false,
     enableAdaptiveRendering: true,
     enableMetricsCollection: true,
+    enablePerformanceTracking: true,
+    enableRenderTracking: true,
+    enableVirtualization: true,
+    enableMemoryMonitoring: true,
+    enableDetailedLogging: false,
+    enableValidation: true,
+    enablePropTracking: false,
+    batchRenderUpdates: true,
+    throttleInterval: 300,
+    samplingRate: 0.5,
+    maxTrackedComponents: 25,
+    intelligentProfiling: true,
+    inactiveTabThrottling: true,
+    batchUpdates: true,
     animations: {
       reduceMotion: false,
       enableFancyTransitions: false
@@ -102,6 +148,20 @@ export const defaultConfigs: Record<'low' | 'medium' | 'high', PerfConfig> = {
     enableHighPerformanceMode: true,
     enableAdaptiveRendering: false,
     enableMetricsCollection: true,
+    enablePerformanceTracking: true,
+    enableRenderTracking: true,
+    enableVirtualization: false,
+    enableMemoryMonitoring: true,
+    enableDetailedLogging: true,
+    enableValidation: true,
+    enablePropTracking: true,
+    batchRenderUpdates: false,
+    throttleInterval: 0,
+    samplingRate: 1.0,
+    maxTrackedComponents: 100,
+    intelligentProfiling: true,
+    inactiveTabThrottling: false,
+    batchUpdates: false,
     animations: {
       reduceMotion: false,
       enableFancyTransitions: true
