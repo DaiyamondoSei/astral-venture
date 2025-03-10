@@ -55,6 +55,36 @@ export class AppError extends Error {
     // This is needed to make instanceof work correctly
     Object.setPrototypeOf(this, AppError.prototype);
   }
+
+  /**
+   * Convert to a serializable object
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      severity: this.severity,
+      category: this.category,
+      userMessage: this.userMessage,
+      statusCode: this.statusCode,
+      context: this.context,
+      stack: this.stack
+    };
+  }
+
+  /**
+   * Create a user-friendly string representation
+   */
+  toUserString(): string {
+    return this.userMessage;
+  }
+
+  /**
+   * Create a debug string representation
+   */
+  toDebugString(): string {
+    return `[${this.severity.toUpperCase()}] ${this.category}: ${this.message}`;
+  }
 }
 
 /**

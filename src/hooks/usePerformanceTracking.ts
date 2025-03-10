@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { usePerfConfig } from '@/contexts/PerfConfigContext';
+import { usePerfConfig } from './usePerfConfig';
 import performanceMonitor from '@/utils/performance/performanceMonitor';
 import type { MetricType } from '@/utils/performance/types';
 
@@ -46,6 +46,16 @@ export interface UsePerformanceTrackingOptions {
    * Custom threshold for slow renders in milliseconds
    */
   slowRenderThreshold?: number;
+  
+  /**
+   * Categories for this component, used for filtering
+   */
+  categories?: string[];
+  
+  /**
+   * Whether to auto-start tracking
+   */
+  autoStart?: boolean;
 }
 
 /**
@@ -65,12 +75,15 @@ export function usePerformanceTracking(
     reportInterval = 30000, // 30 seconds
     logSlowRenders = false,
     slowRenderThreshold = 16, // 16ms = 1 frame at 60fps
+    categories = [],
+    autoStart = true,
   } = options;
 
   const { config } = usePerfConfig();
   const reportIntervalRef = useRef<number | null>(null);
   const interactionTimers = useRef<Record<string, number>>({});
   const lastRenderTime = useRef<number | null>(null);
+  const enabled = useRef(autoStart);
 
   // Clean up on unmount
   useEffect(() => {
@@ -108,6 +121,7 @@ export function usePerformanceTracking(
    * Records a component render time
    */
   const recordRenderTime = useCallback((time: number) => {
+    if (!enabled.current) return;
     if (config.enablePerformanceTracking && trackRenders) {
       performanceMonitor.addComponentMetric(componentName, time, 'render');
       
@@ -123,6 +137,7 @@ export function usePerformanceTracking(
    * Starts timing an interaction and returns a function to stop and record it
    */
   const startInteractionTiming = useCallback((interactionName: string) => {
+    if (!enabled.current) return () => {};
     if (!config.enablePerformanceTracking || !trackInteractions) {
       return () => {}; // No-op
     }
@@ -141,19 +156,47 @@ export function usePerformanceTracking(
   }, [componentName, config.enablePerformanceTracking, trackInteractions]);
 
   /**
+   * Tracks a simple user interaction and returns metadata
+   */
+  const trackInteraction = useCallback((interactionName: string) => {
+    if (!enabled.current) return () => {};
+    const endTiming = startInteractionTiming(interactionName);
+    
+    return () => {
+      endTiming();
+      return {
+        componentName,
+        interactionName,
+        timestamp: new Date().toISOString()
+      };
+    };
+  }, [componentName, startInteractionTiming]);
+
+  /**
    * Tracks an event with a manually specified duration
    */
   const trackEvent = useCallback((eventName: string, duration: number) => {
+    if (!enabled.current) return;
     if (config.enablePerformanceTracking) {
       const fullName = `${componentName}:${eventName}`;
       performanceMonitor.addComponentMetric(fullName, duration, 'interaction');
     }
   }, [componentName, config.enablePerformanceTracking]);
 
+  /**
+   * Enables or disables performance tracking
+   */
+  const setEnabled = useCallback((value: boolean) => {
+    enabled.current = value;
+  }, []);
+
   return {
     recordRenderTime,
     startInteractionTiming,
-    trackEvent
+    trackInteraction,
+    trackEvent,
+    setEnabled,
+    isEnabled: enabled.current
   };
 }
 

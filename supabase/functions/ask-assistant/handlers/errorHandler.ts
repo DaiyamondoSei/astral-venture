@@ -41,10 +41,10 @@ export function handleOpenAIError(error: any): Response {
     
     // Check for specific error types
     if (errorMessage.includes("exceeded your current quota")) {
-      errorCode = "quota_exceeded";
+      errorCode = ErrorCode.QUOTA_EXCEEDED;
       statusCode = 402; // Payment Required
     } else if (errorMessage.includes("rate limit")) {
-      errorCode = "rate_limited";
+      errorCode = ErrorCode.RATE_LIMITED;
       statusCode = 429; // Too Many Requests
     } else if (errorMessage.includes("invalid_api_key") || errorMessage.includes("authentication")) {
       errorCode = "invalid_api_key";

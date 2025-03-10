@@ -1,65 +1,41 @@
 
 /**
- * Shared response utilities for Edge Functions
+ * Edge Function Response Utilities
+ * 
+ * This module provides utilities for creating standardized responses
+ * from Supabase Edge Functions.
  */
 
-// Common headers for cross-origin requests
+// Standard CORS headers for all edge functions
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
 
-// Error codes for consistent error responses
+// Standardized error codes
 export enum ErrorCode {
+  INTERNAL_ERROR = "internal_error",
+  UNAUTHORIZED = "unauthorized",
   MISSING_PARAMETERS = "missing_parameters",
   INVALID_PARAMETERS = "invalid_parameters",
-  UNAUTHORIZED = "unauthorized",
-  FORBIDDEN = "forbidden",
-  NOT_FOUND = "not_found",
-  TIMEOUT = "timeout",
-  DATABASE_ERROR = "database_error",
   EXTERNAL_API_ERROR = "external_api_error",
-  INTERNAL_ERROR = "internal_error"
+  RESOURCE_NOT_FOUND = "resource_not_found",
+  RATE_LIMITED = "rate_limited",
+  SERVICE_UNAVAILABLE = "service_unavailable",
+  QUOTA_EXCEEDED = "quota_exceeded"
 }
-
-// Result interface for success responses
-interface SuccessResult<T> {
-  success: true;
-  data: T;
-  metadata?: Record<string, any>;
-}
-
-// Result interface for error responses
-interface ErrorResult {
-  success: false;
-  error: {
-    code: ErrorCode | string;
-    message: string;
-    details?: any;
-  };
-}
-
-// Union type for all response types
-export type ApiResult<T> = SuccessResult<T> | ErrorResult;
 
 /**
- * Create a success response with proper headers
+ * Create a successful response with consistent formatting
  */
-export function createSuccessResponse<T>(
-  data: T,
-  metadata?: Record<string, any>,
-  status = 200
-): Response {
-  const result: SuccessResult<T> = {
-    success: true,
-    data,
-    ...(metadata && { metadata })
-  };
-
+export function createSuccessResponse(data: any, statusCode: number = 200) {
   return new Response(
-    JSON.stringify(result),
+    JSON.stringify({
+      success: true,
+      data
+    }),
     {
-      status,
+      status: statusCode,
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json"
@@ -69,41 +45,26 @@ export function createSuccessResponse<T>(
 }
 
 /**
- * Alias for createSuccessResponse for backward compatibility
- */
-export function createResponse<T>(
-  data: T,
-  metadata?: Record<string, any>,
-  status = 200
-): Response {
-  return createSuccessResponse(data, metadata, status);
-}
-
-/**
- * Create an error response with proper headers
+ * Create an error response with consistent formatting
  */
 export function createErrorResponse(
-  code: ErrorCode | string,
-  message?: string | null,
-  details?: any,
-  status = 400
-): Response {
-  // Use default message if not provided
-  const errorMessage = message || getDefaultErrorMessage(code);
-
-  const result: ErrorResult = {
-    success: false,
-    error: {
-      code,
-      message: errorMessage,
-      ...(details && { details })
-    }
-  };
-
+  code: string,
+  message: string,
+  details: any = null,
+  statusCode: number = 400
+) {
   return new Response(
-    JSON.stringify(result),
+    JSON.stringify({
+      success: false,
+      error: {
+        code,
+        message,
+        details,
+        timestamp: new Date().toISOString()
+      }
+    }),
     {
-      status,
+      status: statusCode,
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json"
@@ -113,72 +74,61 @@ export function createErrorResponse(
 }
 
 /**
- * Log an event with structured data
+ * Create a response for CORS preflight requests
+ */
+export function createPreflightResponse() {
+  return new Response(null, {
+    headers: {
+      ...corsHeaders
+    }
+  });
+}
+
+/**
+ * Log events in a structured format
  */
 export function logEvent(
-  level: "info" | "warn" | "error",
+  level: "debug" | "info" | "warn" | "error",
   message: string,
-  data?: Record<string, any>
-): void {
-  const timestamp = new Date().toISOString();
-  const logData = {
-    timestamp,
+  data: any = {}
+) {
+  console.log(JSON.stringify({
     level,
     message,
+    timestamp: new Date().toISOString(),
     ...data
-  };
-
-  // Use different console methods based on level
-  switch (level) {
-    case "warn":
-      console.warn(JSON.stringify(logData));
-      break;
-    case "error":
-      console.error(JSON.stringify(logData));
-      break;
-    default:
-      console.log(JSON.stringify(logData));
-  }
+  }));
 }
 
 /**
- * Validate that all required parameters are present
+ * Validate required parameters in a request
  */
-export function validateRequiredParameters(
-  data: Record<string, any>,
-  requiredParams: string[]
-): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredParams.filter(param => !data[param]);
-  return {
-    isValid: missingParams.length === 0,
-    missingParams
-  };
+export function validateRequiredParams(params: any, requiredParams: string[]): string[] {
+  const missingParams: string[] = [];
+  
+  for (const param of requiredParams) {
+    if (params[param] === undefined || params[param] === null || params[param] === "") {
+      missingParams.push(param);
+    }
+  }
+  
+  return missingParams;
 }
 
 /**
- * Get a default error message for known error codes
+ * Create a streaming response (for chat completions)
  */
-function getDefaultErrorMessage(code: ErrorCode | string): string {
-  switch (code) {
-    case ErrorCode.MISSING_PARAMETERS:
-      return "Missing required parameters";
-    case ErrorCode.INVALID_PARAMETERS:
-      return "Invalid parameters provided";
-    case ErrorCode.UNAUTHORIZED:
-      return "Authentication required";
-    case ErrorCode.FORBIDDEN:
-      return "You don't have permission to access this resource";
-    case ErrorCode.NOT_FOUND:
-      return "The requested resource was not found";
-    case ErrorCode.TIMEOUT:
-      return "The request timed out";
-    case ErrorCode.DATABASE_ERROR:
-      return "Database error occurred";
-    case ErrorCode.EXTERNAL_API_ERROR:
-      return "Error communicating with external service";
-    case ErrorCode.INTERNAL_ERROR:
-      return "An internal server error occurred";
-    default:
-      return "An error occurred";
-  }
+export function createStreamingResponse(
+  stream: ReadableStream<Uint8Array>,
+  additionalHeaders: Record<string, string> = {}
+) {
+  return new Response(stream, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      ...additionalHeaders
+    }
+  });
 }

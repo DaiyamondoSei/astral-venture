@@ -1,215 +1,228 @@
 
 /**
- * Runtime Type Validation Utilities
+ * Runtime Validation Utilities
  * 
- * Provides utilities for validating data types at runtime with detailed errors.
+ * Provides type-safe validation functions for runtime data checking.
+ * These utilities help ensure data integrity across system boundaries.
  */
 
-import ValidationError, { isValidationError } from './ValidationError';
+import { AppError } from '@/utils/errorHandling/AppError';
+import { ErrorCategory, ErrorSeverity } from '@/utils/errorHandling/types';
 
 /**
- * Validates that a value is not undefined or null
+ * Custom error for validation failures
  */
-export function validateRequired(
-  value: unknown, 
-  fieldName: string, 
-  message?: string
-): void {
-  if (value === undefined || value === null) {
-    throw ValidationError.requiredError(fieldName, message);
+export class ValidationError extends AppError {
+  constructor(message: string, fieldName?: string) {
+    super(
+      fieldName ? `Validation error for '${fieldName}': ${message}` : message,
+      {
+        severity: ErrorSeverity.WARNING,
+        category: ErrorCategory.VALIDATION,
+        userMessage: 'The data provided is invalid or incomplete.'
+      }
+    );
+    this.name = 'ValidationError';
+    
+    // This is needed to make instanceof work correctly
+    Object.setPrototypeOf(this, ValidationError.prototype);
+  }
+  
+  /**
+   * Create a ValidationError from an API error response
+   */
+  static fromApiError(apiError: unknown, fieldName?: string): ValidationError {
+    if (apiError instanceof Error) {
+      return new ValidationError(apiError.message, fieldName);
+    }
+    return new ValidationError('Unknown API validation error', fieldName);
+  }
+  
+  /**
+   * Create a ValidationError from a schema validation failure
+   */
+  static schemaError(message: string, fieldPath?: string): ValidationError {
+    return new ValidationError(message, fieldPath);
   }
 }
 
 /**
- * Validates that a value is of a specific primitive type
+ * Check if an error is a ValidationError
  */
-export function validateType(
-  value: unknown, 
-  expectedType: 'string' | 'number' | 'boolean' | 'object' | 'function' | 'symbol' | 'bigint', 
-  fieldName: string,
-  message?: string
-): void {
-  // Skip validation for null/undefined to avoid confusing errors
-  if (value === null || value === undefined) {
-    return;
+export function isValidationError(error: unknown): error is ValidationError {
+  return error instanceof ValidationError;
+}
+
+/**
+ * Validates that a value is defined (not null or undefined)
+ */
+export function validateDefined<T>(value: T | null | undefined, name = 'value'): T {
+  if (value === undefined || value === null) {
+    throw new ValidationError(`${name} is required, but got ${value}`, name);
   }
-  
-  if (typeof value !== expectedType) {
-    throw ValidationError.typeError(
-      fieldName, 
-      expectedType, 
-      value,
-      message
-    );
+  return value;
+}
+
+/**
+ * Validates that a value is a string
+ */
+export function validateString(value: unknown, name = 'value'): string {
+  if (typeof value !== 'string') {
+    throw new ValidationError(`${name} must be a string, but got ${typeof value}`, name);
   }
+  return value;
+}
+
+/**
+ * Validates that a value is a number
+ */
+export function validateNumber(value: unknown, name = 'value'): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new ValidationError(`${name} must be a number, but got ${typeof value}`, name);
+  }
+  return value;
+}
+
+/**
+ * Validates that a value is a boolean
+ */
+export function validateBoolean(value: unknown, name = 'value'): boolean {
+  if (typeof value !== 'boolean') {
+    throw new ValidationError(`${name} must be a boolean, but got ${typeof value}`, name);
+  }
+  return value;
+}
+
+/**
+ * Validates that a value is within a numeric range
+ */
+export function validateRange(value: unknown, min: number, max: number, name = 'value'): number {
+  const num = validateNumber(value, name);
+  if (num < min || num > max) {
+    throw new ValidationError(`${name} must be between ${min} and ${max}, but got ${num}`, name);
+  }
+  return num;
 }
 
 /**
  * Validates that a value is an array
  */
-export function validateArray(
+export function validateArray<T>(
   value: unknown, 
-  fieldName: string,
-  message?: string
-): void {
-  // Skip validation for null/undefined to avoid confusing errors
-  if (value === null || value === undefined) {
-    return;
+  itemValidator?: (item: unknown, index: number) => T,
+  name = 'value'
+): T[] {
+  if (!Array.isArray(value)) {
+    throw new ValidationError(`${name} must be an array, but got ${typeof value}`, name);
   }
   
-  if (!Array.isArray(value)) {
-    throw ValidationError.typeError(
-      fieldName, 
-      'array', 
-      value,
-      message
-    );
+  if (itemValidator) {
+    return value.map((item, index) => {
+      try {
+        return itemValidator(item, index);
+      } catch (err) {
+        if (isValidationError(err)) {
+          throw new ValidationError(
+            err.message,
+            `${name}[${index}]`
+          );
+        }
+        throw err;
+      }
+    });
   }
+  
+  return value as T[];
 }
 
 /**
- * Validates that a value is one of the allowed values
+ * Validates that a value is an object
  */
-export function validateOneOf<T>(
+export function validateObject<T extends Record<string, unknown>>(
+  value: unknown,
+  name = 'value'
+): T {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ValidationError(
+      `${name} must be an object, but got ${value === null ? 'null' : typeof value}`,
+      name
+    );
+  }
+  return value as T;
+}
+
+/**
+ * Validates a complex object against a schema of validators
+ */
+export function validateSchema<T extends Record<string, unknown>>(
+  value: unknown,
+  schema: Record<string, (value: unknown) => unknown>,
+  name = 'value'
+): T {
+  const obj = validateObject(value, name);
+  const result: Record<string, unknown> = {};
+  
+  for (const [key, validator] of Object.entries(schema)) {
+    try {
+      if (key in obj) {
+        result[key] = validator(obj[key]);
+      } else if (validator === validateDefined) {
+        // If validateDefined is used as a validator, the field is required
+        throw new ValidationError(`Required field '${key}' is missing`, `${name}.${key}`);
+      }
+    } catch (err) {
+      if (isValidationError(err)) {
+        throw new ValidationError(
+          err.message,
+          err.message.includes(`${name}.${key}`) ? err.message : `${name}.${key}`
+        );
+      }
+      throw err;
+    }
+  }
+  
+  return result as T;
+}
+
+/**
+ * Validates that a value matches one of the provided values
+ */
+export function validateEnum<T extends string | number>(
   value: unknown,
   allowedValues: readonly T[],
-  fieldName: string,
-  message?: string
-): void {
-  // Skip validation for null/undefined to avoid confusing errors
-  if (value === null || value === undefined) {
-    return;
+  name = 'value'
+): T {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    throw new ValidationError(
+      `${name} must be a string or number, but got ${typeof value}`,
+      name
+    );
   }
   
   if (!allowedValues.includes(value as T)) {
     throw new ValidationError(
-      message || `${fieldName} must be one of: ${allowedValues.join(', ')}`,
-      {
-        field: fieldName,
-        rule: 'oneOf',
-        details: {
-          allowedValues,
-          received: value
-        },
-        code: 'invalid_value'
-      }
+      `${name} must be one of [${allowedValues.join(', ')}], but got ${value}`,
+      name
     );
   }
+  
+  return value as T;
 }
 
 /**
- * Validates that a string matches a specific pattern
+ * Validates and transforms an ISO date string to a Date object
  */
-export function validatePattern(
-  value: string,
-  pattern: RegExp,
-  fieldName: string,
-  message?: string
-): void {
-  // Skip validation for null/undefined to avoid confusing errors
-  if (value === null || value === undefined) {
-    return;
+export function validateDate(value: unknown, name = 'value'): Date {
+  if (value instanceof Date) {
+    return value;
   }
   
-  validateType(value, 'string', fieldName);
+  const strValue = validateString(value, name);
+  const date = new Date(strValue);
   
-  if (!pattern.test(value)) {
-    throw ValidationError.formatError(
-      fieldName,
-      pattern.toString(),
-      value,
-      message
-    );
+  if (isNaN(date.getTime())) {
+    throw new ValidationError(`${name} must be a valid date string, but got "${strValue}"`, name);
   }
+  
+  return date;
 }
-
-/**
- * Validates that a number is within a specific range
- */
-export function validateRange(
-  value: number,
-  min: number | undefined,
-  max: number | undefined,
-  fieldName: string,
-  message?: string
-): void {
-  // Skip validation for null/undefined to avoid confusing errors
-  if (value === null || value === undefined) {
-    return;
-  }
-  
-  validateType(value, 'number', fieldName);
-  
-  if ((min !== undefined && value < min) || (max !== undefined && value > max)) {
-    throw ValidationError.rangeError(
-      fieldName,
-      min,
-      max,
-      value,
-      message
-    );
-  }
-}
-
-/**
- * Validates an object against a schema of validation functions
- */
-export function validateObject<T extends Record<string, unknown>>(
-  value: unknown,
-  schema: Record<string, (value: unknown) => void>,
-  fieldName: string = 'object'
-): void {
-  // Skip validation for null/undefined to avoid confusing errors
-  if (value === null || value === undefined) {
-    return;
-  }
-  
-  validateType(value, 'object', fieldName);
-  
-  const errors: ValidationError[] = [];
-  
-  Object.entries(schema).forEach(([key, validator]) => {
-    try {
-      validator((value as Record<string, unknown>)[key]);
-    } catch (error) {
-      if (isValidationError(error)) {
-        errors.push(error);
-      } else {
-        errors.push(new ValidationError(
-          `Validation failed for ${key}`,
-          {
-            field: key,
-            rule: 'custom',
-            originalError: error
-          }
-        ));
-      }
-    }
-  });
-  
-  if (errors.length > 0) {
-    throw new ValidationError(
-      `Object validation failed`,
-      {
-        field: fieldName,
-        rule: 'object',
-        details: { errors: errors.map(e => e.message) },
-        code: 'object_validation'
-      }
-    );
-  }
-}
-
-// Re-export isValidationError from ValidationError.ts
-export { isValidationError };
-
-export default {
-  validateRequired,
-  validateType,
-  validateArray,
-  validateOneOf,
-  validatePattern,
-  validateRange,
-  validateObject,
-  isValidationError
-};
