@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormLabel } from '@/components/ui/form-label';
@@ -19,7 +19,7 @@ const AuthForms = ({ className }: AuthFormsProps) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState<{email?: string; password?: string}>({});
-  const { signIn, signUp, isLoading, authError } = useAuth();
+  const { login, register, isLoading, errorMessage } = useAuth();
 
   const validateForm = () => {
     const errors: {email?: string; password?: string} = {};
@@ -48,9 +48,9 @@ const AuthForms = ({ className }: AuthFormsProps) => {
     }
     
     if (isSignUp) {
-      await signUp(email, password);
+      await register(email, password);
     } else {
-      await signIn(email, password);
+      await login(email, password);
     }
   };
 
@@ -81,9 +81,9 @@ const AuthForms = ({ className }: AuthFormsProps) => {
         {isSignUp ? "Begin Your Journey" : "Return to Quanex"}
       </h2>
       
-      {authError && (
+      {errorMessage && (
         <div className="mb-4 p-3 rounded bg-destructive/10 border border-destructive/30 text-destructive-foreground text-sm" role="alert">
-          {authError}
+          {errorMessage}
         </div>
       )}
       

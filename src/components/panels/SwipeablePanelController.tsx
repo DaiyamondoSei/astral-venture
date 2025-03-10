@@ -4,10 +4,15 @@ import { motion } from 'framer-motion';
 import usePanelState from '@/hooks/usePanelState';
 import type { ISwipeablePanelProps } from '@/components/ui/types';
 
+/**
+ * SwipeablePanel component that provides swipeable panels from different positions
+ */
 const SwipeablePanel: React.FC<ISwipeablePanelProps> = ({
   children,
   position,
-  initialState = false
+  initialState = false,
+  title,
+  height
 }) => {
   const { isPanelOpen, activePanelPosition, setIsPanelOpen } = usePanelState();
 
@@ -28,15 +33,34 @@ const SwipeablePanel: React.FC<ISwipeablePanelProps> = ({
     }
   };
 
+  // Apply different styling based on position
+  const panelClasses = `fixed z-50 bg-background/80 backdrop-blur-sm ${
+    position === 'bottom' ? 'inset-x-0 bottom-0' : 'top-0 right-0 h-full'
+  }`;
+
+  const panelStyle = {
+    height: position === 'bottom' && height ? height : undefined,
+    width: position === 'right' ? '85%' : undefined,
+    maxWidth: position === 'right' ? '450px' : undefined
+  };
+
   return (
     <motion.div
-      className="fixed inset-x-0 bottom-0 z-50 bg-background/80 backdrop-blur-sm"
+      className={panelClasses}
+      style={panelStyle}
       initial="closed"
       animate={isPanelOpen ? 'open' : 'closed'}
       variants={panelVariants}
       transition={{ type: 'spring', damping: 20 }}
     >
-      {children}
+      {title && (
+        <div className="p-4 border-b border-border/20">
+          <h3 className="text-lg font-medium">{title}</h3>
+        </div>
+      )}
+      <div className="max-h-[85vh] overflow-y-auto">
+        {children}
+      </div>
     </motion.div>
   );
 };

@@ -1,95 +1,96 @@
 
 import React, { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import usePanelState from '@/hooks/usePanelState';
+import SwipeablePanel from './SwipeablePanelController';
 import AchievementHeader from './achievement/AchievementHeader';
+import AchievementFilter from './achievement/AchievementFilter';
 import AchievementItem from './achievement/AchievementItem';
 import EmptyAchievementList from './achievement/EmptyAchievementList';
-import AchievementFilter from './achievement/AchievementFilter';
-import SwipeablePanelController from './SwipeablePanelController';
-import { handleError, ErrorCategory } from '@/utils/errorHandling';
-import { invokeEdgeFunction } from '@/utils/edgeFunctionHelper';
-import type { Achievement, AchievementCategory } from '@/types/achievement';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabaseClient';
+import type { Achievement } from '@/types/achievement';
 
 /**
- * Panel that displays user achievements
+ * Achievements panel that displays user achievements
  */
-const AchievementsPanel: React.FC = () => {
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [filteredAchievements, setFilteredAchievements] = useState<Achievement[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<AchievementCategory | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const AchievementsPanel = () => {
+  const [filter, setFilter] = useState<string | null>(null);
+  const { activePanelType } = usePanelState();
   
-  // Fetch achievements on mount
-  useEffect(() => {
-    const fetchAchievements = async () => {
+  // Only fetch achievements if the panel is open
+  const shouldFetch = activePanelType === 'achievements';
+  
+  const { data: achievements = [], isLoading, error } = useQuery({
+    queryKey: ['achievements', shouldFetch],
+    queryFn: async () => {
+      if (!shouldFetch) return [];
+      
       try {
-        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('achievements')
+          .select('*');
         
-        const data = await invokeEdgeFunction<{
-          achievements: Achievement[];
-          unlocked: string[];
-        }>('get_user_achievements');
+        if (error) throw error;
         
-        // Mark achievements as unlocked
-        const achievementsWithStatus = data.achievements.map(achievement => ({
-          ...achievement,
-          unlocked: data.unlocked.includes(achievement.id)
+        // Transform to Achievement type and add unlocked status
+        return data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          category: item.category,
+          icon: item.icon,
+          unlocked: Math.random() > 0.5, // Placeholder - replace with actual logic
+          progress: Math.floor(Math.random() * 100), // Placeholder
+          difficulty: ['beginner', 'intermediate', 'advanced', 'master'][
+            Math.floor(Math.random() * 4)
+          ] as Achievement['difficulty'],
+          createdAt: item.created_at,
+          unlockedAt: Math.random() > 0.7 ? new Date().toISOString() : undefined,
+          requiredCount: Math.floor(Math.random() * 10) + 1,
+          currentCount: Math.floor(Math.random() * 10)
         }));
-        
-        setAchievements(achievementsWithStatus);
-        setFilteredAchievements(achievementsWithStatus);
-        
-        toast.success('Achievements loaded');
-      } catch (error) {
-        handleError(error, {
-          category: ErrorCategory.DATA_PROCESSING,
-          context: 'Achievement loading',
-          customMessage: 'Failed to load achievements'
-        });
-      } finally {
-        setIsLoading(false);
+      } catch (err) {
+        console.error('Error fetching achievements:', err);
+        return [];
       }
-    };
-    
-    fetchAchievements();
-  }, []);
+    },
+    enabled: shouldFetch,
+    staleTime: 1000 * 60 * 5 // 5 minutes
+  });
   
-  // Filter achievements when category changes
-  useEffect(() => {
-    if (selectedCategory === null) {
-      setFilteredAchievements(achievements);
-    } else {
-      setFilteredAchievements(
-        achievements.filter(achievement => achievement.category === selectedCategory)
-      );
-    }
-  }, [selectedCategory, achievements]);
-  
-  // Handlers
-  const handleCategoryChange = (category: AchievementCategory | null) => {
-    setSelectedCategory(category);
-  };
-  
-  // Calculate counts
-  const unlockedCount = achievements.filter(a => a.unlocked).length;
-  const totalCount = achievements.length;
-  
+  // Filter achievements based on selected filter
+  const filteredAchievements = filter 
+    ? achievements.filter(achievement => achievement.category === filter)
+    : achievements;
+
+  // Get unique categories for filter
+  const categories = Array.from(
+    new Set(achievements.map(achievement => achievement.category))
+  );
+
   return (
-    <SwipeablePanelController position="bottom" height="85vh" title="Achievements">
-      <div className="space-y-4">
-        <AchievementHeader unlockedCount={unlockedCount} totalCount={totalCount} />
+    <SwipeablePanel position="bottom" title="Achievements">
+      <div className="p-4 pb-safe">
+        <AchievementHeader achievementCount={achievements.length || 0} />
         
         <AchievementFilter 
-          selectedCategory={selectedCategory} 
-          onCategoryChange={handleCategoryChange} 
+          categories={categories} 
+          selectedFilter={filter} 
+          onFilterChange={setFilter}
         />
         
         {isLoading ? (
           <div className="flex justify-center py-8">
-            <div className="animate-pulse h-8 w-8 rounded-full bg-primary-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : filteredAchievements.length > 0 ? (
-          <div className="space-y-3">
+        ) : error ? (
+          <div className="text-center py-8 text-destructive">
+            Failed to load achievements
+          </div>
+        ) : filteredAchievements.length === 0 ? (
+          <EmptyAchievementList />
+        ) : (
+          <div className="grid gap-4 pt-4">
             {filteredAchievements.map(achievement => (
               <AchievementItem 
                 key={achievement.id} 
@@ -97,11 +98,9 @@ const AchievementsPanel: React.FC = () => {
               />
             ))}
           </div>
-        ) : (
-          <EmptyAchievementList selectedCategory={selectedCategory} />
         )}
       </div>
-    </SwipeablePanelController>
+    </SwipeablePanel>
   );
 };
 

@@ -1,34 +1,42 @@
 
 import React from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import SeedOfLifePortal from '@/components/seed-of-life/SeedOfLifePortal';
-import CosmicBackground from '@/components/visual-foundation/CosmicBackground';
-import SwipeablePanelController from '@/components/panels/SwipeablePanelController';
-import SwipeIndicator from '@/components/panels/SwipeIndicator';
+import { useAuth } from '@/hooks/useAuth';
+import Layout from '@/components/Layout';
+import UserWelcome from '@/components/UserWelcome';
+import SacredHomePage from '@/components/home/SacredHomePage';
+import SwipeablePanel from '@/components/panels/SwipeablePanelController';
 
+/**
+ * HomePage component that shows the main application page
+ */
 const HomePage: React.FC = () => {
-  const { user } = useAuth();
-  const isAuthenticated = !!user;
+  const { user, userProfile, isAuthenticated, userStreak, handleLogout } = useAuth();
+  
+  const userName = userProfile?.displayName || user?.email?.split('@')[0] || 'Explorer';
+  const astralLevel = 3; // Placeholder - to be replaced with actual level calculation
   
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Background */}
-      <CosmicBackground className="absolute inset-0 z-0" />
-      
-      {/* Main content */}
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4">
-        <SeedOfLifePortal className="max-w-md w-full" />
-      </main>
-      
-      {/* Swipeable panels controller - only shown when authenticated */}
-      {isAuthenticated && (
-        <>
-          <SwipeablePanelController />
-          <SwipeIndicator position="top" />
-          <SwipeIndicator position="bottom" />
-        </>
-      )}
-    </div>
+    <Layout>
+      <div className="container px-4 py-6 mx-auto">
+        {isAuthenticated && (
+          <UserWelcome 
+            username={userName} 
+            onLogout={handleLogout}
+            astralLevel={astralLevel}
+          />
+        )}
+        
+        <SacredHomePage />
+        
+        {/* Bottom panel with placeholder content */}
+        <SwipeablePanel position="bottom" initialState={false}>
+          <div className="p-4">
+            <h2 className="text-xl font-semibold mb-4">Panel content</h2>
+            <p>This is a swipeable panel from the bottom.</p>
+          </div>
+        </SwipeablePanel>
+      </div>
+    </Layout>
   );
 };
 

@@ -11,7 +11,6 @@ const supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     storageKey: 'cosmic-app-auth',
-    // Ensure each app instance has a unique storage key to prevent conflicts
     autoRefreshToken: true,
     detectSessionInUrl: true
   }

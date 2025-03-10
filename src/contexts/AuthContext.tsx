@@ -1,3 +1,4 @@
+
 import { createContext, useState, useCallback, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
@@ -34,6 +35,7 @@ export interface IAuthContext {
   updateStreak: (streak: IUserStreak) => void;
   updateActivatedChakras: (chakras: number[]) => void;
   updateUserProfile: (profile: Partial<IUserProfile>) => void;
+  errorMessage: string;
 }
 
 export const AuthContext = createContext<IAuthContext | null>(null);
@@ -48,9 +50,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasCompletedLoading, setHasCompletedLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
+    setErrorMessage('');
     try {
       const { data: { user }, error } = await supabase.auth.signInWithPassword({
         email: email,
@@ -59,11 +63,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Login error:', error);
+        setErrorMessage(error.message);
         return false;
       }
 
       setUser(user);
       return true;
+    } catch (err) {
+      const error = err as Error;
+      console.error('Unexpected login error:', error);
+      setErrorMessage(error.message || 'An unexpected error occurred during login');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = useCallback(async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
+    setErrorMessage('');
     try {
       const { data: { user }, error } = await supabase.auth.signUp({
         email: email,
@@ -79,11 +90,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Registration error:', error);
+        setErrorMessage(error.message);
         return false;
       }
 
       setUser(user);
       return true;
+    } catch (err) {
+      const error = err as Error;
+      console.error('Unexpected registration error:', error);
+      setErrorMessage(error.message || 'An unexpected error occurred during registration');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -95,11 +112,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Logout error:', error);
+        setErrorMessage(error.message);
       }
       setUser(null);
       setUserProfile(null);
       setActivatedChakras([]);
       setTodayChallenge(null);
+    } catch (err) {
+      const error = err as Error;
+      console.error('Unexpected logout error:', error);
+      setErrorMessage(error.message || 'An unexpected error occurred during logout');
     } finally {
       setIsLoggingOut(false);
     }
@@ -121,9 +143,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('Error fetching profile:', error);
+          setErrorMessage(error.message);
         }
 
-        setUserProfile(data || null);
+        if (data) {
+          setUserProfile(data as IUserProfile);
+        } else {
+          setUserProfile(null);
+        }
+      } catch (err) {
+        const error = err as Error;
+        console.error('Unexpected error fetching user profile:', error);
+        setErrorMessage(error.message || 'Error fetching user profile');
       } finally {
         setProfileLoading(false);
       }
@@ -141,7 +172,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error fetching streak:', error);
         }
 
-        setUserStreak(data || null);
+        if (data) {
+          setUserStreak({
+            current: data.current_streak || 0,
+            longest: data.longest_streak || 0,
+            lastActivity: data.last_activity_date
+          });
+        } else {
+          setUserStreak(null);
+        }
       } catch (err) {
         console.error("Unexpected error fetching user streak:", err);
       }
@@ -185,6 +224,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
+    // Reset error message when auth state changes
+    setErrorMessage('');
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
       setIsLoading(false);
@@ -224,7 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const updateUserProfile = useCallback((profile: Partial<IUserProfile>) => {
-    setUserProfile(prev => prev ? { ...prev, ...profile } : { ...profile } as IUserProfile);
+    setUserProfile(prev => prev ? { ...prev, ...profile } as IUserProfile : { ...profile } as IUserProfile);
   }, []);
 
   const value: IAuthContext = {
@@ -245,6 +287,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateStreak,
     updateActivatedChakras,
     updateUserProfile,
+    errorMessage,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

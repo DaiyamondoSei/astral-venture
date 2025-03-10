@@ -45,8 +45,10 @@ function App() {
           <QuantumThemeProvider>
             <AuthProvider>
               <PanelProvider>
-                {/* Swipeable panels controller */}
-                <SwipeablePanelController />
+                {/* Swipeable panels controller - pass required props */}
+                <SwipeablePanel position="bottom" initialState={false}>
+                  <div>Default panel content</div>
+                </SwipeablePanel>
                 
                 {/* Routes configuration */}
                 <Routes>
