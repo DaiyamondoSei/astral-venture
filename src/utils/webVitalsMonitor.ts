@@ -87,8 +87,6 @@ export function recordWebVital(name: WebVitalName, value: number, navigationType
   
   // Report to performance monitor
   performanceMonitor.addWebVital(name, value, category);
-  
-  // This might be extended to report to analytics in the future
 }
 
 // Performance measuring utilities
@@ -97,8 +95,8 @@ export function markStart(markName: string): void {
   performance.mark(`${markName}-start`);
 }
 
-export function markEnd(markName: string): void {
-  if (typeof performance === 'undefined') return;
+export function markEnd(markName: string): number {
+  if (typeof performance === 'undefined') return 0;
   
   try {
     performance.mark(`${markName}-end`);
@@ -114,9 +112,12 @@ export function markEnd(markName: string): void {
       if (process.env.NODE_ENV !== 'production') {
         console.log(`%c${markName}: ${duration.toFixed(2)}ms`, 'color: blue');
       }
+      return duration;
     }
+    return 0;
   } catch (error) {
     console.error(`Failed to measure ${markName}:`, error);
+    return 0;
   }
 }
 
@@ -124,12 +125,8 @@ export function markEnd(markName: string): void {
  * Initialize the Web Vitals monitoring
  */
 export function initWebVitals(): void {
-  // This will be expanded as needed
   if (typeof window !== 'undefined') {
     try {
-      // We could use web-vitals library here in the future
-      // For now just minimal implementation
-      
       // Measure Time To First Byte (TTFB)
       if (performance && performance.getEntriesByType) {
         const navEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
@@ -139,7 +136,37 @@ export function initWebVitals(): void {
         }
       }
       
-      // More implementations can be added as needed
+      // Set up FCP listener
+      const observer = new PerformanceObserver((entryList) => {
+        for (const entry of entryList.getEntries()) {
+          if (entry.name === 'first-contentful-paint') {
+            recordWebVital('FCP', entry.startTime);
+            observer.disconnect();
+          }
+        }
+      });
+      
+      observer.observe({ type: 'paint', buffered: true });
+      
+      // Set up input delay listeners for FID approximation
+      let firstInputDelay = 0;
+      const onFirstInput = (event: Event) => {
+        if (!firstInputDelay && event.timeStamp) {
+          firstInputDelay = event.timeStamp;
+          recordWebVital('FID', firstInputDelay);
+          
+          // Remove listeners after first input
+          ['mousedown', 'keydown', 'touchstart', 'pointerdown'].forEach(type => {
+            window.removeEventListener(type, onFirstInput, { capture: true });
+          });
+        }
+      };
+      
+      // Add listeners for first input
+      ['mousedown', 'keydown', 'touchstart', 'pointerdown'].forEach(type => {
+        window.addEventListener(type, onFirstInput, { capture: true, passive: true });
+      });
+      
     } catch (error) {
       console.error('Error initializing Web Vitals monitoring:', error);
     }

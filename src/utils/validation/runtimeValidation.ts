@@ -1,359 +1,271 @@
 
 /**
- * Runtime validation utilities
+ * Runtime Validation Utilities
  * 
- * Provides type checking and validation functions for runtime data validation
+ * Type validation functions that run at runtime
  */
 
 import { ValidationError } from './ValidationError';
 
 /**
- * Validate that a value is not null or undefined
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated non-null value
- * @throws ValidationError if validation fails
+ * Check if a value is a ValidationError
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  return error instanceof ValidationError;
+}
+
+/**
+ * Validate that a value is defined (not null or undefined)
  */
 export function validateDefined<T>(value: T | null | undefined, name = 'value'): T {
-  if (value === undefined || value === null) {
-    throw ValidationError.requiredError(name);
+  if (value === null || value === undefined) {
+    throw new ValidationError({
+      message: `${name} is required, but got ${value}`,
+      field: name,
+      rule: 'required',
+      value
+    });
   }
   return value;
 }
 
 /**
  * Validate that a value is a string
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated string
- * @throws ValidationError if validation fails
  */
 export function validateString(value: unknown, name = 'value'): string {
-  const nonNull = validateDefined(value, name);
-  
-  if (typeof nonNull !== 'string') {
-    throw ValidationError.typeError(name, 'string', value);
+  if (typeof value !== 'string') {
+    throw new ValidationError({
+      message: `${name} must be a string, but got ${typeof value}`,
+      field: name,
+      expectedType: 'string',
+      rule: 'type',
+      value
+    });
   }
-  
-  return nonNull;
+  return value;
 }
 
 /**
- * Validate that a value is a non-empty string
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated non-empty string
- * @throws ValidationError if validation fails
+ * Validate that a value is a number
+ */
+export function validateNumber(value: unknown, name = 'value'): number {
+  if (typeof value !== 'number' || isNaN(value)) {
+    throw new ValidationError({
+      message: `${name} must be a number, but got ${typeof value}`,
+      field: name,
+      expectedType: 'number',
+      rule: 'type',
+      value
+    });
+  }
+  return value;
+}
+
+/**
+ * Validate that a value is a boolean
+ */
+export function validateBoolean(value: unknown, name = 'value'): boolean {
+  if (typeof value !== 'boolean') {
+    throw new ValidationError({
+      message: `${name} must be a boolean, but got ${typeof value}`,
+      field: name,
+      expectedType: 'boolean',
+      rule: 'type',
+      value
+    });
+  }
+  return value;
+}
+
+/**
+ * Validate that a value is a valid date
+ */
+export function validateDate(value: unknown, name = 'value'): Date {
+  if (!(value instanceof Date) || isNaN(value.getTime())) {
+    throw new ValidationError({
+      message: `${name} must be a valid Date, but got ${value}`,
+      field: name,
+      expectedType: 'Date',
+      rule: 'type',
+      value
+    });
+  }
+  return value;
+}
+
+/**
+ * Validate that a value is an object
+ */
+export function validateObject(value: unknown, name = 'value'): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new ValidationError({
+      message: `${name} must be an object, but got ${typeof value}`,
+      field: name,
+      expectedType: 'object',
+      rule: 'type',
+      value
+    });
+  }
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Validate that a value is an array
+ */
+export function validateArray<T = unknown>(value: unknown, itemValidator?: (item: unknown, index: number) => T, name = 'value'): T[] {
+  if (!Array.isArray(value)) {
+    throw new ValidationError({
+      message: `${name} must be an array, but got ${typeof value}`,
+      field: name,
+      expectedType: 'array',
+      rule: 'type',
+      value
+    });
+  }
+  
+  // Apply item validator if provided
+  if (itemValidator) {
+    return value.map((item, index) => {
+      try {
+        return itemValidator(item, index);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          throw new ValidationError({
+            message: `${name}[${index}]: ${error.message}`,
+            field: `${name}[${index}]`,
+            rule: error.rule,
+            value: item,
+            originalError: error
+          });
+        }
+        throw error;
+      }
+    });
+  }
+
+  return value as unknown[];
+}
+
+/**
+ * Validate that a value is one of the allowed values
+ */
+export function validateOneOf<T extends string | number>(
+  value: unknown,
+  allowedValues: readonly T[],
+  name = 'value'
+): T {
+  // First ensure it's the right type
+  const valueType = typeof allowedValues[0];
+  if (typeof value !== valueType) {
+    throw new ValidationError({
+      message: `${name} must be a ${valueType}, but got ${typeof value}`,
+      field: name,
+      expectedType: valueType,
+      rule: 'type',
+      value
+    });
+  }
+  
+  // Then validate it's one of the allowed values
+  if (!allowedValues.includes(value as T)) {
+    throw new ValidationError({
+      message: `${name} must be one of [${allowedValues.join(', ')}], but got ${value}`,
+      field: name,
+      rule: 'oneOf',
+      value
+    });
+  }
+  
+  return value as T;
+}
+
+/**
+ * Validate an email address
+ */
+export function validateEmail(value: unknown, name = 'email'): string {
+  const email = validateString(value, name);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (!emailRegex.test(email)) {
+    throw new ValidationError({
+      message: `${name} must be a valid email address`,
+      field: name,
+      rule: 'format',
+      value
+    });
+  }
+  
+  return email;
+}
+
+/**
+ * Validate a URL
+ */
+export function validateUrl(value: unknown, name = 'url'): string {
+  const url = validateString(value, name);
+  
+  try {
+    new URL(url);
+    return url;
+  } catch {
+    throw new ValidationError({
+      message: `${name} must be a valid URL`,
+      field: name,
+      rule: 'format',
+      value
+    });
+  }
+}
+
+/**
+ * Validate a UUID
+ */
+export function validateUuid(value: unknown, name = 'id'): string {
+  const id = validateString(value, name);
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  
+  if (!uuidRegex.test(id)) {
+    throw new ValidationError({
+      message: `${name} must be a valid UUID`,
+      field: name,
+      rule: 'format',
+      value
+    });
+  }
+  
+  return id;
+}
+
+/**
+ * Validate a non-empty string
  */
 export function validateNonEmptyString(value: unknown, name = 'value'): string {
   const str = validateString(value, name);
   
   if (str.trim() === '') {
-    throw new ValidationError(`${name} cannot be empty`, { field: name, rule: 'nonEmpty' });
-  }
-  
-  return str;
-}
-
-/**
- * Validate that a value is a number
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated number
- * @throws ValidationError if validation fails
- */
-export function validateNumber(value: unknown, name = 'value'): number {
-  const nonNull = validateDefined(value, name);
-  
-  // Handle string numbers
-  if (typeof nonNull === 'string') {
-    const parsed = Number(nonNull);
-    if (!isNaN(parsed)) {
-      return parsed;
-    }
-  }
-  
-  if (typeof nonNull !== 'number' || isNaN(nonNull)) {
-    throw ValidationError.typeError(name, 'number', value);
-  }
-  
-  return nonNull;
-}
-
-/**
- * Validate that a value is a boolean
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated boolean
- * @throws ValidationError if validation fails
- */
-export function validateBoolean(value: unknown, name = 'value'): boolean {
-  const nonNull = validateDefined(value, name);
-  
-  // Handle string booleans
-  if (typeof nonNull === 'string') {
-    if (nonNull.toLowerCase() === 'true') return true;
-    if (nonNull.toLowerCase() === 'false') return false;
-  }
-  
-  if (typeof nonNull !== 'boolean') {
-    throw ValidationError.typeError(name, 'boolean', value);
-  }
-  
-  return nonNull;
-}
-
-/**
- * Validate that a value is an object
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated object
- * @throws ValidationError if validation fails
- */
-export function validateObject(value: unknown, name = 'value'): Record<string, unknown> {
-  const nonNull = validateDefined(value, name);
-  
-  if (typeof nonNull !== 'object' || Array.isArray(nonNull) || nonNull === null) {
-    throw ValidationError.typeError(name, 'object', value);
-  }
-  
-  return nonNull as Record<string, unknown>;
-}
-
-/**
- * Validate that a value is an array
- * 
- * @param value Value to validate
- * @param itemValidator Optional validator for each item in the array
- * @param name Name of the value for error messages
- * @returns The validated array
- * @throws ValidationError if validation fails
- */
-export function validateArray<T = unknown>(
-  value: unknown, 
-  itemValidator?: (item: unknown, index: number) => T,
-  name = 'value'
-): T[] {
-  const nonNull = validateDefined(value, name);
-  
-  if (!Array.isArray(nonNull)) {
-    throw ValidationError.typeError(name, 'array', value);
-  }
-  
-  if (itemValidator) {
-    try {
-      return nonNull.map((item, index) => itemValidator(item, index));
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw new ValidationError(
-          `Invalid item in ${name} array: ${error.message}`,
-          {
-            ...error.details,
-            arrayIndex: error.details.arrayIndex ?? index,
-            path: `${name}[${error.details.arrayIndex ?? index}]${error.details.path ? '.' + error.details.path : ''}`
-          }
-        );
-      }
-      throw error;
-    }
-  }
-  
-  return nonNull as unknown[];
-}
-
-/**
- * Validate that a value is one of the allowed values
- * 
- * @param value Value to validate
- * @param allowedValues Array of allowed values
- * @param name Name of the value for error messages
- * @returns The validated value
- * @throws ValidationError if validation fails
- */
-export function validateOneOf<T>(value: unknown, allowedValues: T[], name = 'value'): T {
-  const nonNull = validateDefined(value, name);
-  
-  if (!allowedValues.includes(nonNull as T)) {
-    throw new ValidationError(
-      `${name} must be one of: ${allowedValues.join(', ')}`,
-      {
-        field: name,
-        rule: 'oneOf',
-        allowedValues,
-        actualValue: value
-      }
-    );
-  }
-  
-  return nonNull as T;
-}
-
-/**
- * Validate UUID format
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated UUID string
- * @throws ValidationError if validation fails
- */
-export function validateUuid(value: unknown, name = 'id'): string {
-  const str = validateString(value, name);
-  
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(str)) {
-    throw new ValidationError(
-      `${name} must be a valid UUID`,
-      {
-        field: name,
-        rule: 'format',
-        expectedType: 'UUID',
-        actualValue: value
-      }
-    );
-  }
-  
-  return str;
-}
-
-/**
- * Validate email format
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated email string
- * @throws ValidationError if validation fails
- */
-export function validateEmail(value: unknown, name = 'email'): string {
-  const str = validateString(value, name);
-  
-  // Simple email regex
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  if (!emailRegex.test(str)) {
-    throw new ValidationError(
-      `${name} must be a valid email address`,
-      {
-        field: name,
-        rule: 'format',
-        expectedType: 'email',
-        actualValue: value
-      }
-    );
-  }
-  
-  return str;
-}
-
-/**
- * Validate URL format
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated URL string
- * @throws ValidationError if validation fails
- */
-export function validateUrl(value: unknown, name = 'url'): string {
-  const str = validateString(value, name);
-  
-  try {
-    new URL(str);
-    return str;
-  } catch {
-    throw new ValidationError(
-      `${name} must be a valid URL`,
-      {
-        field: name,
-        rule: 'format',
-        expectedType: 'URL',
-        actualValue: value
-      }
-    );
-  }
-}
-
-/**
- * Validate date format
- * 
- * @param value Value to validate
- * @param name Name of the value for error messages
- * @returns The validated Date object
- * @throws ValidationError if validation fails
- */
-export function validateDate(value: unknown, name = 'date'): Date {
-  const nonNull = validateDefined(value, name);
-  
-  if (nonNull instanceof Date) {
-    if (isNaN(nonNull.getTime())) {
-      throw new ValidationError(
-        `${name} is an invalid Date object`,
-        {
-          field: name,
-          rule: 'format',
-          expectedType: 'Date',
-          actualValue: value
-        }
-      );
-    }
-    return nonNull;
-  }
-  
-  if (typeof nonNull === 'string' || typeof nonNull === 'number') {
-    const date = new Date(nonNull);
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-  }
-  
-  throw new ValidationError(
-    `${name} must be a valid date`,
-    {
+    throw new ValidationError({
+      message: `${name} cannot be empty`,
       field: name,
-      rule: 'format',
-      expectedType: 'Date',
-      actualValue: value
-    }
-  );
+      rule: 'minLength',
+      value
+    });
+  }
+  
+  return str;
 }
 
-/**
- * Batch validate multiple values
- * 
- * @param validators Object of validation functions
- * @returns Object with validated values
- * @throws ValidationError if any validation fails
- */
-export function validateBatch<T extends Record<string, unknown>>(
-  validators: { [K in keyof T]: (value: unknown) => T[K] }
-): T {
-  const errors: ValidationError[] = [];
-  const result = {} as T;
-  
-  for (const key in validators) {
-    try {
-      result[key] = validators[key](undefined);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        errors.push(error);
-      } else {
-        throw error;
-      }
-    }
-  }
-  
-  if (errors.length > 0) {
-    throw new ValidationError(
-      `Multiple validation errors occurred`,
-      {
-        allErrors: errors,
-        rule: 'batch'
-      }
-    );
-  }
-  
-  return result;
-}
+export default {
+  validateDefined,
+  validateString,
+  validateNumber,
+  validateBoolean,
+  validateDate,
+  validateObject,
+  validateArray,
+  validateOneOf,
+  validateEmail,
+  validateUrl,
+  validateUuid,
+  validateNonEmptyString,
+  isValidationError
+};

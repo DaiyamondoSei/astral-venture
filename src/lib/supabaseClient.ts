@@ -61,7 +61,7 @@ export const supabaseClient = supabase;
  * Calls a Supabase RPC function with safe error handling
  */
 export async function callRpcSafely<T>(
-  functionName: 'increment_points' | 'get_user_achievements' | 'get_total_points' | 'get_performance_metrics' | 'ensure_performance_metrics_table',
+  functionName: 'increment_points' | 'get_user_achievements' | 'get_total_points' | 'get_performance_metrics' | 'ensure_performance_metrics_table' | 'get_web_vitals' | 'get_performance_summary',
   params: Record<string, any> = {},
   options: { showToast?: boolean; errorMessage?: string } = {}
 ): Promise<T | null> {
@@ -199,6 +199,52 @@ export const getPerformanceMetrics = async (
     return metrics || [];
   } catch (error) {
     console.error('Error fetching performance metrics:', error);
+    return [];
+  }
+};
+
+// Function to get web vitals metrics
+export const getWebVitals = async (
+  userId: string,
+  limit = 100,
+  offset = 0
+) => {
+  try {
+    const vitals = await callRpcSafely(
+      'get_web_vitals',
+      {
+        user_id_param: userId,
+        limit_param: limit,
+        offset_param: offset
+      },
+      { showToast: false }
+    );
+    
+    return vitals || [];
+  } catch (error) {
+    console.error('Error fetching web vitals:', error);
+    return [];
+  }
+};
+
+// Function to get performance summary
+export const getPerformanceSummary = async (
+  userId: string,
+  days = 7
+) => {
+  try {
+    const summary = await callRpcSafely(
+      'get_performance_summary',
+      {
+        user_id_param: userId,
+        days_param: days
+      },
+      { showToast: false }
+    );
+    
+    return summary || [];
+  } catch (error) {
+    console.error('Error fetching performance summary:', error);
     return [];
   }
 };

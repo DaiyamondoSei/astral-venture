@@ -60,9 +60,6 @@ export interface UsePerformanceTrackingOptions {
 
 /**
  * Hook for tracking component performance
- * 
- * Provides utilities for measuring and reporting component performance metrics
- * like render times and user interactions.
  */
 export function usePerformanceTracking(
   options: UsePerformanceTrackingOptions = {}

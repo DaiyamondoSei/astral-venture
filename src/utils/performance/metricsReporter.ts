@@ -2,196 +2,261 @@
 /**
  * Performance Metrics Reporter
  * 
- * Handles reporting performance metrics to the Supabase backend.
+ * Collects and reports performance metrics to the server
  */
 
-import { PerformanceMetric } from './types';
 import { supabase } from '@/lib/supabaseClient';
-import { ensurePerformanceMetricsTable } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
+import type { 
+  ComponentMetrics, 
+  PerformanceMetric, 
+  WebVitalMetric,
+  DeviceInfo
+} from './types';
 
-// Interface for user data
-interface UserResponse {
-  id: string;
-}
-
-/**
- * Handles the reporting of performance metrics to the server
- */
 class MetricsReporter {
-  private isReporting = false;
-  private reportingEnabled = true;
-  private reportingInterval = 60000; // 1 minute
-  private reportingTimer: number | null = null;
-  private metricsQueue: PerformanceMetric[] = [];
-  private queueLimit = 50;
-  private initialized = false;
-  private user: UserResponse | null = null;
-  
+  private metrics: PerformanceMetric[] = [];
+  private webVitals: WebVitalMetric[] = [];
+  private deviceInfo: Partial<DeviceInfo> = {};
+  private bufferSize = 10;
+  private autoReportInterval = 60000; // 1 minute
+  private intervalId: number | null = null;
+  private lastReportTime = 0;
+  private reportInProgress = false;
+  private enabled = true;
+  private immediateReportThreshold = 20; // Report immediately if we have this many metrics
+
+  constructor() {
+    this.initDeviceInfo();
+    this.startAutoReporting();
+  }
+
   /**
-   * Initialize the metrics reporter
+   * Initialize device info data
    */
-  public async init(): Promise<boolean> {
-    if (this.initialized) {
-      return true;
-    }
-    
+  private initDeviceInfo() {
+    if (typeof window === 'undefined') return;
+
     try {
-      if (typeof window === 'undefined') {
-        return false;
+      // Get browser and OS information
+      const userAgent = navigator.userAgent;
+      let deviceType = 'unknown';
+      
+      if (/Mobi|Android|iPhone|iPad|iPod/i.test(userAgent)) {
+        deviceType = 'mobile';
+      } else if (/Tablet|iPad/i.test(userAgent)) {
+        deviceType = 'tablet';
+      } else {
+        deviceType = 'desktop';
       }
-      
-      // Initialize the table if it doesn't exist
-      const tableCreated = await ensurePerformanceMetricsTable();
-      
-      if (!tableCreated) {
-        console.warn('Failed to ensure performance metrics table exists');
-        return false;
-      }
-      
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      this.user = user;
-      
-      // Start reporting timer
-      this.startReportingTimer();
-      
-      this.initialized = true;
-      return true;
+
+      // Get additional device info
+      const screenWidth = window.screen.width;
+      const screenHeight = window.screen.height;
+      const connectionType = (navigator as any).connection?.effectiveType || 'unknown';
+
+      // Store device info
+      this.deviceInfo = {
+        deviceType,
+        screenResolution: `${screenWidth}x${screenHeight}`,
+        connectionType,
+        browser: this.getBrowserInfo(userAgent),
+        os: this.getOSInfo(userAgent)
+      };
     } catch (error) {
-      console.error('Error initializing metrics reporter:', error);
-      return false;
+      console.error('Error collecting device info:', error);
     }
   }
-  
+
   /**
-   * Start the reporting timer
+   * Determine browser info from user agent
    */
-  private startReportingTimer(): void {
-    if (this.reportingTimer !== null || typeof window === 'undefined') {
-      return;
-    }
+  private getBrowserInfo(userAgent: string): string {
+    if (userAgent.includes('Firefox')) return 'Firefox';
+    if (userAgent.includes('Chrome')) return 'Chrome';
+    if (userAgent.includes('Safari')) return 'Safari';
+    if (userAgent.includes('Edge')) return 'Edge';
+    if (userAgent.includes('MSIE') || userAgent.includes('Trident/')) return 'IE';
+    return 'Other';
+  }
+
+  /**
+   * Determine OS info from user agent
+   */
+  private getOSInfo(userAgent: string): string {
+    if (userAgent.includes('Windows')) return 'Windows';
+    if (userAgent.includes('Mac OS')) return 'MacOS';
+    if (userAgent.includes('Linux')) return 'Linux';
+    if (userAgent.includes('Android')) return 'Android';
+    if (userAgent.includes('iOS') || userAgent.includes('iPhone') || userAgent.includes('iPad')) return 'iOS';
+    return 'Other';
+  }
+
+  /**
+   * Start the auto-reporting interval
+   */
+  private startAutoReporting() {
+    if (typeof window === 'undefined') return;
     
-    this.reportingTimer = window.setInterval(() => {
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+    }
+
+    this.intervalId = window.setInterval(() => {
       this.reportMetrics();
-    }, this.reportingInterval);
+    }, this.autoReportInterval);
   }
-  
+
   /**
-   * Stop the reporting timer
+   * Add a component metrics record to the buffer
    */
-  private stopReportingTimer(): void {
-    if (this.reportingTimer === null || typeof window === 'undefined') {
-      return;
-    }
-    
-    window.clearInterval(this.reportingTimer);
-    this.reportingTimer = null;
-  }
-  
-  /**
-   * Queue metrics for reporting
-   */
-  public queueMetrics(metrics: PerformanceMetric | PerformanceMetric[]): void {
-    if (!this.reportingEnabled) {
-      return;
-    }
-    
-    const metricsArray = Array.isArray(metrics) ? metrics : [metrics];
-    
-    // Add user ID if available
-    const metricsWithUser = metricsArray.map(metric => ({
-      ...metric,
-      user_id: this.user?.id || null
-    }));
-    
-    // Add to queue
-    this.metricsQueue.push(...metricsWithUser);
-    
-    // Trim queue if it gets too large
-    if (this.metricsQueue.length > this.queueLimit) {
-      this.metricsQueue = this.metricsQueue.slice(-this.queueLimit);
-    }
-    
-    // Auto-report if queue is getting full
-    if (this.metricsQueue.length >= this.queueLimit / 2) {
+  public addComponentMetric(metric: ComponentMetrics): void {
+    if (!this.enabled) return;
+
+    const performanceMetric: PerformanceMetric = {
+      component_name: metric.componentName,
+      average_render_time: metric.averageRenderTime,
+      total_renders: metric.renderCount,
+      slow_renders: metric.slowRenderCount,
+      max_render_time: metric.maxRenderTime,
+      min_render_time: metric.minRenderTime === Number.MAX_SAFE_INTEGER ? 0 : metric.minRenderTime,
+      metric_type: metric.metricType || 'render',
+      context: {
+        lastRenderTime: metric.lastRenderTime,
+        recentRenders: metric.renderTimes
+      }
+    };
+
+    this.metrics.push(performanceMetric);
+
+    // Auto-report if buffer is reaching capacity
+    if (this.metrics.length >= this.immediateReportThreshold) {
       this.reportMetrics();
     }
   }
-  
+
+  /**
+   * Add a web vital metric
+   */
+  public addWebVital(vital: WebVitalMetric): void {
+    if (!this.enabled) return;
+    this.webVitals.push(vital);
+  }
+
   /**
    * Report metrics to the server
    */
   public async reportMetrics(): Promise<boolean> {
-    // Skip if already reporting or no metrics
-    if (this.isReporting || this.metricsQueue.length === 0 || !this.reportingEnabled) {
+    if (!this.enabled || this.reportInProgress || (this.metrics.length === 0 && this.webVitals.length === 0)) {
       return false;
     }
-    
+
+    // Avoid reporting too frequently
+    const now = Date.now();
+    if (now - this.lastReportTime < 5000) {
+      return false;
+    }
+
+    this.reportInProgress = true;
+    this.lastReportTime = now;
+
     try {
-      this.isReporting = true;
+      // Prepare payload
+      const metricsToSend = [...this.metrics];
+      const webVitalsToSend = [...this.webVitals];
       
-      // Make sure table exists
-      if (!this.initialized) {
-        await this.init();
+      // Clear buffers
+      this.metrics = [];
+      this.webVitals = [];
+
+      // Only send if we have data
+      if (metricsToSend.length === 0 && webVitalsToSend.length === 0) {
+        this.reportInProgress = false;
+        return true;
       }
-      
-      // Get metrics to report
-      const metricsToReport = [...this.metricsQueue];
-      this.metricsQueue = [];
-      
-      // Insert metrics
-      const { error } = await supabase
-        .from('performance_metrics')
-        .insert(metricsToReport);
-      
+
+      // Send metrics to server
+      const { data, error } = await supabase.functions.invoke('performance-metrics', {
+        body: {
+          metrics: metricsToSend,
+          webVitals: webVitalsToSend,
+          deviceInfo: this.deviceInfo
+        }
+      });
+
+      // Handle errors
       if (error) {
         console.error('Error reporting metrics:', error);
         
-        // Put metrics back in queue to try again later
-        this.metricsQueue = [...metricsToReport, ...this.metricsQueue].slice(0, this.queueLimit);
+        // Put metrics back in the buffer for next attempt
+        this.metrics = [...metricsToSend, ...this.metrics];
+        this.webVitals = [...webVitalsToSend, ...this.webVitals];
         
+        // Trim if over capacity
+        if (this.metrics.length > this.bufferSize * 2) {
+          this.metrics = this.metrics.slice(-this.bufferSize);
+        }
+        
+        this.reportInProgress = false;
         return false;
       }
-      
+
+      // Success
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Metrics reported successfully:', {
+          metricsCount: metricsToSend.length,
+          webVitalsCount: webVitalsToSend.length
+        });
+      }
+
+      this.reportInProgress = false;
       return true;
     } catch (error) {
-      console.error('Error reporting metrics:', error);
+      console.error('Unexpected error reporting metrics:', error);
+      
+      // Put metrics back in the buffer
+      this.metrics = [...this.metrics];
+      
+      this.reportInProgress = false;
       return false;
-    } finally {
-      this.isReporting = false;
     }
   }
-  
+
   /**
-   * Enable or disable reporting
+   * Enable or disable metrics reporting
    */
-  public setReportingEnabled(enabled: boolean): void {
-    this.reportingEnabled = enabled;
+  public setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
     
-    if (enabled) {
-      this.startReportingTimer();
-    } else {
-      this.stopReportingTimer();
+    // If enabling, restart auto-reporting
+    if (enabled && this.intervalId === null) {
+      this.startAutoReporting();
+    }
+    
+    // If disabling, stop auto-reporting
+    if (!enabled && this.intervalId !== null && typeof window !== 'undefined') {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
     }
   }
-  
+
   /**
-   * Dispose of the reporter
+   * Clean up when done
    */
   public dispose(): void {
-    this.stopReportingTimer();
+    if (this.intervalId !== null && typeof window !== 'undefined') {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
     
     // Report any remaining metrics
-    if (this.metricsQueue.length > 0) {
-      this.reportMetrics().catch(error => {
-        console.error('Error reporting metrics during disposal:', error);
-      });
-    }
+    this.reportMetrics().catch(error => {
+      console.error('Error reporting metrics during disposal:', error);
+    });
   }
 }
 
 // Create singleton instance
 const metricsReporter = new MetricsReporter();
 
-// Export singleton
 export default metricsReporter;
