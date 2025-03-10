@@ -1,341 +1,258 @@
 
-import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { markStart, markEnd } from '@/utils/webVitalsMonitor';
+import React, { createContext, useEffect, useState, useCallback } from 'react';
 
-// Define the configuration options
-export type PerformanceMonitoringLevel = 'high' | 'medium' | 'low' | 'debug';
+// Define device capability levels
+export type DeviceCapability = 'low' | 'medium' | 'high';
 
-export interface PerfConfigContextType {
-  monitoringLevel: PerformanceMonitoringLevel;
-  setMonitoringLevel: (level: PerformanceMonitoringLevel) => void;
-  autoOptimize: boolean;
-  setAutoOptimize: (enable: boolean) => void;
-  trackInteractions: boolean;
-  setTrackInteractions: (enable: boolean) => void;
-  reportToServer: boolean;
-  setReportToServer: (enable: boolean) => void;
-  debugMode: boolean;
-  setDebugMode: (enable: boolean) => void;
-  lastReport: number;
-  clearData: () => void;
+// Define logging levels
+export type LoggingLevel = 'debug' | 'balanced' | 'minimal' | 'comprehensive';
+
+// Define performance configuration interface
+export interface PerfConfig {
+  // Feature flags
+  enableHighPerformanceMode: boolean;
+  enableAdaptiveRendering: boolean;
+  enableMetricsCollection: boolean;
   
-  // Essential config properties used by components
-  webVitals: Record<string, number>;
-  deviceCapability: 'high' | 'medium' | 'low';
-  features: {
-    animations: boolean;
-    particleEffects: boolean;
-    backgroundEffects: boolean;
-    highQualityRendering: boolean;
-  };
-  manualPerformanceMode: 'auto' | 'high' | 'balanced' | 'low';
-  setManualPerformanceMode: (mode: 'auto' | 'high' | 'balanced' | 'low') => void;
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
+  // Rendering flags
+  animations: boolean;
+  particleEffects: boolean;
+  backgroundEffects: boolean;
+  highQualityRendering: boolean;
   
-  // Feature flags for tracking
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
+  // Device classification
+  deviceCapability: DeviceCapability;
   
-  // Update functions
-  updateConfig: (updates: Partial<ConfigState>) => void;
-  applyPreset: (preset: 'minimal' | 'balanced' | 'comprehensive' | 'debug') => void;
+  // Monitoring settings
+  monitorMemory: boolean;
+  monitorFramerate: boolean;
+  
+  // Logging configuration
+  loggingLevel: LoggingLevel;
 }
 
-// Internal config state
-interface ConfigState {
-  monitoringLevel: PerformanceMonitoringLevel;
-  autoOptimize: boolean;
-  trackInteractions: boolean;
-  reportToServer: boolean;
-  debugMode: boolean;
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  deviceCapability: 'high' | 'medium' | 'low';
-  manualPerformanceMode: 'auto' | 'high' | 'balanced' | 'low';
-  features: {
-    animations: boolean;
-    particleEffects: boolean;
-    backgroundEffects: boolean;
-    highQualityRendering: boolean;
-  };
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  webVitals: Record<string, number>;
+// Default configuration for different device capabilities
+const defaultConfigs: Record<DeviceCapability, PerfConfig> = {
+  low: {
+    enableHighPerformanceMode: false,
+    enableAdaptiveRendering: true,
+    enableMetricsCollection: true,
+    animations: false,
+    particleEffects: false,
+    backgroundEffects: false,
+    highQualityRendering: false,
+    deviceCapability: 'low',
+    monitorMemory: true,
+    monitorFramerate: true,
+    loggingLevel: 'minimal'
+  },
+  medium: {
+    enableHighPerformanceMode: false,
+    enableAdaptiveRendering: true,
+    enableMetricsCollection: true,
+    animations: true,
+    particleEffects: true,
+    backgroundEffects: false,
+    highQualityRendering: false,
+    deviceCapability: 'medium',
+    monitorMemory: true,
+    monitorFramerate: true,
+    loggingLevel: 'balanced'
+  },
+  high: {
+    enableHighPerformanceMode: true,
+    enableAdaptiveRendering: false,
+    enableMetricsCollection: true,
+    animations: true,
+    particleEffects: true,
+    backgroundEffects: true,
+    highQualityRendering: true,
+    deviceCapability: 'high',
+    monitorMemory: true,
+    monitorFramerate: true,
+    loggingLevel: 'comprehensive'
+  }
+};
+
+// Performance metrics collection functions
+export interface PerformanceMetricsCollector {
+  addComponentMetric: (
+    componentName: string, 
+    renderTime: number, 
+    type?: 'render' | 'load' | 'interaction'
+  ) => void;
+  addWebVital: (
+    name: string, 
+    value: number, 
+    category: 'loading' | 'interaction' | 'visual_stability'
+  ) => void;
+  reportNow: () => Promise<boolean>;
+}
+
+// Context type definition
+export interface PerfConfigContextType {
+  config: PerfConfig;
+  updateConfig: (partial: Partial<PerfConfig>) => void;
+  setDeviceCapability: (capability: DeviceCapability) => void;
+  resetToDefault: () => void;
+  metricsCollector: PerformanceMetricsCollector;
 }
 
 // Create the context with a default value
-const PerfConfigContext = createContext<PerfConfigContextType | null>(null);
-
-// Detect device capability
-function detectDeviceCapability(): 'high' | 'medium' | 'low' {
-  // Simple detection based on memory and cores
-  try {
-    const memory = (navigator as any).deviceMemory || 4;
-    const cores = navigator.hardwareConcurrency || 4;
-    
-    if (memory >= 6 && cores >= 8) return 'high';
-    if (memory >= 4 && cores >= 4) return 'medium';
-    return 'low';
-  } catch (e) {
-    return 'medium'; // Fallback
+export const PerfConfigContext = createContext<PerfConfigContextType>({
+  config: defaultConfigs.medium,
+  updateConfig: () => {},
+  setDeviceCapability: () => {},
+  resetToDefault: () => {},
+  metricsCollector: {
+    addComponentMetric: () => {},
+    addWebVital: () => {},
+    reportNow: async () => false
   }
-}
+});
 
 // Provider component
-export const PerfConfigProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [config, setConfig] = useState<ConfigState>({
-    monitoringLevel: 'medium',
-    autoOptimize: false,
-    trackInteractions: true,
-    reportToServer: false,
-    debugMode: false,
-    samplingRate: 50,
-    throttleInterval: 2000,
-    maxTrackedComponents: 50,
-    deviceCapability: detectDeviceCapability(),
-    manualPerformanceMode: 'auto',
-    features: {
-      animations: true,
-      particleEffects: true,
-      backgroundEffects: true,
-      highQualityRendering: true
-    },
-    enablePerformanceTracking: true,
-    enableRenderTracking: true,
-    enableValidation: false,
-    enablePropTracking: false,
-    enableDebugLogging: false,
-    intelligentProfiling: false,
-    inactiveTabThrottling: true,
-    batchUpdates: true,
-    webVitals: {}
-  });
+export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Initialize with medium settings by default until we detect device capabilities
+  const [config, setConfig] = useState<PerfConfig>(defaultConfigs.medium);
   
-  const [lastReport, setLastReport] = useState(0);
-  
-  // Load saved configuration from localStorage on component mount
-  useEffect(() => {
+  // Function to detect device capabilities
+  const detectDeviceCapability = useCallback((): DeviceCapability => {
     try {
-      markStart('loadPerfConfig');
-      const savedConfig = localStorage.getItem('perfConfig');
-      if (savedConfig) {
-        const parsedConfig = JSON.parse(savedConfig);
-        setConfig(prev => ({
-          ...prev,
-          monitoringLevel: parsedConfig.monitoringLevel || prev.monitoringLevel,
-          autoOptimize: parsedConfig.autoOptimize ?? prev.autoOptimize,
-          trackInteractions: parsedConfig.trackInteractions ?? prev.trackInteractions,
-          reportToServer: parsedConfig.reportToServer ?? prev.reportToServer,
-          debugMode: parsedConfig.debugMode ?? prev.debugMode,
-          manualPerformanceMode: parsedConfig.manualPerformanceMode || prev.manualPerformanceMode
-        }));
+      // Access navigator properties safely
+      const nav = navigator as any;
+      
+      // Low-end device detection
+      if (
+        // Memory constraints (less than 4GB)
+        (nav.deviceMemory && nav.deviceMemory < 4) ||
+        // CPU constraints (less than 4 cores)
+        (nav.hardwareConcurrency && nav.hardwareConcurrency < 4) ||
+        // Connection constraints (slow connection)
+        (nav.connection && 
+          ['slow-2g', '2g', '3g'].includes(nav.connection.effectiveType))
+      ) {
+        return 'low';
       }
-      markEnd('loadPerfConfig');
+      
+      // High-end device detection
+      if (
+        // Good memory (8GB+)
+        (nav.deviceMemory && nav.deviceMemory >= 8) &&
+        // Good CPU (8+ cores)
+        (nav.hardwareConcurrency && nav.hardwareConcurrency >= 8) &&
+        // Good connection
+        (!nav.connection || 
+          ['4g', 'wifi'].includes(nav.connection.effectiveType))
+      ) {
+        return 'high';
+      }
+      
+      // Default to medium for anything else
+      return 'medium';
     } catch (error) {
-      console.error('Error loading performance configuration:', error);
+      console.warn('Error detecting device capability:', error);
+      return 'medium'; // Default to medium on error
     }
   }, []);
   
-  // Save configuration to localStorage when it changes
-  useEffect(() => {
-    try {
-      const configToSave = {
-        monitoringLevel: config.monitoringLevel,
-        autoOptimize: config.autoOptimize,
-        trackInteractions: config.trackInteractions,
-        reportToServer: config.reportToServer,
-        debugMode: config.debugMode,
-        manualPerformanceMode: config.manualPerformanceMode
-      };
-      localStorage.setItem('perfConfig', JSON.stringify(configToSave));
-    } catch (error) {
-      console.error('Error saving performance configuration:', error);
-    }
-  }, [config.monitoringLevel, config.autoOptimize, config.trackInteractions, 
-      config.reportToServer, config.debugMode, config.manualPerformanceMode]);
-  
-  // Function to clear collected data
-  const clearData = useCallback(() => {
-    setLastReport(Date.now());
-    // Additional data clearing logic would go here
-  }, []);
-  
-  // Update config function
-  const updateConfig = useCallback((updates: Partial<ConfigState>) => {
+  // Update the config with partial changes
+  const updateConfig = useCallback((partialConfig: Partial<PerfConfig>) => {
     setConfig(prevConfig => ({
       ...prevConfig,
-      ...updates
+      ...partialConfig
     }));
   }, []);
   
-  // Apply preset configurations
-  const applyPreset = useCallback((preset: 'minimal' | 'balanced' | 'comprehensive' | 'debug') => {
-    switch (preset) {
-      case 'minimal':
-        updateConfig({
-          monitoringLevel: 'low',
-          samplingRate: 10,
-          enableRenderTracking: false,
-          enableValidation: false,
-          enablePropTracking: false,
-          enableDebugLogging: false,
-          throttleInterval: 5000
-        });
-        break;
-      case 'balanced':
-        updateConfig({
-          monitoringLevel: 'medium',
-          samplingRate: 50,
-          enableRenderTracking: true,
-          enableValidation: false,
-          enablePropTracking: false,
-          enableDebugLogging: false,
-          throttleInterval: 2000
-        });
-        break;
-      case 'comprehensive':
-        updateConfig({
-          monitoringLevel: 'high',
-          samplingRate: 100,
-          enableRenderTracking: true,
-          enableValidation: true,
-          enablePropTracking: true,
-          enableDebugLogging: false,
-          throttleInterval: 1000
-        });
-        break;
-      case 'debug':
-        updateConfig({
-          monitoringLevel: 'debug',
-          samplingRate: 100,
-          enableRenderTracking: true,
-          enableValidation: true,
-          enablePropTracking: true,
-          enableDebugLogging: true,
-          throttleInterval: 500
-        });
-        break;
-    }
-  }, [updateConfig]);
+  // Set the device capability and update config accordingly
+  const setDeviceCapability = useCallback((capability: DeviceCapability) => {
+    setConfig(defaultConfigs[capability]);
+  }, []);
   
-  // Function to update feature capabilities based on performance mode
-  useEffect(() => {
-    if (config.manualPerformanceMode === 'auto') {
-      // Auto mode uses device capability
-      const deviceFeatures = {
-        high: {
-          animations: true,
-          particleEffects: true,
-          backgroundEffects: true,
-          highQualityRendering: true
-        },
-        medium: {
-          animations: true,
-          particleEffects: true,
-          backgroundEffects: true,
-          highQualityRendering: false
-        },
-        low: {
-          animations: true,
-          particleEffects: false,
-          backgroundEffects: false,
-          highQualityRendering: false
-        }
-      };
-      
-      updateConfig({ 
-        features: deviceFeatures[config.deviceCapability] 
-      });
-    } else {
-      // Manual mode overrides
-      const manualFeatures = {
-        high: {
-          animations: true,
-          particleEffects: true,
-          backgroundEffects: true,
-          highQualityRendering: true
-        },
-        balanced: {
-          animations: true,
-          particleEffects: true,
-          backgroundEffects: true,
-          highQualityRendering: false
-        },
-        low: {
-          animations: true,
-          particleEffects: false,
-          backgroundEffects: false,
-          highQualityRendering: false
-        }
-      };
-      
-      if (config.manualPerformanceMode !== 'auto') {
-        updateConfig({ 
-          features: manualFeatures[config.manualPerformanceMode] 
+  // Reset to default based on device capability
+  const resetToDefault = useCallback(() => {
+    const capability = detectDeviceCapability();
+    setConfig(defaultConfigs[capability]);
+  }, [detectDeviceCapability]);
+  
+  // Initialize performance metrics collector
+  const metricsCollector: PerformanceMetricsCollector = {
+    addComponentMetric: (componentName, renderTime, type = 'render') => {
+      try {
+        // Import dynamically to avoid SSR issues
+        import('../utils/webVitalsMonitor').then(({ trackComponentRender }) => {
+          trackComponentRender(
+            componentName, 
+            renderTime, 
+            type === 'load' ? 'initial' : (type === 'interaction' ? 'effect' : 'update')
+          );
         });
+      } catch (error) {
+        console.error('Error recording component metric:', error);
+      }
+    },
+    
+    addWebVital: (name, value, category) => {
+      try {
+        // Import dynamically to avoid SSR issues
+        import('../utils/webVitalsMonitor').then(({ trackWebVital }) => {
+          trackWebVital(name, value, category);
+        });
+      } catch (error) {
+        console.error('Error recording web vital:', error);
+      }
+    },
+    
+    reportNow: async () => {
+      try {
+        const { reportMetricsToServer } = await import('../utils/webVitalsMonitor');
+        return await reportMetricsToServer();
+      } catch (error) {
+        console.error('Error reporting metrics:', error);
+        return false;
       }
     }
-  }, [config.deviceCapability, config.manualPerformanceMode, updateConfig]);
+  };
+  
+  // Detect device capability on mount
+  useEffect(() => {
+    // Start with medium settings
+    let initialCapability: DeviceCapability = 'medium';
+    
+    try {
+      // Try to detect device capability
+      initialCapability = detectDeviceCapability();
+      
+      // Override with URL parameters if present (for testing)
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceCapability = urlParams.get('deviceCap') as DeviceCapability | null;
+      
+      if (forceCapability && ['low', 'medium', 'high'].includes(forceCapability)) {
+        initialCapability = forceCapability as DeviceCapability;
+        console.log(`Forced device capability via URL: ${forceCapability}`);
+      }
+    } catch (error) {
+      console.warn('Error during initial capability detection:', error);
+    }
+    
+    // Set initial configuration based on detected capability
+    setConfig(defaultConfigs[initialCapability]);
+    
+    // Log the detected capability
+    console.log(`Detected device capability: ${initialCapability}`);
+  }, [detectDeviceCapability]);
   
   // Create context value
-  const value: PerfConfigContextType = {
-    monitoringLevel: config.monitoringLevel,
-    setMonitoringLevel: (level) => updateConfig({ monitoringLevel: level }),
-    autoOptimize: config.autoOptimize,
-    setAutoOptimize: (enable) => updateConfig({ autoOptimize: enable }),
-    trackInteractions: config.trackInteractions,
-    setTrackInteractions: (enable) => updateConfig({ trackInteractions: enable }),
-    reportToServer: config.reportToServer,
-    setReportToServer: (enable) => updateConfig({ reportToServer: enable }),
-    debugMode: config.debugMode,
-    setDebugMode: (enable) => updateConfig({ debugMode: enable }),
-    lastReport,
-    clearData,
-    
-    // Additional properties
-    deviceCapability: config.deviceCapability,
-    manualPerformanceMode: config.manualPerformanceMode,
-    setManualPerformanceMode: (mode) => updateConfig({ manualPerformanceMode: mode }),
-    features: config.features,
-    webVitals: config.webVitals,
-    
-    // Configuration options
-    samplingRate: config.samplingRate, 
-    throttleInterval: config.throttleInterval,
-    maxTrackedComponents: config.maxTrackedComponents,
-    
-    // Feature flags
-    enablePerformanceTracking: config.enablePerformanceTracking,
-    enableRenderTracking: config.enableRenderTracking,
-    enableValidation: config.enableValidation,
-    enablePropTracking: config.enablePropTracking,
-    enableDebugLogging: config.enableDebugLogging,
-    intelligentProfiling: config.intelligentProfiling,
-    inactiveTabThrottling: config.inactiveTabThrottling,
-    batchUpdates: config.batchUpdates,
-    
-    // Update methods
+  const contextValue: PerfConfigContextType = {
+    config,
     updateConfig,
-    applyPreset
+    setDeviceCapability,
+    resetToDefault,
+    metricsCollector
   };
   
   return (
-    <PerfConfigContext.Provider value={value}>
+    <PerfConfigContext.Provider value={contextValue}>
       {children}
     </PerfConfigContext.Provider>
   );

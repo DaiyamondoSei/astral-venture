@@ -34,6 +34,72 @@ const sessionId = generateSessionId();
 const deviceInfo = getDeviceInfo();
 
 /**
+ * Initialize web vitals monitoring
+ * Sets up reporting intervals and listeners for web vitals
+ */
+export function initWebVitals(): void {
+  try {
+    // Set up regular reporting interval
+    const reportingInterval = setInterval(() => {
+      if (webVitalsMetrics.length > 0 || Object.keys(componentMetrics).length > 0) {
+        reportMetricsToServer().catch(err => {
+          console.error('Failed to report metrics:', err);
+        });
+      }
+    }, 60000); // Report every minute
+
+    // Clean up function to clear the interval when needed
+    const cleanup = () => {
+      clearInterval(reportingInterval);
+    };
+    
+    // Setup listeners for browser visibility changes
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          // Report metrics when page is being hidden/unloaded
+          reportMetricsToServer().catch(err => {
+            console.error('Failed to report metrics on page hide:', err);
+          });
+        }
+      });
+    }
+    
+    // Setup core web vitals tracking if available
+    if (typeof window !== 'undefined') {
+      import('web-vitals').then(webVitals => {
+        webVitals.onCLS(metric => {
+          trackWebVital('CLS', metric.value, 'visual_stability');
+        });
+        
+        webVitals.onFID(metric => {
+          trackWebVital('FID', metric.value, 'interaction');
+        });
+        
+        webVitals.onLCP(metric => {
+          trackWebVital('LCP', metric.value, 'loading');
+        });
+        
+        webVitals.onTTFB(metric => {
+          trackWebVital('TTFB', metric.value, 'loading');
+        });
+        
+        webVitals.onFCP(metric => {
+          trackWebVital('FCP', metric.value, 'loading');
+        });
+      }).catch(err => {
+        console.error('Failed to load web-vitals:', err);
+      });
+    }
+    
+    return cleanup;
+  } catch (error) {
+    console.error('Error initializing web vitals:', error);
+    return () => {};
+  }
+}
+
+/**
  * Create a performance mark start point
  * @param markName Unique identifier for the performance mark
  */
@@ -276,7 +342,8 @@ export const webVitalsMonitor = {
   trackWebVital,
   getAllMetrics,
   clearMetrics,
-  reportMetricsToServer
+  reportMetricsToServer,
+  initWebVitals
 };
 
 export default webVitalsMonitor;
