@@ -2,60 +2,105 @@
 /**
  * Handler for processing AI responses
  */
-
-import { createSuccessResponse } from "../../shared/responseUtils.ts";
-import { extractKeyInsights, extractSuggestedPractices } from "../services/insightExtractor.ts";
-import { AIModel } from "../services/openai/types.ts";
+import { corsHeaders, createSuccessResponse, createErrorResponse, logEvent } from "../../shared/responseUtils.ts";
+import { extractInsights } from "../services/insightExtractor.ts";
+import { cacheResponse } from "./cacheHandler.ts";
+import { createCacheKey } from "../../shared/cacheUtils.ts";
 
 /**
- * Process an AI response and prepare a structured response
+ * Process an AI response
  * 
- * @param aiResponse The raw AI response text
- * @param reflectionId Optional reflection ID if this was a reflection analysis
- * @param startTime The start time of the request for timing metrics
- * @param model The AI model used
- * @param totalTokens The total tokens used
- * @returns Structured response with insights and metrics
+ * @param content The response content from OpenAI
+ * @param startTime Performance timing start
+ * @param model The model used for the request
+ * @param totalTokens The total tokens used for the request
+ * @returns Response object with processed data
  */
 export async function processAIResponse(
-  aiResponse: string, 
-  reflectionId: string | undefined, 
-  startTime: number, 
-  model: AIModel,
+  content: string,
+  startTime: number,
+  model: string,
   totalTokens: number
 ): Promise<Response> {
-  // Extract insights from the response
-  const insights = extractKeyInsights(aiResponse);
-  
-  // Process suggested practices from the response
-  const suggestedPractices = extractSuggestedPractices(aiResponse);
-  
-  // Calculate processing time
-  const processingTime = Date.now() - startTime;
-  
-  // Create related insights array
-  // In a production app, this might come from a recommendation engine
-  const relatedInsights = [];
-  
-  // Return success response
-  return createSuccessResponse(
-    {
-      answer: aiResponse,
+  try {
+    // Calculate processing time
+    const processingTime = Date.now() - startTime;
+    
+    // Extract insights using the insight extractor
+    const insights = extractInsights(content);
+    
+    // Build the response data
+    const responseData = {
+      response: content,
       insights,
-      reflectionId,
-      suggestedPractices,
-      relatedInsights,
-      meta: {
-        model: model,
+      metrics: {
+        processingTime,
         tokenUsage: totalTokens,
-        processingTime
+        model
       }
-    },
-    {
-      processingTime,
-      tokenUsage: totalTokens,
-      model: model,
-      version: "1.2.0"
+    };
+    
+    // Return formatted response
+    return createSuccessResponse(responseData);
+  } catch (error) {
+    logEvent("error", "Error processing AI response", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    return createErrorResponse(
+      "processing_error",
+      "Failed to process AI response",
+      { details: error instanceof Error ? error.message : String(error) }
+    );
+  }
+}
+
+/**
+ * Create a cached response
+ * 
+ * @param query The original query
+ * @param response The response to cache
+ * @param model The model used for the request
+ * @param context Optional context information
+ * @returns The cache key used
+ */
+export async function createCachedResponse(
+  query: string,
+  response: any,
+  model: string,
+  context?: string | null
+): Promise<string> {
+  try {
+    // Generate cache key
+    const cacheKey = createCacheKey(query, context, model);
+    
+    // Store in cache
+    await cacheResponse(cacheKey, response.clone(), false);
+    
+    return cacheKey;
+  } catch (error) {
+    logEvent("error", "Error creating cached response", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // Return empty key on error
+    return "";
+  }
+}
+
+/**
+ * Format streaming response for streaming endpoint
+ * 
+ * @param streamResponse The streaming response from OpenAI
+ * @returns Formatted response object for streaming
+ */
+export function formatStreamingResponse(
+  streamResponse: ReadableStream<Uint8Array>
+): Response {
+  return new Response(streamResponse, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream"
     }
-  );
+  });
 }

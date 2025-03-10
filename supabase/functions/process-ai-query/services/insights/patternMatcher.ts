@@ -1,195 +1,241 @@
 
 /**
- * Comprehensive pattern matching service for insight extraction
- * Combines multiple extraction approaches for better results
+ * Extract insights from AI responses using pattern matching
  */
 
-// Insight type definition
 export interface Insight {
-  type: string;       // The category of insight (emotional, chakra, practice, etc.)
-  content: string;    // The actual content of the insight
-  relevance?: number; // Optional relevance score (0-10)
+  type: 'practice' | 'reflection' | 'chakra' | 'emotional' | 'wisdom';
+  content: string;
+  category?: string;
+  score?: number;
+  relatedChakras?: number[];
 }
 
 /**
- * Extract list items from text as insights
- * @param text The text to analyze
- * @returns Array of extracted insights from lists
+ * Extract insights from AI response text
  */
-export function extractListItems(text: string): Insight[] {
-  if (!text) return [];
-  
+export function extractInsights(text: string): Insight[] {
   const insights: Insight[] = [];
   
-  // Look for bullet points and numbered lists
-  const listItemRegex = /(?:^|\n)[-*•]|\d+\.\s+(.+?)(?=$|\n)/g;
-  let match;
+  // Pattern 1: Bulleted lists with insights
+  extractBulletedInsights(text, insights);
   
-  while ((match = listItemRegex.exec(text)) !== null) {
-    const content = match[1] || match[0].replace(/^[-*•]|\d+\.\s+/, '').trim();
-    if (content.length > 5) { // Minimum content length
+  // Pattern 2: Numbered lists with insights
+  extractNumberedInsights(text, insights);
+  
+  // Pattern 3: Paragraph-based insights with strong indicators
+  extractParagraphInsights(text, insights);
+  
+  // Pattern 4: Chakra-specific insights
+  extractChakraInsights(text, insights);
+  
+  // Pattern 5: Emotional insights
+  extractEmotionalInsights(text, insights);
+  
+  // Sort by relevance (longer insights are typically more detailed/relevant)
+  return insights.sort((a, b) => b.content.length - a.content.length);
+}
+
+/**
+ * Extract insights from bulleted lists
+ */
+function extractBulletedInsights(text: string, insights: Insight[]): void {
+  // Match bulleted lists (*, -, •)
+  const bulletPattern = /(?:^|\n)\s*[•\-*]\s+(.*?)(?=\n\s*[•\-*]|\n\n|$)/g;
+  let match: RegExpExecArray | null;
+  
+  while ((match = bulletPattern.exec(text)) !== null) {
+    const content = match[1].trim();
+    if (content.length > 10) { // Filter out very short items
+      const type = categorizeInsight(content);
       insights.push({
-        type: 'list-item',
-        content: content.trim()
+        type,
+        content,
+        category: determineCategory(content, type)
       });
     }
   }
-  
-  return insights;
 }
 
 /**
- * Identify insights by looking for key phrases and patterns
- * @param text The text to analyze
- * @returns Array of extracted insights by keywords
+ * Extract insights from numbered lists
  */
-export function identifyInsightsByKeywords(text: string): Insight[] {
-  if (!text) return [];
+function extractNumberedInsights(text: string, insights: Insight[]): void {
+  // Match numbered lists (1., 2., etc.)
+  const numberedPattern = /(?:^|\n)\s*\d+\.\s+(.*?)(?=\n\s*\d+\.|\n\n|$)/g;
+  let match: RegExpExecArray | null;
   
-  const insights: Insight[] = [];
+  while ((match = numberedPattern.exec(text)) !== null) {
+    const content = match[1].trim();
+    if (content.length > 10) { // Filter out very short items
+      const type = categorizeInsight(content);
+      insights.push({
+        type,
+        content,
+        category: determineCategory(content, type)
+      });
+    }
+  }
+}
+
+/**
+ * Extract insights from paragraphs with strong indicators
+ */
+function extractParagraphInsights(text: string, insights: Insight[]): void {
+  // Split into paragraphs
   const paragraphs = text.split(/\n\n+/);
   
-  // Keywords that indicate different types of insights
-  const keywordPatterns = [
-    { pattern: /chakra|energy center|root|sacral|solar plexus|heart|throat|third eye|crown/i, type: 'chakra' },
-    { pattern: /emotion|feel|feeling|emotional|mood|anxiety|stress|joy|happiness|sadness/i, type: 'emotional' },
-    { pattern: /meditat|breath|mindful|practice|technique|exercise|routine/i, type: 'practice' },
-    { pattern: /reflect|insight|realiz|understand|awareness|conscious/i, type: 'awareness' },
-    { pattern: /recommend|suggest|try|consider|might help|could benefit/i, type: 'recommendation' }
+  // Insight indicator patterns
+  const insightPatterns = [
+    /\b(?:consider|try|practice|recommended|suggestion|insight|advice|reflect on|focus on|remember)\b/i,
+    /\b(?:important|key|essential|vital|critical|fundamental)\b.*\b(?:aspect|element|component|part|factor)\b/i,
+    /\b(?:beneficial|helpful|useful|effective|valuable)\b.*\b(?:practice|technique|approach|method|strategy)\b/i
   ];
   
-  // Examine each paragraph for insights
-  paragraphs.forEach(paragraph => {
-    const trimmedParagraph = paragraph.trim();
-    if (trimmedParagraph.length < 15) return; // Skip very short paragraphs
+  for (const paragraph of paragraphs) {
+    const content = paragraph.trim();
     
-    // Determine the type based on keywords
-    for (const { pattern, type } of keywordPatterns) {
-      if (pattern.test(trimmedParagraph)) {
-        insights.push({
-          type,
-          content: trimmedParagraph,
-          relevance: calculateRelevance(trimmedParagraph, type)
-        });
-        break; // Assign only one type per paragraph
-      }
+    // Skip short paragraphs
+    if (content.length < 40 || content.length > 200) continue;
+    
+    // Check if paragraph matches any insight patterns
+    const matchesPattern = insightPatterns.some(pattern => pattern.test(content));
+    if (matchesPattern) {
+      const type = categorizeInsight(content);
+      insights.push({
+        type,
+        content,
+        category: determineCategory(content, type)
+      });
     }
-  });
-  
-  return insights;
+  }
 }
 
 /**
- * Calculate relevance score for an insight based on content and type
- * @param content The insight content
- * @param type The insight type
- * @returns Relevance score (0-10)
+ * Extract chakra-specific insights
  */
-function calculateRelevance(content: string, type: string): number {
-  // Base relevance
-  let relevance = 5;
+function extractChakraInsights(text: string, insights: Insight[]): void {
+  // Chakra keywords
+  const chakraKeywords = [
+    { name: 'root', number: 1, keywords: ['root chakra', 'muladhara', 'first chakra', 'base chakra', 'safety', 'security', 'grounding', 'survival'] },
+    { name: 'sacral', number: 2, keywords: ['sacral chakra', 'svadhisthana', 'second chakra', 'creativity', 'passion', 'pleasure', 'emotions'] },
+    { name: 'solar plexus', number: 3, keywords: ['solar plexus', 'manipura', 'third chakra', 'power', 'confidence', 'self-esteem', 'willpower'] },
+    { name: 'heart', number: 4, keywords: ['heart chakra', 'anahata', 'fourth chakra', 'love', 'compassion', 'harmony', 'peace'] },
+    { name: 'throat', number: 5, keywords: ['throat chakra', 'vishuddha', 'fifth chakra', 'communication', 'expression', 'truth', 'voice'] },
+    { name: 'third eye', number: 6, keywords: ['third eye', 'ajna', 'sixth chakra', 'intuition', 'insight', 'vision', 'perception'] },
+    { name: 'crown', number: 7, keywords: ['crown chakra', 'sahasrara', 'seventh chakra', 'consciousness', 'awareness', 'enlightenment', 'spirituality'] }
+  ];
   
-  // Adjust based on content length (longer content may be more detailed)
-  if (content.length > 100) relevance += 1;
-  if (content.length > 200) relevance += 1;
+  // Extract sentences with chakra keywords
+  for (const chakra of chakraKeywords) {
+    const chakraPattern = new RegExp(`[^.!?]*(?:${chakra.keywords.join('|')})[^.!?]*[.!?]`, 'gi');
+    let match: RegExpExecArray | null;
+    
+    while ((match = chakraPattern.exec(text)) !== null) {
+      const content = match[0].trim();
+      if (content.length > 20) { // Filter out very short sentences
+        insights.push({
+          type: 'chakra',
+          content,
+          category: chakra.name,
+          relatedChakras: [chakra.number]
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Extract emotional insights
+ */
+function extractEmotionalInsights(text: string, insights: Insight[]): void {
+  // Emotional keywords
+  const emotionalKeywords = [
+    { category: 'anxiety', keywords: ['anxiety', 'anxious', 'worry', 'stress', 'fear', 'panic', 'tension'] },
+    { category: 'happiness', keywords: ['happiness', 'joy', 'delight', 'pleasure', 'contentment', 'bliss', 'satisfaction'] },
+    { category: 'sadness', keywords: ['sadness', 'grief', 'sorrow', 'melancholy', 'depression', 'despair', 'unhappiness'] },
+    { category: 'anger', keywords: ['anger', 'frustration', 'irritation', 'rage', 'resentment', 'hostility', 'annoyance'] },
+    { category: 'peace', keywords: ['peace', 'calm', 'tranquility', 'serenity', 'harmony', 'stillness', 'relaxation'] }
+  ];
   
-  // Adjust based on specific keywords presence
-  const strongIndicators = {
-    chakra: ['balance', 'blockage', 'alignment', 'energy flow', 'activation'],
-    emotional: ['pattern', 'trigger', 'response', 'regulation', 'healing'],
-    practice: ['daily', 'regular', 'consistent', 'technique', 'method'],
-    awareness: ['insight', 'realization', 'understanding', 'perspective', 'clarity'],
-    recommendation: ['specific', 'personalized', 'tailored', 'effective', 'proven']
+  // Extract sentences with emotional keywords
+  for (const emotion of emotionalKeywords) {
+    const emotionPattern = new RegExp(`[^.!?]*(?:${emotion.keywords.join('|')})[^.!?]*[.!?]`, 'gi');
+    let match: RegExpExecArray | null;
+    
+    while ((match = emotionPattern.exec(text)) !== null) {
+      const content = match[0].trim();
+      if (content.length > 20) { // Filter out very short sentences
+        insights.push({
+          type: 'emotional',
+          content,
+          category: emotion.category
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Categorize insight type based on content
+ */
+function categorizeInsight(content: string): Insight['type'] {
+  // Practice indicators
+  if (/\b(?:practice|exercise|technique|try|do|perform)\b/i.test(content)) {
+    return 'practice';
+  }
+  
+  // Reflection indicators
+  if (/\b(?:reflect|consider|contemplate|think about|ponder|meditate on)\b/i.test(content)) {
+    return 'reflection';
+  }
+  
+  // Chakra indicators
+  if (/\b(?:chakra|energy center|muladhara|svadhisthana|manipura|anahata|vishuddha|ajna|sahasrara)\b/i.test(content)) {
+    return 'chakra';
+  }
+  
+  // Emotional indicators
+  if (/\b(?:emotion|feeling|mood|anxiety|depression|happiness|joy|sadness|anger|peace)\b/i.test(content)) {
+    return 'emotional';
+  }
+  
+  // Default to wisdom
+  return 'wisdom';
+}
+
+/**
+ * Determine category based on content and type
+ */
+function determineCategory(content: string, type: Insight['type']): string {
+  // Meditation category
+  if (/\b(?:meditat|breath|mindful)\b/i.test(content)) {
+    return 'meditation';
+  }
+  
+  // Yoga category
+  if (/\b(?:yoga|pose|asana|stretch)\b/i.test(content)) {
+    return 'yoga';
+  }
+  
+  // Energy category
+  if (/\b(?:energy|vibration|frequency|resonance)\b/i.test(content)) {
+    return 'energy';
+  }
+  
+  // Wisdom category
+  if (/\b(?:wisdom|truth|insight|reality|awareness)\b/i.test(content)) {
+    return 'wisdom';
+  }
+  
+  // Default based on type
+  const defaultCategories: Record<Insight['type'], string> = {
+    practice: 'general practice',
+    reflection: 'self-reflection',
+    chakra: 'energy work',
+    emotional: 'emotional wellness',
+    wisdom: 'insight'
   };
   
-  // Add points for strong indicators
-  const indicators = strongIndicators[type as keyof typeof strongIndicators] || [];
-  for (const indicator of indicators) {
-    if (content.toLowerCase().includes(indicator)) {
-      relevance += 0.5;
-    }
-  }
-  
-  // Cap at 10
-  return Math.min(10, relevance);
-}
-
-/**
- * Extract insights from AI response text using multiple pattern matching approaches
- * @param text The AI response text to analyze
- * @returns Array of extracted insights with type categorization
- */
-export function extractInsights(text: string): Insight[] {
-  if (!text || typeof text !== 'string') {
-    console.warn("Empty or invalid text provided to extractInsights");
-    return [];
-  }
-  
-  try {
-    // Get insights from list pattern matcher
-    const listInsights = extractListItems(text);
-    
-    // Get insights from keyword pattern matcher
-    const keywordInsights = identifyInsightsByKeywords(text);
-    
-    // Combine insights from both approaches
-    const combinedInsights: Insight[] = [
-      ...listInsights,
-      ...keywordInsights
-    ];
-    
-    // Deduplicate insights by comparing content similarity
-    const uniqueInsights = deduplicateInsights(combinedInsights);
-    
-    // Sort by relevance (if available) or default to alphabetical by type
-    return uniqueInsights.sort((a, b) => {
-      if (a.relevance && b.relevance) {
-        return b.relevance - a.relevance;
-      }
-      return a.type.localeCompare(b.type);
-    });
-  } catch (error) {
-    console.error("Error extracting insights:", error);
-    return [];
-  }
-}
-
-/**
- * Remove duplicate insights based on content similarity
- */
-function deduplicateInsights(insights: Insight[]): Insight[] {
-  const uniqueInsights: Insight[] = [];
-  const seenContent = new Set<string>();
-  
-  for (const insight of insights) {
-    // Create a normalized version of the content for comparison
-    const normalizedContent = insight.content
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 100); // Use first 100 chars for comparison
-    
-    // Skip if we've seen very similar content
-    if (!seenContent.has(normalizedContent)) {
-      seenContent.add(normalizedContent);
-      uniqueInsights.push(insight);
-    } else {
-      // If duplicate found, keep the one with higher relevance
-      const existingIndex = uniqueInsights.findIndex(
-        item => item.content.toLowerCase().includes(normalizedContent) ||
-                normalizedContent.includes(item.content.toLowerCase())
-      );
-      
-      if (existingIndex >= 0) {
-        const existing = uniqueInsights[existingIndex];
-        
-        // If new insight has higher relevance, replace the existing one
-        if ((insight.relevance || 0) > (existing.relevance || 0)) {
-          uniqueInsights[existingIndex] = insight;
-        }
-      }
-    }
-  }
-  
-  return uniqueInsights;
+  return defaultCategories[type];
 }

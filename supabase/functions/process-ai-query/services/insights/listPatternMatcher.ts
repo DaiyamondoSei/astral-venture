@@ -1,114 +1,197 @@
+
 /**
- * Extract list items from text as insights
- * @param text The AI response text to analyze
- * @returns Array of extracted list items as insights
+ * Extract list items from AI responses
  */
-export function extractListItems(text: string): { type: string; content: string }[] {
-  const insights: { type: string; content: string }[] = [];
-  
-  // Match different types of lists with improved regex
-  const listPatterns = [
-    // Markdown bullet lists (- or *)
-    /(?:^|\n)(?:[*\-] .+(?:\n(?![*\-]).+)*)+/gm,
-    
-    // Numbered lists (1. 2. etc)
-    /(?:^|\n)(?:\d+\.\s+.+(?:\n(?!\d+\.).+)*)+/gm,
-    
-    // Section-based lists with headers followed by text
-    /(?:^|\n)(?:(?:Practice|Technique|Exercise|Meditation|Reflection|Step)\s+\d+:[ \t]*[\w\s]+(?:\n(?!(?:Practice|Technique|Exercise|Meditation|Reflection|Step)\s+\d+:).+)*)+/gim
-  ];
-  
-  // Process each pattern type
-  for (const pattern of listPatterns) {
-    const matches = text.matchAll(pattern);
-    
-    for (const match of matches) {
-      const listContent = match[0].trim();
-      
-      // Skip very short list items or ones that are likely headers
-      if (listContent.length < 20 || listContent.split('\n').length < 2) continue;
-      
-      // Determine the insight type based on content
-      const insightType = determineInsightType(listContent);
-      
-      insights.push({
-        type: insightType,
-        content: listContent
-      });
-    }
-  }
-  
-  // If we have too many insights of the same type, keep only the most relevant ones
-  const typeCount: Record<string, number> = {};
-  const typeLimit = 2; // Max number of insights per type
-  
-  return insights
-    .sort((a, b) => b.content.length - a.content.length) // Sort by content length as a proxy for richness
-    .filter(insight => {
-      // Initialize counter for this type if it doesn't exist
-      if (!typeCount[insight.type]) {
-        typeCount[insight.type] = 0;
-      }
-      
-      // Increment counter and check if we should keep this insight
-      typeCount[insight.type]++;
-      return typeCount[insight.type] <= typeLimit;
-    });
+import type { Insight } from './patternMatcher.ts';
+
+/**
+ * List item with metadata
+ */
+interface ListItem {
+  text: string;
+  type: 'bullet' | 'numbered';
+  index?: number; // For numbered lists
+  depth: number; // Nesting level
 }
 
 /**
- * Determine insight type based on content keywords with improved matching
+ * Extract list items from text
  */
-function determineInsightType(content: string): string {
-  const lowerContent = content.toLowerCase();
+export function extractListItems(text: string): ListItem[] {
+  const items: ListItem[] = [];
   
-  // Create weighted pattern matches for better categorization
-  const patternMatches = [
-    {
-      type: 'emotional',
-      keywords: ['emotion', 'feel', 'feeling', 'emotional', 'mood', 'anxiety', 'joy', 'peace', 'balance'],
-      matches: 0
-    },
-    {
-      type: 'chakra',
-      keywords: ['chakra', 'energy center', 'root', 'sacral', 'solar plexus', 'heart', 'throat', 'third eye', 'crown', 'kundalini'],
-      matches: 0
-    },
-    {
-      type: 'practice',
-      keywords: ['practice', 'meditat', 'exercise', 'technique', 'routine', 'breathe', 'breathing', 'daily', 'habitual'],
-      matches: 0
-    },
-    {
-      type: 'awareness',
-      keywords: ['aware', 'conscious', 'mindful', 'awaken', 'perspective', 'attention', 'present', 'observe'],
-      matches: 0
-    }
-  ];
+  // Extract bulleted list items
+  const bulletedItems = extractBulletedItems(text);
+  items.push(...bulletedItems);
   
-  // Count matches for each pattern
-  patternMatches.forEach(pattern => {
-    pattern.keywords.forEach(keyword => {
-      if (lowerContent.includes(keyword)) {
-        // Give more weight to keywords that appear earlier in the content
-        const position = lowerContent.indexOf(keyword);
-        const positionFactor = 1 - (position / Math.min(100, lowerContent.length));
-        
-        // Count repeated occurrences
-        const regex = new RegExp(keyword, 'gi');
-        const occurrences = (lowerContent.match(regex) || []).length;
-        
-        pattern.matches += occurrences * (1 + positionFactor);
-      }
-    });
+  // Extract numbered list items
+  const numberedItems = extractNumberedItems(text);
+  items.push(...numberedItems);
+  
+  // Sort by position in text
+  return items.sort((a, b) => {
+    const aIndex = text.indexOf(a.text);
+    const bIndex = text.indexOf(b.text);
+    return aIndex - bIndex;
   });
+}
+
+/**
+ * Extract bulleted list items from text
+ */
+function extractBulletedItems(text: string): ListItem[] {
+  const items: ListItem[] = [];
   
-  // Find the pattern with the most matches
-  const bestMatch = patternMatches.reduce((best, current) => 
-    current.matches > best.matches ? current : best, 
-    { type: 'general', keywords: [], matches: 0 }
-  );
+  // Match bulleted lists (* , - , •)
+  // Also handle various levels of indentation
+  const bulletPattern = /^(\s*)([*\-•])\s+(.+)$/gm;
+  let match: RegExpExecArray | null;
   
-  // Return general if no strong matches found
-  return bestMatch.matches > 1 ? bestMatch.type : 'general';
+  while ((match = bulletPattern.exec(text)) !== null) {
+    const indentation = match[1].length;
+    const depth = Math.floor(indentation / 2); // Every 2 spaces increases nesting level
+    const content = match[3].trim();
+    
+    items.push({
+      text: content,
+      type: 'bullet',
+      depth
+    });
+  }
+  
+  return items;
+}
+
+/**
+ * Extract numbered list items from text
+ */
+function extractNumberedItems(text: string): ListItem[] {
+  const items: ListItem[] = [];
+  
+  // Match numbered lists (1., 2., etc.) with possible indentation
+  const numberedPattern = /^(\s*)(\d+)\.?\s+(.+)$/gm;
+  let match: RegExpExecArray | null;
+  
+  while ((match = numberedPattern.exec(text)) !== null) {
+    const indentation = match[1].length;
+    const depth = Math.floor(indentation / 2); // Every 2 spaces increases nesting level
+    const index = parseInt(match[2], 10);
+    const content = match[3].trim();
+    
+    items.push({
+      text: content,
+      type: 'numbered',
+      index,
+      depth
+    });
+  }
+  
+  return items;
+}
+
+/**
+ * Convert list items to insights
+ */
+export function convertListItemsToInsights(
+  items: ListItem[], 
+  parentType?: string
+): Insight[] {
+  return items.map(item => {
+    // Determine insight type based on content
+    const type = determineInsightType(item.text, parentType);
+    
+    return {
+      type,
+      content: item.text,
+      category: determineCategoryFromContent(item.text, type)
+    };
+  });
+}
+
+/**
+ * Determine insight type from content
+ */
+function determineInsightType(
+  content: string, 
+  parentType?: string
+): Insight['type'] {
+  // Use parent type if available as a hint
+  if (parentType) {
+    switch (parentType.toLowerCase()) {
+      case 'practice':
+      case 'practices':
+      case 'exercises':
+      case 'techniques':
+        return 'practice';
+      case 'reflection':
+      case 'reflections':
+      case 'questions':
+      case 'prompts':
+        return 'reflection';
+      case 'chakra':
+      case 'chakras':
+      case 'energy centers':
+        return 'chakra';
+      case 'emotion':
+      case 'emotions':
+      case 'feelings':
+        return 'emotional';
+    }
+  }
+  
+  // Look for type indicators in content
+  if (/\b(?:try|practice|do|perform|exercise)\b/i.test(content)) {
+    return 'practice';
+  }
+  
+  if (/\b(?:reflect|consider|contemplate|journal)\b/i.test(content)) {
+    return 'reflection';
+  }
+  
+  if (/\b(?:chakra|energy|center|muladhara|svadhisthana|manipura|anahata|vishuddha|ajna|sahasrara)\b/i.test(content)) {
+    return 'chakra';
+  }
+  
+  if (/\b(?:feel|emotion|mood|anxiety|joy|sadness|anger|peace)\b/i.test(content)) {
+    return 'emotional';
+  }
+  
+  // Default
+  return 'wisdom';
+}
+
+/**
+ * Determine category from content
+ */
+function determineCategoryFromContent(
+  content: string, 
+  type: Insight['type']
+): string {
+  // Content-based categories
+  if (/\b(?:meditat|breath|mindful)\b/i.test(content)) {
+    return 'meditation';
+  }
+  
+  if (/\b(?:yoga|pose|asana|stretch)\b/i.test(content)) {
+    return 'yoga';
+  }
+  
+  if (/\b(?:journal|write|record)\b/i.test(content)) {
+    return 'journaling';
+  }
+  
+  if (/\b(?:affirm|mantra|repeat)\b/i.test(content)) {
+    return 'affirmation';
+  }
+  
+  // Type-based default categories
+  const defaultCategories: Record<Insight['type'], string> = {
+    practice: 'general practice',
+    reflection: 'self-reflection',
+    chakra: 'energy work',
+    emotional: 'emotional wellness',
+    wisdom: 'insight'
+  };
+  
+  return defaultCategories[type];
 }

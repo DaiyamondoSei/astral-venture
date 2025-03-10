@@ -1,133 +1,138 @@
 
 /**
- * Handler for response caching
+ * Cache handler for AI responses
  */
+import { corsHeaders } from "../../shared/responseUtils.ts";
+import { setCacheValue, getCacheValue } from "../../shared/cacheUtils.ts";
 
-import { 
-  setMemoryCacheValue, 
-  getMemoryCacheValue, 
-  clearAllCache, 
-  clearExpiredCache 
-} from "../../shared/cacheUtils.ts";
-import { logEvent } from "../../shared/responseUtils.ts";
+// Default cache TTL (30 minutes)
+const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
 
 /**
  * Get a cached response if available
  * 
- * @param cacheKey Cache key
- * @param isStreaming Whether the response is streaming
- * @returns Cached response or undefined
+ * @param cacheKey The cache key to check
+ * @param isStream Whether the response is a streaming response
+ * @returns Cached response or null if not cached
  */
 export async function getCachedResponse(
   cacheKey: string,
-  isStreaming: boolean
-): Promise<Response | undefined> {
+  isStream: boolean = false
+): Promise<Response | null> {
   try {
-    const cached = getMemoryCacheValue<{
-      data: Uint8Array,
-      timestamp: number,
-      isStreaming: boolean
-    }>(cacheKey);
+    // Get cached data
+    const cachedData = await getCacheValue<any>(cacheKey);
     
-    if (!cached) {
-      return undefined;
+    // Return null if not in cache
+    if (!cachedData) {
+      return null;
     }
     
-    // Handle streaming and non-streaming responses differently
-    if (cached.isStreaming !== isStreaming) {
-      logEvent("debug", "Cache hit but format mismatch", { 
-        cacheKey, 
-        cached: "streaming", 
-        requested: isStreaming ? "streaming" : "standard" 
+    // Handle streaming response differently
+    if (isStream) {
+      // For streaming, we need to convert cached content into a stream
+      const encoder = new TextEncoder();
+      const streamInit = {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream"
+        }
+      };
+      
+      // Create a stream where we push all the cached events
+      const stream = new ReadableStream({
+        start(controller) {
+          // Add all cached events
+          for (const event of cachedData.events) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          }
+          
+          // Add final event
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ finished: true })}\n\n`));
+          
+          // Close the stream
+          controller.close();
+        }
       });
       
-      return undefined;
+      return new Response(stream, streamInit);
+    } else {
+      // For regular responses, reconstruct the Response object
+      return new Response(JSON.stringify(cachedData), {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "X-Cache": "HIT"
+        }
+      });
     }
-    
-    logEvent("info", "Cache hit", { 
-      cacheKey, 
-      ageMs: Date.now() - cached.timestamp,
-      isStreaming
-    });
-    
-    // Construct appropriate headers
-    const headers = isStreaming ? {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive"
-    } : {
-      "Content-Type": "application/json",
-      "Cache-Control": "private, max-age=600"
-    };
-    
-    // Create a new response from the cached data
-    return new Response(cached.data, { headers });
   } catch (error) {
-    logEvent("error", "Error retrieving cached response", {
-      error: error instanceof Error ? error.message : String(error),
-      cacheKey
-    });
-    
-    return undefined;
+    console.error("Cache retrieval error:", error);
+    return null;
   }
 }
 
 /**
  * Cache a response for future use
  * 
- * @param cacheKey Cache key
- * @param response Response to cache
- * @param isStreaming Whether the response is streaming
+ * @param cacheKey The cache key to use
+ * @param response The response to cache
+ * @param isStream Whether the response is a streaming response
+ * @param ttl Cache time-to-live in milliseconds
+ * @returns Success status
  */
 export async function cacheResponse(
   cacheKey: string,
   response: Response,
-  isStreaming: boolean
-): Promise<void> {
+  isStream: boolean = false,
+  ttl: number = DEFAULT_CACHE_TTL
+): Promise<boolean> {
   try {
-    const responseData = await response.arrayBuffer();
+    if (isStream) {
+      // For streaming, we need to capture all events
+      const reader = response.body?.getReader();
+      if (!reader) return false;
+      
+      const decoder = new TextDecoder();
+      const events: any[] = [];
+      
+      // Read and process all chunks
+      let done = false;
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        
+        if (value) {
+          const chunk = decoder.decode(value, { stream: !done });
+          const lines = chunk.split("\n\n");
+          
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const eventData = JSON.parse(line.slice(6));
+                events.push(eventData);
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
+      }
+      
+      // Cache the stream events
+      await setCacheValue(cacheKey, { events }, ttl);
+    } else {
+      // For regular responses, clone and extract JSON
+      const clonedResponse = response.clone();
+      const data = await clonedResponse.json();
+      
+      // Cache the response data
+      await setCacheValue(cacheKey, data, ttl);
+    }
     
-    // Cache the response data
-    setMemoryCacheValue(
-      cacheKey,
-      {
-        data: new Uint8Array(responseData),
-        timestamp: Date.now(),
-        isStreaming
-      },
-      30 * 60 * 1000 // 30 minute TTL
-    );
-    
-    logEvent("debug", "Response cached", { cacheKey, isStreaming });
+    return true;
   } catch (error) {
-    logEvent("error", "Error caching response", {
-      error: error instanceof Error ? error.message : String(error),
-      cacheKey
-    });
-  }
-}
-
-/**
- * Clean up the cache
- * 
- * @param clearAll Whether to clear all cache entries or just expired ones
- * @returns Number of entries cleared
- */
-export async function cleanupCache(clearAll: boolean = false): Promise<number> {
-  try {
-    const clearedCount = clearAll ? clearAllCache() : clearExpiredCache();
-    
-    logEvent("info", `Cache cleanup completed`, {
-      clearedEntries: clearedCount,
-      fullCleanup: clearAll
-    });
-    
-    return clearedCount;
-  } catch (error) {
-    logEvent("error", "Error cleaning up cache", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-    
-    return 0;
+    console.error("Cache storage error:", error);
+    return false;
   }
 }

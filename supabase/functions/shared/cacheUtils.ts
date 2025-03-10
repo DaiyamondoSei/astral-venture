@@ -1,132 +1,122 @@
 
 /**
- * In-memory cache for edge functions
- * Provides a simple way to cache responses and reduce API calls
+ * Shared caching utilities for Edge Functions
  */
 
-// In-memory cache storage
-const MEMORY_CACHE = new Map<string, {
-  data: any;
-  expiresAt: number;
-  timestamp: number;
-}>();
+// Default cache TTL (30 minutes)
+const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
 
 /**
- * Set a value in the memory cache
- * 
- * @param key Cache key
- * @param value Value to cache
- * @param ttl Time to live in milliseconds
+ * Create a cache key from input parameters
  */
-export function setMemoryCacheValue<T>(
+export function createCacheKey(
+  query: string,
+  context?: string | null,
+  model?: string
+): string {
+  // Normalize inputs for consistent keys
+  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedContext = context ? context.trim().toLowerCase() : '';
+  const normalizedModel = model || 'default';
+  
+  // Create a composite key
+  const compositeKey = `${normalizedModel}:${normalizedQuery}:${normalizedContext}`;
+  
+  // Use a hash function for shorter keys
+  // Simple hash implementation that's good enough for caching
+  let hash = 0;
+  for (let i = 0; i < compositeKey.length; i++) {
+    const char = compositeKey.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  
+  return `cache:${Math.abs(hash).toString(16)}`;
+}
+
+/**
+ * Store a value in the KV store with expiration
+ */
+export async function setCacheValue(
   key: string,
-  value: T,
-  ttl: number = 5 * 60 * 1000 // 5 minutes default
-): void {
-  MEMORY_CACHE.set(key, {
-    data: value,
-    expiresAt: Date.now() + ttl,
-    timestamp: Date.now()
-  });
-}
-
-/**
- * Get a value from the memory cache
- * 
- * @param key Cache key
- * @returns Cached value or undefined if not found or expired
- */
-export function getMemoryCacheValue<T>(key: string): T | undefined {
-  const cached = MEMORY_CACHE.get(key);
-  
-  if (!cached) {
-    return undefined;
+  value: any,
+  ttl: number = DEFAULT_CACHE_TTL
+): Promise<void> {
+  try {
+    // Add expiration timestamp
+    const expiresAt = Date.now() + ttl;
+    const cacheObject = {
+      value,
+      expiresAt
+    };
+    
+    // Store serialized value
+    await Deno.env.get("SUPABASE_KV")?.set(key, JSON.stringify(cacheObject));
+  } catch (error) {
+    console.error("Cache set error:", error);
+    // Fail silently - caching errors shouldn't break functionality
   }
-  
-  // Check if the cache entry has expired
-  if (cached.expiresAt < Date.now()) {
-    MEMORY_CACHE.delete(key);
-    return undefined;
-  }
-  
-  return cached.data as T;
 }
 
 /**
- * Delete a value from the memory cache
- * 
- * @param key Cache key
- * @returns True if the value was deleted, false if it wasn't found
+ * Retrieve a value from the KV store, checking expiration
  */
-export function deleteMemoryCacheValue(key: string): boolean {
-  return MEMORY_CACHE.delete(key);
-}
-
-/**
- * Clear all expired items from the cache
- * 
- * @returns Number of items cleared
- */
-export function clearExpiredCache(): number {
-  const now = Date.now();
-  let cleared = 0;
-  
-  for (const [key, value] of MEMORY_CACHE.entries()) {
-    if (value.expiresAt < now) {
-      MEMORY_CACHE.delete(key);
-      cleared++;
-    }
-  }
-  
-  return cleared;
-}
-
-/**
- * Clear all items from the cache
- * 
- * @returns Number of items cleared
- */
-export function clearAllCache(): number {
-  const size = MEMORY_CACHE.size;
-  MEMORY_CACHE.clear();
-  return size;
-}
-
-/**
- * Get the current cache size
- * 
- * @returns Number of items in the cache
- */
-export function getCacheSize(): number {
-  return MEMORY_CACHE.size;
-}
-
-/**
- * Get cache stats
- * 
- * @returns Cache statistics
- */
-export function getCacheStats(): { 
-  size: number; 
-  oldestEntry: number | null;
-  newestEntry: number | null;
-} {
-  let oldestTimestamp: number | null = null;
-  let newestTimestamp: number | null = null;
-  
-  for (const value of MEMORY_CACHE.values()) {
-    if (oldestTimestamp === null || value.timestamp < oldestTimestamp) {
-      oldestTimestamp = value.timestamp;
+export async function getCacheValue<T>(key: string): Promise<T | null> {
+  try {
+    // Get value from KV store
+    const cachedData = await Deno.env.get("SUPABASE_KV")?.get<string>(key);
+    
+    if (!cachedData) {
+      return null;
     }
     
-    if (newestTimestamp === null || value.timestamp > newestTimestamp) {
-      newestTimestamp = value.timestamp;
+    // Parse the cache object
+    const cacheObject = JSON.parse(cachedData);
+    
+    // Check if value has expired
+    if (cacheObject.expiresAt && cacheObject.expiresAt < Date.now()) {
+      // Expired, remove from cache
+      await Deno.env.get("SUPABASE_KV")?.delete(key);
+      return null;
     }
+    
+    return cacheObject.value as T;
+  } catch (error) {
+    console.error("Cache get error:", error);
+    // Fail silently - caching errors shouldn't break functionality
+    return null;
   }
-  
-  return {
-    size: MEMORY_CACHE.size,
-    oldestEntry: oldestTimestamp,
-    newestEntry: newestTimestamp
-  };
+}
+
+/**
+ * Remove a value from the KV store
+ */
+export async function deleteCacheValue(key: string): Promise<void> {
+  try {
+    await Deno.env.get("SUPABASE_KV")?.delete(key);
+  } catch (error) {
+    console.error("Cache delete error:", error);
+    // Fail silently - caching errors shouldn't break functionality
+  }
+}
+
+/**
+ * Clear all keys with a specific prefix
+ */
+export async function clearCacheByPrefix(prefix: string): Promise<void> {
+  try {
+    const kv = Deno.env.get("SUPABASE_KV");
+    if (!kv) return;
+    
+    // List all keys with the prefix
+    const keys = await kv.list({ prefix });
+    
+    // Delete each key
+    for await (const key of keys) {
+      await kv.delete(key.key);
+    }
+  } catch (error) {
+    console.error("Cache clear error:", error);
+    // Fail silently - caching errors shouldn't break functionality
+  }
 }

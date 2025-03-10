@@ -1,89 +1,107 @@
 
 /**
- * Chat service for OpenAI integration
+ * OpenAI chat completion service
  */
-
-import { logEvent } from "../../../shared/responseUtils.ts";
-import { AIModel, ChatMetrics, ChatOptions } from "./types.ts";
+import type { 
+  AIModel, 
+  ChatOptions, 
+  ChatMetrics, 
+  ChatCompletionResponse 
+} from "./types.ts";
 
 /**
- * Generate chat response from OpenAI
+ * Generate a chat completion response from OpenAI
  * 
- * @param prompt User prompt
- * @param systemPrompt System instructions
- * @param options Configuration options
- * @returns Generated response and usage metrics
+ * @param messages - Array of chat messages
+ * @param options - Configuration options
+ * @returns Response content and metrics
  */
 export async function generateChatResponse(
-  prompt: string,
-  systemPrompt: string,
-  options: ChatOptions = {}
-): Promise<{ content: string; metrics: ChatMetrics }> {
-  const model = options.model || "gpt-4o-mini";
-  const temperature = options.temperature || 0.7;
-  const maxTokens = options.max_tokens || 1500;
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  messages: Array<{ role: string; content: string; }>,
+  options?: ChatOptions
+): Promise<{
+  content: string;
+  metrics: ChatMetrics;
+  functionCall?: { name: string; arguments: string; }
+}> {
+  const startTime = performance.now();
   
+  // Get API key from environment
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) {
-    throw new Error("Missing OPENAI_API_KEY environment variable");
+    throw new Error("OpenAI API key not configured");
+  }
+
+  // Set up default options
+  const model = options?.model || "gpt-4o-mini";
+  const temperature = options?.temperature ?? 0.7;
+  const max_tokens = options?.max_tokens ?? 1000;
+  
+  // Prepare request body
+  const requestBody: Record<string, any> = {
+    model,
+    messages,
+    temperature,
+    max_tokens
+  };
+  
+  // Add function calling if specified
+  if (options?.function_call) {
+    requestBody.function_call = options.function_call;
+  }
+  
+  if (options?.functions) {
+    requestBody.functions = options.functions;
   }
   
   try {
-    const startTime = Date.now();
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    // Make request to OpenAI
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
-        ],
-        temperature,
-        max_tokens: maxTokens,
-        stream: false,
-        function_call: options.function_call,
-        functions: options.functions
-      })
+      body: JSON.stringify(requestBody)
     });
     
-    const endTime = Date.now();
-    const latency = endTime - startTime;
-    
+    // Handle errors
     if (!response.ok) {
-      const error = await response.json();
-      logEvent("error", "OpenAI API error", { error });
-      throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+      const errorData = await response.json();
+      throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
     }
     
-    const data = await response.json();
+    // Parse response
+    const data = await response.json() as ChatCompletionResponse;
+    const firstChoice = data.choices[0];
     
-    // Log the success
-    logEvent("info", "Chat response generated", {
-      model: data.model || model,
-      tokensUsed: data.usage?.total_tokens || 0,
-      latencyMs: latency
-    });
+    if (!firstChoice) {
+      throw new Error("No completion choices returned");
+    }
     
+    // Calculate latency
+    const latency = performance.now() - startTime;
+    
+    // Extract content and metrics
+    const content = firstChoice.message.content || "";
+    const functionCall = firstChoice.message.function_call;
+    
+    const metrics: ChatMetrics = {
+      model: data.model,
+      totalTokens: data.usage.total_tokens,
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      latency
+    };
+    
+    // Return content and metrics (and function call if present)
     return {
-      content: data.choices[0]?.message?.content || "Sorry, I couldn't generate a response.",
-      metrics: {
-        model: data.model || model,
-        totalTokens: data.usage?.total_tokens || 0,
-        promptTokens: data.usage?.prompt_tokens,
-        completionTokens: data.usage?.completion_tokens,
-        latency
-      }
+      content,
+      metrics,
+      ...(functionCall && { functionCall })
     };
   } catch (error) {
-    logEvent("error", 'Error generating chat response', {
-      error: error instanceof Error ? error.message : String(error),
-      model
-    });
+    console.error("Error in chat completion:", error);
     throw error;
   }
 }

@@ -22,6 +22,18 @@ export interface IUserStreak {
 }
 
 /**
+ * Today's challenge interface
+ */
+export interface ITodayChallenge {
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+  energy_points: number;
+  category: string;
+}
+
+/**
  * Auth context interface
  */
 export interface IAuthContext {
@@ -29,7 +41,7 @@ export interface IAuthContext {
   userProfile: IUserProfile | null;
   userStreak: IUserStreak | null;
   activatedChakras: number[];
-  todayChallenge: any; // Will be typed properly in next iteration
+  todayChallenge: ITodayChallenge | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   hasCompletedLoading: boolean;
