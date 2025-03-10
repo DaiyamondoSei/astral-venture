@@ -1,5 +1,18 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
+
+import { 
+  corsHeaders, 
+  createSuccessResponse, 
+  createErrorResponse, 
+  ErrorCode,
+  handleCorsRequest,
+  safeParseJson
+} from "../shared/responseUtils.ts";
+
+import { withAuth, createAdminClient } from "../shared/authUtils.ts";
 
 interface SyncRequest {
   lastSyncTime: string | null;
@@ -13,40 +26,21 @@ interface SyncResponse {
   timestamp: string;
 }
 
-// These are automatically injected when deployed on Supabase
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-Deno.serve(async (req) => {
+// Process the sync user data request (after authentication)
+async function processSyncRequest(user: any, req: Request): Promise<Response> {
   try {
-    // Check if the request has a valid JWT
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ message: 'Missing authorization header' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Verify the JWT and get the user
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ message: 'Invalid token or user not found' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Get the sync request data
     const { lastSyncTime } = await req.json() as SyncRequest;
-
+    
+    // Create admin client for database operations
+    const supabase = createAdminClient();
+    
     // Query for all user data that needs to be synced
     const syncTimestamp = new Date().toISOString();
     const modifiedSince = lastSyncTime || new Date(0).toISOString();
 
+    console.log(`Syncing data for user ${user.id} modified since ${modifiedSince}`);
+    
     // Query for achievements
     const { data: achievements, error: achievementsError } = await supabase
       .from('user_achievements')
@@ -56,6 +50,12 @@ Deno.serve(async (req) => {
 
     if (achievementsError) {
       console.error('Error fetching achievements:', achievementsError);
+      return createErrorResponse(
+        ErrorCode.DATABASE_ERROR,
+        "Failed to fetch user achievements",
+        { dbError: achievementsError.message },
+        500
+      );
     }
 
     // Query for user stats
@@ -65,8 +65,14 @@ Deno.serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    if (statsError) {
+    if (statsError && statsError.code !== 'PGRST116') { // Not found is ok
       console.error('Error fetching user stats:', statsError);
+      return createErrorResponse(
+        ErrorCode.DATABASE_ERROR,
+        "Failed to fetch user profile",
+        { dbError: statsError.message },
+        500
+      );
     }
 
     // Query for streak data
@@ -76,8 +82,14 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    if (streakError) {
+    if (streakError && streakError.code !== 'PGRST116') { // Not found is ok
       console.error('Error fetching streak data:', streakError);
+      return createErrorResponse(
+        ErrorCode.DATABASE_ERROR,
+        "Failed to fetch user streak data",
+        { dbError: streakError.message },
+        500
+      );
     }
 
     // Query for user preferences
@@ -87,8 +99,14 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    if (preferencesError) {
+    if (preferencesError && preferencesError.code !== 'PGRST116') { // Not found is ok
       console.error('Error fetching user preferences:', preferencesError);
+      return createErrorResponse(
+        ErrorCode.DATABASE_ERROR,
+        "Failed to fetch user preferences",
+        { dbError: preferencesError.message },
+        500
+      );
     }
 
     // Prepare the response
@@ -101,15 +119,27 @@ Deno.serve(async (req) => {
     };
 
     // Return the synced data
-    return new Response(
-      JSON.stringify(syncResponse),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    return createSuccessResponse(
+      syncResponse,
+      { syncTimestamp, lastSyncTime: modifiedSince }
     );
   } catch (error) {
     console.error('Error in sync-user-data function:', error);
-    return new Response(
-      JSON.stringify({ message: 'Internal server error', error: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return createErrorResponse(
+      ErrorCode.INTERNAL_ERROR,
+      "Internal server error during data sync",
+      { error: error.message },
+      500
     );
   }
+}
+
+// Entry point for the edge function
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return handleCorsRequest();
+  }
+
+  return withAuth(req, processSyncRequest);
 });

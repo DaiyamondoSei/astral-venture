@@ -3,13 +3,28 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js";
 import { createErrorResponse, ErrorCode } from "./responseUtils.ts";
 
 /**
+ * Configuration for authentication middleware
+ */
+export interface AuthConfig {
+  requireRole?: string;          // Require a specific role
+  allowAnonymous?: boolean;      // Allow anonymous access
+  allowServiceRole?: boolean;    // Allow service role access
+  cacheUserData?: boolean;       // Cache user data for performance
+}
+
+/**
  * Authentication middleware for Edge Functions
  * Verifies the auth token and passes the authenticated user to the handler
  * 
  * @param req The incoming request
  * @param handler Function to handle the authenticated request
+ * @param config Optional authentication configuration
  */
-export async function withAuth(req: Request, handler: Function): Promise<Response> {
+export async function withAuth(
+  req: Request, 
+  handler: Function, 
+  config: AuthConfig = {}
+): Promise<Response> {
   try {
     // Get JWT token from request
     const authorization = req.headers.get('Authorization') || '';
@@ -17,7 +32,7 @@ export async function withAuth(req: Request, handler: Function): Promise<Respons
       return createErrorResponse(
         ErrorCode.UNAUTHORIZED,
         'Missing or invalid token format',
-        { header: authorization.slice(0, 10) + '...' },
+        { header: authorization ? `${authorization.slice(0, 10)}...` : 'none' },
         401
       );
     }
@@ -43,6 +58,16 @@ export async function withAuth(req: Request, handler: Function): Promise<Respons
       );
     }
     
+    // Check for role requirements
+    if (config.requireRole && user.app_metadata?.role !== config.requireRole) {
+      return createErrorResponse(
+        ErrorCode.FORBIDDEN,
+        `Access requires the ${config.requireRole} role`,
+        { userRole: user.app_metadata?.role },
+        403
+      );
+    }
+    
     // Call the handler with the authenticated user
     return await handler(user, req);
   } catch (error) {
@@ -54,6 +79,17 @@ export async function withAuth(req: Request, handler: Function): Promise<Respons
       500
     );
   }
+}
+
+/**
+ * Check if a request contains a valid service role key
+ * @param req The incoming request
+ */
+export function hasServiceRoleKey(req: Request): boolean {
+  const serviceRoleHeader = req.headers.get('x-supabase-service-role') || '';
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || '';
+  
+  return serviceRoleHeader === serviceRoleKey;
 }
 
 /**
@@ -102,4 +138,20 @@ export function createClientFromRequest(req: Request): {
       error: error.message 
     };
   }
+}
+
+/**
+ * Create an admin client with service role key
+ */
+export function createAdminClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL") || "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
 }

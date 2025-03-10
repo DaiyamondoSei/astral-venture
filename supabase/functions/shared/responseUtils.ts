@@ -101,6 +101,70 @@ export function validateRequiredParameters(
 }
 
 /**
+ * Validate parameter types against expected types
+ * @param params Object containing parameters
+ * @param typeMap Map of parameter names to expected types
+ */
+export function validateParameterTypes(
+  params: Record<string, any>,
+  typeMap: Record<string, string>
+): {
+  isValid: boolean;
+  invalidParams: Array<{param: string, expectedType: string, actualType: string}>;
+} {
+  const invalidParams = [];
+  
+  for (const [param, expectedType] of Object.entries(typeMap)) {
+    if (params[param] !== undefined && params[param] !== null) {
+      const actualType = Array.isArray(params[param]) ? 'array' : typeof params[param];
+      if (actualType !== expectedType) {
+        invalidParams.push({
+          param,
+          expectedType,
+          actualType
+        });
+      }
+    }
+  }
+  
+  return {
+    isValid: invalidParams.length === 0,
+    invalidParams
+  };
+}
+
+/**
+ * Create a standardized validation error response
+ * @param validationErrors Validation error details
+ * @param message Custom error message
+ */
+export function createValidationErrorResponse(
+  validationErrors: any, 
+  message: string = "Validation failed"
+): Response {
+  return createErrorResponse(
+    ErrorCode.VALIDATION_FAILED,
+    message,
+    { validationErrors },
+    400
+  );
+}
+
+/**
+ * Safely parse JSON from a string, with error handling
+ * @param jsonString String to parse as JSON
+ * @param defaultValue Default value to return if parsing fails
+ */
+export function safeParseJson(jsonString: string, defaultValue: any = null): any {
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error("JSON parse error:", error);
+    return defaultValue;
+  }
+}
+
+/**
  * Standard error codes for consistent error handling across functions
  */
 export enum ErrorCode {
@@ -115,5 +179,7 @@ export enum ErrorCode {
   NETWORK_ERROR = "NETWORK_ERROR",
   TIMEOUT = "TIMEOUT",
   AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR",
-  INTERNAL_ERROR = "INTERNAL_ERROR"
+  INTERNAL_ERROR = "INTERNAL_ERROR",
+  DATABASE_ERROR = "DATABASE_ERROR",
+  INVALID_REQUEST = "INVALID_REQUEST"
 }

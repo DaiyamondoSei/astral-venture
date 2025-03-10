@@ -8,10 +8,11 @@ import {
   createErrorResponse, 
   ErrorCode,
   handleCorsRequest,
-  validateRequiredParameters
+  validateRequiredParameters,
+  validateParameterTypes
 } from "../shared/responseUtils.ts";
 
-import { withAuth } from "../shared/authUtils.ts";
+import { withAuth, AuthConfig } from "../shared/authUtils.ts";
 import { generateInsightsWithOpenAI } from "./services/openaiService.ts";
 import { saveInsightsToDatabase, formatReflectionsForAnalysis } from "./services/databaseService.ts";
 import { validateReflectionsData, validateUserId } from "./services/validationService.ts";
@@ -23,7 +24,12 @@ serve(async (req: Request) => {
     return handleCorsRequest();
   }
 
-  return withAuth(req, processRequest);
+  // Authentication configuration
+  const authConfig: AuthConfig = {
+    cacheUserData: true
+  };
+
+  return withAuth(req, processRequest, authConfig);
 });
 
 // Process the insights generation request (after authentication)
@@ -33,19 +39,36 @@ async function processRequest(user: any, req: Request): Promise<Response> {
     const startTime = Date.now();
     
     // Parse request body
-    const { reflections, userId } = await req.json();
+    const requestData = await req.json();
     
     // Validate required parameters
-    const validation = validateRequiredParameters(
+    const { reflections, userId } = requestData;
+    const paramValidation = validateRequiredParameters(
       { reflections, userId },
       ["reflections", "userId"]
     );
     
-    if (!validation.isValid) {
+    if (!paramValidation.isValid) {
       return createErrorResponse(
         ErrorCode.MISSING_PARAMETERS,
         "Missing required parameters for insights generation",
-        { missingParams: validation.missingParams }
+        { missingParams: paramValidation.missingParams },
+        400
+      );
+    }
+    
+    // Validate parameter types
+    const typeValidation = validateParameterTypes(
+      { reflections, userId },
+      { reflections: "object", userId: "string" }
+    );
+    
+    if (!typeValidation.isValid) {
+      return createErrorResponse(
+        ErrorCode.VALIDATION_FAILED,
+        "Parameter type validation failed",
+        { invalidParams: typeValidation.invalidParams },
+        400
       );
     }
     
@@ -54,8 +77,9 @@ async function processRequest(user: any, req: Request): Promise<Response> {
     if (!userValidation.isValid) {
       return createErrorResponse(
         ErrorCode.FORBIDDEN,
-        userValidation.errorMessage || "Unauthorized",
-        { requestedUserId: userId, authenticatedUserId: user.id }
+        userValidation.errorMessage || "Unauthorized access to user data",
+        { requestedUserId: userId, authenticatedUserId: user.id },
+        403
       );
     }
     
@@ -65,7 +89,8 @@ async function processRequest(user: any, req: Request): Promise<Response> {
       return createErrorResponse(
         ErrorCode.VALIDATION_FAILED,
         reflectionsValidation.errorMessage || "Invalid reflections data",
-        { details: "Reflections validation failed" }
+        { details: "Reflections validation failed" },
+        400
       );
     }
     
@@ -75,7 +100,8 @@ async function processRequest(user: any, req: Request): Promise<Response> {
       return createErrorResponse(
         ErrorCode.CONFIGURATION_ERROR,
         "OpenAI API key is not configured",
-        { detail: "Missing API key in environment" }
+        { detail: "Missing API key in environment" },
+        500
       );
     }
     
@@ -95,7 +121,11 @@ async function processRequest(user: any, req: Request): Promise<Response> {
     // Return success response
     return createSuccessResponse(
       { insights },
-      { processingTime }
+      { 
+        processingTime,
+        reflectionCount: reflections.length,
+        timestamp: new Date().toISOString() 
+      }
     );
   } catch (error) {
     console.error("Error in generate-insights function:", error);
@@ -105,6 +135,14 @@ async function processRequest(user: any, req: Request): Promise<Response> {
       return createErrorResponse(
         ErrorCode.EXTERNAL_API_ERROR,
         "Error communicating with AI service",
+        { errorMessage: error.message }
+      );
+    }
+    
+    if (error.message?.includes("database") || error.message?.includes("query")) {
+      return createErrorResponse(
+        ErrorCode.DATABASE_ERROR,
+        "Database error occurred",
         { errorMessage: error.message }
       );
     }
