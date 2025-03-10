@@ -1,15 +1,6 @@
-
 import { corsHeaders } from "../../shared/responseUtils.ts";
-import { extractInsights } from "../services/insights/patternMatcher.ts";
+import { extractInsights, Insight } from "../services/insights/index.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-/**
- * Insight type with content
- */
-interface Insight {
-  type: string;
-  content: string;
-}
 
 /**
  * Process and enrich AI responses with extracted insights
@@ -22,7 +13,7 @@ export async function processAIResponse(
   tokensUsed: number
 ): Promise<Response> {
   try {
-    // Extract insights from the AI response
+    // Extract insights from the AI response using our enhanced extraction system
     const insights = extractInsights(aiResponse);
     
     // If this is related to a reflection, store insights
@@ -88,30 +79,34 @@ async function storeReflectionInsights(reflectionId: string, insights: Insight[]
   try {
     const supabaseClient = createSupabaseClient();
     
-    // Store only if we have insights and a reflection ID
-    if (insights.length > 0) {
-      const emotionalInsights = insights.find(i => i.type === 'emotional')?.content || '';
-      const chakraInsights = insights.find(i => i.type === 'chakra')?.content || '';
-      const practiceInsights = insights.find(i => i.type === 'practice')?.content || '';
-      const awarenessInsights = insights.find(i => i.type === 'awareness')?.content || '';
-      
-      // Update the reflection with insights
-      const { error } = await supabaseClient
-        .from("energy_reflections")
-        .update({
-          ai_insights: {
-            emotional: emotionalInsights,
-            chakra: chakraInsights,
-            practice: practiceInsights,
-            awareness: awarenessInsights,
-            updated_at: new Date().toISOString()
-          }
-        })
-        .eq("id", reflectionId);
-      
-      if (error) {
-        console.error("Error storing reflection insights:", error);
+    // Organize insights by type
+    const insightsByType: Record<string, string> = {};
+    
+    // Group insights by type, keeping the most relevant one for each type
+    for (const insight of insights) {
+      if (!insightsByType[insight.type] || 
+          (insight.relevance || 0) > (insights.find(i => i.type === insight.type && i.content === insightsByType[insight.type])?.relevance || 0)) {
+        insightsByType[insight.type] = insight.content;
       }
+    }
+    
+    // Update the reflection with insights
+    const { error } = await supabaseClient
+      .from("energy_reflections")
+      .update({
+        ai_insights: {
+          emotional: insightsByType['emotional'] || '',
+          chakra: insightsByType['chakra'] || '',
+          practice: insightsByType['practice'] || '',
+          awareness: insightsByType['awareness'] || '',
+          general: insightsByType['general'] || '',
+          updated_at: new Date().toISOString()
+        }
+      })
+      .eq("id", reflectionId);
+    
+    if (error) {
+      console.error("Error storing reflection insights:", error);
     }
   } catch (error) {
     console.error("Failed to store reflection insights:", error);
