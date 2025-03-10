@@ -1,128 +1,242 @@
 
+// Supabase Edge Function for performance tracking
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
+import { ErrorCode, createErrorResponse, createSuccessResponse, corsHeaders, validateRequiredParameters } from "../shared/responseUtils.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Create a Supabase client for the edge function
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Create a Supabase client with the service role key
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Type definitions for performance metrics
+interface PerformanceMetric {
+  component_name?: string;
+  metric_name: string;
+  value: number;
+  category: string;
+  timestamp: string;
+  type: string;
+  user_id?: string;
+  session_id?: string;
+  page_url?: string;
+  device_info?: Record<string, any>;
+}
 
-serve(async (req: Request) => {
-  // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: corsHeaders,
-    });
+interface WebVitals {
+  fcp: number;
+  lcp: number;
+  cls: number;
+  fid: number;
+  ttfb: number;
+  inp?: number;
+}
+
+interface ComponentMetrics {
+  totalComponents: number;
+  avgRenderTime: number;
+  slowComponents: number;
+  totalRenders: number;
+}
+
+interface PerformanceSummary {
+  webVitals: WebVitals;
+  components: ComponentMetrics;
+  timestamp: string;
+}
+
+interface TrackPerformancePayload {
+  metrics: PerformanceMetric[];
+  summary?: PerformanceSummary;
+  userId?: string;
+  sessionId?: string;
+}
+
+/**
+ * Ensure necessary database tables exist
+ */
+async function ensureTablesExist(): Promise<boolean> {
+  try {
+    // Check if performance_metrics table exists
+    const { data: tables, error: tablesError } = await supabase
+      .from('pg_tables')
+      .select('tablename')
+      .eq('schemaname', 'public')
+      .in('tablename', ['performance_metrics', 'performance_summaries']);
+
+    if (tablesError) {
+      console.error('Error checking tables:', tablesError);
+      return false;
+    }
+
+    const tableNames = (tables || []).map(t => t.tablename);
+    let needsMigration = false;
+    
+    // Create performance_metrics table if it doesn't exist
+    if (!tableNames.includes('performance_metrics')) {
+      needsMigration = true;
+      const { error } = await supabase.rpc('create_performance_metrics_table');
+      if (error) {
+        console.error('Error creating performance_metrics table:', error);
+        return false;
+      }
+    }
+    
+    // Create performance_summaries table if it doesn't exist
+    if (!tableNames.includes('performance_summaries')) {
+      needsMigration = true;
+      const { error } = await supabase.rpc('create_performance_summaries_table');
+      if (error) {
+        console.error('Error creating performance_summaries table:', error);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error ensuring tables exist:', error);
+    return false;
+  }
+}
+
+/**
+ * Store performance metrics in the database
+ */
+async function storePerformanceMetrics(metrics: PerformanceMetric[]): Promise<boolean> {
+  try {
+    if (metrics.length === 0) {
+      return true;
+    }
+    
+    // Ensure user_id is present
+    const processedMetrics = metrics.map(metric => ({
+      ...metric,
+      timestamp: metric.timestamp || new Date().toISOString()
+    }));
+    
+    // Insert metrics in batches of 100
+    const batchSize = 100;
+    for (let i = 0; i < processedMetrics.length; i += batchSize) {
+      const batch = processedMetrics.slice(i, i + batchSize);
+      const { error } = await supabase
+        .from('performance_metrics')
+        .insert(batch);
+        
+      if (error) {
+        console.error('Error inserting metrics batch:', error);
+        throw error;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error storing performance metrics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Store performance summary in the database
+ */
+async function storePerformanceSummary(
+  summary: PerformanceSummary,
+  userId?: string,
+  sessionId?: string,
+  url?: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('performance_summaries')
+      .insert({
+        web_vitals: summary.webVitals,
+        component_metrics: summary.components,
+        timestamp: summary.timestamp || new Date().toISOString(),
+        user_id: userId,
+        session_id: sessionId,
+        page_url: url
+      });
+      
+    if (error) {
+      console.error('Error inserting performance summary:', error);
+      throw error;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error storing performance summary:', error);
+    throw error;
+  }
+}
+
+/**
+ * Main request handler
+ */
+serve(async (req) => {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify authentication
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Extract JWT token
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid token", details: authError }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+    // Validate request method
+    if (req.method !== 'POST') {
+      return createErrorResponse(
+        ErrorCode.INVALID_REQUEST,
+        'Method not allowed',
+        { allowedMethod: 'POST' },
+        405
       );
     }
 
     // Parse request body
-    const { metrics, vitals } = await req.json();
-    const userId = user.id;
-    const timestamp = new Date().toISOString();
-
-    // Process metrics if present
-    if (metrics && Array.isArray(metrics) && metrics.length > 0) {
-      const metricsWithUser = metrics.map((metric) => ({
-        ...metric,
-        user_id: userId,
-        created_at: timestamp,
-      }));
-
-      const { error: metricsError } = await supabase
-        .from("performance_metrics")
-        .insert(metricsWithUser);
-
-      if (metricsError) {
-        console.error("Error inserting metrics:", metricsError);
-        return new Response(
-          JSON.stringify({ error: "Failed to save metrics", details: metricsError }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
+    const payload = await req.json() as TrackPerformancePayload;
+    
+    // Validate required parameters
+    const validation = validateRequiredParameters(
+      { metrics: payload.metrics },
+      ['metrics']
+    );
+    
+    if (!validation.isValid) {
+      return createErrorResponse(
+        ErrorCode.MISSING_PARAMETERS,
+        'Missing required parameters',
+        { missingParams: validation.missingParams }
+      );
     }
-
-    // Process web vitals if present
-    if (vitals && Array.isArray(vitals) && vitals.length > 0) {
-      const vitalsWithUser = vitals.map((vital) => ({
-        ...vital,
-        user_id: userId,
-        timestamp: vital.timestamp || timestamp,
-      }));
-
-      const { error: vitalsError } = await supabase
-        .from("web_vitals")
-        .insert(vitalsWithUser);
-
-      if (vitalsError) {
-        console.error("Error inserting web vitals:", vitalsError);
-        return new Response(
-          JSON.stringify({ error: "Failed to save web vitals", details: vitalsError }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
+    
+    // Ensure required tables exist
+    await ensureTablesExist();
+    
+    // Store metrics
+    await storePerformanceMetrics(payload.metrics);
+    
+    // Store summary if provided
+    if (payload.summary) {
+      await storePerformanceSummary(
+        payload.summary,
+        payload.userId,
+        payload.sessionId,
+        payload.metrics[0]?.page_url
+      );
     }
-
+    
     // Return success response
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Performance data recorded successfully",
-        timestamp,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return createSuccessResponse(
+      { 
+        processed: payload.metrics.length,
+        summaryStored: !!payload.summary 
+      },
+      { operation: 'track_performance' }
     );
   } catch (error) {
-    console.error("Error in track-performance function:", error);
+    console.error('Error in track-performance function:', error);
     
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-        message: error.message || "Unknown error occurred",
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return createErrorResponse(
+      ErrorCode.INTERNAL_ERROR,
+      'Error processing performance metrics',
+      { error: error instanceof Error ? error.message : String(error) }
     );
   }
 });

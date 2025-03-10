@@ -1,53 +1,67 @@
 
 /**
- * Shared response utilities for edge functions
+ * Shared response utilities for Edge Functions
  */
 
-// CORS Headers for edge functions
+/**
+ * CORS headers for all responses
+ */
 export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Error codes for consistent error handling
+/**
+ * Error codes for API responses
+ */
 export enum ErrorCode {
+  MISSING_PARAMETERS = 'missing_parameters',
+  INVALID_REQUEST = 'invalid_request',
   UNAUTHORIZED = 'unauthorized',
   FORBIDDEN = 'forbidden',
   NOT_FOUND = 'not_found',
   VALIDATION_FAILED = 'validation_failed',
-  MISSING_PARAMETERS = 'missing_parameters',
   RATE_LIMITED = 'rate_limited',
-  SERVICE_UNAVAILABLE = 'service_unavailable',
+  QUOTA_EXCEEDED = 'quota_exceeded',
+  EXTERNAL_API_ERROR = 'external_api_error',
+  TIMEOUT = 'timeout',
   INTERNAL_ERROR = 'internal_error',
-  BAD_REQUEST = 'bad_request',
 }
 
-// Options for error handling
+/**
+ * Options for error handling
+ */
 export interface ErrorHandlingOptions {
-  showInResponse?: boolean;
-  logToConsole?: boolean;
   context?: string;
   metadata?: Record<string, unknown>;
+  showToast?: boolean;
+  customMessage?: string;
+  logToConsole?: boolean;
+  logToServer?: boolean;
+  includeStack?: boolean;
+  defaultStatus?: number;
 }
 
 /**
  * Create a standardized success response
  */
 export function createSuccessResponse(
-  data: any,
-  metadata: Record<string, any> = {}
+  data: Record<string, any>,
+  metadata?: Record<string, any>,
+  status = 200
 ): Response {
-  const responseBody = {
-    success: true,
-    data,
-    ...metadata,
-  };
-
   return new Response(
-    JSON.stringify(responseBody),
+    JSON.stringify({
+      success: true,
+      data,
+      ...metadata && { metadata }
+    }),
     {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
     }
   );
 }
@@ -58,169 +72,81 @@ export function createSuccessResponse(
 export function createErrorResponse(
   code: ErrorCode,
   message: string,
-  details?: any,
-  status: number = getStatusCodeForError(code)
+  details?: Record<string, any> | null,
+  status = 400
 ): Response {
-  const responseBody = {
-    success: false,
-    error: {
-      code,
-      message,
-      ...(details ? { details } : {}),
-    },
-  };
-
   return new Response(
-    JSON.stringify(responseBody),
+    JSON.stringify({
+      success: false,
+      error: {
+        code,
+        message,
+        ...details && { details }
+      }
+    }),
     {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
     }
   );
 }
 
 /**
- * Log an event for monitoring
+ * Validate that required parameters are present
+ */
+export function validateRequiredParameters(
+  params: Record<string, any>,
+  required: string[]
+): { isValid: boolean; missingParams: string[] } {
+  const missingParams = required.filter(param => 
+    params[param] === undefined || 
+    params[param] === null || 
+    (typeof params[param] === 'string' && params[param].trim() === '') ||
+    (Array.isArray(params[param]) && params[param].length === 0)
+  );
+  
+  return {
+    isValid: missingParams.length === 0,
+    missingParams
+  };
+}
+
+/**
+ * Log an event for monitoring and debugging
  */
 export function logEvent(
   level: 'debug' | 'info' | 'warn' | 'error',
   message: string,
   data?: Record<string, any>
 ): void {
-  const timestamp = new Date().toISOString();
   const logData = {
-    timestamp,
+    timestamp: new Date().toISOString(),
     level,
     message,
-    ...data,
+    ...data
   };
-
+  
+  // Always log to console for edge functions
   switch (level) {
     case 'debug':
-      console.debug(JSON.stringify(logData));
+      console.debug(message, data);
       break;
     case 'info':
-      console.info(JSON.stringify(logData));
+      console.info(message, data);
       break;
     case 'warn':
-      console.warn(JSON.stringify(logData));
+      console.warn(message, data);
       break;
     case 'error':
-      console.error(JSON.stringify(logData));
+      console.error(message, data);
       break;
   }
+  
+  // In a real-world scenario, we might:
+  // 1. Send to logging service
+  // 2. Store in database
+  // 3. Send to monitoring system
 }
-
-/**
- * Validate required parameters in a request
- */
-export function validateRequiredParameters(
-  params: Record<string, any>,
-  requiredParams: string[]
-): { isValid: boolean; missingParams: string[] } {
-  const missingParams = requiredParams.filter(param => {
-    const value = params[param];
-    return value === undefined || value === null || value === '';
-  });
-
-  return {
-    isValid: missingParams.length === 0,
-    missingParams,
-  };
-}
-
-/**
- * Map error codes to HTTP status codes
- */
-function getStatusCodeForError(code: ErrorCode): number {
-  switch (code) {
-    case ErrorCode.UNAUTHORIZED:
-      return 401;
-    case ErrorCode.FORBIDDEN:
-      return 403;
-    case ErrorCode.NOT_FOUND:
-      return 404;
-    case ErrorCode.VALIDATION_FAILED:
-    case ErrorCode.MISSING_PARAMETERS:
-    case ErrorCode.BAD_REQUEST:
-      return 400;
-    case ErrorCode.RATE_LIMITED:
-      return 429;
-    case ErrorCode.SERVICE_UNAVAILABLE:
-      return 503;
-    case ErrorCode.INTERNAL_ERROR:
-    default:
-      return 500;
-  }
-}
-
-/**
- * Handle errors in edge functions
- */
-export function handleError(
-  error: any,
-  options: ErrorHandlingOptions = {}
-): Response {
-  const { showInResponse = true, logToConsole = true, context, metadata } = options;
-  
-  // Default error information
-  let code = ErrorCode.INTERNAL_ERROR;
-  let message = 'An unexpected error occurred';
-  let status = 500;
-  
-  // Extract error details if possible
-  if (error.code) {
-    code = error.code;
-  }
-  
-  if (error.message) {
-    message = error.message;
-  }
-  
-  if (error.status) {
-    status = error.status;
-  }
-  
-  // Determine if this is a known error type
-  if (error.response) {
-    // API error
-    message = error.response.data?.message || message;
-    status = error.response.status || status;
-  }
-  
-  // Log the error
-  if (logToConsole) {
-    const contextStr = context ? ` (${context})` : '';
-    logEvent('error', `${message}${contextStr}`, {
-      error: {
-        message: error.message,
-        stack: error.stack,
-        code: error.code,
-      },
-      ...metadata
-    });
-  }
-  
-  // Create the error response
-  if (showInResponse) {
-    return createErrorResponse(code, message, undefined, status);
-  } else {
-    // Generic error response for sensitive errors
-    return createErrorResponse(
-      ErrorCode.INTERNAL_ERROR,
-      'An internal error occurred',
-      undefined,
-      500
-    );
-  }
-}
-
-export default {
-  corsHeaders,
-  createSuccessResponse,
-  createErrorResponse,
-  logEvent,
-  validateRequiredParameters,
-  handleError,
-  ErrorCode,
-};

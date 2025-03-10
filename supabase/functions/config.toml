@@ -27,5 +27,6 @@ verify_jwt = true
 import_map = "import_map.json"
 
 [functions.track-performance]
-verify_jwt = true
+verify_jwt = false
 import_map = "import_map.json"
+

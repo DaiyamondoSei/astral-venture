@@ -1,70 +1,74 @@
 
-import { supabaseClient } from '@/lib/supabaseClient';
+/**
+ * Edge Function Helper
+ * 
+ * Utility functions for interacting with Supabase Edge Functions
+ */
+
+import { supabase } from '@/lib/supabaseClient';
 import { ValidationError } from './validation/ValidationError';
 
 /**
- * Invokes an edge function with type safety
+ * Invoke a Supabase Edge Function with error handling
  * 
- * @param functionName - Name of the edge function to call
- * @param payload - Data to send to the function
- * @returns The function response data
- * @throws ValidationError if the API request fails
+ * @param functionName Name of the Edge Function to invoke
+ * @param payload Data to send to the function
+ * @returns Response data from the function
  */
-export async function invokeEdgeFunction<T = any, P = any>(
+export async function invokeEdgeFunction<T = any>(
   functionName: string,
-  payload?: P
+  payload?: Record<string, any>
 ): Promise<T> {
   try {
-    const { data, error } = await supabaseClient.functions.invoke<T>(functionName, {
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    const { data, error } = await supabase.functions.invoke(functionName, {
       body: payload,
     });
 
     if (error) {
-      throw new ValidationError(`Edge function error: ${error.message}`, {
-        statusCode: error.code || 500,
-        details: error
-      });
+      throw new ValidationError(
+        `Error invoking ${functionName}: ${error.message}`,
+        [{ path: 'edgeFunction', message: error.message }]
+      );
     }
 
-    if (!data) {
-      throw new ValidationError('Edge function returned no data', {
-        statusCode: 500
-      });
-    }
-
-    return data;
+    return data as T;
   } catch (error) {
     if (error instanceof ValidationError) {
       throw error;
     }
-    
-    throw new ValidationError(`Failed to call edge function: ${functionName}`, {
-      statusCode: 500,
-      details: { originalError: String(error) }
-    });
+
+    // Handle network errors
+    if (error instanceof Error) {
+      throw new ValidationError(
+        `Network error when invoking ${functionName}: ${error.message}`,
+        [{ path: 'network', message: error.message }]
+      );
+    }
+
+    // Handle unknown errors
+    throw new ValidationError(
+      `Unknown error when invoking ${functionName}`,
+      [{ path: 'unknown', message: String(error) }]
+    );
   }
 }
 
 /**
- * Resolves an API error response
- * 
- * @param error - The error from the API
- * @param context - Context information for the error
- * @returns A formatted error message
+ * Type alias for edge function response
  */
-export function resolveApiError(error: unknown, context: string): string {
-  if (error instanceof ValidationError) {
-    return error.message;
-  } else if (error instanceof Error) {
-    return `${context}: ${error.message}`;
-  } else if (typeof error === 'string') {
-    return `${context}: ${error}`;
-  } else {
-    return `${context}: An unknown error occurred`;
-  }
-}
+export type EdgeFunctionResponse<T> = {
+  data?: T;
+  error?: {
+    message: string;
+    code?: string;
+    details?: any;
+  };
+};
 
 export default {
-  invokeEdgeFunction,
-  resolveApiError
+  invokeEdgeFunction
 };

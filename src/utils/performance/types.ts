@@ -1,142 +1,114 @@
 
 /**
  * Performance Monitoring Type Definitions
+ * 
+ * Centralized type definitions for the performance monitoring system.
  */
 
 /**
  * Types of metrics that can be tracked
  */
-export type MetricType = 'render' | 'interaction' | 'load';
+export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network';
 
 /**
- * Component performance metrics
+ * Categories for web vitals
+ */
+export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
+
+/**
+ * Component metric data
  */
 export interface ComponentMetrics {
-  /** Name of the component being measured */
   componentName: string;
-  
-  /** Total render time across all renders */
-  totalRenderTime: number;
-  
-  /** Number of times the component has rendered */
   renderCount: number;
-  
-  /** Average render time */
+  totalRenderTime: number;
   averageRenderTime: number;
-  
-  /** Most recent render time */
+  slowRenders: number;
   lastRenderTime: number;
-  
-  /** Number of slow renders (over threshold) */
-  slowRenderCount: number;
-  
-  /** Maximum render time */
-  maxRenderTime: number;
-  
-  /** Minimum render time */
-  minRenderTime: number;
-  
-  /** Recent render times for trend analysis */
-  renderTimes: number[];
-  
-  /** When the metrics started being collected */
-  createdAt: number;
-  
-  /** When metrics were last updated */
-  lastUpdated: number;
-  
-  /** Type of metric being tracked */
-  metricType: MetricType;
+  timestamps?: number[];
 }
 
 /**
- * Core Web Vitals metric
+ * Web vital metric data
  */
 export interface WebVitalMetric {
-  /** Name of the metric (FCP, LCP, CLS, etc.) */
   name: string;
-  
-  /** Value of the metric */
   value: number;
-  
-  /** When the metric was recorded */
   timestamp: number;
-  
-  /** Category of the metric */
-  category: 'interaction' | 'loading' | 'visual_stability';
+  category: WebVitalCategory;
 }
 
 /**
- * General performance metric
+ * Device information for metrics context
  */
-export interface PerformanceMetric {
-  /** A unique identifier for the metric */
-  id?: string;
-  
-  /** Name of the component or feature being measured */
-  component_name: string;
-  
-  /** Average render time in milliseconds */
-  average_render_time: number;
-  
-  /** Total number of renders captured */
-  total_renders: number;
-  
-  /** Number of slow renders (exceeding threshold) */
-  slow_renders: number;
-  
-  /** When the metric was created */
-  created_at: string;
-  
-  /** When the metric was last updated */
-  updated_at?: string;
-  
-  /** User id if applicable */
-  user_id?: string;
-  
-  /** Type of the metric */
-  metric_type: string;
-  
-  /** JSON data with additional metrics */
-  metric_data?: Record<string, any>;
-  
-  /** Device info */
-  device_info?: {
-    userAgent: string;
-    deviceCategory: 'mobile' | 'tablet' | 'desktop' | 'unknown';
+export interface DeviceInfo {
+  userAgent: string;
+  deviceCategory: 'mobile' | 'tablet' | 'desktop' | 'unknown';
+  screenWidth?: number;
+  screenHeight?: number;
+  devicePixelRatio?: number;
+  connection?: {
+    type?: string;
+    downlink?: number;
+    rtt?: number;
   };
 }
 
 /**
- * Device information for performance context
+ * Performance metric record for database storage
  */
-export interface DeviceInfo {
-  /** User agent string from browser */
-  userAgent: string;
-  
-  /** Device category based on user agent */
-  deviceCategory: 'mobile' | 'tablet' | 'desktop' | 'unknown';
+export interface PerformanceMetric {
+  component_name?: string;
+  metric_name: string;
+  value: number;
+  category: string;
+  timestamp: string;
+  type: string;
+  user_id?: string;
+  session_id?: string;
+  page_url?: string;
+  device_info?: Record<string, any>;
 }
 
 /**
- * Performance report payload
+ * Performance summary
  */
-export interface PerformanceReportPayload {
-  /** Component metrics */
-  componentMetrics: ComponentMetrics[];
-  
-  /** Web Vitals metrics */
-  webVitals: WebVitalMetric[];
-  
-  /** Information about the device */
-  deviceInfo: DeviceInfo;
-  
-  /** When the report was generated */
-  timestamp: string;
-  
-  /** User id if available */
-  userId?: string;
-  
-  /** Session id if available */
-  sessionId?: string;
+export interface PerformanceSummary {
+  webVitals: {
+    fcp: number;
+    lcp: number;
+    cls: number;
+    fid: number;
+    ttfb: number;
+    inp?: number;
+  };
+  components: {
+    totalComponents: number;
+    avgRenderTime: number;
+    slowComponents: number;
+  };
+  resources: {
+    totalSize: number;
+    loadTime: number;
+    count: number;
+  };
+  device: DeviceInfo;
+}
+
+/**
+ * Configuration for the performance monitoring system
+ */
+export interface PerformanceMonitorConfig {
+  enabled: boolean;
+  sampleRate: number;
+  slowRenderThreshold: number;
+  reportInterval: number;
+  maxMetricsPerReport: number;
+  trackResourceMetrics: boolean;
+  trackMemoryUsage: boolean;
+  trackNetworkRequests: boolean;
+  includeDeviceInfo: boolean;
+  includeLocationInfo: boolean;
+  batchReports: boolean;
+  debugMode: boolean;
 }
