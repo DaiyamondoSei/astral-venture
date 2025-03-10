@@ -1,68 +1,193 @@
 
 /**
- * Shared cache utility functions for Edge Functions
- * Provides standardized caching mechanisms
+ * Shared Caching Utilities for Edge Functions
  */
+import { logEvent } from "./responseUtils.ts";
+import { getSupabaseAdmin } from "./authUtils.ts";
+
+// In-memory cache with TTL
+const memoryCache = new Map<string, {
+  data: any;
+  expiresAt: number;
+}>();
+
+// Default TTL in milliseconds
+const DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Create a consistent cache key based on query parameters
+ * Set a value in the in-memory cache
  */
-export function createCacheKey(
-  query: string, 
-  context?: string | null, 
-  model?: string
-): string {
-  // Normalize inputs to prevent cache misses due to whitespace/case
-  const normalizedQuery = query.trim().toLowerCase();
-  const normalizedContext = context ? context.trim().substring(0, 100) : '';
-  const modelIdentifier = model || 'default';
-  
-  // Create a deterministic hash for the cache key
-  return btoa(
-    `${normalizedQuery}::${normalizedContext.substring(0, 50)}::${modelIdentifier}`
-  ).replace(/[^a-zA-Z0-9]/g, '');
+export function setMemoryCacheValue(
+  key: string,
+  value: any,
+  ttlMs: number = DEFAULT_TTL
+): void {
+  memoryCache.set(key, {
+    data: value,
+    expiresAt: Date.now() + ttlMs
+  });
 }
 
 /**
- * Determine if a cached response is expired
+ * Get a value from the in-memory cache
  */
-export function isCacheExpired(
-  timestamp: string | number,
-  ttl: number = 30 * 60 * 1000 // Default 30 minutes
-): boolean {
-  const cacheTime = typeof timestamp === 'string' 
-    ? new Date(timestamp).getTime() 
-    : timestamp;
+export function getMemoryCacheValue<T>(key: string): T | null {
+  const cached = memoryCache.get(key);
   
-  return Date.now() > cacheTime + ttl;
+  if (!cached) return null;
+  
+  // Check if expired
+  if (Date.now() > cached.expiresAt) {
+    memoryCache.delete(key);
+    return null;
+  }
+  
+  return cached.data as T;
 }
 
 /**
- * Calculate appropriate cache TTL based on content type and size
+ * Delete a value from the in-memory cache
  */
-export function calculateCacheTTL(
-  contentType: "reflection" | "query" | "streaming" | "user_data",
-  contentSize?: number
-): number {
-  switch (contentType) {
-    case "streaming":
-      return 10 * 60 * 1000; // 10 minutes for streaming responses
-    case "reflection":
-      return 60 * 60 * 1000; // 1 hour for reflection analysis
-    case "user_data":
-      return 5 * 60 * 1000;  // 5 minutes for user data
-    case "query":
-    default:
-      // For regular queries, scale TTL based on content size
-      const baseTime = 30 * 60 * 1000; // 30 minutes base
-      if (!contentSize) return baseTime;
-      
-      // Shorter cache time for very small responses (might be error responses)
-      if (contentSize < 100) return 5 * 60 * 1000;
-      
-      // Longer cache time for large, complex responses
-      if (contentSize > 10000) return 2 * 60 * 60 * 1000; // 2 hours
-      
-      return baseTime;
+export function deleteMemoryCacheValue(key: string): boolean {
+  return memoryCache.delete(key);
+}
+
+/**
+ * Clear expired cache entries
+ */
+export function clearExpiredCache(): number {
+  let clearedCount = 0;
+  const now = Date.now();
+  
+  for (const [key, value] of memoryCache.entries()) {
+    if (now > value.expiresAt) {
+      memoryCache.delete(key);
+      clearedCount++;
+    }
+  }
+  
+  return clearedCount;
+}
+
+/**
+ * Clear all cache entries
+ */
+export function clearAllCache(): number {
+  const size = memoryCache.size;
+  memoryCache.clear();
+  return size;
+}
+
+/**
+ * Cache a function result with a cache key generator
+ */
+export async function withCache<T>(
+  cacheKeyOrGenerator: string | ((...args: any[]) => string),
+  fn: () => Promise<T>,
+  ttlMs: number = DEFAULT_TTL,
+  ...args: any[]
+): Promise<T> {
+  const cacheKey = typeof cacheKeyOrGenerator === 'function'
+    ? cacheKeyOrGenerator(...args)
+    : cacheKeyOrGenerator;
+  
+  // Try to get from cache first
+  const cachedValue = getMemoryCacheValue<T>(cacheKey);
+  if (cachedValue !== null) {
+    logEvent("debug", `Cache hit for key: ${cacheKey}`);
+    return cachedValue;
+  }
+  
+  // Execute the function
+  logEvent("debug", `Cache miss for key: ${cacheKey}`);
+  const result = await fn();
+  
+  // Cache the result
+  setMemoryCacheValue(cacheKey, result, ttlMs);
+  
+  return result;
+}
+
+/**
+ * Store a cache item in the database
+ */
+export async function setDatabaseCache(
+  key: string,
+  value: any,
+  ttlSeconds: number = 300
+): Promise<boolean> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+    
+    const { error } = await supabase
+      .from('cache')
+      .upsert({
+        key,
+        value: JSON.stringify(value),
+        expires_at: expiresAt
+      });
+    
+    if (error) {
+      logEvent("error", "Error storing in database cache", { error, key });
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    logEvent("error", "Exception storing in database cache", { error, key });
+    return false;
+  }
+}
+
+/**
+ * Get a cache item from the database
+ */
+export async function getDatabaseCache<T>(key: string): Promise<T | null> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const now = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('cache')
+      .select('value')
+      .eq('key', key)
+      .gt('expires_at', now)
+      .maybeSingle();
+    
+    if (error || !data) {
+      return null;
+    }
+    
+    return JSON.parse(data.value) as T;
+  } catch (error) {
+    logEvent("error", "Error retrieving from database cache", { error, key });
+    return null;
+  }
+}
+
+/**
+ * Delete expired cache items from database
+ */
+export async function cleanDatabaseCache(): Promise<number> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const now = new Date().toISOString();
+    
+    const { count, error } = await supabase
+      .from('cache')
+      .delete()
+      .lt('expires_at', now)
+      .select('count');
+    
+    if (error) {
+      logEvent("error", "Error cleaning database cache", { error });
+      return 0;
+    }
+    
+    return count || 0;
+  } catch (error) {
+    logEvent("error", "Exception cleaning database cache", { error });
+    return 0;
   }
 }

@@ -1,212 +1,151 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
-
 /**
- * Interface for database query configuration
+ * Shared Database Utilities for Edge Functions
  */
-export interface QueryConfig {
-  // Retry configuration
-  maxRetries?: number;
-  retryDelay?: number;
-  
-  // Timeout configuration
-  timeout?: number;
-  
-  // Logging configuration
-  logQueries?: boolean;
-  logQueryParams?: boolean;
-}
+import { getSupabaseAdmin } from "./authUtils.ts";
+import { logEvent } from "./responseUtils.ts";
 
-/**
- * Create a Supabase admin client with service role key
- */
-export function createAdminClient() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL") || "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
+// Create a type-safe database query wrapper
+export async function executeQuery<T = any>(
+  tableName: string,
+  operation: "select" | "insert" | "update" | "delete" | "upsert",
+  options: {
+    select?: string;
+    match?: Record<string, any>;
+    data?: Record<string, any> | Record<string, any>[];
+    order?: Record<string, "asc" | "desc">;
+    limit?: number;
+    single?: boolean;
+    returning?: boolean | string;
+  } = {}
+): Promise<{ data: T | null; error: any }> {
+  try {
+    const supabase = getSupabaseAdmin();
+    let query = supabase.from(tableName);
+    
+    if (operation === "select") {
+      query = query.select(options.select || "*");
+      
+      if (options.match) {
+        Object.entries(options.match).forEach(([column, value]) => {
+          query = query.eq(column, value);
+        });
       }
+      
+      if (options.order) {
+        Object.entries(options.order).forEach(([column, direction]) => {
+          query = query.order(column, { ascending: direction === "asc" });
+        });
+      }
+      
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      if (options.single) {
+        return await query.maybeSingle();
+      }
+      
+      return await query;
     }
-  );
-}
-
-/**
- * Execute a database query with retry and timeout handling
- * @param queryFn Function that executes the query
- * @param config Query configuration
- */
-export async function executeWithRetry<T>(
-  queryFn: () => Promise<T>,
-  config: QueryConfig = {}
-): Promise<T> {
-  const {
-    maxRetries = 3,
-    retryDelay = 500,
-    timeout = 10000,
-    logQueries = false
-  } = config;
-  
-  // Create timeout promise
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
-      reject(new Error(`Database query timed out after ${timeout}ms`));
-    }, timeout);
-  });
-  
-  let lastError: Error | null = null;
-  
-  // Retry loop
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      if (logQueries) {
-        console.log(`Executing database query (attempt ${attempt + 1}/${maxRetries})`);
+    
+    if (operation === "insert") {
+      if (!options.data) {
+        throw new Error("Data is required for insert operation");
       }
       
-      // Race between query and timeout
-      return await Promise.race([queryFn(), timeoutPromise]);
-    } catch (error) {
-      lastError = error;
+      const insertQuery = query.insert(options.data);
       
-      // Check if we should retry
-      const shouldRetry = 
-        attempt < maxRetries - 1 && 
-        (error.message?.includes('connection') || 
-         error.message?.includes('timeout') ||
-         error.status === 429);
-      
-      if (shouldRetry) {
-        const delay = retryDelay * Math.pow(2, attempt);
-        console.log(`Query failed, retrying in ${delay}ms:`, error.message);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        break;
+      if (options.returning) {
+        return await insertQuery.select(options.returning === true ? "*" : options.returning);
       }
+      
+      return await insertQuery;
     }
+    
+    if (operation === "update") {
+      if (!options.data) {
+        throw new Error("Data is required for update operation");
+      }
+      
+      if (!options.match) {
+        throw new Error("Match conditions are required for update operation");
+      }
+      
+      let updateQuery = query.update(options.data);
+      
+      Object.entries(options.match).forEach(([column, value]) => {
+        updateQuery = updateQuery.eq(column, value);
+      });
+      
+      if (options.returning) {
+        return await updateQuery.select(options.returning === true ? "*" : options.returning);
+      }
+      
+      return await updateQuery;
+    }
+    
+    if (operation === "delete") {
+      if (!options.match) {
+        throw new Error("Match conditions are required for delete operation");
+      }
+      
+      let deleteQuery = query.delete();
+      
+      Object.entries(options.match).forEach(([column, value]) => {
+        deleteQuery = deleteQuery.eq(column, value);
+      });
+      
+      if (options.returning) {
+        return await deleteQuery.select(options.returning === true ? "*" : options.returning);
+      }
+      
+      return await deleteQuery;
+    }
+    
+    if (operation === "upsert") {
+      if (!options.data) {
+        throw new Error("Data is required for upsert operation");
+      }
+      
+      const upsertQuery = query.upsert(options.data);
+      
+      if (options.returning) {
+        return await upsertQuery.select(options.returning === true ? "*" : options.returning);
+      }
+      
+      return await upsertQuery;
+    }
+    
+    throw new Error(`Unsupported operation: ${operation}`);
+  } catch (error) {
+    logEvent("error", `Database error in ${operation} operation on ${tableName}`, { error });
+    return { data: null, error };
   }
-  
-  throw lastError || new Error('Query failed after all retry attempts');
 }
 
-/**
- * Fetch records safely with error handling and retry logic
- * @param table Table name
- * @param query Query builder function
- * @param config Query configuration
- */
-export async function fetchRecordsSafely<T = any>(
-  table: string,
-  query: (queryBuilder: any) => any,
-  config: QueryConfig = {}
-): Promise<T[]> {
-  const supabase = createAdminClient();
+// Function to safely parse JSON data
+export function safeParseJson<T>(jsonString: string | null, defaultValue: T): T {
+  if (!jsonString) return defaultValue;
   
-  return executeWithRetry(async () => {
-    // Start with the table
-    let queryBuilder = supabase.from(table).select();
-    
-    // Apply the query modifications
-    queryBuilder = query(queryBuilder);
-    
-    // Execute the query
-    const { data, error } = await queryBuilder;
-    
-    if (error) {
-      console.error(`Error fetching from ${table}:`, error);
-      throw error;
-    }
-    
-    return data || [];
-  }, config);
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch (error) {
+    logEvent("error", "Error parsing JSON", { error, jsonString });
+    return defaultValue;
+  }
 }
 
-/**
- * Insert records safely with error handling and retry logic
- * @param table Table name
- * @param records Records to insert
- * @param config Query configuration
- */
-export async function insertRecordsSafely<T = any>(
-  table: string,
-  records: any | any[],
-  config: QueryConfig = {}
-): Promise<T[]> {
-  const supabase = createAdminClient();
+// Function to safely handle database values
+export function safeGetValue<T>(
+  data: Record<string, any> | null,
+  key: string,
+  defaultValue: T
+): T {
+  if (!data) return defaultValue;
   
-  return executeWithRetry(async () => {
-    const { data, error } = await supabase
-      .from(table)
-      .insert(records)
-      .select();
-    
-    if (error) {
-      console.error(`Error inserting into ${table}:`, error);
-      throw error;
-    }
-    
-    return data || [];
-  }, config);
-}
-
-/**
- * Update records safely with error handling and retry logic
- * @param table Table name
- * @param updates Record updates
- * @param matchColumn Column to match for updates
- * @param matchValue Value to match for updates
- * @param config Query configuration
- */
-export async function updateRecordsSafely<T = any>(
-  table: string,
-  updates: any,
-  matchColumn: string,
-  matchValue: any,
-  config: QueryConfig = {}
-): Promise<T[]> {
-  const supabase = createAdminClient();
+  const value = data[key];
+  if (value === undefined || value === null) return defaultValue;
   
-  return executeWithRetry(async () => {
-    const { data, error } = await supabase
-      .from(table)
-      .update(updates)
-      .eq(matchColumn, matchValue)
-      .select();
-    
-    if (error) {
-      console.error(`Error updating ${table}:`, error);
-      throw error;
-    }
-    
-    return data || [];
-  }, config);
-}
-
-/**
- * Delete records safely with error handling and retry logic
- * @param table Table name
- * @param matchColumn Column to match for deletion
- * @param matchValue Value to match for deletion
- * @param config Query configuration
- */
-export async function deleteRecordsSafely(
-  table: string,
-  matchColumn: string,
-  matchValue: any,
-  config: QueryConfig = {}
-): Promise<void> {
-  const supabase = createAdminClient();
-  
-  return executeWithRetry(async () => {
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq(matchColumn, matchValue);
-    
-    if (error) {
-      console.error(`Error deleting from ${table}:`, error);
-      throw error;
-    }
-  }, config);
+  return value as T;
 }

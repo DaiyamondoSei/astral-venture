@@ -66,6 +66,13 @@ export interface PerformanceMetric {
   created_at: string;
 }
 
+// AI question types
+export interface AIQuestion {
+  text: string;
+  context?: string;
+  reflectionIds?: string[];
+}
+
 // Error types
 export enum EdgeFunctionErrorCode {
   VALIDATION_ERROR = 'VALIDATION_ERROR',
@@ -76,5 +83,10 @@ export enum EdgeFunctionErrorCode {
   INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
   SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
   DATABASE_ERROR = 'DATABASE_ERROR',
-  EXTERNAL_API_ERROR = 'EXTERNAL_API_ERROR'
+  EXTERNAL_API_ERROR = 'EXTERNAL_API_ERROR',
+  MISSING_PARAMETERS = 'MISSING_PARAMETERS',
+  VALIDATION_FAILED = 'VALIDATION_FAILED',
+  UNHANDLED_ERROR = 'UNHANDLED_ERROR',
+  EDGE_FUNCTION_ERROR = 'EDGE_FUNCTION_ERROR',
+  UNAUTHORIZED = 'UNAUTHORIZED'
 }

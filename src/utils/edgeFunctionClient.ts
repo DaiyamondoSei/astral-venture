@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { EdgeFunctionResponse } from '@/types/edge-functions';
+import { EdgeFunctionResponse, EdgeFunctionErrorCode } from '@/types/edge-functions';
 
 /**
  * Generic client for calling Supabase Edge Functions
@@ -45,7 +45,7 @@ export async function callEdgeFunction<T = any, P = any>(
       return {
         success: false,
         error: {
-          code: 'EDGE_FUNCTION_ERROR',
+          code: EdgeFunctionErrorCode.EDGE_FUNCTION_ERROR,
           message: error.message,
           details: error,
         },
@@ -101,7 +101,7 @@ export async function callEdgeFunction<T = any, P = any>(
     return {
       success: false,
       error: {
-        code: 'UNHANDLED_ERROR',
+        code: EdgeFunctionErrorCode.UNHANDLED_ERROR,
         message: error.message || 'An unexpected error occurred',
         details: error,
       },

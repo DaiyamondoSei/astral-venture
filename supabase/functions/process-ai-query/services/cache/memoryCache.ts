@@ -1,15 +1,15 @@
 
-// In-memory cache for responses with expiration and size limits
-const memoryCache = new Map<string, { 
-  data: Uint8Array, 
-  timestamp: number,
-  isStreaming: boolean,
-  expiresAt: number
-}>();
+import { 
+  setMemoryCacheValue, 
+  getMemoryCacheValue, 
+  clearExpiredCache,
+  clearAllCache,
+  deleteMemoryCacheValue
+} from "../../../shared/cacheUtils.ts";
+import { logEvent } from "../../../shared/responseUtils.ts";
 
 // Default cache configuration
 const DEFAULT_CACHE_TTL = 30 * 60 * 1000; // 30 minutes in milliseconds
-const MAX_CACHE_SIZE = 100; // Maximum number of items in cache
 
 /**
  * Get a value from memory cache
@@ -19,15 +19,14 @@ export function getFromMemoryCache(cacheKey: string): {
   timestamp: number,
   isStreaming: boolean 
 } | undefined {
-  const cacheItem = memoryCache.get(cacheKey);
+  const cacheItem = getMemoryCacheValue<{
+    data: Uint8Array,
+    timestamp: number,
+    isStreaming: boolean,
+    expiresAt: number
+  }>(cacheKey);
   
   if (!cacheItem) return undefined;
-  
-  // Check if the item has expired
-  if (Date.now() > cacheItem.expiresAt) {
-    memoryCache.delete(cacheKey);
-    return undefined;
-  }
   
   return {
     data: cacheItem.data,
@@ -43,19 +42,23 @@ export function storeInMemoryCache(
   cacheKey: string, 
   data: Uint8Array, 
   isStreaming: boolean,
-  ttl: number = DEFAULT_CACHE_TTL
+  ttl = DEFAULT_CACHE_TTL
 ): void {
-  // If cache is at max size, remove oldest item
-  if (memoryCache.size >= MAX_CACHE_SIZE) {
-    const oldestKey = findOldestCacheKey();
-    if (oldestKey) memoryCache.delete(oldestKey);
-  }
+  setMemoryCacheValue(
+    cacheKey, 
+    {
+      data,
+      timestamp: Date.now(),
+      isStreaming,
+      expiresAt: Date.now() + ttl
+    }, 
+    ttl
+  );
   
-  memoryCache.set(cacheKey, {
-    data,
-    timestamp: Date.now(),
-    isStreaming,
-    expiresAt: Date.now() + ttl
+  logEvent("debug", "Added to memory cache", { 
+    cacheKey, 
+    isStreaming, 
+    ttl 
   });
 }
 
@@ -63,55 +66,28 @@ export function storeInMemoryCache(
  * Delete a value from memory cache
  */
 export function deleteFromMemoryCache(cacheKey: string): boolean {
-  return memoryCache.delete(cacheKey);
+  return deleteMemoryCacheValue(cacheKey);
 }
 
 /**
  * Clear all items from memory cache
  */
 export function clearMemoryCache(): number {
-  const size = memoryCache.size;
-  memoryCache.clear();
-  return size;
+  return clearAllCache();
 }
 
 /**
  * Get the size of the memory cache
  */
 export function getMemoryCacheSize(): number {
-  return memoryCache.size;
-}
-
-/**
- * Find the oldest key in the cache
- */
-function findOldestCacheKey(): string | undefined {
-  let oldestKey: string | undefined;
-  let oldestTimestamp = Infinity;
-  
-  for (const [key, value] of memoryCache.entries()) {
-    if (value.timestamp < oldestTimestamp) {
-      oldestTimestamp = value.timestamp;
-      oldestKey = key;
-    }
-  }
-  
-  return oldestKey;
+  // This is an estimation as we need to implement a size tracker
+  // in the shared cacheUtils module
+  return 0;
 }
 
 /**
  * Clear expired items from the cache
  */
 export function clearExpiredItems(): number {
-  const now = Date.now();
-  let removedCount = 0;
-  
-  for (const [key, value] of memoryCache.entries()) {
-    if (now > value.expiresAt) {
-      memoryCache.delete(key);
-      removedCount++;
-    }
-  }
-  
-  return removedCount;
+  return clearExpiredCache();
 }

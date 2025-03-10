@@ -8,6 +8,7 @@ import { handleStreamingRequest } from "./streamingHandler.ts";
 import { processAIResponse } from "./aiResponseHandler.ts";
 import { handleError } from "./errorHandler.ts";
 import { getCachedResponse, cacheResponse, cleanupCache } from "./cacheHandler.ts";
+import { logEvent } from "../../shared/responseUtils.ts";
 
 /**
  * Main request handler for AI assistant requests
@@ -108,6 +109,14 @@ export async function handleAIRequest(user: any, req: Request): Promise<Response
       await cacheResponse(cacheKey, response.clone(), false);
     }
     
+    logEvent("info", "AI response generated successfully", {
+      userId: user.id,
+      processingTimeMs: Date.now() - startTime,
+      model,
+      tokens: metrics.totalTokens,
+      cached: false
+    });
+    
     return response;
   } catch (error) {
     return handleError(error);
@@ -138,6 +147,12 @@ export async function handleClearCache(user: any, req: Request): Promise<Respons
     
     // Clear the cache
     const clearedCount = await cleanupCache(true);
+    
+    logEvent("info", "Cache cleared by admin", {
+      userId: user.id,
+      clearedCount,
+      timestamp: new Date().toISOString()
+    });
     
     return createSuccessResponse(
       { cleared: clearedCount, timestamp: new Date().toISOString() },

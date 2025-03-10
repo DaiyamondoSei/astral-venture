@@ -1,157 +1,119 @@
 
+/**
+ * Shared Authentication Utilities for Edge Functions
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
 import { createErrorResponse, ErrorCode } from "./responseUtils.ts";
 
-/**
- * Configuration for authentication middleware
- */
-export interface AuthConfig {
-  requireRole?: string;          // Require a specific role
-  allowAnonymous?: boolean;      // Allow anonymous access
-  allowServiceRole?: boolean;    // Allow service role access
-  cacheUserData?: boolean;       // Cache user data for performance
-}
-
-/**
- * Authentication middleware for Edge Functions
- * Verifies the auth token and passes the authenticated user to the handler
- * 
- * @param req The incoming request
- * @param handler Function to handle the authenticated request
- * @param config Optional authentication configuration
- */
-export async function withAuth(
-  req: Request, 
-  handler: Function, 
-  config: AuthConfig = {}
-): Promise<Response> {
-  try {
-    // Get JWT token from request
-    const authorization = req.headers.get('Authorization') || '';
-    if (!authorization.startsWith('Bearer ')) {
-      return createErrorResponse(
-        ErrorCode.UNAUTHORIZED,
-        'Missing or invalid token format',
-        { header: authorization ? `${authorization.slice(0, 10)}...` : 'none' },
-        401
-      );
-    }
-    
-    const token = authorization.replace('Bearer ', '');
-    
-    // Initialize Supabase client
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
-    
-    // Verify the token and get user
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    
-    if (authError || !user) {
-      return createErrorResponse(
-        ErrorCode.UNAUTHORIZED,
-        'Invalid authentication token',
-        { error: authError?.message },
-        401
-      );
-    }
-    
-    // Check for role requirements
-    if (config.requireRole && user.app_metadata?.role !== config.requireRole) {
-      return createErrorResponse(
-        ErrorCode.FORBIDDEN,
-        `Access requires the ${config.requireRole} role`,
-        { userRole: user.app_metadata?.role },
-        403
-      );
-    }
-    
-    // Call the handler with the authenticated user
-    return await handler(user, req);
-  } catch (error) {
-    console.error("Authentication error:", error);
-    return createErrorResponse(
-      ErrorCode.INTERNAL_ERROR,
-      'Internal server error during authentication',
-      { error: error.message },
-      500
-    );
-  }
-}
-
-/**
- * Check if a request contains a valid service role key
- * @param req The incoming request
- */
-export function hasServiceRoleKey(req: Request): boolean {
-  const serviceRoleHeader = req.headers.get('x-supabase-service-role') || '';
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || '';
+// Helper for getting Supabase admin client
+export function getSupabaseAdmin() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   
-  return serviceRoleHeader === serviceRoleKey;
-}
-
-/**
- * Helper to create Supabase client from request
- * This approach allows more flexible access to Supabase client
- * 
- * @param req The incoming request
- */
-export function createClientFromRequest(req: Request): { 
-  client: any; 
-  token?: string;
-  error?: string;
-} {
-  try {
-    const authorization = req.headers.get('Authorization') || '';
-    if (!authorization.startsWith('Bearer ')) {
-      return { 
-        client: null, 
-        error: 'Missing or invalid token format' 
-      };
-    }
-    
-    const token = authorization.replace('Bearer ', '');
-    
-    const client = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { 
-        auth: { 
-          persistSession: false,
-          autoRefreshToken: false
-        },
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      }
-    );
-    
-    return { client, token };
-  } catch (error) {
-    console.error("Error creating client:", error);
-    return { 
-      client: null, 
-      error: error.message 
-    };
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase URL or service role key");
   }
+  
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false }
+  });
 }
 
-/**
- * Create an admin client with service role key
- */
-export function createAdminClient() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL") || "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
+// Helper for getting Supabase client with user token
+export function getSupabaseClient(token: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase URL or anon key");
+  }
+  
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      headers: {
+        Authorization: `Bearer ${token}`
       }
     }
-  );
+  });
+}
+
+// Extract token from request headers
+export function extractToken(req: Request): string | null {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+  return authHeader.replace("Bearer ", "");
+}
+
+// Authenticate request and get user
+export async function getAuthenticatedUser(req: Request) {
+  const token = extractToken(req);
+  if (!token) {
+    return { user: null, error: "No authorization token provided" };
+  }
+  
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.auth.getUser(token);
+  
+  if (error || !data.user) {
+    return { user: null, error: error?.message || "Invalid token" };
+  }
+  
+  return { user: data.user, error: null };
+}
+
+// Auth middleware for Edge Functions
+export async function withAuth(
+  req: Request,
+  handler: (user: any, req: Request) => Response | Promise<Response>
+): Promise<Response> {
+  const { user, error } = await getAuthenticatedUser(req);
+  
+  if (!user) {
+    return createErrorResponse(
+      ErrorCode.AUTHENTICATION_ERROR,
+      error || "Authentication required",
+      null,
+      401
+    );
+  }
+  
+  return await handler(user, req);
+}
+
+// Check admin role
+export function isAdmin(user: any): boolean {
+  return user?.app_metadata?.role === "admin";
+}
+
+// Admin-only middleware
+export async function withAdminAuth(
+  req: Request,
+  handler: (user: any, req: Request) => Response | Promise<Response>
+): Promise<Response> {
+  const { user, error } = await getAuthenticatedUser(req);
+  
+  if (!user) {
+    return createErrorResponse(
+      ErrorCode.AUTHENTICATION_ERROR,
+      error || "Authentication required",
+      null,
+      401
+    );
+  }
+  
+  if (!isAdmin(user)) {
+    return createErrorResponse(
+      ErrorCode.AUTHORIZATION_ERROR,
+      "Admin privileges required",
+      null,
+      403
+    );
+  }
+  
+  return await handler(user, req);
 }

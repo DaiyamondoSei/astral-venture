@@ -1,17 +1,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isCacheExpired } from "../../utils/cacheUtils.ts";
-
-/**
- * Get a Supabase admin client
- */
-function getSupabaseAdmin() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
-}
+import { logEvent } from "../../../shared/responseUtils.ts";
+import { 
+  setDatabaseCache, 
+  getDatabaseCache 
+} from "../../../shared/cacheUtils.ts";
+import { getSupabaseAdmin } from "../../../shared/authUtils.ts";
 
 /**
  * Retrieve a cached response from database
@@ -22,25 +16,19 @@ export async function getFromDatabaseCache(cacheKey: string): Promise<{
   createdAt: string;
 } | null> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const cachedData = await getDatabaseCache<{
+      responseData: string;
+      isStreaming: boolean;
+      createdAt: string;
+    }>(cacheKey);
     
-    const { data, error } = await supabaseAdmin
-      .from("ai_response_cache")
-      .select("response_data, created_at, is_streaming")
-      .eq("cache_key", cacheKey)
-      .single();
-    
-    if (error || !data) {
+    if (!cachedData) {
       return null;
     }
     
-    return {
-      responseData: data.response_data,
-      isStreaming: data.is_streaming,
-      createdAt: data.created_at
-    };
+    return cachedData;
   } catch (error) {
-    console.error("Error retrieving from database cache:", error);
+    logEvent("error", "Error retrieving from database cache", { error, cacheKey });
     return null;
   }
 }
@@ -54,18 +42,17 @@ export async function storeInDatabaseCache(
   isStreaming: boolean
 ): Promise<void> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
-    
-    await supabaseAdmin
-      .from("ai_response_cache")
-      .upsert({
-        cache_key: cacheKey,
-        response_data: responseData,
-        is_streaming: isStreaming,
-        created_at: new Date().toISOString()
-      });
+    await setDatabaseCache(
+      cacheKey,
+      {
+        responseData,
+        isStreaming,
+        createdAt: new Date().toISOString()
+      },
+      isStreaming ? 600 : 1800 // 10 minutes for streaming, 30 minutes for regular
+    );
   } catch (error) {
-    console.error("Error storing in database cache:", error);
+    logEvent("error", "Error storing in database cache", { error, cacheKey });
   }
 }
 
@@ -74,12 +61,12 @@ export async function storeInDatabaseCache(
  */
 export async function clearExpiredDatabaseCache(): Promise<number> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
+    const supabase = getSupabaseAdmin();
     const streamingExpiryTime = new Date(Date.now() - (10 * 60 * 1000)).toISOString();
     const regularExpiryTime = new Date(Date.now() - (30 * 60 * 1000)).toISOString();
     
     // Delete expired streaming entries
-    const { count: streamingCount } = await supabaseAdmin
+    const { count: streamingCount } = await supabase
       .from("ai_response_cache")
       .delete()
       .eq("is_streaming", true)
@@ -87,7 +74,7 @@ export async function clearExpiredDatabaseCache(): Promise<number> {
       .select("count");
     
     // Delete expired regular entries
-    const { count: regularCount } = await supabaseAdmin
+    const { count: regularCount } = await supabase
       .from("ai_response_cache")
       .delete()
       .eq("is_streaming", false)
@@ -96,7 +83,7 @@ export async function clearExpiredDatabaseCache(): Promise<number> {
     
     return (streamingCount || 0) + (regularCount || 0);
   } catch (error) {
-    console.error("Error clearing expired database cache:", error);
+    logEvent("error", "Error clearing expired database cache", { error });
     return 0;
   }
 }
@@ -106,15 +93,15 @@ export async function clearExpiredDatabaseCache(): Promise<number> {
  */
 export async function clearAllDatabaseCache(): Promise<number> {
   try {
-    const supabaseAdmin = getSupabaseAdmin();
-    const { count } = await supabaseAdmin
+    const supabase = getSupabaseAdmin();
+    const { count } = await supabase
       .from("ai_response_cache")
       .delete()
       .select("count");
     
     return count || 0;
   } catch (error) {
-    console.error("Error clearing all database cache:", error);
+    logEvent("error", "Error clearing all database cache", { error });
     return 0;
   }
 }
