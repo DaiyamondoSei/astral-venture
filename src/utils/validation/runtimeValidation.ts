@@ -1,4 +1,6 @@
 
+import { handleError, ErrorCategory, ErrorSeverity } from '../errorHandling';
+
 /**
  * Error thrown when validation fails
  */
@@ -151,4 +153,39 @@ export function validateEmail(value: unknown, name: string): string {
   }
   
   return email;
+}
+
+/**
+ * Creates a safe validation function that catches and handles validation errors
+ * 
+ * @param validationFn - The validation function to wrap
+ * @param defaultValue - Default value to return on validation failure
+ * @returns A function that performs validation but never throws
+ */
+export function createSafeValidator<T, R>(
+  validationFn: (value: T) => R,
+  defaultValue: R
+): (value: T) => R {
+  return (value: T): R => {
+    try {
+      return validationFn(value);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        handleError(error, {
+          category: ErrorCategory.VALIDATION,
+          severity: ErrorSeverity.WARNING,
+          context: 'Data Validation',
+          showToast: false
+        });
+      } else {
+        handleError(error, {
+          category: ErrorCategory.UNEXPECTED,
+          severity: ErrorSeverity.ERROR,
+          context: 'Validation System',
+          showToast: false
+        });
+      }
+      return defaultValue;
+    }
+  };
 }

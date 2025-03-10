@@ -1,5 +1,5 @@
 
-import { validateDefined } from './validation/runtimeValidation';
+import { validateDefined } from './typeValidation';
 
 /**
  * Achievement status types

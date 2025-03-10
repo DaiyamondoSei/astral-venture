@@ -1,3 +1,4 @@
+
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { initWebVitals, trackWebVital, trackComponentRender, reportMetricsToServer } from '../utils/webVitalsMonitor';
 

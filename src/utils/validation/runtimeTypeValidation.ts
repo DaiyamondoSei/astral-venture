@@ -1,115 +1,187 @@
-/**
- * Runtime type validation utilities to ensure data consistency
- */
 
-import { handleError } from '../errorHandling';
-import { isMetatronsNode, isMetatronsConnection } from '../typeGuards';
-import type { MetatronsNode, MetatronsConnection } from '@/components/visual-foundation/metatrons-cube/types';
+import { ValidationError } from './runtimeValidation';
+import { handleError, ErrorCategory, ErrorSeverity } from '../errorHandling';
 
 /**
- * Validates an array of MetatronsNodes
- * @param nodes Array to validate
- * @param context Context for error reporting
- * @returns True if valid, false otherwise
+ * Type validation options
  */
-export function validateMetatronsNodes(
-  nodes: unknown[], 
-  context = 'MetatronsNodes Validation'
-): nodes is MetatronsNode[] {
-  try {
-    if (!Array.isArray(nodes)) {
-      handleError(`Expected nodes to be an array, got ${typeof nodes}`, { context, showToast: false });
-      return false;
-    }
-    
-    // Check each node
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      if (!isMetatronsNode(node)) {
-        handleError(`Invalid node at index ${i}`, {
-          context,
-          showToast: false,
-          includeStack: false
-        });
-        return false;
-      }
-    }
-    
-    return true;
-  } catch (error) {
-    handleError(error, { context, showToast: false });
-    return false;
-  }
+export interface TypeValidationOptions {
+  /** Whether to throw on validation failure */
+  throwOnError?: boolean;
+  /** Custom validation error message */
+  errorMessage?: string;
+  /** Whether to include call stack in the error */
+  includeStack?: boolean;
 }
 
 /**
- * Validates an array of MetatronsConnections
- * @param connections Array to validate
- * @param context Context for error reporting
- * @returns True if valid, false otherwise
+ * Validate a value is of expected type
+ * 
+ * @param value - Value to validate
+ * @param expectedType - Expected type (string representation)
+ * @param name - Name of the parameter for error messages
+ * @param options - Validation options
+ * @returns The validated value or null if validation fails
  */
-export function validateMetatronsConnections(
-  connections: unknown[],
-  context = 'MetatronsConnections Validation'
-): connections is MetatronsConnection[] {
-  try {
-    if (!Array.isArray(connections)) {
-      handleError(`Expected connections to be an array, got ${typeof connections}`, { context, showToast: false });
-      return false;
-    }
+export function validateType<T>(
+  value: unknown, 
+  expectedType: string, 
+  name: string,
+  options: TypeValidationOptions = {}
+): T | null {
+  const { throwOnError = true, errorMessage, includeStack = false } = options;
+  
+  // Determine actual type
+  const actualType = Array.isArray(value) 
+    ? 'array' 
+    : (value === null ? 'null' : typeof value);
+  
+  // Check if type matches
+  const isValid = actualType === expectedType || 
+    (expectedType === 'array' && Array.isArray(value)) ||
+    // Special case for objects but not arrays or null
+    (expectedType === 'object' && actualType === 'object' && !Array.isArray(value) && value !== null);
+  
+  if (!isValid) {
+    const errorMsg = errorMessage ?? 
+      `Invalid type for ${name}: expected ${expectedType}, got ${actualType}`;
     
-    // Check each connection
-    for (let i = 0; i < connections.length; i++) {
-      const connection = connections[i];
-      if (!isMetatronsConnection(connection)) {
-        handleError(`Invalid connection at index ${i}`, {
-          context,
-          showToast: false,
-          includeStack: false
-        });
-        return false;
+    // Handle based on options
+    if (throwOnError) {
+      throw new ValidationError(errorMsg);
+    } else {
+      handleError(new ValidationError(errorMsg), {
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.WARNING,
+        context: 'Type Validation',
+        showToast: false,
+        includeStack
+      });
+      return null;
+    }
+  }
+  
+  return value as T;
+}
+
+/**
+ * Validate a value against a schema
+ * 
+ * @param value - Value to validate
+ * @param schema - Validation schema object
+ * @param name - Name of the object for error messages
+ * @param options - Validation options
+ * @returns The validated object or null if validation fails
+ */
+export function validateSchema<T>(
+  value: unknown,
+  schema: Record<string, { type: string, required?: boolean }>,
+  name: string,
+  options: TypeValidationOptions = {}
+): T | null {
+  const { throwOnError = true, includeStack = false } = options;
+  
+  // Validate object first
+  const obj = validateType<Record<string, unknown>>(value, 'object', name, { 
+    throwOnError,
+    includeStack
+  });
+  
+  if (!obj) return null;
+  
+  try {
+    // Check each field in the schema
+    for (const [field, fieldSchema] of Object.entries(schema)) {
+      const fieldValue = obj[field];
+      const fieldName = `${name}.${field}`;
+      
+      // Check if required field is missing
+      if (fieldSchema.required && (fieldValue === undefined || fieldValue === null)) {
+        throw new ValidationError(`Required field ${fieldName} is missing`);
       }
       
-      // If using deprecated fields, log warning
-      const conn = connection as MetatronsConnection;
-      if ((conn.source || conn.target) && !(conn.from && conn.to)) {
-        console.warn(
-          `[DEPRECATED] Connection at index ${i} is using deprecated 'source/target' fields. ` +
-          `Please use 'from/to' fields instead.`
-        );
+      // Skip validation for optional fields that are undefined
+      if (fieldValue === undefined) continue;
+      
+      // Validate field type
+      if (fieldValue !== null) {
+        validateType(fieldValue, fieldSchema.type, fieldName, { throwOnError: true });
       }
     }
     
-    return true;
+    return obj as unknown as T;
   } catch (error) {
-    handleError(error, { context, showToast: false });
-    return false;
+    if (throwOnError) {
+      throw error;
+    } else {
+      handleError(error, {
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.WARNING,
+        context: 'Schema Validation',
+        showToast: false,
+        includeStack
+      });
+      return null;
+    }
   }
 }
 
 /**
- * Normalizes MetatronsConnection objects to use the new from/to fields
- * @param connections Array of connections to normalize
- * @returns Normalized connections
+ * Type-guard function that checks if value is not null or undefined
+ * 
+ * @param value - Value to check
+ * @returns True if value is defined
  */
-export function normalizeMetatronsConnections(
-  connections: MetatronsConnection[]
-): MetatronsConnection[] {
-  return connections.map(conn => {
-    const result: MetatronsConnection = {
-      from: conn.from || conn.source || '',
-      to: conn.to || conn.target || '',
-    };
-    
-    // Copy other properties
-    if (conn.animated !== undefined) result.animated = conn.animated;
-    if (conn.active !== undefined) result.active = conn.active;
-    if (conn.intensity !== undefined) result.intensity = conn.intensity;
-    
-    // Keep source/target for backward compatibility
-    if (conn.source) result.source = conn.source;
-    if (conn.target) result.target = conn.target;
-    
-    return result;
-  });
+export function isDefined<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
+/**
+ * Type-guard function that checks if value is a string
+ * 
+ * @param value - Value to check
+ * @returns True if value is a string
+ */
+export function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+/**
+ * Type-guard function that checks if value is a number
+ * 
+ * @param value - Value to check
+ * @returns True if value is a number
+ */
+export function isNumber(value: unknown): value is number {
+  return typeof value === 'number' && !isNaN(value);
+}
+
+/**
+ * Type-guard function that checks if value is a boolean
+ * 
+ * @param value - Value to check
+ * @returns True if value is a boolean
+ */
+export function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean';
+}
+
+/**
+ * Type-guard function that checks if value is an array
+ * 
+ * @param value - Value to check
+ * @returns True if value is an array
+ */
+export function isArray<T>(value: unknown): value is Array<T> {
+  return Array.isArray(value);
+}
+
+/**
+ * Type-guard function that checks if value is an object
+ * 
+ * @param value - Value to check
+ * @returns True if value is an object
+ */
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
