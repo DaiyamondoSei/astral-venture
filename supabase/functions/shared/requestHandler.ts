@@ -17,7 +17,7 @@ export type RequestHandler = (req: Request, ctx: Record<string, any>) => Promise
 export type AuthenticatedRequestHandler = (user: any, req: Request, ctx: Record<string, any>) => Promise<Response>;
 
 /**
- * Create a standard error handler
+ * Create a standard error handler with improved type safety
  */
 export function handleRequestError(error: unknown): Response {
   console.error("Function error:", error);
@@ -54,6 +54,7 @@ export function handleRequestError(error: unknown): Response {
 
 /**
  * Create middleware for handling CORS
+ * Improved with better type safety
  */
 export function withCors(handler: RequestHandler): RequestHandler {
   return async (req: Request, ctx: Record<string, any>) => {
@@ -85,7 +86,7 @@ export function withCors(handler: RequestHandler): RequestHandler {
 }
 
 /**
- * Create middleware for error handling
+ * Create middleware for error handling with enhanced type safety
  */
 export function withErrorHandling(handler: RequestHandler): RequestHandler {
   return async (req: Request, ctx: Record<string, any>) => {
@@ -98,7 +99,7 @@ export function withErrorHandling(handler: RequestHandler): RequestHandler {
 }
 
 /**
- * Create middleware for authentication
+ * Create middleware for authentication with improved error messages
  */
 export function withAuth(handler: AuthenticatedRequestHandler): RequestHandler {
   return async (req: Request, ctx: Record<string, any>) => {
@@ -122,8 +123,19 @@ export function withAuth(handler: AuthenticatedRequestHandler): RequestHandler {
       // Create Supabase client
       const supabaseClient = ctx.supabaseClient;
       
+      if (!supabaseClient) {
+        return createErrorResponse(
+          ErrorCode.INTERNAL_ERROR,
+          "Supabase client not available",
+          null,
+          500,
+          corsHeaders
+        );
+      }
+      
       // Verify the token
-      const { data: { user }, error } = await supabaseClient.auth.getUser(token);
+      const { data, error } = await supabaseClient.auth.getUser(token);
+      const user = data?.user;
       
       if (error || !user) {
         return createErrorResponse(

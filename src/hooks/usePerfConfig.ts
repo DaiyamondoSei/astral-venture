@@ -1,6 +1,37 @@
 
 import { useContext } from 'react';
-import PerfConfigContext, { PerfConfigContextType, defaultConfigs } from '@/contexts/PerfConfigContext';
+import PerfConfigContext, { PerfConfigContextType } from '@/contexts/PerfConfigContext';
+
+// Define default configurations for different device capabilities
+export const defaultConfigs = {
+  low: {
+    maxParticles: 50,
+    effectsQuality: 'low',
+    animationFrameRate: 30,
+    useLightweightAnimations: true,
+    disableParallaxEffects: true,
+    batchDomUpdates: true,
+    virtualizeLists: true,
+  },
+  medium: {
+    maxParticles: 100,
+    effectsQuality: 'medium',
+    animationFrameRate: 45,
+    useLightweightAnimations: false,
+    disableParallaxEffects: false,
+    batchDomUpdates: true,
+    virtualizeLists: true,
+  },
+  high: {
+    maxParticles: 200,
+    effectsQuality: 'high',
+    animationFrameRate: 60,
+    useLightweightAnimations: false,
+    disableParallaxEffects: false,
+    batchDomUpdates: false,
+    virtualizeLists: false,
+  }
+};
 
 /**
  * Custom hook to use the performance configuration context

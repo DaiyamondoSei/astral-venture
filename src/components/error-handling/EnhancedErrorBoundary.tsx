@@ -1,123 +1,113 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { ErrorFallback } from './ErrorFallback';
-import { handleError, ErrorSeverity, ErrorCategory } from '@/utils/errorHandling';
 
-/**
- * Props for the enhanced error boundary component
- */
-export interface EnhancedErrorBoundaryProps {
-  /** Child components to render */
-  children: ReactNode;
-  /** Custom fallback component to render when an error occurs */
-  fallback?: ReactNode;
-  /** Callback function called when an error is caught */
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  /** Whether to reset the error state when props change */
-  resetOnPropsChange?: boolean;
-  /** Optional error context for better error tracking */
+export interface ErrorHandlingOptions {
+  componentName?: string;
   errorContext?: string;
+  reportErrors?: boolean;
+  logErrors?: boolean;
+  fallbackRender?: (props: { 
+    error: Error; 
+    resetErrorBoundary: () => void;
+  }) => ReactNode;
 }
 
-/**
- * State for the enhanced error boundary component
- */
-interface EnhancedErrorBoundaryState {
-  /** Whether an error has occurred */
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  options?: ErrorHandlingOptions;
+}
+
+interface State {
   hasError: boolean;
-  /** The error that occurred */
   error: Error | null;
-  /** Additional information about the error */
-  errorInfo: ErrorInfo | null;
 }
 
 /**
- * Enhanced error boundary component with additional features
- * Catches JavaScript errors in its child component tree and displays a fallback UI
+ * An enhanced error boundary component that provides better error handling
+ * and customization options than the basic React error boundary
  */
-class EnhancedErrorBoundary extends Component<EnhancedErrorBoundaryProps, EnhancedErrorBoundaryState> {
-  constructor(props: EnhancedErrorBoundaryProps) {
+export class EnhancedErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null
+    this.state = { 
+      hasError: false, 
+      error: null 
     };
   }
 
-  /**
-   * Update state when errors are caught
-   */
-  static getDerivedStateFromError(error: Error): Partial<EnhancedErrorBoundaryState> {
-    return { hasError: true, error };
+  static getDerivedStateFromError(error: Error): State {
+    return { 
+      hasError: true, 
+      error 
+    };
   }
 
-  /**
-   * Called when an error is caught
-   */
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    this.setState({ errorInfo });
-
-    // Log the error to our error handling system
-    handleError(error, {
-      severity: ErrorSeverity.ERROR,
-      category: ErrorCategory.USER_INTERFACE,
-      context: this.props.errorContext || 'EnhancedErrorBoundary',
-      metadata: {
-        componentStack: errorInfo.componentStack,
+    const { onError, options } = this.props;
+    
+    // Call custom error handler if provided
+    if (onError) {
+      onError(error, errorInfo);
+    }
+    
+    // Log errors to console if enabled
+    if (!options?.logErrors || options.logErrors) {
+      console.error(
+        `Error caught by EnhancedErrorBoundary${
+          options?.componentName ? ` in ${options.componentName}` : ''
+        }:`, 
+        error, 
         errorInfo
-      }
+      );
+    }
+    
+    // Report errors to monitoring service if enabled
+    if (options?.reportErrors) {
+      // This would connect to an error reporting service
+      // Example: reportErrorToService(error, errorInfo, options.componentName);
+    }
+  }
+
+  resetErrorBoundary = (): void => {
+    this.setState({ 
+      hasError: false, 
+      error: null 
     });
-
-    // Call the onError prop if provided
-    if (this.props.onError) {
-      this.props.onError(error, errorInfo);
-    }
   }
 
-  /**
-   * Reset error state when props change if resetOnPropsChange is true
-   */
-  componentDidUpdate(prevProps: EnhancedErrorBoundaryProps): void {
-    if (
-      this.state.hasError &&
-      this.props.resetOnPropsChange &&
-      this.props.children !== prevProps.children
-    ) {
-      this.setState({
-        hasError: false,
-        error: null,
-        errorInfo: null
-      });
-    }
-  }
-
-  /**
-   * Render the error fallback or children
-   */
   render(): ReactNode {
-    if (this.state.hasError) {
-      // Render custom fallback if provided, otherwise use default fallback
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
+    const { children, fallback, options } = this.props;
+    const { hasError, error } = this.state;
 
+    if (hasError && error) {
+      // Use custom fallback render if provided
+      if (options?.fallbackRender) {
+        return options.fallbackRender({ 
+          error, 
+          resetErrorBoundary: this.resetErrorBoundary 
+        });
+      }
+      
+      // Use provided fallback component if available
+      if (fallback) {
+        return fallback;
+      }
+      
+      // Use default ErrorFallback component
       return (
         <ErrorFallback
-          error={this.state.error}
-          errorInfo={this.state.errorInfo}
-          resetError={() => {
-            this.setState({
-              hasError: false,
-              error: null,
-              errorInfo: null
-            });
-          }}
+          error={error}
+          resetErrorBoundary={this.resetErrorBoundary}
+          componentName={options?.componentName}
+          errorContext={options?.errorContext}
         />
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }
 

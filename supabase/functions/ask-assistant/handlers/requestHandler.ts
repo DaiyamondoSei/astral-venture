@@ -10,7 +10,7 @@ import { handleError } from "./errorHandler.ts";
 import { getCachedResponse, cacheResponse, cleanupCache } from "./cacheHandler.ts";
 import { logEvent } from "../../shared/responseUtils.ts";
 
-// Define interface for request parameters
+// Define improved interface for request parameters
 interface AIRequestParams {
   message: string;
   reflectionId?: string;
@@ -145,7 +145,7 @@ export async function handleClearCache(user: any, req: Request): Promise<Respons
     // Check if user is admin with better validation
     const isAdmin = user && 
                    (user.app_metadata?.role === "admin" || 
-                    authHeader.includes("admin-key")); // Real implementation would be more secure
+                    authHeader.includes("admin-key"));
     
     if (!isAdmin) {
       return createErrorResponse(

@@ -1,153 +1,148 @@
 
-import { ValidationError } from './runtimeValidation';
+import { ValidationError } from './ValidationError';
 
 /**
  * Result of schema validation
  */
 export interface ValidationResult<T> {
-  /** Whether the validation was successful */
+  /**
+   * Whether the validation succeeded
+   */
   isValid: boolean;
-  /** The validated data (if validation was successful) */
+  
+  /**
+   * The validated data (only present if validation succeeded)
+   */
   data?: T;
-  /** Validation errors (if validation failed) */
-  errors?: ValidationError[];
+  
+  /**
+   * The error that occurred (only present if validation failed)
+   */
+  error?: ValidationError;
+  
+  /**
+   * Additional validation issues
+   */
+  issues?: ValidationIssue[];
 }
 
 /**
- * Interface for schema validator
+ * Represents a specific validation issue
+ */
+export interface ValidationIssue {
+  code: string;
+  path: string[];
+  message: string;
+}
+
+/**
+ * A schema validator for runtime type checking
  */
 export interface SchemaValidator<T> {
-  /** Validate data against schema */
-  validate: (data: unknown) => ValidationResult<T>;
-  /** Parse data and throw if invalid */
-  parse: (data: unknown) => T;
-  /** Check if data matches schema without returning the data */
-  check: (data: unknown) => boolean;
+  /**
+   * Validate data against the schema
+   * @param data The data to validate
+   * @returns A validation result object
+   */
+  validate(data: unknown): ValidationResult<T>;
+  
+  /**
+   * Parse data against the schema, throws on validation failure
+   * @param data The data to parse
+   * @returns The validated data
+   * @throws ValidationError if validation fails
+   */
+  parse(data: unknown): T;
+  
+  /**
+   * Check if data matches the schema
+   * @param data The data to check
+   * @returns Whether the data is valid
+   */
+  check(data: unknown): boolean;
 }
 
 /**
- * Create a schema validator for type validation
- * 
- * @param schema - Schema to validate against
- * @param options - Validation options
- * @returns Schema validator
+ * Create a basic schema validator for an object type
+ * @param schema Object describing the expected shape of the data
+ * @returns A schema validator
  */
-export function createSchemaValidator<T>(
-  validationFn: (data: unknown) => T,
-  schemaName: string
+export function createObjectSchema<T extends Record<string, any>>(
+  schema: Record<keyof T, (value: unknown) => boolean>
 ): SchemaValidator<T> {
   return {
-    validate: (data: unknown): ValidationResult<T> => {
-      try {
-        const validData = validationFn(data);
-        return {
-          isValid: true,
-          data: validData
-        };
-      } catch (error) {
-        let validationErrors: ValidationError[] = [];
-        
-        if (error instanceof ValidationError) {
-          validationErrors = [error];
-        } else if (error instanceof Error) {
-          validationErrors = [
-            new ValidationError(error.message, {
-              code: 'VALIDATION_ERROR',
-              details: { schema: schemaName }
-            })
-          ];
-        } else {
-          validationErrors = [
-            new ValidationError('Unknown validation error', {
-              code: 'VALIDATION_ERROR',
-              details: { schema: schemaName }
-            })
-          ];
-        }
-        
+    validate(data: unknown): ValidationResult<T> {
+      // Check if data is an object
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
         return {
           isValid: false,
-          errors: validationErrors
+          error: ValidationError.invalidType('schema', data, 'object')
         };
       }
-    },
-    
-    parse: (data: unknown): T => {
-      try {
-        return validationFn(data);
-      } catch (error) {
-        if (error instanceof ValidationError) {
-          throw error;
-        }
+      
+      const inputData = data as Record<string, unknown>;
+      const issues: ValidationIssue[] = [];
+      
+      // Check each property in the schema
+      for (const [key, validator] of Object.entries(schema)) {
+        const value = inputData[key];
         
-        if (error instanceof Error) {
-          throw new ValidationError(error.message, {
-            code: 'VALIDATION_ERROR',
-            details: { schema: schemaName }
+        // Skip undefined optional properties
+        if (value === undefined) continue;
+        
+        // Validate the property
+        if (!validator(value)) {
+          issues.push({
+            code: 'invalid_property',
+            path: [key],
+            message: `Invalid value for property '${key}'`
           });
         }
-        
-        throw new ValidationError('Unknown validation error', {
-          code: 'VALIDATION_ERROR',
-          details: { schema: schemaName }
-        });
       }
+      
+      if (issues.length > 0) {
+        return {
+          isValid: false,
+          error: ValidationError.schemaValidation(
+            'object',
+            data,
+            `${issues.length} validation issues found`
+          ),
+          issues
+        };
+      }
+      
+      return {
+        isValid: true,
+        data: inputData as unknown as T
+      };
     },
     
-    check: (data: unknown): boolean => {
-      try {
-        validationFn(data);
-        return true;
-      } catch (error) {
-        return false;
+    parse(data: unknown): T {
+      const result = this.validate(data);
+      
+      if (!result.isValid || !result.data) {
+        throw result.error || new ValidationError('Schema validation failed');
       }
+      
+      return result.data;
+    },
+    
+    check(data: unknown): boolean {
+      return this.validate(data).isValid;
     }
   };
 }
 
 /**
- * Create an API validator for specific endpoints
- * 
- * @param endpointValidators - Object mapping endpoint paths to their validators
- * @returns API validator
+ * Validate that the object matches the schema
+ * @param data The data to validate
+ * @param schema The schema to validate against
+ * @returns The validated data
+ * @throws ValidationError if validation fails
  */
-export function createApiValidator<
-  T extends Record<string, SchemaValidator<unknown>>
->(endpointValidators: T): T & {
-  validateRequest: (endpoint: keyof T, data: unknown) => ValidationResult<unknown>;
-  validateResponse: (endpoint: keyof T, data: unknown) => ValidationResult<unknown>;
-} {
-  return {
-    ...endpointValidators,
-    validateRequest: (endpoint: keyof T, data: unknown): ValidationResult<unknown> => {
-      const validator = endpointValidators[endpoint];
-      if (!validator) {
-        return {
-          isValid: false,
-          errors: [new ValidationError(`No validator found for endpoint: ${String(endpoint)}`, {
-            code: 'MISSING_VALIDATOR',
-            details: { endpoint: String(endpoint) }
-          })]
-        };
-      }
-      
-      return validator.validate(data);
-    },
-    validateResponse: (endpoint: keyof T, data: unknown): ValidationResult<unknown> => {
-      const validator = endpointValidators[endpoint];
-      if (!validator) {
-        return {
-          isValid: false,
-          errors: [new ValidationError(`No validator found for endpoint: ${String(endpoint)}`, {
-            code: 'MISSING_VALIDATOR',
-            details: { endpoint: String(endpoint) }
-          })]
-        };
-      }
-      
-      return validator.validate(data);
-    }
-  };
+export function validateSchema<T>(data: unknown, schema: SchemaValidator<T>): T {
+  return schema.parse(data);
 }
 
-export default createSchemaValidator;
+export default validateSchema;
