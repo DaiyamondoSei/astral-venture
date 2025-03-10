@@ -1,172 +1,101 @@
 
 /**
- * Identify insights in text based on keyword patterns
- * Enhanced with semantic grouping and contextual relevance
- * 
- * @param text The AI response text to analyze
- * @returns Array of identified insights with type and content
+ * Keyword-based pattern matcher for insight extraction
+ * Identifies insights based on semantic keywords and their context
  */
-export function identifyInsightsByKeywords(text: string): { type: string; content: string }[] {
-  const insights: { type: string; content: string }[] = [];
-  
-  // Split text into semantic units (paragraphs, sentences)
+
+/**
+ * Extract insights based on keyword patterns in the text
+ * @param text AI response text to analyze for insights
+ * @returns Array of possible insights with relevance scores
+ */
+export function identifyInsightsByKeywords(text: string): { type: string; content: string; relevance: number }[] {
+  // No need to extract if text is too short
+  if (!text || text.length < 50) {
+    return [];
+  }
+
   const paragraphs = text.split(/\n\n+/);
-  const contentBlocks = [];
+  const insights: { type: string; content: string; relevance: number }[] = [];
   
-  // Process paragraphs into semantic content blocks
-  for (let i = 0; i < paragraphs.length; i++) {
-    const paragraph = paragraphs[i].trim();
+  // Define keyword patterns for different insight types
+  const keywordPatterns: Record<string, string[]> = {
+    emotional: [
+      'emotion', 'feel', 'feeling', 'emotional', 'mood', 'anxiety', 'joy', 'peace',
+      'balance', 'stress', 'tension', 'release', 'calm', 'anger', 'frustration'
+    ],
+    chakra: [
+      'chakra', 'energy center', 'root', 'sacral', 'solar plexus', 'heart', 'throat', 
+      'third eye', 'crown', 'kundalini', 'energy flow', 'blockage', 'alignment'
+    ],
+    practice: [
+      'practice', 'meditat', 'exercise', 'technique', 'routine', 'breathe', 'breathing', 
+      'daily', 'habitual', 'posture', 'ritual', 'discipline', 'consistency'
+    ],
+    awareness: [
+      'aware', 'conscious', 'mindful', 'awaken', 'perspective', 'attention', 'present', 
+      'observe', 'witness', 'notice', 'vigilance', 'alertness', 'focus'
+    ],
+    general: [
+      'insight', 'understand', 'realize', 'recognize', 'discover', 'learn', 'wisdom',
+      'knowledge', 'awareness', 'comprehension', 'clarity', 'enlightenment'
+    ]
+  };
+  
+  // Process each paragraph to identify potential insights
+  for (const paragraph of paragraphs) {
+    if (paragraph.length < 40) continue; // Skip very short paragraphs
     
-    // Skip short paragraphs or likely headers
-    if (paragraph.length < 30 || paragraph.endsWith(':') || paragraph.length > 500) {
-      continue;
-    }
+    const lowerParagraph = paragraph.toLowerCase();
+    const typeMatches: Record<string, number> = {};
     
-    // Check if this paragraph should be merged with the next one for context
-    if (i < paragraphs.length - 1) {
-      const nextParagraph = paragraphs[i+1].trim();
-      // If next paragraph is short and related to current, merge them
-      if (nextParagraph.length < 50 && isRelatedContent(paragraph, nextParagraph)) {
-        contentBlocks.push(`${paragraph}\n\n${nextParagraph}`);
-        i++; // Skip the next paragraph since we merged it
-        continue;
+    // Calculate keyword matches for each insight type
+    for (const [type, keywords] of Object.entries(keywordPatterns)) {
+      let matchScore = 0;
+      
+      for (const keyword of keywords) {
+        // Check for exact keyword matches
+        const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+        const matches = lowerParagraph.match(regex);
+        
+        if (matches) {
+          // Calculate relevance based on:
+          // 1. Number of matches
+          // 2. Position in paragraph (earlier = more important)
+          // 3. Keyword density
+          const matchCount = matches.length;
+          const firstPosition = lowerParagraph.indexOf(keyword) / lowerParagraph.length;
+          const density = matchCount / (paragraph.split(' ').length);
+          
+          // Combined relevance score
+          matchScore += matchCount * (1 + (1 - firstPosition) * 0.5) * (1 + density * 10);
+        }
+      }
+      
+      if (matchScore > 0) {
+        typeMatches[type] = matchScore;
       }
     }
     
-    contentBlocks.push(paragraph);
-  }
-  
-  // Define insight patterns with improved categorization
-  const insightPatterns = [
-    { 
-      type: 'emotional', 
-      keywords: [
-        'emotion', 'feel', 'feeling', 'emotional', 'mood', 'energy', 'attitude',
-        'anxiety', 'joy', 'peace', 'balance', 'fear', 'love', 'happiness',
-        'sadness', 'grief', 'anger', 'frustration', 'contentment'
-      ],
-      priority: 2,
-      significanceThreshold: 0.6
-    },
-    { 
-      type: 'chakra', 
-      keywords: [
-        'chakra', 'root', 'sacral', 'solar plexus', 'heart', 'throat', 'third eye',
-        'crown', 'energy center', 'aura', 'kundalini', 'energy flow', 'blockage',
-        'activation', 'alignment', 'balancing', 'energy body'
-      ],
-      priority: 3,
-      significanceThreshold: 0.7
-    },
-    { 
-      type: 'practice', 
-      keywords: [
-        'practice', 'meditation', 'exercise', 'technique', 'routine', 'habit',
-        'discipline', 'ritual', 'breathing', 'breathwork', 'visualization',
-        'mindfulness', 'daily practice', 'morning routine', 'evening routine',
-        'mantra', 'affirmation', 'yoga', 'pranayama', 'cultivate'
-      ],
-      priority: 1,
-      significanceThreshold: 0.5
-    },
-    { 
-      type: 'awareness', 
-      keywords: [
-        'awareness', 'mindful', 'conscious', 'perspective', 'insight',
-        'realization', 'understanding', 'reflection', 'witnessing', 'presence',
-        'observation', 'attention', 'awakening', 'enlightenment', 'transformation',
-        'transcendence', 'higher consciousness', 'higher self'
-      ],
-      priority: 0,
-      significanceThreshold: 0.55
-    }
-  ];
-  
-  // Process each content block
-  contentBlocks.forEach(content => {
-    const normalizedContent = content.toLowerCase();
-    
-    // Find all matching patterns and calculate significance scores
-    const matches = insightPatterns.map(pattern => {
-      let matchCount = 0;
-      let keywordMatches = 0;
+    // Determine the best matching type for this paragraph
+    if (Object.keys(typeMatches).length > 0) {
+      // Find the type with the highest match score
+      const bestType = Object.entries(typeMatches)
+        .sort((a, b) => b[1] - a[1])[0];
       
-      pattern.keywords.forEach(keyword => {
-        // Count occurrences of each keyword
-        const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
-        const matches = normalizedContent.match(regex);
-        if (matches) {
-          keywordMatches++;
-          matchCount += matches.length;
-        }
-      });
-      
-      // Calculate significance score based on keyword diversity and frequency
-      const diversityFactor = keywordMatches / pattern.keywords.length;
-      const frequencyFactor = matchCount / (normalizedContent.length / 50); // Normalize by content length
-      const significanceScore = (diversityFactor * 0.7) + (frequencyFactor * 0.3);
-      
-      return {
-        pattern,
-        significanceScore,
-        keywordMatches
-      };
-    });
-    
-    // Get the most significant match that passes the threshold
-    const bestMatch = matches
-      .filter(m => m.significanceScore >= m.pattern.significanceThreshold && m.keywordMatches >= 2)
-      .sort((a, b) => {
-        // Sort by significance score first, then by pattern priority
-        if (Math.abs(a.significanceScore - b.significanceScore) > 0.1) {
-          return b.significanceScore - a.significanceScore;
-        }
-        return b.pattern.priority - a.pattern.priority;
-      })[0];
-    
-    if (bestMatch) {
-      insights.push({
-        type: bestMatch.pattern.type,
-        content: content
-      });
-    }
-  });
-  
-  return insights;
-}
-
-/**
- * Determine if two content pieces are semantically related
- */
-function isRelatedContent(content1: string, content2: string): boolean {
-  const c1 = content1.toLowerCase();
-  const c2 = content2.toLowerCase();
-  
-  // Check if content2 starts with connective phrases
-  const connectivePhrases = [
-    'this', 'these', 'those', 'it', 'they', 'therefore', 'thus', 'hence',
-    'consequently', 'as a result', 'so', 'additionally', 'furthermore', 
-    'moreover', 'for example', 'such as', 'like', 'including'
-  ];
-  
-  for (const phrase of connectivePhrases) {
-    if (c2.startsWith(phrase)) {
-      return true;
+      // Only include if the score is significant
+      if (bestType[1] > 1.5) {
+        insights.push({
+          type: bestType[0],
+          content: paragraph.trim(),
+          relevance: Math.min(10, bestType[1]) // Cap relevance at 10
+        });
+      }
     }
   }
   
-  // Check if they share significant words (excluding common words)
-  const commonWords = new Set(['and', 'or', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about', 'from']);
-  const words1 = new Set(c1.split(/\W+/).filter(w => w.length > 3 && !commonWords.has(w)));
-  const words2 = new Set(c2.split(/\W+/).filter(w => w.length > 3 && !commonWords.has(w)));
-  
-  let sharedWords = 0;
-  for (const word of words1) {
-    if (words2.has(word)) {
-      sharedWords++;
-    }
-  }
-  
-  // If they share multiple significant words, they're likely related
-  return sharedWords >= 3;
+  // Sort by relevance and limit to most relevant insights
+  return insights
+    .sort((a, b) => b.relevance - a.relevance)
+    .slice(0, 5);
 }
