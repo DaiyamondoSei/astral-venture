@@ -22,17 +22,49 @@ export enum ErrorCode {
   RESOURCE_NOT_FOUND = "resource_not_found",
   RATE_LIMITED = "rate_limited",
   SERVICE_UNAVAILABLE = "service_unavailable",
-  QUOTA_EXCEEDED = "quota_exceeded"
+  QUOTA_EXCEEDED = "quota_exceeded",
+  DATABASE_ERROR = "database_error",
+  TIMEOUT = "timeout",
+  VALIDATION_FAILED = "validation_failed"
+}
+
+/**
+ * Interface for response metadata
+ */
+interface ResponseMetadata {
+  processingTime?: number;
+  version?: string;
+  cacheTTL?: number;
+  rateLimit?: {
+    limit: number;
+    remaining: number;
+    reset: number;
+  };
+  operation?: string;
+  tokenUsage?: number;
+  model?: string;
+  [key: string]: any;
 }
 
 /**
  * Create a successful response with consistent formatting
  */
-export function createSuccessResponse(data: any, statusCode: number = 200) {
+export function createSuccessResponse(
+  data: any, 
+  metadata: ResponseMetadata | number = {},
+  statusCode: number = 200
+) {
+  // Handle legacy function signature where second param was status code
+  if (typeof metadata === 'number') {
+    statusCode = metadata;
+    metadata = {};
+  }
+
   return new Response(
     JSON.stringify({
       success: true,
-      data
+      data,
+      meta: metadata
     }),
     {
       status: statusCode,
@@ -45,10 +77,15 @@ export function createSuccessResponse(data: any, statusCode: number = 200) {
 }
 
 /**
+ * Alias for createSuccessResponse for backward compatibility
+ */
+export const createResponse = createSuccessResponse;
+
+/**
  * Create an error response with consistent formatting
  */
 export function createErrorResponse(
-  code: string,
+  code: string | ErrorCode,
   message: string,
   details: any = null,
   statusCode: number = 400
@@ -85,6 +122,11 @@ export function createPreflightResponse() {
 }
 
 /**
+ * Alias for createPreflightResponse for backward compatibility
+ */
+export const handleCorsRequest = createPreflightResponse;
+
+/**
  * Log events in a structured format
  */
 export function logEvent(
@@ -103,7 +145,10 @@ export function logEvent(
 /**
  * Validate required parameters in a request
  */
-export function validateRequiredParams(params: any, requiredParams: string[]): string[] {
+export function validateRequiredParams(
+  params: any, 
+  requiredParams: string[]
+): string[] {
   const missingParams: string[] = [];
   
   for (const param of requiredParams) {
@@ -113,6 +158,20 @@ export function validateRequiredParams(params: any, requiredParams: string[]): s
   }
   
   return missingParams;
+}
+
+/**
+ * Validate required parameters and return validation result
+ */
+export function validateRequiredParameters(
+  params: any,
+  requiredParams: string[]
+): { isValid: boolean; missingParams: string[] } {
+  const missingParams = validateRequiredParams(params, requiredParams);
+  return {
+    isValid: missingParams.length === 0,
+    missingParams
+  };
 }
 
 /**
@@ -131,4 +190,29 @@ export function createStreamingResponse(
       ...additionalHeaders
     }
   });
+}
+
+/**
+ * Error handling options for edge functions
+ */
+export interface ErrorHandlingOptions {
+  /**
+   * Whether to include stack trace in the response
+   */
+  includeStack?: boolean;
+  
+  /**
+   * Custom error message to return instead of the original
+   */
+  customMessage?: string;
+  
+  /**
+   * Default HTTP status code to use
+   */
+  defaultStatus?: number;
+  
+  /**
+   * Additional context to include in error logs
+   */
+  context?: Record<string, unknown>;
 }

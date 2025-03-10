@@ -6,7 +6,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 // Import shared utilities
 import { 
   corsHeaders,
-  handleCorsRequest
+  createPreflightResponse
 } from "../shared/responseUtils.ts";
 
 import { withAuth } from "../shared/authUtils.ts";
@@ -16,7 +16,7 @@ import { handleAIRequest, handleClearCache } from "./handlers/requestHandler.ts"
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return handleCorsRequest();
+    return createPreflightResponse();
   }
   
   // Add route for clearing cache (admin only)

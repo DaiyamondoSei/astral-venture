@@ -1,17 +1,16 @@
 
-import { createSuccessResponse, createErrorResponse, ErrorCode } from "../../shared/responseUtils.ts";
-import { validateRequiredParameters } from "../../shared/responseUtils.ts";
+import { createSuccessResponse, createErrorResponse, ErrorCode, validateRequiredParameters, ErrorHandlingOptions } from "../../shared/responseUtils.ts";
 import { checkMessageModeration } from "../services/moderationService.ts";
 import { fetchUserContext } from "../services/userContextService.ts";
-import { createPersonalizedSystemPrompt } from "../services/promptBuilder.ts";
-import { buildContextualizedPrompt } from "../services/promptBuilder.ts";
+import { createPersonalizedSystemPrompt, buildContextualizedPrompt } from "../services/promptBuilder.ts";
 import { generateChatResponse, selectOptimalModel } from "../services/openai/index.ts";
 import { handleStreamingRequest } from "./streamingHandler.ts";
 import { processAIResponse } from "./aiResponseHandler.ts";
 import { handleError } from "./errorHandler.ts";
 import { getCachedResponse, cacheResponse, cleanupCache } from "./cacheHandler.ts";
 import { logEvent } from "../../shared/responseUtils.ts";
-import { ErrorHandlingOptions } from "../../shared/requestHandler.ts";
+import { createCacheKey } from "../../shared/cacheUtils.ts";
+import { isAdmin } from "../../shared/authUtils.ts";
 
 // Define improved interface for request parameters
 interface AIRequestParams {
@@ -56,9 +55,12 @@ export async function handleAIRequest(
       );
     }
     
+    // Generate cache key if not provided
+    const actualCacheKey = cacheKey || createCacheKey(message, reflectionContent);
+    
     // Check if we have a cached response
-    if (cacheKey) {
-      const cachedResponse = await getCachedResponse(cacheKey, stream);
+    if (actualCacheKey) {
+      const cachedResponse = await getCachedResponse(actualCacheKey, stream);
       if (cachedResponse) {
         return cachedResponse;
       }
@@ -98,8 +100,8 @@ export async function handleAIRequest(
       const streamingResponse = await handleStreamingRequest(prompt, systemPrompt, model);
       
       // Cache the streaming response if we have a cache key
-      if (cacheKey) {
-        await cacheResponse(cacheKey, streamingResponse.clone(), true);
+      if (actualCacheKey) {
+        await cacheResponse(actualCacheKey, streamingResponse.clone(), true);
       }
       
       return streamingResponse;
@@ -122,8 +124,8 @@ export async function handleAIRequest(
     );
     
     // Cache the response if we have a cache key
-    if (cacheKey) {
-      await cacheResponse(cacheKey, response.clone(), false);
+    if (actualCacheKey) {
+      await cacheResponse(actualCacheKey, response.clone(), false);
     }
     
     logEvent("info", "AI response generated successfully", {
@@ -150,15 +152,8 @@ export async function handleClearCache(
   options: ErrorHandlingOptions = {}
 ): Promise<Response> {
   try {
-    // Extract auth header correctly
-    const authHeader = req.headers.get("authorization") || "";
-    
-    // Check if user is admin with better validation
-    const isAdmin = user && 
-                   (user.app_metadata?.role === "admin" || 
-                    authHeader.includes("admin-key"));
-    
-    if (!isAdmin) {
+    // Check if user is admin
+    if (!isAdmin(user)) {
       return createErrorResponse(
         ErrorCode.UNAUTHORIZED,
         "Admin privileges required",

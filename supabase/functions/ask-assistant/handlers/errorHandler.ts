@@ -6,7 +6,8 @@ import {
   corsHeaders,
   createErrorResponse,
   ErrorCode,
-  logEvent
+  logEvent,
+  ErrorHandlingOptions
 } from "../../shared/responseUtils.ts";
 
 /**
@@ -15,7 +16,7 @@ import {
  * @param error The error object from OpenAI
  * @returns Formatted error response
  */
-export function handleOpenAIError(error: any): Response {
+export function handleOpenAIError(error: any, options: ErrorHandlingOptions = {}): Response {
   // Extract error details
   const errorMessage = error.message || "Unknown OpenAI API error";
   let errorCode = ErrorCode.EXTERNAL_API_ERROR;
@@ -47,9 +48,18 @@ export function handleOpenAIError(error: any): Response {
       errorCode = ErrorCode.RATE_LIMITED;
       statusCode = 429; // Too Many Requests
     } else if (errorMessage.includes("invalid_api_key") || errorMessage.includes("authentication")) {
-      errorCode = "invalid_api_key";
+      errorCode = ErrorCode.UNAUTHORIZED;
       statusCode = 401; // Unauthorized
     }
+    
+    // Include stack trace if enabled and in development
+    const includeStack = options.includeStack && (Deno.env.get("ENVIRONMENT") !== "production");
+    if (includeStack && error.stack) {
+      errorDetails.stack = error.stack;
+    }
+    
+    // Use custom message if provided
+    const message = options.customMessage || "Error communicating with AI service";
     
     // Log the error
     logEvent("error", "OpenAI API error", {
@@ -61,7 +71,7 @@ export function handleOpenAIError(error: any): Response {
     // Create standardized error response
     return createErrorResponse(
       errorCode,
-      "Error communicating with AI service",
+      message,
       {
         originalError: errorMessage,
         ...errorDetails
@@ -135,22 +145,76 @@ export function handleAuthError(message?: string): Response {
  * Handle unexpected errors
  * 
  * @param error The error object
+ * @param options Error handling options
  * @returns Error response
  */
-export function handleUnexpectedError(error: any): Response {
+export function handleUnexpectedError(error: any, options: ErrorHandlingOptions = {}): Response {
   const errorMessage = error instanceof Error ? error.message : String(error);
+  const includeStack = options.includeStack && (Deno.env.get("ENVIRONMENT") !== "production");
+  
+  // Determine status code
+  const statusCode = options.defaultStatus || 500;
   
   // Log the unexpected error
   logEvent("error", "Unexpected error", {
     error: errorMessage,
-    stack: error instanceof Error ? error.stack : undefined
+    stack: includeStack && error instanceof Error ? error.stack : undefined,
+    context: options.context
   });
+  
+  // Include appropriate details
+  const details: Record<string, unknown> = { 
+    errorType: error.constructor?.name || typeof error
+  };
+  
+  if (includeStack && error instanceof Error && error.stack) {
+    details.stack = error.stack;
+  }
+  
+  if (options.context) {
+    details.context = options.context;
+  }
   
   // Create generic error response
   return createErrorResponse(
     ErrorCode.INTERNAL_ERROR,
-    "An unexpected error occurred",
-    { details: errorMessage },
-    500
+    options.customMessage || "An unexpected error occurred",
+    details,
+    statusCode
   );
+}
+
+/**
+ * Main error handler function for edge functions
+ */
+export function handleError(error: any, options: ErrorHandlingOptions = {}): Response {
+  // Check for specific error types
+  if (error.name === 'OpenAIError' || error.message?.includes('OpenAI')) {
+    return handleOpenAIError(error, options);
+  }
+  
+  if (error.message?.includes('validation') || error.name === 'ValidationError') {
+    return createErrorResponse(
+      ErrorCode.VALIDATION_FAILED,
+      options.customMessage || error.message,
+      error.details || { error: String(error) },
+      400
+    );
+  }
+  
+  if (error.message?.includes('auth') || error.status === 401 || error.statusCode === 401) {
+    return handleAuthError(options.customMessage);
+  }
+  
+  if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
+    return createErrorResponse(
+      ErrorCode.TIMEOUT,
+      options.customMessage || "Request timed out",
+      { error: error.message },
+      408 // Request Timeout
+    );
+  }
+  
+  // Default to unexpected error handling
+  return handleUnexpectedError(error, options);
 }

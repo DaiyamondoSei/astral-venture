@@ -1,196 +1,120 @@
 
 /**
- * ValidationError Class
+ * Validation Error Class
  * 
- * A specialized error class for validation errors with structured information
- * about the specific validation that failed.
+ * A specialized error class for validation errors with rich metadata.
  */
+import { AppError } from '../errorHandling/AppError';
+import { ErrorCategory, ErrorSeverity } from '../errorHandling/types';
 
-// Default error messages
-const DEFAULT_ERROR_MESSAGES = {
-  required: 'This field is required',
-  type: 'Type validation failed',
-  format: 'Invalid format',
-  range: 'Value is out of range',
-  pattern: 'Pattern validation failed',
-  custom: 'Validation failed'
-};
-
-export interface ValidationErrorOptions {
+export interface ValidationErrorDetails {
   field?: string;
-  code?: string;
-  value?: unknown;
-  rule?: string;
+  arrayIndex?: number;
   expectedType?: string;
-  details?: string | Record<string, unknown>;
-  statusCode?: number;
+  actualType?: string;
+  allowedValues?: unknown[];
+  actualValue?: unknown;
+  recordField?: string;
+  extraFields?: string[];
+  allErrors?: ValidationError[];
   originalError?: unknown;
+  path?: string;
+  [key: string]: unknown;
 }
 
-/**
- * Specialized error class for validation failures
- */
 export class ValidationError extends Error {
-  /** Field that failed validation */
-  readonly field: string;
-  
-  /** Validation error code */
-  readonly code: string;
-  
-  /** Value that failed validation */
-  readonly value: unknown;
-  
-  /** Validation rule that failed */
-  readonly rule?: string;
-  
-  /** Expected type for type validations */
-  readonly expectedType?: string;
-  
-  /** Additional details about the validation failure */
-  readonly details?: string | Record<string, unknown>;
-  
-  /** HTTP status code to use (typically 400) */
-  readonly statusCode: number;
-  
-  /** Original error if this wraps another error */
-  readonly originalError?: unknown;
-  
   /**
-   * Create a new validation error
+   * Additional details about the validation failure
    */
-  constructor(message: string, options: ValidationErrorOptions = {}) {
+  readonly details: ValidationErrorDetails;
+
+  constructor(message: string, details: ValidationErrorDetails = {}) {
     super(message);
     this.name = 'ValidationError';
-    this.field = options.field || 'unknown';
-    this.code = options.code || 'validation_error';
-    this.value = options.value;
-    this.rule = options.rule;
-    this.expectedType = options.expectedType;
-    this.details = options.details;
-    this.statusCode = options.statusCode || 400;
-    this.originalError = options.originalError;
-    
+    this.details = details;
+
     // This is needed to make instanceof work correctly
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
-  
+
   /**
-   * Factory method to create a required field error
+   * Get a user-friendly message about this error
    */
-  static requiredError(field: string, message?: string): ValidationError {
-    return new ValidationError(
-      message || `${field} is required`,
+  toUserMessage(): string {
+    const { field } = this.details;
+    if (field) {
+      return `Invalid value for ${field}: ${this.message}`;
+    }
+    return this.message;
+  }
+
+  /**
+   * Convert to an AppError for consistent error handling
+   */
+  toAppError(): AppError {
+    return new AppError(
+      this.message,
       {
-        field,
-        code: 'required',
-        rule: 'required'
-      }
+        severity: ErrorSeverity.WARNING,
+        category: ErrorCategory.VALIDATION,
+        userMessage: this.toUserMessage(),
+        context: this.details
+      },
+      this
     );
   }
-  
+
   /**
-   * Factory method to create a type error
+   * Create a ValidationError from an API error response
    */
-  static typeError(
-    field: string, 
-    expectedType: string, 
-    value: unknown, 
-    message?: string
-  ): ValidationError {
-    return new ValidationError(
-      message || `${field} must be a ${expectedType}`,
-      {
-        field,
-        code: 'type_error',
-        rule: 'type-check',
-        expectedType,
-        value
-      }
-    );
-  }
-  
-  /**
-   * Factory method to create a format error
-   */
-  static formatError(
-    field: string,
-    pattern: string,
-    value: unknown,
-    message?: string
-  ): ValidationError {
-    return new ValidationError(
-      message || `${field} has an invalid format`,
-      {
-        field,
-        code: 'format_error',
-        rule: 'format',
-        details: { pattern },
-        value
-      }
-    );
-  }
-  
-  /**
-   * Factory method to create a range error
-   */
-  static rangeError(
-    field: string,
-    min?: number,
-    max?: number,
-    value?: unknown,
-    message?: string
-  ): ValidationError {
-    const details: Record<string, unknown> = {};
-    if (min !== undefined) details.min = min;
-    if (max !== undefined) details.max = max;
-    
-    return new ValidationError(
-      message || `${field} is out of range`,
-      {
-        field,
-        code: 'range_error',
-        rule: min !== undefined && max !== undefined 
-          ? 'range' 
-          : min !== undefined ? 'min' : 'max',
-        details,
-        value
-      }
-    );
-  }
-  
-  /**
-   * Factory method to create an API validation error
-   */
-  static fromApiError(
-    error: unknown, 
-    defaultMessage = 'API validation failed'
-  ): ValidationError {
-    // Handle case where the error is already a ValidationError
-    if (isValidationError(error)) {
-      return error;
+  static fromApiError(apiError: any): ValidationError {
+    // Handle API error formats from different sources
+    if (apiError.validation?.errors) {
+      // Handle validation errors with a list of field errors
+      const firstError = apiError.validation.errors[0];
+      return new ValidationError(
+        firstError.message || 'Validation failed',
+        {
+          field: firstError.field,
+          allErrors: apiError.validation.errors.map((err: any) => 
+            new ValidationError(err.message, { field: err.field })
+          )
+        }
+      );
     }
     
-    // Try to extract information from other error types
-    const message = error instanceof Error ? error.message : String(error);
-    
-    return new ValidationError(message || defaultMessage, {
-      code: 'api_validation_error',
-      originalError: error,
-      statusCode: 400
+    // Generic API error
+    return new ValidationError(
+      apiError.message || 'API validation failed',
+      { 
+        apiError: apiError 
+      }
+    );
+  }
+
+  /**
+   * Determine if an unknown error is a ValidationError
+   */
+  static isValidationError(error: unknown): error is ValidationError {
+    return (
+      error instanceof ValidationError ||
+      (error instanceof Error && error.name === 'ValidationError')
+    );
+  }
+
+  /**
+   * Create schema-specific validation error
+   */
+  static schemaError(message: string, path?: string): ValidationError {
+    return new ValidationError(`Schema validation failed: ${message}`, { 
+      path 
     });
   }
 }
 
 /**
- * Type guard to check if an error is a ValidationError
+ * Helper to check if an error is a validation error
  */
 export function isValidationError(error: unknown): error is ValidationError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    error.name === 'ValidationError'
-  );
+  return ValidationError.isValidationError(error);
 }
-
-export default ValidationError;

@@ -1,122 +1,104 @@
 
 /**
- * Shared caching utilities for Edge Functions
+ * Shared caching utilities for edge functions
  */
-
-// Default cache TTL (30 minutes)
-const DEFAULT_CACHE_TTL = 30 * 60 * 1000;
 
 /**
- * Create a cache key from input parameters
+ * Create a cache key based on input parameters
+ * 
+ * @param query The main query/prompt
+ * @param context Optional context data
+ * @param model The AI model being used
+ * @returns A consistent cache key
  */
-export function createCacheKey(
-  query: string,
-  context?: string | null,
-  model?: string
-): string {
-  // Normalize inputs for consistent keys
+export function createCacheKey(query: string, context: any = null, model: string = 'default'): string {
+  // Normalize the query by trimming whitespace and lowercasing
   const normalizedQuery = query.trim().toLowerCase();
-  const normalizedContext = context ? context.trim().toLowerCase() : '';
-  const normalizedModel = model || 'default';
   
-  // Create a composite key
-  const compositeKey = `${normalizedModel}:${normalizedQuery}:${normalizedContext}`;
+  // Hash function to create a simple string hash
+  const simpleHash = (str: string): string => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString(16);
+  };
   
-  // Use a hash function for shorter keys
-  // Simple hash implementation that's good enough for caching
-  let hash = 0;
-  for (let i = 0; i < compositeKey.length; i++) {
-    const char = compositeKey.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+  // Create base key from query
+  const queryHash = simpleHash(normalizedQuery);
+  
+  // Add context hash if provided
+  let contextHash = '';
+  if (context) {
+    // If context is an object, stringify it first
+    const contextStr = typeof context === 'string' 
+      ? context 
+      : JSON.stringify(context);
+    
+    contextHash = `-${simpleHash(contextStr)}`;
   }
   
-  return `cache:${Math.abs(hash).toString(16)}`;
+  // Add model information
+  const modelSuffix = model ? `-${model.replace(/[^a-z0-9]/gi, '_')}` : '';
+  
+  // Combine all parts
+  return `q-${queryHash}${contextHash}${modelSuffix}`;
 }
 
 /**
- * Store a value in the KV store with expiration
+ * Get cache time-to-live based on content type
+ * 
+ * @param contentType Type of content being cached
+ * @returns Cache TTL in milliseconds
  */
-export async function setCacheValue(
-  key: string,
-  value: any,
-  ttl: number = DEFAULT_CACHE_TTL
-): Promise<void> {
-  try {
-    // Add expiration timestamp
-    const expiresAt = Date.now() + ttl;
-    const cacheObject = {
-      value,
-      expiresAt
-    };
-    
-    // Store serialized value
-    await Deno.env.get("SUPABASE_KV")?.set(key, JSON.stringify(cacheObject));
-  } catch (error) {
-    console.error("Cache set error:", error);
-    // Fail silently - caching errors shouldn't break functionality
+export function getCacheTTL(contentType: 'query' | 'context' | 'reflection' | 'user' = 'query'): number {
+  switch (contentType) {
+    case 'query':
+      return 30 * 60 * 1000; // 30 minutes for general queries
+    case 'context':
+      return 24 * 60 * 60 * 1000; // 24 hours for context data
+    case 'reflection':
+      return 7 * 24 * 60 * 60 * 1000; // 7 days for reflections
+    case 'user':
+      return 60 * 60 * 1000; // 1 hour for user data
+    default:
+      return 15 * 60 * 1000; // 15 minutes default
   }
 }
 
 /**
- * Retrieve a value from the KV store, checking expiration
+ * Create a cache key for user-specific content
+ * 
+ * @param userId User ID
+ * @param action The action/query being performed
+ * @param params Optional parameters
+ * @returns User-specific cache key
  */
-export async function getCacheValue<T>(key: string): Promise<T | null> {
-  try {
-    // Get value from KV store
-    const cachedData = await Deno.env.get("SUPABASE_KV")?.get<string>(key);
+export function createUserCacheKey(userId: string, action: string, params: any = null): string {
+  if (!userId) return '';
+  
+  const prefix = `user-${userId.slice(0, 8)}`;
+  const actionKey = action.replace(/[^a-z0-9]/gi, '_');
+  
+  let paramSuffix = '';
+  if (params) {
+    // If params is an object, stringify it and create a hash
+    const paramStr = typeof params === 'string' 
+      ? params 
+      : JSON.stringify(params);
     
-    if (!cachedData) {
-      return null;
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < paramStr.length; i++) {
+      const char = paramStr.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
     }
     
-    // Parse the cache object
-    const cacheObject = JSON.parse(cachedData);
-    
-    // Check if value has expired
-    if (cacheObject.expiresAt && cacheObject.expiresAt < Date.now()) {
-      // Expired, remove from cache
-      await Deno.env.get("SUPABASE_KV")?.delete(key);
-      return null;
-    }
-    
-    return cacheObject.value as T;
-  } catch (error) {
-    console.error("Cache get error:", error);
-    // Fail silently - caching errors shouldn't break functionality
-    return null;
+    paramSuffix = `-${hash.toString(16)}`;
   }
-}
-
-/**
- * Remove a value from the KV store
- */
-export async function deleteCacheValue(key: string): Promise<void> {
-  try {
-    await Deno.env.get("SUPABASE_KV")?.delete(key);
-  } catch (error) {
-    console.error("Cache delete error:", error);
-    // Fail silently - caching errors shouldn't break functionality
-  }
-}
-
-/**
- * Clear all keys with a specific prefix
- */
-export async function clearCacheByPrefix(prefix: string): Promise<void> {
-  try {
-    const kv = Deno.env.get("SUPABASE_KV");
-    if (!kv) return;
-    
-    // List all keys with the prefix
-    const keys = await kv.list({ prefix });
-    
-    // Delete each key
-    for await (const key of keys) {
-      await kv.delete(key.key);
-    }
-  } catch (error) {
-    console.error("Cache clear error:", error);
-    // Fail silently - caching errors shouldn't break functionality
-  }
+  
+  return `${prefix}-${actionKey}${paramSuffix}`;
 }

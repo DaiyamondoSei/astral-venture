@@ -1,77 +1,85 @@
 /**
  * Performance Metrics Collector
  * 
- * This module handles the collection of performance metrics from components.
+ * Collects and organizes performance metrics for components and web vitals.
  */
 
-import type { ComponentMetric, ComponentMetrics, MetricType, MetricsSubscriber, WebVitalMetric } from './types';
+import type { MetricType, ComponentMetrics, WebVitalMetric } from './types';
 
-export class MetricsCollector {
+interface MetricsSubscription {
+  callback: (metrics: Map<string, ComponentMetrics>) => void;
+  id: string;
+}
+
+class MetricsCollector {
   private metrics: Map<string, ComponentMetrics> = new Map();
   private webVitals: WebVitalMetric[] = [];
-  private slowThreshold: number = 16; // 16ms = 60fps
-  private subscribers: Set<MetricsSubscriber> = new Set();
-
-  constructor() {
-    this.reset();
-  }
-
-  public reset(): void {
-    this.metrics = new Map();
-    this.webVitals = [];
-  }
-
-  public setSlowThreshold(threshold: number): void {
-    this.slowThreshold = threshold;
-  }
-
+  private slowThreshold: number = 16; // 16ms = 1 frame at 60fps
+  private subscribers: MetricsSubscription[] = [];
+  private nextSubscriberId: number = 1;
+  
+  /**
+   * Add or update a component metric
+   */
   public addComponentMetric(
     componentName: string,
     renderTime: number,
     type: MetricType = 'render'
   ): void {
-    const timestamp = Date.now();
-    const metric: ComponentMetric = {
-      componentName,
-      renderTime,
-      timestamp,
-      type
-    };
-
-    const existingMetrics = this.metrics.get(componentName) || {
-      totalRenders: 0,
-      slowRenders: 0,
-      totalRenderTime: 0,
-      firstRenderTime: null,
-      lastRenderTime: timestamp,
-      metrics: []
-    };
-
-    existingMetrics.totalRenders += 1;
-    existingMetrics.totalRenderTime += renderTime;
-    existingMetrics.lastRenderTime = timestamp;
+    const existingMetric = this.metrics.get(componentName);
     
-    if (renderTime > this.slowThreshold) {
-      existingMetrics.slowRenders += 1;
+    if (existingMetric) {
+      // Update existing metric
+      existingMetric.totalRenderTime += renderTime;
+      existingMetric.renderCount += 1;
+      existingMetric.averageRenderTime = existingMetric.totalRenderTime / existingMetric.renderCount;
+      existingMetric.lastRenderTime = renderTime;
+      
+      if (renderTime > this.slowThreshold) {
+        existingMetric.slowRenderCount += 1;
+      }
+      
+      if (renderTime > existingMetric.maxRenderTime) {
+        existingMetric.maxRenderTime = renderTime;
+      }
+      
+      if (renderTime < existingMetric.minRenderTime || existingMetric.minRenderTime === 0) {
+        existingMetric.minRenderTime = renderTime;
+      }
+      
+      existingMetric.renderTimes.push(renderTime);
+      // Keep only the last 100 render times
+      if (existingMetric.renderTimes.length > 100) {
+        existingMetric.renderTimes.shift();
+      }
+      
+      // Update last updated timestamp
+      existingMetric.lastUpdated = Date.now();
+    } else {
+      // Create new metric
+      this.metrics.set(componentName, {
+        componentName,
+        totalRenderTime: renderTime,
+        renderCount: 1,
+        averageRenderTime: renderTime,
+        lastRenderTime: renderTime,
+        slowRenderCount: renderTime > this.slowThreshold ? 1 : 0,
+        maxRenderTime: renderTime,
+        minRenderTime: renderTime,
+        renderTimes: [renderTime],
+        createdAt: Date.now(),
+        lastUpdated: Date.now(),
+        metricType: type
+      });
     }
-    
-    if (existingMetrics.firstRenderTime === null) {
-      existingMetrics.firstRenderTime = renderTime;
-    }
-    
-    existingMetrics.metrics.push(metric);
-    
-    // Keep only the most recent metrics to avoid memory leaks
-    if (existingMetrics.metrics.length > 20) {
-      existingMetrics.metrics = existingMetrics.metrics.slice(-20);
-    }
-    
-    this.metrics.set(componentName, existingMetrics);
     
     // Notify subscribers
     this.notifySubscribers();
   }
-
+  
+  /**
+   * Add a web vital metric
+   */
   public addWebVital(
     name: string,
     value: number,
@@ -80,54 +88,112 @@ export class MetricsCollector {
     this.webVitals.push({
       name,
       value,
-      category,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      category
     });
     
-    // Keep only recent web vitals
-    if (this.webVitals.length > 50) {
-      this.webVitals = this.webVitals.slice(-50);
+    // Limit the number of stored web vitals to prevent memory issues
+    if (this.webVitals.length > 500) {
+      this.webVitals.shift();
     }
   }
-
+  
+  /**
+   * Get all metrics
+   */
   public getMetrics(): Map<string, ComponentMetrics> {
     return new Map(this.metrics);
   }
-
+  
+  /**
+   * Get web vitals metrics
+   */
   public getWebVitals(): WebVitalMetric[] {
     return [...this.webVitals];
   }
-
+  
+  /**
+   * Set the threshold for slow renders
+   */
+  public setSlowThreshold(thresholdMs: number): void {
+    this.slowThreshold = thresholdMs;
+    
+    // Recalculate slow render counts for all metrics
+    this.metrics.forEach(metric => {
+      metric.slowRenderCount = metric.renderTimes.filter(time => time > thresholdMs).length;
+    });
+  }
+  
+  /**
+   * Get the current slow threshold
+   */
+  public getSlowThreshold(): number {
+    return this.slowThreshold;
+  }
+  
+  /**
+   * Reset all collected metrics
+   */
+  public reset(): void {
+    this.metrics.clear();
+    this.webVitals = [];
+    this.notifySubscribers();
+  }
+  
+  /**
+   * Get the components with the slowest average render times
+   */
   public getSlowestComponents(limit: number = 5): [string, ComponentMetrics][] {
-    const metricsArray = Array.from(this.metrics.entries());
-    return metricsArray
-      .sort((a, b) => {
-        const aAvg = a[1].totalRenderTime / a[1].totalRenders;
-        const bAvg = b[1].totalRenderTime / b[1].totalRenders;
-        return bAvg - aAvg;
-      })
+    return Array.from(this.metrics.entries())
+      .sort((a, b) => b[1].averageRenderTime - a[1].averageRenderTime)
       .slice(0, limit);
   }
-
-  public subscribe(callback: MetricsSubscriber): () => void {
-    this.subscribers.add(callback);
+  
+  /**
+   * Get components with the most renders
+   */
+  public getMostRenderedComponents(limit: number = 5): [string, ComponentMetrics][] {
+    return Array.from(this.metrics.entries())
+      .sort((a, b) => b[1].renderCount - a[1].renderCount)
+      .slice(0, limit);
+  }
+  
+  /**
+   * Subscribe to metrics updates
+   */
+  public subscribe(callback: (metrics: Map<string, ComponentMetrics>) => void): () => void {
+    const id = `sub_${this.nextSubscriberId++}`;
+    
+    this.subscribers.push({
+      callback,
+      id
+    });
+    
+    // Return unsubscribe function
     return () => {
-      this.subscribers.delete(callback);
+      this.subscribers = this.subscribers.filter(sub => sub.id !== id);
     };
   }
-
+  
+  /**
+   * Notify all subscribers of metrics updates
+   */
   private notifySubscribers(): void {
-    for (const subscriber of this.subscribers) {
+    if (this.subscribers.length === 0) return;
+    
+    const metrics = this.getMetrics();
+    this.subscribers.forEach(sub => {
       try {
-        subscriber(this.metrics);
+        sub.callback(metrics);
       } catch (error) {
-        console.error('Error in performance metrics subscriber:', error);
+        console.error('Error in metrics subscriber:', error);
       }
-    }
+    });
   }
 }
 
 // Create a singleton instance
 export const metricsCollector = new MetricsCollector();
 
+// Export the singleton instance as the default export
 export default metricsCollector;
