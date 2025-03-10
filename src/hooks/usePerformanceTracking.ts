@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import performanceMonitor from '@/utils/performance/performanceMonitor';
 import { ValidationError } from '@/utils/validation/ValidationError';

@@ -3,66 +3,64 @@
  * Shared type definitions for edge functions
  */
 
-// Error types
-export class ValidationError extends Error {
-  field: string;
+// Base error types
+export interface ErrorDetails {
+  message: string;
+  code?: string;
+  field?: string;
+  details?: unknown;
+}
+
+// Error types with proper inheritance
+export class BaseError extends Error {
   code?: string;
   details?: unknown;
 
-  constructor(message: string, field: string, code?: string, details?: unknown) {
+  constructor(message: string, code?: string, details?: unknown) {
     super(message);
-    this.name = "ValidationError";
-    this.field = field;
+    this.name = this.constructor.name;
     this.code = code;
     this.details = details;
     
-    // This is needed in TypeScript to maintain proper inheritance
-    Object.setPrototypeOf(this, ValidationError.prototype);
+    // Required for proper inheritance in TypeScript
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
-export class AuthenticationError extends Error {
-  code?: string;
+export class ValidationError extends BaseError {
+  field: string;
 
+  constructor(message: string, field: string, code?: string, details?: unknown) {
+    super(message, code, details);
+    this.field = field;
+  }
+}
+
+export class AuthenticationError extends BaseError {
   constructor(message: string, code?: string) {
-    super(message);
-    this.name = "AuthenticationError";
-    this.code = code;
-    
-    // This is needed in TypeScript to maintain proper inheritance
-    Object.setPrototypeOf(this, AuthenticationError.prototype);
+    super(message, code);
   }
 }
 
-export class DatabaseError extends Error {
+export class DatabaseError extends BaseError {
   operation: string;
   table?: string;
-  code?: string;
 
   constructor(message: string, operation: string, table?: string, code?: string) {
-    super(message);
-    this.name = "DatabaseError";
+    super(message, code);
     this.operation = operation;
     this.table = table;
-    this.code = code;
-    
-    // This is needed in TypeScript to maintain proper inheritance
-    Object.setPrototypeOf(this, DatabaseError.prototype);
   }
 }
 
-export class ExternalApiError extends Error {
+export class ExternalApiError extends BaseError {
   service: string;
   statusCode?: number;
   
   constructor(message: string, service: string, statusCode?: number) {
-    super(message);
-    this.name = "ExternalApiError";
+    super(message, 'EXTERNAL_API_ERROR');
     this.service = service;
     this.statusCode = statusCode;
-    
-    // This is needed in TypeScript to maintain proper inheritance
-    Object.setPrototypeOf(this, ExternalApiError.prototype);
   }
 }
 
@@ -70,15 +68,11 @@ export class ExternalApiError extends Error {
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  error?: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
+  error?: ErrorDetails;
   metadata?: Record<string, unknown>;
 }
 
-// Chat service types
+// Chat service types with improved type safety
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -104,7 +98,7 @@ export interface ChatCompletionResult {
   metrics: ChatCompletionMetrics;
 }
 
-// User context types
+// User context types with strict typing
 export interface UserContext {
   userId: string;
   username?: string;
@@ -113,7 +107,7 @@ export interface UserContext {
 }
 
 export interface UserPreferences {
-  theme?: string;
+  theme?: "light" | "dark" | "system";
   notifications?: boolean;
   language?: string;
 }
@@ -125,7 +119,7 @@ export interface UserProfile {
   completedPractices?: number;
 }
 
-// Function handler options
+// Function handler options with strict typing
 export interface RequestHandlerOptions {
   requireAuth?: boolean;
   adminOnly?: boolean;
@@ -135,7 +129,7 @@ export interface RequestHandlerOptions {
   };
 }
 
-// Types for global Deno namespace
+// Global type declarations
 declare global {
   interface Deno {
     env: {
@@ -144,7 +138,6 @@ declare global {
     };
   }
   
-  // For EdgeRuntime
   interface EdgeRuntime {
     waitUntil(promise: Promise<any>): void;
   }

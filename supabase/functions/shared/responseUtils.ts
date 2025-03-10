@@ -11,34 +11,26 @@ export const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Error codes for standardized error handling
+// Error codes mapping
 export enum ErrorCode {
-  // Authentication errors
   UNAUTHORIZED = "unauthorized",
   AUTHENTICATION_ERROR = "authentication_error",
   INVALID_TOKEN = "invalid_token",
   
-  // Validation errors
   VALIDATION_FAILED = "validation_failed",
   MISSING_PARAMETERS = "missing_parameters",
   INVALID_PARAMETERS = "invalid_parameters",
   
-  // Processing errors
   INTERNAL_ERROR = "internal_error",
   EXTERNAL_API_ERROR = "external_api_error",
   TIMEOUT = "timeout",
   
-  // Rate limiting
   RATE_LIMITED = "rate_limited",
   QUOTA_EXCEEDED = "quota_exceeded",
   
-  // Network errors
   NETWORK_ERROR = "network_error",
-  
-  // Database errors
   DATABASE_ERROR = "database_error",
   
-  // Content errors
   CONTENT_POLICY_VIOLATION = "content_policy_violation"
 }
 
@@ -46,7 +38,7 @@ export enum ErrorCode {
  * Create a standardized success response
  */
 export function createSuccessResponse<T>(
-  data: T, 
+  data: T,
   metadata?: Record<string, unknown>
 ): Response {
   const response: ApiResponse<T> = {
@@ -104,66 +96,6 @@ export function handleCorsRequest(): Response {
 }
 
 /**
- * Validate required parameters in a request
- */
-export function validateRequiredParameters<T extends Record<string, any>>(
-  params: T,
-  requiredParams: Array<keyof T>
-): { isValid: boolean; missingParams: string[] } {
-  const missingParams: string[] = [];
-  
-  for (const param of requiredParams) {
-    if (params[param] === undefined || params[param] === null || params[param] === '') {
-      missingParams.push(String(param));
-    }
-  }
-  
-  return {
-    isValid: missingParams.length === 0,
-    missingParams
-  };
-}
-
-/**
- * Validate parameter types
- */
-export function validateParameterTypes<T extends Record<string, any>>(
-  params: T,
-  typeValidations: Record<keyof T, (value: any) => boolean>
-): { isValid: boolean; invalidParams: { param: string; expected: string; received: string }[] } {
-  const invalidParams: { param: string; expected: string; received: string }[] = [];
-  
-  for (const [param, validator] of Object.entries(typeValidations) as [keyof T, (value: any) => boolean][]) {
-    if (params[param] !== undefined && !validator(params[param])) {
-      invalidParams.push({
-        param: String(param),
-        expected: getFunctionExpectedType(validator),
-        received: typeof params[param]
-      });
-    }
-  }
-  
-  return {
-    isValid: invalidParams.length === 0,
-    invalidParams
-  };
-}
-
-/**
- * Get the expected type from a validator function
- */
-function getFunctionExpectedType(validator: Function): string {
-  const fnStr = validator.toString();
-  if (fnStr.includes('typeof') && fnStr.includes('===')) {
-    const match = fnStr.match(/typeof .+ === ['"](.+)['"]/);
-    if (match && match[1]) {
-      return match[1];
-    }
-  }
-  return "unknown";
-}
-
-/**
  * Log events with structured information
  */
 export function logEvent(
@@ -196,16 +128,15 @@ export function parseApiError(error: unknown): {
   code?: string;
   details?: unknown;
 } {
+  if (error instanceof ValidationError) {
+    return {
+      message: error.message,
+      code: error.code || ErrorCode.VALIDATION_FAILED,
+      details: { field: error.field, details: error.details }
+    };
+  }
+  
   if (error instanceof Error) {
-    if (error instanceof ValidationError) {
-      return {
-        message: error.message,
-        code: error.code || ErrorCode.VALIDATION_FAILED,
-        details: { field: error.field, details: error.details }
-      };
-    }
-    
-    // Check for fetch/response errors
     const anyError = error as any;
     if (anyError.status && anyError.statusText) {
       return {
@@ -218,6 +149,5 @@ export function parseApiError(error: unknown): {
     return { message: error.message };
   }
   
-  // Handle unknown error types
   return { message: String(error) };
 }
