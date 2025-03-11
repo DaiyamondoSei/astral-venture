@@ -24,6 +24,15 @@ export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network
 export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
 export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 'responsiveness';
 
+// Web vital metric structure
+export interface WebVitalMetric {
+  name: string;
+  value: number;
+  category: WebVitalCategory;
+  timestamp: number;
+  rating?: 'good' | 'needs-improvement' | 'poor';
+}
+
 // Performance metric structure
 export interface PerformanceMetric {
   component_name?: string;
@@ -120,4 +129,13 @@ export interface PerformanceBoundaries {
   criticalMemory: number;
   highMemory: number;
   mediumMemory: number;
+}
+
+// Performance metric validation interface
+export interface MetricValidation {
+  validateMetric: (metric: PerformanceMetric) => boolean;
+  validateWebVital: (vital: WebVitalMetric) => boolean;
+  isValidMetricType: (type: string) => type is MetricType;
+  isValidWebVitalName: (name: string) => name is WebVitalName;
+  isValidWebVitalCategory: (category: string) => category is WebVitalCategory;
 }

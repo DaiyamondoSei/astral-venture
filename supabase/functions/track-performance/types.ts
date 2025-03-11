@@ -8,6 +8,23 @@
 export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network' | 'resource' | 'javascript' | 'css' | 'animation' | 'metric' | 'summary' | 'performance' | 'webVital';
 
 /**
+ * Web vital metrics
+ */
+export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
+export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 'responsiveness';
+
+/**
+ * Web vital metric structure
+ */
+export interface WebVitalMetric {
+  name: string;
+  value: number;
+  category: WebVitalCategory;
+  timestamp: number;
+  rating?: 'good' | 'needs-improvement' | 'poor';
+}
+
+/**
  * Performance metric record for database storage
  */
 export interface PerformanceMetric {
@@ -31,6 +48,7 @@ export interface PerformanceMetric {
  */
 export interface TrackPerformancePayload {
   metrics: PerformanceMetric[];
+  webVitals?: WebVitalMetric[];
   sessionId?: string;
   userId?: string;
   timestamp: string;

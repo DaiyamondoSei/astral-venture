@@ -2,7 +2,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
-import type { TrackPerformancePayload, TrackPerformanceResponse, PerformanceMetric } from "./types.ts";
+import type { 
+  TrackPerformancePayload, 
+  TrackPerformanceResponse, 
+  PerformanceMetric,
+  WebVitalMetric 
+} from "./types.ts";
 
 /**
  * Edge Function: track-performance
@@ -50,6 +55,7 @@ serve(async (req) => {
     // Process metrics
     const errors: Array<{metricIndex: number, message: string}> = [];
     const validMetrics: PerformanceMetric[] = [];
+    const validWebVitals: WebVitalMetric[] = [];
 
     // Validate and sanitize each metric
     payload.metrics.forEach((metric, index) => {
@@ -75,6 +81,23 @@ serve(async (req) => {
       }
     });
 
+    // Process web vitals if present
+    if (payload.webVitals && Array.isArray(payload.webVitals)) {
+      payload.webVitals.forEach((vital, index) => {
+        try {
+          // Basic validation
+          if (!vital.name || typeof vital.value !== 'number' || !vital.category) {
+            throw new Error("Missing required fields in web vital");
+          }
+
+          validWebVitals.push(vital);
+        } catch (error) {
+          errors.push({ metricIndex: index, message: `Web vital error: ${error.message}` });
+          console.error(`Error processing web vital at index ${index}:`, error);
+        }
+      });
+    }
+
     // Ensure the performance_metrics table exists
     await supabase.rpc('ensure_performance_metrics_table');
 
@@ -91,19 +114,40 @@ serve(async (req) => {
       console.log(`Successfully processed ${validMetrics.length} metrics`);
     }
 
+    // Insert web vitals if present
+    if (validWebVitals.length > 0) {
+      const { error: vitalError } = await supabase
+        .from("web_vitals")
+        .insert(validWebVitals.map(vital => ({
+          name: vital.name,
+          value: vital.value,
+          category: vital.category,
+          user_id: payload.userId,
+          client_timestamp: new Date(vital.timestamp).toISOString(),
+          rating: vital.rating
+        })));
+
+      if (vitalError) {
+        console.error(`Web vitals error: ${vitalError.message}`);
+        errors.push({ metricIndex: -1, message: `Web vitals error: ${vitalError.message}` });
+      } else {
+        console.log(`Successfully processed ${validWebVitals.length} web vitals`);
+      }
+    }
+
     // Generate recommendations based on metrics
-    const recommendations = generateRecommendations(validMetrics);
+    const recommendations = generateRecommendations(validMetrics, validWebVitals);
 
     // Prepare response
     const response: TrackPerformanceResponse = {
       success: true,
-      metricsProcessed: validMetrics.length,
+      metricsProcessed: validMetrics.length + validWebVitals.length,
       timestamp: new Date().toISOString(),
       recommendations,
     };
 
     if (errors.length > 0) {
-      response.success = validMetrics.length > 0;
+      response.success = validMetrics.length > 0 || validWebVitals.length > 0;
       response.errors = errors;
     }
 
@@ -131,20 +175,37 @@ serve(async (req) => {
 });
 
 /**
- * Generates recommendations based on performance metrics
+ * Generates recommendations based on performance metrics and web vitals
  */
-function generateRecommendations(metrics: PerformanceMetric[]): string[] {
+function generateRecommendations(metrics: PerformanceMetric[], webVitals: WebVitalMetric[] = []): string[] {
   const recommendations: string[] = [];
   
-  // Example recommendation logic
+  // Generate recommendations based on metrics
   const slowRenders = metrics.filter(m => 
     m.type === 'render' && m.value > 100); // 100ms threshold
   
   if (slowRenders.length > 0) {
-    const components = [...new Set(slowRenders.map(m => m.component_name))];
+    const components = [...new Set(slowRenders.map(m => m.component_name).filter(Boolean))];
     if (components.length > 0) {
       recommendations.push(
         `Consider optimizing these slow components: ${components.join(', ')}`
+      );
+    }
+  }
+
+  // Generate recommendations based on web vitals
+  if (webVitals.length > 0) {
+    const highCLS = webVitals.find(v => v.name === 'CLS' && v.value > 0.1);
+    if (highCLS) {
+      recommendations.push(
+        `Consider improving visual stability - CLS is ${highCLS.value.toFixed(2)}`
+      );
+    }
+
+    const slowLCP = webVitals.find(v => v.name === 'LCP' && v.value > 2500);
+    if (slowLCP) {
+      recommendations.push(
+        `Consider improving loading performance - LCP is ${(slowLCP.value/1000).toFixed(2)}s`
       );
     }
   }

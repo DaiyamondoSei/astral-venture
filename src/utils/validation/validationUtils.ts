@@ -2,84 +2,62 @@
 /**
  * Validation Utilities
  * 
- * Type-safe validation utilities for runtime type checking.
+ * Provides type-safe validation primitives for runtime type checking.
  */
 
-// Validation result type
-export interface ValidationResult {
-  valid: boolean;
-  errorCode?: string;
-  errorMessage?: string;
-  errors?: ValidationErrorDetail[];
-}
-
-// Validation error detail
-export interface ValidationErrorDetail {
-  path: string;
-  message: string;
-  code: string;
-}
-
-// Type guard function type
-export type TypeGuardFunction<T> = (value: unknown) => value is T;
+import { ValidationError, ValidationErrorDetail } from './ValidationError';
 
 /**
- * Creates a validation result
+ * Result of a validation check
  */
-export function createValidationResult(
-  valid: boolean,
-  errorCode?: string,
-  errorMessage?: string,
-  errors?: ValidationErrorDetail[]
-): ValidationResult {
-  return {
-    valid,
-    errorCode,
-    errorMessage,
-    errors
-  };
+export interface ValidationResult {
+  valid: boolean;
+  error?: ValidationErrorDetail;
 }
+
+/**
+ * Validator function type
+ */
+export type Validator<T = any> = (value: unknown) => ValidationResult;
 
 /**
  * Required field validator
  */
-export function required(field: string): (value: unknown) => ValidationResult {
-  return (value: unknown) => {
+export const required = (field: string): Validator => {
+  return (value: unknown): ValidationResult => {
     if (value === undefined || value === null) {
       return {
         valid: false,
-        errorCode: 'REQUIRED',
-        errorMessage: `${field} is required`,
-        errors: [{
+        error: {
           path: field,
-          message: 'This field is required',
+          message: `${field} is required`,
+          rule: 'required',
           code: 'REQUIRED'
-        }]
+        }
       };
     }
     return { valid: true };
   };
-}
+};
 
 /**
- * Creates a type guard validator
+ * Type guard validator creator
  */
 export function createTypeGuard<T>(
-  guard: TypeGuardFunction<T>,
-  errorCode: string,
-  errorMessage: string
-): (value: unknown) => ValidationResult {
-  return (value: unknown) => {
+  guard: (value: unknown) => value is T,
+  code: string,
+  message: string
+): Validator<T> {
+  return (value: unknown): ValidationResult => {
     if (!guard(value)) {
       return {
         valid: false,
-        errorCode,
-        errorMessage,
-        errors: [{
+        error: {
           path: '',
-          message: errorMessage,
-          code: errorCode
-        }]
+          message,
+          code,
+          rule: 'type'
+        }
       };
     }
     return { valid: true };
@@ -87,12 +65,10 @@ export function createTypeGuard<T>(
 }
 
 /**
- * Combines multiple validators
+ * Combine multiple validators
  */
-export function combineValidators(
-  validators: Array<(value: unknown) => ValidationResult>
-): (value: unknown) => ValidationResult {
-  return (value: unknown) => {
+export function combineValidators(validators: Validator[]): Validator {
+  return (value: unknown): ValidationResult => {
     for (const validator of validators) {
       const result = validator(value);
       if (!result.valid) {
@@ -104,65 +80,70 @@ export function combineValidators(
 }
 
 /**
- * Runtime type validation for strings
+ * Common type guards for primitive types
  */
-export function validateString(value: unknown, fieldName = 'value'): string {
-  if (typeof value !== 'string') {
-    throw new Error(`${fieldName} must be a string, got ${typeof value}`);
+export const isString = (value: unknown): value is string => typeof value === 'string';
+export const isNumber = (value: unknown): value is number => typeof value === 'number' && !Number.isNaN(value);
+export const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+export const isArray = <T>(itemGuard?: (item: unknown) => item is T) => 
+  (value: unknown): value is T[] => {
+    if (!Array.isArray(value)) return false;
+    if (!itemGuard) return true;
+    return value.every(item => itemGuard(item));
+  };
+export const isObject = (value: unknown): value is Record<string, unknown> => 
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Validate unknown data against a schema
+ */
+export function validateData<T>(
+  data: unknown, 
+  schema: Record<string, Validator>,
+  errorMessage: string = 'Validation failed'
+): T {
+  if (!isObject(data)) {
+    throw new ValidationError(
+      'Invalid data format', 
+      [{ path: '', message: 'Expected an object', code: 'TYPE_ERROR' }]
+    );
   }
-  return value;
+
+  const errors: ValidationErrorDetail[] = [];
+
+  for (const [field, validator] of Object.entries(schema)) {
+    const result = validator(data[field]);
+    if (!result.valid && result.error) {
+      errors.push({
+        ...result.error,
+        path: result.error.path || field
+      });
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new ValidationError(errorMessage, errors);
+  }
+
+  return data as T;
 }
 
 /**
- * Runtime type validation for numbers
+ * Type-safe object property access with validation
  */
-export function validateNumber(value: unknown, fieldName = 'value'): number {
-  if (typeof value !== 'number' || isNaN(value)) {
-    throw new Error(`${fieldName} must be a number, got ${typeof value}`);
-  }
-  return value;
-}
-
-/**
- * Runtime type validation for booleans
- */
-export function validateBoolean(value: unknown, fieldName = 'value'): boolean {
-  if (typeof value !== 'boolean') {
-    throw new Error(`${fieldName} must be a boolean, got ${typeof value}`);
-  }
-  return value;
-}
-
-/**
- * Runtime type validation for objects
- */
-export function validateObject(value: unknown, fieldName = 'value'): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null) {
-    throw new Error(`${fieldName} must be an object, got ${value === null ? 'null' : typeof value}`);
-  }
-  return value as Record<string, unknown>;
-}
-
-/**
- * Runtime type validation for arrays
- */
-export function validateArray(value: unknown, fieldName = 'value'): unknown[] {
-  if (!Array.isArray(value)) {
-    throw new Error(`${fieldName} must be an array, got ${typeof value}`);
-  }
-  return value;
-}
-
-/**
- * Runtime type validation for optional values
- */
-export function validateOptional<T>(
-  value: unknown, 
-  validator: (v: unknown) => T, 
-  fieldName = 'value'
+export function getProperty<T>(
+  obj: unknown, 
+  key: string,
+  validator?: Validator
 ): T | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
+  if (!isObject(obj)) return undefined;
+  
+  const value = obj[key];
+  
+  if (validator) {
+    const result = validator(value);
+    if (!result.valid) return undefined;
   }
-  return validator(value);
+  
+  return value as T;
 }

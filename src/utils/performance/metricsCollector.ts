@@ -1,9 +1,13 @@
+
 /**
  * Metrics Collector
  * 
  * Service for collecting and tracking performance metrics.
  */
-import { PerformanceMetric, ComponentMetrics, MetricType } from '../performance/types';
+import { PerformanceMetric, ComponentMetrics, MetricType } from './types';
+import { validatePerformanceMetric } from './validation';
+import { ValidationError } from '../validation/ValidationError';
+import { tryResult } from '../result/Result';
 
 class MetricsCollector {
   private metrics: PerformanceMetric[] = [];
@@ -29,7 +33,8 @@ class MetricsCollector {
     }
     this.throttleTimestamp = now;
 
-    const metric: PerformanceMetric = {
+    // Create and validate the metric
+    const rawMetric = {
       component_name: componentName,
       metric_name: metricName,
       value,
@@ -38,6 +43,15 @@ class MetricsCollector {
       type
     };
 
+    // Wrap validation in a try/result to avoid exceptions
+    const validationResult = tryResult(() => validatePerformanceMetric(rawMetric));
+    
+    if (validationResult.type === 'failure') {
+      console.error('Invalid metric:', validationResult.error);
+      return;
+    }
+
+    const metric = validationResult.value;
     this.metrics.push(metric);
     this.updateComponentMetrics(componentName, value, type);
   }
@@ -54,7 +68,8 @@ class MetricsCollector {
   ): void {
     if (!this.isEnabled) return;
     
-    const metric: PerformanceMetric = {
+    // Create the raw metric
+    const rawMetric = {
       metric_name: metricName,
       value,
       timestamp: Date.now(),
@@ -63,7 +78,16 @@ class MetricsCollector {
       component_name: componentName,
       metadata
     };
+
+    // Validate the metric
+    const validationResult = tryResult(() => validatePerformanceMetric(rawMetric));
     
+    if (validationResult.type === 'failure') {
+      console.error('Invalid metric:', validationResult.error);
+      return;
+    }
+    
+    const metric = validationResult.value;
     this.metrics.push(metric);
     
     if (componentName && type === 'render') {
