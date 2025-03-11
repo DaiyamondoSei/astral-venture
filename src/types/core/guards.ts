@@ -1,135 +1,38 @@
 
 /**
- * Core Type Guards
- * 
- * This file defines type guard functions that provide runtime type checking
- * capabilities. These guards help ensure that values conform to expected types
- * and can be used to validate external data.
+ * Type guards for runtime type checking
  */
 
-import { Optional, UUID, Email, URI, AnyRecord } from './base';
+import { ID, Email, URI, ISO8601Date } from './base';
 
-/**
- * Checks if a value is defined (not null or undefined)
- */
-export function isDefined<T>(value: Optional<T>): value is T {
+// Basic type guards
+export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
 }
 
-/**
- * Checks if a value is null
- */
-export function isNull(value: unknown): value is null {
-  return value === null;
-}
-
-/**
- * Checks if a value is undefined
- */
-export function isUndefined(value: unknown): value is undefined {
-  return value === undefined;
-}
-
-/**
- * Checks if a value is an object (not null, not an array)
- */
-export function isObject(value: unknown): value is AnyRecord {
+export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * Checks if a value is a plain object (created with {} or new Object())
- */
-export function isPlainObject(value: unknown): value is AnyRecord {
-  if (!isObject(value)) return false;
-  
-  const prototype = Object.getPrototypeOf(value);
-  return (
-    prototype === null || 
-    prototype === Object.prototype ||
-    Object.getPrototypeOf(prototype) === null
-  );
+export function isArray<T>(itemGuard?: (item: unknown) => item is T) {
+  return (value: unknown): value is T[] => {
+    if (!Array.isArray(value)) return false;
+    if (!itemGuard) return true;
+    return value.every(item => itemGuard(item));
+  };
 }
 
-/**
- * Checks if a value is an array
- */
-export function isArray(value: unknown): value is unknown[] {
-  return Array.isArray(value);
-}
-
-/**
- * Checks if a value is a typed array
- */
-export function isTypedArray<T>(
-  value: unknown,
-  itemGuard: (item: unknown) => item is T
-): value is T[] {
-  return isArray(value) && value.every(itemGuard);
-}
-
-/**
- * Checks if a value is a string
- */
+// String type guards
 export function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
-/**
- * Checks if a value is a number
- */
-export function isNumber(value: unknown): value is number {
-  return typeof value === 'number' && !isNaN(value);
-}
-
-/**
- * Checks if a value is an integer
- */
-export function isInteger(value: unknown): value is number {
-  return isNumber(value) && Number.isInteger(value);
-}
-
-/**
- * Checks if a value is a finite number
- */
-export function isFiniteNumber(value: unknown): value is number {
-  return isNumber(value) && Number.isFinite(value);
-}
-
-/**
- * Checks if a value is a boolean
- */
-export function isBoolean(value: unknown): value is boolean {
-  return typeof value === 'boolean';
-}
-
-/**
- * Checks if a value is a function
- */
-export function isFunction(value: unknown): value is Function {
-  return typeof value === 'function';
-}
-
-/**
- * Checks if a value is a UUID
- */
-export function isUUID(value: unknown): value is UUID {
-  if (!isString(value)) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-}
-
-/**
- * Checks if a value is an email address
- */
 export function isEmail(value: unknown): value is Email {
   if (!isString(value)) return false;
-  // Basic email validation - for more comprehensive validation use a library
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(value);
 }
 
-/**
- * Checks if a value is a valid URI
- */
 export function isURI(value: unknown): value is URI {
   if (!isString(value)) return false;
   try {
@@ -140,81 +43,22 @@ export function isURI(value: unknown): value is URI {
   }
 }
 
-/**
- * Checks if a value matches a regular expression pattern
- */
-export function matchesPattern(value: unknown, pattern: RegExp): value is string {
-  return isString(value) && pattern.test(value);
-}
-
-/**
- * Checks if a value is a valid ISO 8601 date string
- */
-export function isISODateString(value: unknown): value is string {
+export function isISO8601Date(value: unknown): value is ISO8601Date {
   if (!isString(value)) return false;
-  try {
-    const date = new Date(value);
-    return !isNaN(date.getTime()) && value.includes('T');
-  } catch {
-    return false;
-  }
+  const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/;
+  return iso8601Regex.test(value);
 }
 
-/**
- * Checks if a value is a valid date object
- */
-export function isDate(value: unknown): value is Date {
-  return value instanceof Date && !isNaN(value.getTime());
+// Number type guards
+export function isNumber(value: unknown): value is number {
+  return typeof value === 'number' && !Number.isNaN(value);
 }
 
-/**
- * Checks if a value is a non-empty string
- */
-export function isNonEmptyString(value: unknown): value is string {
-  return isString(value) && value.trim().length > 0;
+export function isInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value);
 }
 
-/**
- * Checks if a value is a non-empty array
- */
-export function isNonEmptyArray(value: unknown): value is unknown[] {
-  return isArray(value) && value.length > 0;
+export function isPositive(value: unknown): value is number {
+  return isNumber(value) && value > 0;
 }
 
-/**
- * Checks if a value is a valid enum value
- */
-export function isEnumValue<T extends object>(
-  value: unknown,
-  enumObject: T
-): value is T[keyof T] {
-  return Object.values(enumObject).includes(value as T[keyof T]);
-}
-
-/**
- * Type guard creator that composes multiple type guards
- */
-export function composeGuards<T>(
-  ...guards: ((value: unknown) => boolean)[]
-): (value: unknown) => value is T {
-  return ((value: unknown): value is T => {
-    return guards.every(guard => guard(value));
-  });
-}
-
-/**
- * Creates an optimized type guard function
- */
-export function createOptimizedGuard<T>(
-  check: (value: unknown) => value is T,
-  errorMessage: string = 'Type validation failed'
-): (value: unknown) => value is T {
-  return (value: unknown): value is T => {
-    // Fast-path checks first
-    if (value === null || value === undefined) {
-      return false;
-    }
-    
-    return check(value);
-  };
-}
