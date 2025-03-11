@@ -1,167 +1,277 @@
 
 /**
- * Example implementation of the Result pattern for API calls
+ * API Example using Result and AsyncResult patterns
  * 
- * This demonstrates how to use the Result pattern to handle API calls
- * with proper error handling and type safety.
+ * This example demonstrates how to use the Result and AsyncResult patterns
+ * for robust error handling in API calls, providing type safety and
+ * predictable error handling.
  */
 
-import { ApiAsyncResult, ErrorSubtype, createError } from '../ResultTypes';
-import { AsyncResult } from '../AsyncResult';
-import { success, failure } from '../Result';
+import { supabase } from '@/lib/supabaseClient';
+import { 
+  Result, success, failure, isSuccess, unwrap, unwrapOr,
+  asyncResultify, tryCatch
+} from '../Result';
+import { 
+  AsyncResult, mapAsync, flatMapAsync, tapAsync, tapErrorAsync,
+  withTimeout, retryAsync
+} from '../AsyncResult';
 
-// Sample API response types
-interface User {
-  id: string;
-  name: string;
-  email: string;
+// Define type-safe errors for better error handling
+interface EnhancedError extends Error {
+  code: string;
+  context?: Record<string, unknown>;
 }
 
-interface ApiError {
-  status: number;
-  message: string;
-  code?: string;
+// Create a utility for generating typed errors
+function createApiError(
+  message: string, 
+  code: string, 
+  context?: Record<string, unknown>
+): EnhancedError {
+  const error = new Error(message) as EnhancedError;
+  error.code = code;
+  error.context = context;
+  return error;
 }
 
-/**
- * Example API client that returns Results
- */
-export class ApiClient {
-  private baseUrl: string;
-  
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
-  
+// Define our API service with Result-based error handling
+export class ApiService {
   /**
-   * Fetch a user by ID with proper error handling
+   * Fetches user data with robust error handling
    */
-  async getUser(id: string): ApiAsyncResult<User> {
+  async getUserProfile(userId: string): AsyncResult<UserProfile, EnhancedError> {
+    // Basic validation before making the request
+    if (!userId) {
+      return failure(createApiError(
+        'User ID is required', 
+        'MISSING_PARAMETER',
+        { parameter: 'userId' }
+      ));
+    }
+
     try {
-      const response = await fetch(`${this.baseUrl}/users/${id}`);
-      
-      if (!response.ok) {
-        const errorData: ApiError = await response.json().catch(() => ({
-          status: response.status,
-          message: response.statusText
-        }));
-        
-        return this.handleHttpError(response.status, errorData);
+      // Use the base Supabase client for the request
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        // Transform database errors to our enhanced error type
+        return failure(createApiError(
+          `Failed to fetch user profile: ${error.message}`,
+          error.code,
+          { originalError: error, userId }
+        ));
       }
-      
-      const userData: User = await response.json();
-      return success(userData);
+
+      if (!data) {
+        return failure(createApiError(
+          'User profile not found',
+          'NOT_FOUND',
+          { userId }
+        ));
+      }
+
+      // Return successful result with typed data
+      return success(data as UserProfile);
     } catch (error) {
-      // Handle network errors
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        return failure(createError('Network error while fetching user', {
-          subtype: ErrorSubtype.NETWORK,
-          context: { userId: id }
-        }));
-      }
-      
-      // Handle other unexpected errors
-      return failure(createError(
-        `Unexpected error fetching user: ${error instanceof Error ? error.message : String(error)}`,
-        {
-          subtype: ErrorSubtype.UNKNOWN,
-          cause: error,
-          context: { userId: id }
-        }
+      // Catch any unexpected errors and transform them
+      return failure(createApiError(
+        `Unexpected error fetching user profile: ${error instanceof Error ? error.message : String(error)}`,
+        'UNEXPECTED_ERROR',
+        { originalError: error, userId }
       ));
     }
   }
-  
+
   /**
-   * Create a structured error based on HTTP status code
+   * Updates user data with comprehensive error handling
    */
-  private handleHttpError(status: number, errorData: ApiError): AsyncResult<never, Error> {
-    switch (status) {
-      case 401:
-      case 403:
-        return failure(createError(errorData.message || 'Authentication error', {
-          code: errorData.code || 'AUTH_ERROR',
-          subtype: ErrorSubtype.AUTH
-        }));
-        
-      case 404:
-        return failure(createError(errorData.message || 'Resource not found', {
-          code: errorData.code || 'NOT_FOUND',
-          subtype: ErrorSubtype.RESOURCE_NOT_FOUND
-        }));
-        
-      case 422:
-        return failure(createError(errorData.message || 'Validation error', {
-          code: errorData.code || 'VALIDATION_ERROR',
-          subtype: ErrorSubtype.VALIDATION
-        }));
-        
-      case 429:
-        return failure(createError(errorData.message || 'Too many requests', {
-          code: errorData.code || 'RATE_LIMIT',
-          subtype: ErrorSubtype.RATE_LIMIT,
-          retryable: true
-        }));
-        
-      case 500:
-      case 502:
-      case 503:
-        return failure(createError(errorData.message || 'Server error', {
-          code: errorData.code || 'SERVER_ERROR',
-          subtype: ErrorSubtype.INTERNAL,
-          retryable: true
-        }));
-        
-      default:
-        return failure(createError(errorData.message || 'Unknown API error', {
-          code: errorData.code || 'UNKNOWN_ERROR',
-          subtype: ErrorSubtype.UNKNOWN
-        }));
+  async updateUserProfile(
+    userId: string,
+    profileData: Partial<UserProfile>
+  ): AsyncResult<UserProfile, EnhancedError> {
+    // Input validation
+    if (!userId) {
+      return failure(createApiError('User ID is required', 'MISSING_PARAMETER'));
+    }
+
+    if (!profileData || Object.keys(profileData).length === 0) {
+      return failure(createApiError('No update data provided', 'INVALID_DATA'));
+    }
+
+    try {
+      // Execute the update operation
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update(profileData)
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        return failure(createApiError(
+          `Failed to update profile: ${error.message}`,
+          error.code,
+          { originalError: error, userId }
+        ));
+      }
+
+      return success(data as UserProfile);
+    } catch (error) {
+      return failure(createApiError(
+        `Error updating profile: ${error instanceof Error ? error.message : String(error)}`,
+        'UNEXPECTED_ERROR',
+        { originalError: error, userId }
+      ));
+    }
+  }
+
+  /**
+   * Demonstrates composition of multiple API calls with error handling
+   */
+  async initializeUserData(userId: string): AsyncResult<UserDataSummary, EnhancedError> {
+    // First, get user profile
+    const profileResult = await this.getUserProfile(userId);
+
+    // Use flatMapAsync for composing dependent async operations
+    return flatMapAsync(profileResult, async (profile) => {
+      // Get preferences in parallel
+      const preferencesResult = await this.getUserPreferences(userId);
+      
+      // Get stats in parallel
+      const statsResult = await this.getUserStats(userId);
+
+      // Combine the results
+      if (isSuccess(preferencesResult) && isSuccess(statsResult)) {
+        return success({
+          profile,
+          preferences: preferencesResult.value,
+          stats: statsResult.value
+        });
+      } else if (!isSuccess(preferencesResult)) {
+        return preferencesResult;
+      } else {
+        return statsResult;
+      }
+    });
+  }
+
+  // Additional methods using the pattern
+  async getUserPreferences(userId: string): AsyncResult<UserPreferences, EnhancedError> {
+    // Implementation using the same pattern
+    // This is a placeholder - would follow the same robust error handling approach
+    return success({ theme: 'dark', notifications: true });
+  }
+
+  async getUserStats(userId: string): AsyncResult<UserStats, EnhancedError> {
+    // Implementation using the same pattern
+    // This is a placeholder - would follow the same robust error handling approach
+    return success({ lastActive: new Date(), loginCount: 42 });
+  }
+}
+
+// Example of using AsyncResult with retries for network resilience
+async function fetchWithRetry<T>(url: string): AsyncResult<T, EnhancedError> {
+  return retryAsync(
+    () => {
+      // Make the actual API call
+      return asyncResultify(async () => {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw createApiError(
+            `API request failed with status ${response.status}`,
+            'API_ERROR',
+            { status: response.status, url }
+          );
+        }
+        return response.json();
+      })();
+    },
+    {
+      maxRetries: 3,
+      initialDelayMs: 300,
+      backoffFactor: 1.5,
+      maxDelayMs: 5000,
+      retryableErrors: (error) => {
+        // Only retry certain errors, like network timeouts
+        return error instanceof Error && 
+          (error.message.includes('timeout') || error.message.includes('network'));
+      }
+    }
+  );
+}
+
+// Example of consumer code using the API service
+async function loadUserProfile(userId: string) {
+  const apiService = new ApiService();
+  
+  // Using withTimeout to ensure we don't wait forever
+  const userProfileResult = await withTimeout(
+    apiService.getUserProfile(userId),
+    5000, // 5 second timeout
+    createApiError('Request timed out', 'TIMEOUT', { userId })
+  );
+  
+  // Use tapAsync for side effects like logging on success
+  await tapAsync(userProfileResult, (profile) => {
+    console.log('Successfully loaded profile:', profile.username);
+  });
+  
+  // Use tapErrorAsync for error logging without affecting the flow
+  await tapErrorAsync(userProfileResult, (error) => {
+    console.error('Error loading profile:', error.message, error.code);
+  });
+  
+  // Safely use the result with type safety
+  if (isSuccess(userProfileResult)) {
+    const profile = userProfileResult.value;
+    // Do something with the profile data
+    return profile;
+  } else {
+    // Handle the error case
+    const { code, message } = userProfileResult.error;
+    
+    // Provide appropriate fallback behavior
+    if (code === 'NOT_FOUND') {
+      return { username: 'Guest', astral_level: 1 };
+    } else {
+      throw userProfileResult.error; // Re-throw for upper-level handling
     }
   }
 }
 
-/**
- * Example usage
- */
-export async function exampleApiUsage(): Promise<void> {
-  const api = new ApiClient('https://api.example.com');
-  
-  // Example of handling the Result directly
-  const userResult = await api.getUser('123');
-  
-  if (userResult.type === 'success') {
-    console.log('User:', userResult.value);
-  } else {
-    console.error('Error:', userResult.error.message);
-  }
-  
-  // Example of using AsyncResult utilities
-  import { foldAsync, recoverAsync, mapAsync } from '../AsyncResult';
-  
-  // Using fold to handle both success and error cases
-  const displayName = await foldAsync(
-    api.getUser('123'),
-    user => `${user.name} <${user.email}>`,
-    error => `Unknown user: ${error.message}`
-  );
-  
-  console.log('User display name:', displayName);
-  
-  // Using map to transform the success case
-  const userEmails = await mapAsync(
-    api.getUser('123'),
-    user => user.email
-  );
-  
-  // Using recover to provide a default value
-  const user = await recoverAsync(
-    api.getUser('123'),
-    error => {
-      console.error('Using default user due to error:', error);
-      return { id: 'default', name: 'Default User', email: 'default@example.com' };
-    }
-  );
-  
-  console.log('User (possibly default):', user);
+// Type definitions
+interface UserProfile {
+  id: string;
+  username: string;
+  astral_level: number;
+  energy_points: number;
+  created_at: string;
+  updated_at: string;
 }
+
+interface UserPreferences {
+  theme: string;
+  notifications: boolean;
+}
+
+interface UserStats {
+  lastActive: Date;
+  loginCount: number;
+}
+
+interface UserDataSummary {
+  profile: UserProfile;
+  preferences: UserPreferences;
+  stats: UserStats;
+}
+
+// Export functionality for use in the application
+export {
+  loadUserProfile,
+  fetchWithRetry
+};
