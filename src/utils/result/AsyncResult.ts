@@ -8,7 +8,8 @@
  */
 
 // Re-export types
-export { AsyncResult, RetryOptions, DEFAULT_RETRY_OPTIONS } from './AsyncResultTypes';
+export type { AsyncResult, RetryOptions } from './AsyncResultTypes';
+export { DEFAULT_RETRY_OPTIONS } from './AsyncResultTypes';
 
 // Re-export core functions
 export {

@@ -1,4 +1,3 @@
-
 /**
  * AsyncResult Core Functions
  * 
@@ -14,7 +13,7 @@ import {
   isSuccess,
   isFailure
 } from './Result';
-import { AsyncResult } from './AsyncResultTypes';
+import type { AsyncResult } from './AsyncResultTypes';
 
 /**
  * Maps a successful AsyncResult value using the provided function
