@@ -1,5 +1,8 @@
+import { QualityLevel, PerformanceBoundaries, PerformanceSettings } from './performance/core/types';
 
-import { DeviceCapability, PerformanceSettings } from './performance/core/types';
+export type DeviceCapability = 'low' | 'medium' | 'high';
+export type PerformanceMode = 'quality' | 'balanced' | 'performance';
+export type RenderFrequency = 'low' | 'medium' | 'high';
 
 export const getPerformanceCategory = (capability: DeviceCapability): string => {
   switch (capability) {
@@ -57,5 +60,41 @@ export const getDefaultSettings = (capability: DeviceCapability): PerformanceSet
         particleCount: 200,
         maxAnimationsPerFrame: 2
       };
+  }
+};
+
+export const getParticleCount = (capability: DeviceCapability): number => {
+  switch (capability) {
+    case 'high':
+      return 1000;
+    case 'medium':
+      return 500;
+    case 'low':
+      return 200;
+  }
+};
+
+export const shouldEnableFeature = (
+  capability: DeviceCapability,
+  feature: 'particles' | 'blur' | 'shadows' | 'complexAnimations'
+): boolean => {
+  switch (capability) {
+    case 'high':
+      return true;
+    case 'medium':
+      return feature !== 'complexAnimations' && feature !== 'blur';
+    case 'low':
+      return false;
+  }
+};
+
+export const getGeometryDetail = (capability: DeviceCapability): number => {
+  switch (capability) {
+    case 'high':
+      return 1;
+    case 'medium':
+      return 0.7;
+    case 'low':
+      return 0.5;
   }
 };
