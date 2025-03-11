@@ -1,138 +1,110 @@
 
-/**
- * useAsyncResult Hook
- * 
- * A React hook for safely using the Result pattern with async operations,
- * providing type-safe error handling and loading states.
- */
+import { useEffect, useState, useCallback } from 'react';
+import { Result, success, failure, isSuccess, isFailure } from '../utils/result/Result';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Result, isSuccess, isFailure } from '../utils/result/Result';
-import { asyncResultify } from '../utils/result/AsyncResult';
+export type AsyncStatus = 'idle' | 'loading' | 'success' | 'error';
 
-/**
- * Async operation state
- */
-export interface AsyncState<T, E> {
+export interface AsyncResult<T, E = Error> {
   data: T | null;
   error: E | null;
+  status: AsyncStatus;
   isLoading: boolean;
   isSuccess: boolean;
   isError: boolean;
+  refetch: () => Promise<void>;
 }
 
 /**
- * Async operation controller
+ * Hook for safely handling asynchronous operations with proper typing
  */
-export interface AsyncController<T, E, P extends any[]> {
-  execute: (...params: P) => Promise<void>;
-  reset: () => void;
-}
+export function useAsyncResult<T, E = Error>(
+  asyncFn: () => Promise<Result<T, E>>,
+  dependencies: any[] = [],
+  initialState: Partial<AsyncResult<T, E>> = {}
+): AsyncResult<T, E> {
+  const [data, setData] = useState<T | null>(initialState.data || null);
+  const [error, setError] = useState<E | null>(initialState.error || null);
+  const [status, setStatus] = useState<AsyncStatus>(initialState.status || 'idle');
 
-/**
- * Hook return type
- */
-export type UseAsyncResultReturn<T, E, P extends any[]> = 
-  AsyncState<T, E> & AsyncController<T, E, P>;
-
-/**
- * Custom hook for handling async operations with Result pattern
- * 
- * @param asyncFn - Async function that returns a Result
- * @param immediate - Whether to execute immediately
- * @param initialParams - Initial parameters for immediate execution
- * @returns Async state and controller
- */
-export function useAsyncResult<T, E, P extends any[]>(
-  asyncFn: (...params: P) => Promise<Result<T, E>>,
-  immediate = false,
-  initialParams?: P
-): UseAsyncResultReturn<T, E, P> {
-  const [state, setState] = useState<AsyncState<T, E>>({
-    data: null,
-    error: null,
-    isLoading: immediate,
-    isSuccess: false,
-    isError: false
-  });
-
-  const execute = useCallback(async (...params: P) => {
-    setState(prev => ({ ...prev, isLoading: true, isSuccess: false, isError: false }));
+  const execute = useCallback(async () => {
+    setStatus('loading');
     
     try {
-      const result = await asyncFn(...params);
+      const result = await asyncFn();
       
       if (isSuccess(result)) {
-        setState({
-          data: result.value,
-          error: null,
-          isLoading: false,
-          isSuccess: true,
-          isError: false
-        });
+        setData(result.value);
+        setError(null);
+        setStatus('success');
       } else if (isFailure(result)) {
-        setState({
-          data: null,
-          error: result.error,
-          isLoading: false,
-          isSuccess: false,
-          isError: true
-        });
+        setData(null);
+        setError(result.error);
+        setStatus('error');
       }
-    } catch (error) {
-      // This should rarely happen as the Result pattern should capture all errors
-      console.error('Unhandled error in useAsyncResult:', error);
-      
-      setState({
-        data: null,
-        error: error as E,
-        isLoading: false,
-        isSuccess: false,
-        isError: true
-      });
+    } catch (unexpectedError) {
+      setData(null);
+      setError(unexpectedError as E);
+      setStatus('error');
+      console.error('Unexpected error in useAsyncResult:', unexpectedError);
     }
   }, [asyncFn]);
 
-  const reset = useCallback(() => {
-    setState({
-      data: null,
-      error: null,
-      isLoading: false,
-      isSuccess: false,
-      isError: false
-    });
-  }, []);
-
   useEffect(() => {
-    if (immediate) {
-      execute(...(initialParams || [] as unknown as P));
-    }
-  }, [execute, immediate]);
+    execute();
+  }, [...dependencies]);
 
   return {
-    ...state,
-    execute,
-    reset
+    data,
+    error,
+    status,
+    isLoading: status === 'loading',
+    isSuccess: status === 'success',
+    isError: status === 'error',
+    refetch: execute
   };
 }
 
 /**
- * Hook that converts an async function to use Result pattern
- * 
- * @param asyncFn - Async function to convert
- * @param immediate - Whether to execute immediately
- * @param initialParams - Initial parameters for immediate execution
- * @returns Async state and controller
+ * Creates an AsyncResult in the success state
  */
-export function useAsync<T, P extends any[]>(
-  asyncFn: (...params: P) => Promise<T>,
-  immediate = false,
-  initialParams?: P
-): UseAsyncResultReturn<T, Error, P> {
-  const wrappedFn = useCallback(
-    asyncResultify(asyncFn),
-    [asyncFn]
-  );
-  
-  return useAsyncResult(wrappedFn, immediate, initialParams);
+export function asyncSuccess<T, E = Error>(data: T): AsyncResult<T, E> {
+  return {
+    data,
+    error: null,
+    status: 'success',
+    isLoading: false,
+    isSuccess: true,
+    isError: false,
+    refetch: async () => {}
+  };
+}
+
+/**
+ * Creates an AsyncResult in the error state
+ */
+export function asyncFailure<T, E = Error>(error: E): AsyncResult<T, E> {
+  return {
+    data: null,
+    error,
+    status: 'error',
+    isLoading: false,
+    isSuccess: false,
+    isError: true,
+    refetch: async () => {}
+  };
+}
+
+/**
+ * Creates an AsyncResult in the loading state
+ */
+export function asyncLoading<T, E = Error>(): AsyncResult<T, E> {
+  return {
+    data: null,
+    error: null,
+    status: 'loading',
+    isLoading: true,
+    isSuccess: false,
+    isError: false,
+    refetch: async () => {}
+  };
 }

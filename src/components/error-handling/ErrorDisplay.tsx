@@ -1,145 +1,126 @@
 
 import React from 'react';
-import { Button } from '../ui/button';
-import { ApiError, ApiErrorType } from '../../utils/api/types';
-import { ValidationError } from '../../utils/validation/ValidationError';
-import { AlertCircle, WifiOff, Clock, Lock, FileX, Server, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { ValidationError, ValidationErrorDetail } from '@/utils/validation/validator';
+import { 
+  ApiError, 
+  NotFoundError, 
+  DatabaseError, 
+  isNotFoundError, 
+  isDatabaseError 
+} from '@/utils/api/createResourceService';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 
 interface ErrorDisplayProps {
-  error: Error | ApiError | ValidationError | unknown;
+  error: unknown;
+  title?: string;
+  showDetails?: boolean;
   onRetry?: () => void;
   className?: string;
-  showDetails?: boolean;
-  actionText?: string;
-  showAction?: boolean;
-  fallback?: React.ReactNode;
 }
 
 /**
- * Error display component with contextual messaging based on error type
+ * A component that displays various types of errors in a consistent way
  */
 const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   error,
+  title,
+  showDetails = false,
   onRetry,
   className = '',
-  showDetails = false,
-  actionText = 'Try Again',
-  showAction = true,
-  fallback
 }) => {
-  // Determine error type and display appropriate message and icon
-  let title = 'An error occurred';
-  let message = 'Something went wrong. Please try again later.';
-  let details = null;
-  let Icon = AlertCircle;
+  // Generate appropriate error message and title based on error type
+  const getErrorContent = () => {
+    if (error instanceof ValidationError) {
+      const details = error.details.length > 0 
+        ? error.details.map((detail: ValidationErrorDetail) => (
+            <li key={detail.field || detail.message} className="text-sm">
+              {detail.message}
+            </li>
+          ))
+        : null;
+        
+      return {
+        title: title || 'Validation Error',
+        message: error.message,
+        details,
+        showRetry: false,
+      };
+    }
+    
+    if (isNotFoundError(error)) {
+      return {
+        title: title || 'Not Found',
+        message: error.message,
+        details: null,
+        showRetry: true,
+      };
+    }
+    
+    if (isDatabaseError(error)) {
+      return {
+        title: title || 'Database Error',
+        message: 'An error occurred while accessing the database.',
+        details: showDetails ? <p className="text-sm mt-2">{error.message}</p> : null,
+        showRetry: true,
+      };
+    }
+    
+    if (error instanceof ApiError) {
+      return {
+        title: title || 'API Error',
+        message: 'An error occurred while communicating with the server.',
+        details: showDetails ? <p className="text-sm mt-2">{error.message}</p> : null,
+        showRetry: true,
+      };
+    }
+    
+    if (error instanceof Error) {
+      return {
+        title: title || 'Error',
+        message: error.message || 'An unexpected error occurred.',
+        details: showDetails && error.stack 
+          ? <pre className="text-xs mt-2 bg-secondary/50 p-2 rounded overflow-auto max-h-32">{error.stack}</pre> 
+          : null,
+        showRetry: true,
+      };
+    }
+    
+    // Fallback for unknown error types
+    return {
+      title: title || 'Error',
+      message: error ? String(error) : 'An unknown error occurred.',
+      details: null,
+      showRetry: true,
+    };
+  };
   
-  // Handle API errors
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const apiError = error as ApiError;
-    
-    switch (apiError.code) {
-      case ApiErrorType.NETWORK:
-        title = 'Network Error';
-        message = 'Unable to connect to the server. Please check your internet connection.';
-        Icon = WifiOff;
-        break;
-      
-      case ApiErrorType.TIMEOUT:
-        title = 'Request Timeout';
-        message = 'The request took too long to complete. Please try again.';
-        Icon = Clock;
-        break;
-      
-      case ApiErrorType.AUTH:
-        title = 'Authentication Error';
-        message = apiError.status === 401 
-          ? 'You need to be logged in to access this resource.' 
-          : 'You do not have permission to access this resource.';
-        Icon = Lock;
-        break;
-      
-      case ApiErrorType.VALIDATION:
-        title = 'Validation Error';
-        message = apiError.message || 'The data you submitted is invalid.';
-        Icon = FileX;
-        break;
-      
-      case ApiErrorType.NOT_FOUND:
-        title = 'Not Found';
-        message = 'The requested resource could not be found.';
-        Icon = FileX;
-        break;
-      
-      case ApiErrorType.SERVER:
-        title = 'Server Error';
-        message = 'Something went wrong on our server. Our team has been notified.';
-        Icon = Server;
-        break;
-      
-      default:
-        title = 'Error';
-        message = apiError.message || 'An unexpected error occurred.';
-        Icon = AlertTriangle;
-    }
-    
-    // Show details if available and showDetails is true
-    if (showDetails && apiError.details) {
-      details = apiError.details;
-    }
-  }
-  // Handle validation errors
-  else if (error instanceof ValidationError) {
-    title = 'Validation Error';
-    message = error.getFormattedMessage() || 'The data you submitted is invalid.';
-    Icon = FileX;
-    
-    if (showDetails && error.details.length > 0) {
-      details = error.details;
-    }
-  }
-  // Handle standard errors
-  else if (error instanceof Error) {
-    message = error.message || message;
-    
-    if (showDetails && error.stack) {
-      details = error.stack;
-    }
-  }
-  
-  // Custom fallback content
-  if (fallback) {
-    return (
-      <div className={`error-container ${className}`}>
-        {fallback}
-        {showAction && onRetry && (
-          <Button onClick={onRetry} className="mt-4">
-            {actionText}
-          </Button>
-        )}
-      </div>
-    );
-  }
+  const { title: errorTitle, message, details, showRetry } = getErrorContent();
   
   return (
-    <div className={`rounded-lg bg-destructive/5 p-4 flex flex-col items-center text-center ${className}`}>
-      <Icon className="h-10 w-10 text-destructive mb-2" />
-      <h3 className="font-semibold text-lg mb-1">{title}</h3>
-      <p className="text-muted-foreground mb-4">{message}</p>
-      
-      {showDetails && details && (
-        <pre className="text-xs bg-card p-2 rounded overflow-auto max-h-24 w-full mb-4">
-          {typeof details === 'string' 
-            ? details 
-            : JSON.stringify(details, null, 2)}
-        </pre>
-      )}
-      
-      {showAction && onRetry && (
-        <Button onClick={onRetry} variant="outline" className="mt-2">
-          {actionText}
-        </Button>
-      )}
-    </div>
+    <Alert variant="destructive" className={`border-destructive ${className}`}>
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>{errorTitle}</AlertTitle>
+      <AlertDescription>
+        <div className="mt-2">
+          <p>{message}</p>
+          {details && <div className="mt-2">{details}</div>}
+          
+          {showRetry && onRetry && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onRetry} 
+              className="mt-4 bg-transparent border-destructive text-destructive hover:bg-destructive/10"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          )}
+        </div>
+      </AlertDescription>
+    </Alert>
   );
 };
 
