@@ -1,3 +1,4 @@
+
 /**
  * Performance utility functions and types
  * 
@@ -11,48 +12,38 @@ import {
   RenderFrequency,
   PerformanceMetric,
   WebVitalMetric,
-  DeviceInfo 
-} from '../types/core/performance/MetricTypes';
+  DeviceInfo,
+  PerformanceReportPayload,
+  PerformanceMonitorConfig,
+  QualityLevel
+} from '../types/core/performance/metrics';
 
-// Re-export types for backwards compatibility
+// Re-export types from core modules for centralized access
 export { 
   DeviceCapability, 
   PerformanceMode, 
-  RenderFrequency 
-};
+  RenderFrequency,
+  QualityLevel,
+  MetricType,
+  WebVitalName,
+  WebVitalCategory,
+  WebVitalRating 
+} from '../types/core/performance/metrics';
 
-// Export types needed by existing code
+// Export interfaces for external use
 export type { 
-  DeviceInfo, 
-  PerformanceMetric, 
-  WebVitalMetric 
-};
-
-export interface PerformanceReportPayload {
-  metrics: PerformanceMetric[];
-  webVitals?: WebVitalMetric[];
-  sessionId?: string;
-  userId?: string;
-  timestamp: string;
-  source: 'web' | 'mobile' | 'desktop';
-  deviceInfo?: DeviceInfo;
-}
-
-export interface PerformanceConfig {
-  enabled: boolean;
-  targetFPS: number;
-  qualityLevel: string;
-  monitoringEnabled: boolean;
-  optimizationEnabled: boolean;
-}
-
-export interface PerformanceContextState {
-  deviceCapability: DeviceCapability;
-  performanceMode: PerformanceMode;
-  webGL2Support: boolean;
-  gpuCapability: number;
-  config: PerformanceConfig;
-}
+  PerformanceMetric,
+  WebVitalMetric,
+  DeviceInfo,
+  ComponentMetrics,
+  PerformanceReportPayload,
+  PerformanceMonitorConfig,
+  PerformanceSettings,
+  AdaptiveSettings,
+  PerformanceBoundaries,
+  PerformanceTrackingOptions,
+  PerfConfig
+} from '../types/core/performance/config';
 
 /**
  * Determines the device capability based on various factors
@@ -68,8 +59,8 @@ export function detectDeviceCapability(): DeviceCapability {
   const isLowEndDevice = 
     !window.requestAnimationFrame ||
     /Mobile|Android/.test(navigator.userAgent) ||
-    (navigator?.deviceMemory && navigator.deviceMemory < 4) ||
-    (navigator?.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
+    (navigator.deviceMemory && navigator.deviceMemory < 4) ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
 
   if (isLowEndDevice) {
     return DeviceCapability.LOW;
@@ -77,8 +68,8 @@ export function detectDeviceCapability(): DeviceCapability {
 
   // Check for high-end indicators
   const isHighEndDevice = 
-    (navigator?.hardwareConcurrency && navigator.hardwareConcurrency >= 8) ||
-    (navigator?.deviceMemory && navigator.deviceMemory >= 8) ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency >= 8) ||
+    (navigator.deviceMemory && navigator.deviceMemory >= 8) ||
     matchMedia('(min-resolution: 2dppx)').matches;
 
   if (isHighEndDevice) {
@@ -87,7 +78,7 @@ export function detectDeviceCapability(): DeviceCapability {
 
   // Check for ultra-high-end
   const isUltraDevice =
-    (navigator?.hardwareConcurrency && navigator.hardwareConcurrency >= 12) ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency >= 12) ||
     (window.innerWidth >= 2560 && window.innerHeight >= 1440);
 
   if (isUltraDevice) {
@@ -170,15 +161,134 @@ export function estimateGPUCapability(): number {
 }
 
 /**
- * Throttles a function to limit execution frequency
+ * Get appropriate particle count based on device capability
+ * @param deviceCapability The detected device capability
+ * @returns Number of particles to render
+ */
+export function getParticleCount(deviceCapability: DeviceCapability): number {
+  switch (deviceCapability) {
+    case DeviceCapability.LOW:
+      return 25;
+    case DeviceCapability.MEDIUM:
+      return 50;
+    case DeviceCapability.HIGH:
+      return 100;
+    case DeviceCapability.ULTRA:
+      return 200;
+    default:
+      return 50;
+  }
+}
+
+/**
+ * Determine if a feature should be enabled based on device capability
+ * @param feature The feature to check
+ * @param deviceCapability The detected device capability
+ * @returns Boolean indicating if feature should be enabled
+ */
+export function shouldEnableFeature(
+  feature: 'blur' | 'shadows' | 'particles' | 'animations' | 'effects',
+  deviceCapability: DeviceCapability
+): boolean {
+  switch (feature) {
+    case 'blur':
+    case 'shadows':
+      return deviceCapability !== DeviceCapability.LOW;
+    case 'particles':
+      return deviceCapability !== DeviceCapability.LOW;
+    case 'animations':
+      return true; // Always enable basic animations
+    case 'effects':
+      return deviceCapability !== DeviceCapability.LOW;
+    default:
+      return true;
+  }
+}
+
+/**
+ * Get appropriate geometry detail level based on device capability
+ * @param deviceCapability The detected device capability
+ * @returns Detail level from 1 (low) to 4 (ultra)
+ */
+export function getGeometryDetail(deviceCapability: DeviceCapability): number {
+  switch (deviceCapability) {
+    case DeviceCapability.LOW:
+      return 1;
+    case DeviceCapability.MEDIUM:
+      return 2;
+    case DeviceCapability.HIGH:
+      return 3;
+    case DeviceCapability.ULTRA:
+      return 4;
+    default:
+      return 2;
+  }
+}
+
+/**
+ * Get performance category based on component metrics
+ * @param renderTime The render time in ms
+ * @param renderCount The number of renders
+ * @returns Performance category classification
+ */
+export function getPerformanceCategory(renderTime: number, renderCount: number): string {
+  if (renderTime > 100 || renderCount > 20) {
+    return 'critical';
+  } else if (renderTime > 50 || renderCount > 10) {
+    return 'warning';
+  } else {
+    return 'good';
+  }
+}
+
+/**
+ * Throttles a function based on performance settings
  * @param func The function to throttle
- * @param limit Time limit in milliseconds
+ * @param deviceCapability The device capability
+ * @returns Throttled function
+ */
+export function throttleForPerformance<T extends (...args: any[]) => any>(
+  func: T,
+  deviceCapability: DeviceCapability
+): (...args: Parameters<T>) => void {
+  const throttleTime = deviceCapability === DeviceCapability.LOW ? 100 : 
+                      deviceCapability === DeviceCapability.MEDIUM ? 50 : 16;
+  
+  let lastCall = 0;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  
+  return function(...args: Parameters<T>): void {
+    const now = Date.now();
+    const remaining = throttleTime - (now - lastCall);
+    
+    if (remaining <= 0) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      lastCall = now;
+      func(...args);
+    } else if (!timeoutId) {
+      timeoutId = setTimeout(() => {
+        lastCall = Date.now();
+        timeoutId = null;
+        func(...args);
+      }, remaining);
+    }
+  };
+}
+
+/**
+ * Create a function that throttles based on FPS target
+ * @param func The function to throttle
+ * @param targetFPS The target frames per second
  * @returns Throttled function
  */
 export function throttle<T extends (...args: any[]) => any>(
   func: T, 
-  limit: number
+  targetFPS = 60
 ): (...args: Parameters<T>) => void {
+  const limit = 1000 / targetFPS;
   let lastCall = 0;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   
@@ -202,7 +312,3 @@ export function throttle<T extends (...args: any[]) => any>(
     }
   };
 }
-
-// Re-export types from core modules for centralized access
-export type { DeviceInfo, PerformanceReportPayload } from './performance/types';
-export type { PerformanceConfig, PerformanceContextState, } from './performance/types';

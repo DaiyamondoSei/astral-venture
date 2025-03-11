@@ -11,10 +11,15 @@ import {
   MetricType,
   WebVitalName,
   WebVitalCategory,
+  ComponentMetrics,
+  DeviceInfo,
   isValidMetricType,
   isValidWebVitalName,
-  isValidWebVitalCategory
-} from './types';
+  isValidWebVitalCategory,
+  ValidationResult,
+  ValidationErrorCode
+} from '../../types/core';
+
 import { ValidationError } from '../validation/ValidationError';
 import { 
   isString, 
@@ -23,7 +28,6 @@ import {
   validateData,
   createSchemaValidator
 } from '../validation/validationUtils';
-import { ValidationResult, Validator, ValidationErrorCode } from '../validation/types';
 
 /**
  * Validates a performance metric
@@ -61,10 +65,7 @@ export function validatePerformanceMetric(metric: unknown): PerformanceMetric {
   if (!metric.type || !isString(metric.type) || !isValidMetricType(metric.type)) {
     throw new ValidationError(
       'Invalid metric type',
-      [{ path: 'type', message: `Metric type must be one of: ${[
-        'render', 'interaction', 'load', 'memory', 'network', 'resource',
-        'javascript', 'css', 'animation', 'metric', 'summary', 'performance', 'webVital'
-      ].join(', ')}`, code: ValidationErrorCode.FORMAT_ERROR }]
+      [{ path: 'type', message: `Metric type must be one of: ${Object.values(MetricType).join(', ')}`, code: ValidationErrorCode.FORMAT_ERROR }]
     );
   }
 
@@ -87,7 +88,7 @@ export function validatePerformanceMetric(metric: unknown): PerformanceMetric {
 /**
  * Performance metric validator as a Validator function
  */
-export const performanceMetricValidator: Validator<PerformanceMetric> = (metric: unknown): ValidationResult<PerformanceMetric> => {
+export function performanceMetricValidator(metric: unknown): ValidationResult<PerformanceMetric> {
   try {
     const validatedMetric = validatePerformanceMetric(metric);
     return { valid: true, validatedData: validatedMetric };
@@ -100,7 +101,7 @@ export const performanceMetricValidator: Validator<PerformanceMetric> = (metric:
       error: { path: '', message: error instanceof Error ? error.message : String(error) } 
     };
   }
-};
+}
 
 /**
  * Validates a web vital metric
@@ -162,7 +163,7 @@ export function validateWebVital(vital: unknown): WebVitalMetric {
 /**
  * Web vital validator as a Validator function
  */
-export const webVitalValidator: Validator<WebVitalMetric> = (vital: unknown): ValidationResult<WebVitalMetric> => {
+export function webVitalValidator(vital: unknown): ValidationResult<WebVitalMetric> {
   try {
     const validatedVital = validateWebVital(vital);
     return { valid: true, validatedData: validatedVital };
@@ -175,7 +176,175 @@ export const webVitalValidator: Validator<WebVitalMetric> = (vital: unknown): Va
       error: { path: '', message: error instanceof Error ? error.message : String(error) } 
     };
   }
-};
+}
+
+/**
+ * Validates component metrics
+ */
+export function validateComponentMetrics(metrics: unknown): ValidationResult<ComponentMetrics> {
+  if (!isObject(metrics)) {
+    return {
+      valid: false,
+      error: { 
+        path: '', 
+        message: 'ComponentMetrics must be an object', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+
+  const requiredFields = ['componentName', 'renderCount', 'totalRenderTime', 'averageRenderTime', 'lastRenderTime'];
+  
+  for (const field of requiredFields) {
+    if (!(field in metrics)) {
+      return {
+        valid: false,
+        error: { 
+          path: field, 
+          message: `${field} is required for ComponentMetrics`, 
+          code: ValidationErrorCode.REQUIRED 
+        }
+      };
+    }
+  }
+
+  // Validate componentName is a string
+  if (!isString(metrics.componentName)) {
+    return {
+      valid: false,
+      error: { 
+        path: 'componentName', 
+        message: 'componentName must be a string', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+
+  // Validate numeric fields
+  const numericFields = ['renderCount', 'totalRenderTime', 'averageRenderTime', 'lastRenderTime'];
+  for (const field of numericFields) {
+    if (field in metrics && !isNumber(metrics[field])) {
+      return {
+        valid: false,
+        error: { 
+          path: field, 
+          message: `${field} must be a number`, 
+          code: ValidationErrorCode.TYPE_ERROR 
+        }
+      };
+    }
+  }
+
+  // Validate domSize if present
+  if ('domSize' in metrics) {
+    const domSize = metrics.domSize;
+    if (isObject(domSize)) {
+      if (!isNumber(domSize.width) || !isNumber(domSize.height)) {
+        return {
+          valid: false,
+          error: { 
+            path: 'domSize', 
+            message: 'domSize must have width and height as numbers', 
+            code: ValidationErrorCode.TYPE_ERROR 
+          }
+        };
+      }
+    } else if (domSize !== undefined) {
+      return {
+        valid: false,
+        error: { 
+          path: 'domSize', 
+          message: 'domSize must be an object with width and height', 
+          code: ValidationErrorCode.TYPE_ERROR 
+        }
+      };
+    }
+  }
+
+  return {
+    valid: true,
+    validatedData: metrics as ComponentMetrics
+  };
+}
+
+/**
+ * Validates device information
+ */
+export function validateDeviceInfo(info: unknown): ValidationResult<DeviceInfo> {
+  if (!isObject(info)) {
+    return {
+      valid: false,
+      error: { 
+        path: '', 
+        message: 'DeviceInfo must be an object', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+  
+  // Allow all properties to be optional
+  // Just verify types of provided properties
+  
+  if ('userAgent' in info && !isString(info.userAgent)) {
+    return {
+      valid: false,
+      error: { 
+        path: 'userAgent', 
+        message: 'userAgent must be a string', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+  
+  if ('deviceCategory' in info && !isString(info.deviceCategory)) {
+    return {
+      valid: false,
+      error: { 
+        path: 'deviceCategory', 
+        message: 'deviceCategory must be a string', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+  
+  if ('screenWidth' in info && !isNumber(info.screenWidth)) {
+    return {
+      valid: false,
+      error: { 
+        path: 'screenWidth', 
+        message: 'screenWidth must be a number', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+  
+  if ('screenHeight' in info && !isNumber(info.screenHeight)) {
+    return {
+      valid: false,
+      error: { 
+        path: 'screenHeight', 
+        message: 'screenHeight must be a number', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+  
+  if ('devicePixelRatio' in info && !isNumber(info.devicePixelRatio)) {
+    return {
+      valid: false,
+      error: { 
+        path: 'devicePixelRatio', 
+        message: 'devicePixelRatio must be a number', 
+        code: ValidationErrorCode.TYPE_ERROR 
+      }
+    };
+  }
+  
+  return {
+    valid: true,
+    validatedData: info as DeviceInfo
+  };
+}
 
 // Schemas for validation
 export const performanceMetricSchema = {
@@ -207,6 +376,8 @@ export const performanceMetricSchema = {
 export const performanceMetricValidation = {
   validateMetric: validatePerformanceMetric,
   validateWebVital: validateWebVital,
+  validateComponentMetrics,
+  validateDeviceInfo,
   isValidMetricType,
   isValidWebVitalName,
   isValidWebVitalCategory,

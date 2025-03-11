@@ -6,7 +6,7 @@
  * This class extends the standard Error class with validation-specific properties.
  */
 
-import { ValidationErrorDetail, ValidationErrorCode, ValidationSeverity } from '../../types/validation/types';
+import { ValidationErrorDetail, ValidationErrorCode, ValidationSeverity } from '../../types/core';
 
 /**
  * ValidationError represents a validation failure with detailed context
@@ -52,13 +52,11 @@ export class ValidationError extends Error {
     this.details = details.map(detail => {
       const normalizedDetail: ValidationErrorDetail = {
         // Ensure path exists (use field as fallback)
-        path: detail.path || detail.field || 'unknown',
+        path: detail.path || 'unknown',
         // Ensure message exists
         message: detail.message || 'Validation failed',
         // Copy all other properties
         ...detail,
-        // Ensure field exists for backward compatibility
-        field: detail.field || detail.path,
         // Ensure severity is set
         severity: detail.severity || ValidationSeverity.ERROR
       };
@@ -71,7 +69,7 @@ export class ValidationError extends Error {
 
     // Extract field, expectedType, and rule from first detail if available
     if (this.details && this.details.length > 0) {
-      this.field = this.details[0].field || this.details[0].path;
+      this.field = this.details[0].path;
       this.expectedType = this.details[0].type;
       this.rule = this.details[0].rule;
     }
@@ -112,7 +110,7 @@ export class ValidationError extends Error {
    */
   public hasErrorForField(field: string): boolean {
     return this.details.some(detail => 
-      detail.path === field || detail.field === field
+      detail.path === field
     );
   }
 
@@ -121,7 +119,7 @@ export class ValidationError extends Error {
    */
   public getFieldError(field: string): string | undefined {
     const error = this.details.find(detail => 
-      detail.path === field || detail.field === field
+      detail.path === field
     );
     return error?.message;
   }
@@ -143,8 +141,7 @@ export class ValidationError extends Error {
       return new ValidationError(
         apiError.message || defaultMessage,
         apiError.errors.map((err: any) => ({
-          path: err.field || err.path || 'unknown',
-          field: err.field || err.path || 'unknown',
+          path: err.path || 'unknown',
           message: err.message || String(err),
           value: err.value,
           type: err.type,
@@ -182,7 +179,6 @@ export class ValidationError extends Error {
       message || `${field} is required`,
       [{ 
         path: field, 
-        field, 
         message: message || `${field} is required`, 
         rule: 'required',
         code: ValidationErrorCode.REQUIRED
@@ -198,7 +194,6 @@ export class ValidationError extends Error {
       message || `${field} must be a ${expectedType}`,
       [{ 
         path: field, 
-        field, 
         message: message || `${field} must be a ${expectedType}`, 
         type: expectedType,
         rule: 'type',
@@ -224,7 +219,6 @@ export class ValidationError extends Error {
       message || defaultMessage,
       [{ 
         path: field, 
-        field, 
         message: message || defaultMessage, 
         rule: 'range',
         code: ValidationErrorCode.RANGE_ERROR
@@ -240,7 +234,6 @@ export class ValidationError extends Error {
       message || `${field} has invalid format`,
       [{ 
         path: field, 
-        field, 
         message: message || `${field} has invalid format (expected: ${format})`, 
         rule: 'format',
         code: ValidationErrorCode.FORMAT_ERROR
