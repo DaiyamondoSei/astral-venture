@@ -1,96 +1,66 @@
 
-/**
- * Core Performance Monitoring Types
- * 
- * Foundational type definitions for the performance monitoring infrastructure.
- * These types are used across the performance monitoring system.
- */
+import { ComponentMetrics, PerformanceMetric } from './metrics';
 
-// Re-export the base types from the central types.ts file
-import {
-  DeviceCapability,
-  PerformanceMode,
-  RenderFrequency,
-  MetricType,
-  WebVitalName,
-  WebVitalCategory,
-  PerformanceMetric,
-  ComponentMetrics,
-  PerformanceMonitorConfig,
-  QualityLevel,
-  PerformanceSettings,
-  PerformanceBoundaries,
-  AdaptiveSettings
-} from '../types';
+export type DeviceCapability = 'low' | 'medium' | 'high';
+export type PerformanceMode = 'quality' | 'balanced' | 'performance';
+export type RenderFrequency = 'low' | 'medium' | 'high';
 
-export {
-  DeviceCapability,
-  PerformanceMode,
-  RenderFrequency,
-  MetricType,
-  WebVitalName,
-  WebVitalCategory,
-  PerformanceMetric,
-  ComponentMetrics,
-  PerformanceMonitorConfig,
-  QualityLevel,
-  PerformanceSettings,
-  PerformanceBoundaries,
-  AdaptiveSettings
-};
-
-// Base metric interface
-export interface BaseMetric<T> {
-  name: string;
-  value: T;
-  timestamp: number;
-  metadata?: Record<string, unknown>;
+export interface PerformanceConfig {
+  deviceCapability: DeviceCapability;
+  useManualCapability: boolean;
+  disableAnimations: boolean;
+  disableEffects: boolean;
+  samplingRate: number;
+  throttleInterval: number;
+  maxTrackedComponents: number;
+  slowRenderThreshold: number;
+  enableValidation: boolean;
+  enablePerformanceTracking: boolean;
+  enableRenderTracking: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
 }
 
-// Web vital metric structure
-export interface WebVitalMetric extends BaseMetric<number> {
-  name: WebVitalName | string;
-  value: number;
-  category: WebVitalCategory;
-  rating?: 'good' | 'needs-improvement' | 'poor';
-  attribution?: {
-    element?: string;
-    largestShiftTarget?: string;
-    largestShiftTime?: number;
-    loadState?: string;
-    navigationEntry?: string;
-    eventEntry?: string;
+export interface PerformanceContext {
+  config: PerformanceConfig;
+  metrics: ComponentMetrics[];
+  status: {
+    fps: number;
+    memory: number;
+    isThrottled: boolean;
   };
+  updateConfig: (updates: Partial<PerformanceConfig>) => void;
+  trackMetric: (metric: PerformanceMetric) => void;
+  getDeviceCapability: () => DeviceCapability;
 }
 
-// Device information for metrics reporting
-export interface DeviceInfo {
-  userAgent: string;
-  deviceCategory: string;
-  screenWidth?: number;
-  screenHeight?: number;
-  devicePixelRatio?: number;
-  viewport?: {
-    width: number;
-    height: number;
-  };
-  connection?: {
-    effectiveType?: string;
-    downlink?: number;
-    rtt?: number;
-    saveData?: boolean;
-  };
-  memory?: {
-    jsHeapSizeLimit?: number;
-    totalJSHeapSize?: number;
-    usedJSHeapSize?: number;
-  };
+export interface ValidationConfig {
+  enabled: boolean;
+  validateProps: boolean;
+  validateState: boolean;
+  validateEffects: boolean;
+  validateRenders: boolean;
+  strictMode: boolean;
 }
 
-// Performance report payload
-export interface PerformanceReportPayload {
-  timestamp: string;
-  session?: string;
-  metrics: PerformanceMetric[];
-  device?: DeviceInfo;
+export interface ValidationError {
+  code: string;
+  message: string;
+  field?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}
+
+export type ValidationFunction<T> = (value: unknown) => T;
+
+export interface ValidationSchema<T> {
+  validate: ValidationFunction<T>;
+  validateAsync?: (value: unknown) => Promise<T>;
 }
