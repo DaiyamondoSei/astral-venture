@@ -6,19 +6,12 @@
  */
 
 import { ValidationError, ValidationErrorDetail } from './ValidationError';
-
-/**
- * Result of a validation check
- */
-export interface ValidationResult {
-  valid: boolean;
-  error?: ValidationErrorDetail;
-}
-
-/**
- * Validator function type
- */
-export type Validator<T = any> = (value: unknown) => ValidationResult;
+import { 
+  ValidationResult, 
+  Validator, 
+  ValidationSchema, 
+  ValidationOptions 
+} from './types';
 
 /**
  * Required field validator
@@ -36,7 +29,7 @@ export const required = (field: string): Validator => {
         }
       };
     }
-    return { valid: true };
+    return { valid: true, validatedData: value };
   };
 };
 
@@ -48,7 +41,7 @@ export function createTypeGuard<T>(
   code: string,
   message: string
 ): Validator<T> {
-  return (value: unknown): ValidationResult => {
+  return (value: unknown): ValidationResult<T> => {
     if (!guard(value)) {
       return {
         valid: false,
@@ -60,22 +53,22 @@ export function createTypeGuard<T>(
         }
       };
     }
-    return { valid: true };
+    return { valid: true, validatedData: value };
   };
 }
 
 /**
  * Combine multiple validators
  */
-export function combineValidators(validators: Validator[]): Validator {
-  return (value: unknown): ValidationResult => {
+export function combineValidators<T>(validators: Validator[]): Validator<T> {
+  return (value: unknown): ValidationResult<T> => {
     for (const validator of validators) {
       const result = validator(value);
       if (!result.valid) {
-        return result;
+        return result as ValidationResult<T>;
       }
     }
-    return { valid: true };
+    return { valid: true, validatedData: value as T };
   };
 }
 
@@ -99,7 +92,8 @@ export const isObject = (value: unknown): value is Record<string, unknown> =>
  */
 export function validateData<T>(
   data: unknown, 
-  schema: Record<string, Validator>,
+  schema: ValidationSchema<T>,
+  options: ValidationOptions = {},
   errorMessage: string = 'Validation failed'
 ): T {
   if (!isObject(data)) {
@@ -110,14 +104,41 @@ export function validateData<T>(
   }
 
   const errors: ValidationErrorDetail[] = [];
+  const result: Record<string, unknown> = {};
 
   for (const [field, validator] of Object.entries(schema)) {
-    const result = validator(data[field]);
-    if (!result.valid && result.error) {
+    if (!validator) continue;
+    
+    const fieldValue = data[field];
+    const validationResult = validator(fieldValue);
+    
+    if (!validationResult.valid && validationResult.error) {
       errors.push({
-        ...result.error,
-        path: result.error.path || field
+        ...validationResult.error,
+        path: validationResult.error.path || field
       });
+      
+      // Stop on first error if abortEarly is true
+      if (options.abortEarly) break;
+    } else if (validationResult.validatedData !== undefined) {
+      result[field] = validationResult.validatedData;
+    }
+  }
+
+  // Add unknown fields if not stripped
+  if (!options.stripUnknown) {
+    for (const [key, value] of Object.entries(data)) {
+      if (!(key in schema)) {
+        if (!options.allowUnknown) {
+          errors.push({
+            path: key,
+            message: `Unknown field: ${key}`,
+            code: 'UNKNOWN_FIELD'
+          });
+        } else {
+          result[key] = value;
+        }
+      }
     }
   }
 
@@ -125,7 +146,7 @@ export function validateData<T>(
     throw new ValidationError(errorMessage, errors);
   }
 
-  return data as T;
+  return result as T;
 }
 
 /**
@@ -134,7 +155,7 @@ export function validateData<T>(
 export function getProperty<T>(
   obj: unknown, 
   key: string,
-  validator?: Validator
+  validator?: Validator<T>
 ): T | undefined {
   if (!isObject(obj)) return undefined;
   
@@ -143,7 +164,34 @@ export function getProperty<T>(
   if (validator) {
     const result = validator(value);
     if (!result.valid) return undefined;
+    return result.validatedData as T;
   }
   
   return value as T;
+}
+
+/**
+ * Create schema validator function from schema object
+ */
+export function createSchemaValidator<T>(schema: ValidationSchema<T>): Validator<T> {
+  return (data: unknown): ValidationResult<T> => {
+    try {
+      const validated = validateData<T>(data, schema);
+      return { valid: true, validatedData: validated };
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return { 
+          valid: false, 
+          errors: error.details
+        };
+      }
+      return { 
+        valid: false, 
+        error: { 
+          path: '', 
+          message: error instanceof Error ? error.message : String(error) 
+        }
+      };
+    }
+  };
 }

@@ -4,7 +4,9 @@ import {
   validateWebVital,
   isValidMetricType,
   isValidWebVitalName,
-  isValidWebVitalCategory
+  isValidWebVitalCategory,
+  performanceMetricValidator,
+  webVitalValidator
 } from '../utils/performance/validation';
 import { ValidationError } from '../utils/validation/ValidationError';
 
@@ -100,6 +102,63 @@ describe('Performance Metrics Validation', () => {
       };
 
       expect(() => validateWebVital(invalidVital)).toThrow(ValidationError);
+    });
+  });
+
+  describe('performanceMetricValidator', () => {
+    test('should return valid=true for valid metrics', () => {
+      const validMetric = {
+        metric_name: 'test',
+        value: 100,
+        category: 'component',
+        type: 'render',
+        timestamp: Date.now()
+      };
+
+      const result = performanceMetricValidator(validMetric);
+      expect(result.valid).toBe(true);
+      expect(result.validatedData).toBeDefined();
+    });
+
+    test('should return valid=false for invalid metrics', () => {
+      const invalidMetric = {
+        // Missing metric_name
+        value: 100,
+        category: 'component',
+        type: 'render'
+      };
+
+      const result = performanceMetricValidator(invalidMetric);
+      expect(result.valid).toBe(false);
+      expect(result.error || result.errors).toBeDefined();
+    });
+  });
+
+  describe('webVitalValidator', () => {
+    test('should return valid=true for valid web vitals', () => {
+      const validVital = {
+        name: 'CLS',
+        value: 0.1,
+        category: 'visual_stability',
+        timestamp: Date.now()
+      };
+
+      const result = webVitalValidator(validVital);
+      expect(result.valid).toBe(true);
+      expect(result.validatedData).toBeDefined();
+    });
+
+    test('should return valid=false for invalid web vitals', () => {
+      const invalidVital = {
+        name: 'CLS',
+        // Missing value
+        category: 'visual_stability',
+        timestamp: Date.now()
+      };
+
+      const result = webVitalValidator(invalidVital);
+      expect(result.valid).toBe(false);
+      expect(result.error || result.errors).toBeDefined();
     });
   });
 });

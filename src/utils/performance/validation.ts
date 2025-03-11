@@ -16,8 +16,11 @@ import { ValidationError } from '../validation/ValidationError';
 import { 
   isString, 
   isNumber, 
-  isObject 
+  isObject,
+  validateData,
+  createSchemaValidator
 } from '../validation/validationUtils';
+import { ValidationResult, Validator } from '../validation/types';
 
 // Validate MetricType
 export function isValidMetricType(type: string): type is MetricType {
@@ -53,7 +56,9 @@ export function isValidWebVitalCategory(category: string): category is WebVitalC
   ].includes(category);
 }
 
-// Validate Performance Metric
+/**
+ * Validates a performance metric
+ */
 export function validatePerformanceMetric(metric: unknown): PerformanceMetric {
   if (!isObject(metric)) {
     throw new ValidationError(
@@ -110,7 +115,27 @@ export function validatePerformanceMetric(metric: unknown): PerformanceMetric {
   return metric as PerformanceMetric;
 }
 
-// Validate Web Vital
+/**
+ * Performance metric validator as a Validator function
+ */
+export const performanceMetricValidator: Validator<PerformanceMetric> = (metric: unknown): ValidationResult<PerformanceMetric> => {
+  try {
+    const validatedMetric = validatePerformanceMetric(metric);
+    return { valid: true, validatedData: validatedMetric };
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { valid: false, errors: error.details };
+    }
+    return { 
+      valid: false, 
+      error: { path: '', message: error instanceof Error ? error.message : String(error) } 
+    };
+  }
+};
+
+/**
+ * Validates a web vital metric
+ */
 export function validateWebVital(vital: unknown): WebVitalMetric {
   if (!isObject(vital)) {
     throw new ValidationError(
@@ -165,13 +190,59 @@ export function validateWebVital(vital: unknown): WebVitalMetric {
   return vital as WebVitalMetric;
 }
 
-// Complete validation system for performance metrics
+/**
+ * Web vital validator as a Validator function
+ */
+export const webVitalValidator: Validator<WebVitalMetric> = (vital: unknown): ValidationResult<WebVitalMetric> => {
+  try {
+    const validatedVital = validateWebVital(vital);
+    return { valid: true, validatedData: validatedVital };
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { valid: false, errors: error.details };
+    }
+    return { 
+      valid: false, 
+      error: { path: '', message: error instanceof Error ? error.message : String(error) } 
+    };
+  }
+};
+
+// Schemas for validation
+export const performanceMetricSchema = {
+  metric_name: createSchemaValidator<string>(value => 
+    typeof value === 'string' 
+      ? { valid: true, validatedData: value }
+      : { valid: false, error: { path: 'metric_name', message: 'Metric name must be a string' } }
+  ),
+  value: createSchemaValidator<number>(value => 
+    typeof value === 'number' && !isNaN(value)
+      ? { valid: true, validatedData: value }
+      : { valid: false, error: { path: 'value', message: 'Value must be a number' } }
+  ),
+  category: createSchemaValidator<string>(value => 
+    typeof value === 'string'
+      ? { valid: true, validatedData: value }
+      : { valid: false, error: { path: 'category', message: 'Category must be a string' } }
+  ),
+  type: createSchemaValidator<MetricType>(value => 
+    typeof value === 'string' && isValidMetricType(value)
+      ? { valid: true, validatedData: value }
+      : { valid: false, error: { path: 'type', message: 'Invalid metric type' } }
+  )
+};
+
+/**
+ * Complete validation system for performance metrics
+ */
 export const performanceMetricValidation = {
   validateMetric: validatePerformanceMetric,
   validateWebVital: validateWebVital,
   isValidMetricType,
   isValidWebVitalName,
-  isValidWebVitalCategory
+  isValidWebVitalCategory,
+  performanceMetricValidator,
+  webVitalValidator
 };
 
 export default performanceMetricValidation;

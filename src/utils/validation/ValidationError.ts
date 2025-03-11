@@ -5,25 +5,7 @@
  * A specialized error type for validation failures with detailed error information.
  */
 
-export interface ValidationErrorDetail {
-  // Core fields
-  path: string;
-  message: string;
-  
-  // Optional fields for additional context
-  value?: any;
-  type?: string;
-  rule?: string;
-  code?: string;
-  
-  // Metadata
-  details?: string;
-  statusCode?: number;
-  
-  // Legacy compatibility field
-  field?: string;
-  expectedType?: string;
-}
+import { ValidationErrorDetail } from './types';
 
 export class ValidationError extends Error {
   public readonly details: ValidationErrorDetail[];
@@ -69,7 +51,7 @@ export class ValidationError extends Error {
     // Extract field, expectedType, and rule from first detail if available
     if (this.details && this.details.length > 0) {
       this.field = this.details[0].field || this.details[0].path;
-      this.expectedType = this.details[0].expectedType || this.details[0].type;
+      this.expectedType = this.details[0].type;
       this.rule = this.details[0].rule;
     }
 
@@ -141,10 +123,8 @@ export class ValidationError extends Error {
           message: err.message || String(err),
           value: err.value,
           type: err.type,
-          expectedType: err.expectedType,
-          rule: err.rule,
           code: err.code,
-          details: err.details,
+          rule: err.rule,
           statusCode: statusCode
         })),
         apiError.code || 'VALIDATION_ERROR',
@@ -190,7 +170,6 @@ export class ValidationError extends Error {
         path: field, 
         field, 
         message: message || `${field} must be a ${expectedType}`, 
-        expectedType,
         type: expectedType,
         rule: 'type',
         code: 'TYPE_ERROR'
@@ -229,19 +208,6 @@ export class ValidationError extends Error {
         message: message || `${field} has invalid format (expected: ${format})`, 
         rule: 'format',
         code: 'FORMAT_ERROR'
-      }]
-    );
-  }
-
-  static schemaError(field: string, message?: string): ValidationError {
-    return new ValidationError(
-      message || `${field} has invalid schema`,
-      [{ 
-        path: field, 
-        field, 
-        message: message || `${field} has invalid schema`, 
-        rule: 'schema',
-        code: 'SCHEMA_ERROR'
       }]
     );
   }

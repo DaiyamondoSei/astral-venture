@@ -14,6 +14,33 @@ export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
 export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 'responsiveness';
 
 /**
+ * Web vital rating types
+ */
+export type WebVitalRating = 'good' | 'needs-improvement' | 'poor';
+
+/**
+ * Device information structure
+ */
+export interface DeviceInfo {
+  userAgent?: string;
+  deviceCategory?: string;
+  screenWidth?: number;
+  screenHeight?: number;
+  devicePixelRatio?: number;
+  connection?: {
+    effectiveType?: string;
+    downlink?: number;
+    rtt?: number;
+    saveData?: boolean;
+  };
+  memory?: {
+    jsHeapSizeLimit?: number;
+    totalJSHeapSize?: number;
+    usedJSHeapSize?: number;
+  };
+}
+
+/**
  * Web vital metric structure
  */
 export interface WebVitalMetric {
@@ -21,7 +48,7 @@ export interface WebVitalMetric {
   value: number;
   category: WebVitalCategory;
   timestamp: number;
-  rating?: 'good' | 'needs-improvement' | 'poor';
+  rating?: WebVitalRating;
 }
 
 /**
@@ -32,15 +59,15 @@ export interface PerformanceMetric {
   metric_name: string;
   value: number;
   category: string;
-  timestamp: string;
+  timestamp: string | number;
   type: MetricType;
   user_id?: string;
   session_id?: string;
   page_url?: string;
-  device_info?: Record<string, any>;
+  device_info?: DeviceInfo | Record<string, any>;
   metadata?: Record<string, any>;
   environment?: string;
-  rating?: 'good' | 'needs-improvement' | 'poor';
+  rating?: WebVitalRating;
 }
 
 /**
@@ -53,24 +80,17 @@ export interface TrackPerformancePayload {
   userId?: string;
   timestamp: string;
   source: 'web' | 'mobile' | 'desktop';
-  deviceInfo?: {
-    userAgent?: string;
-    deviceCategory?: string;
-    screenWidth?: number;
-    screenHeight?: number;
-    devicePixelRatio?: number;
-    connection?: {
-      effectiveType?: string;
-      downlink?: number;
-      rtt?: number;
-      saveData?: boolean;
-    };
-    memory?: {
-      jsHeapSizeLimit?: number;
-      totalJSHeapSize?: number;
-      usedJSHeapSize?: number;
-    };
-  };
+  deviceInfo?: DeviceInfo;
+}
+
+/**
+ * Performance data error structure
+ */
+export interface PerformanceDataError {
+  metricIndex: number;
+  message: string;
+  field?: string;
+  code?: string;
 }
 
 /**
@@ -80,6 +100,34 @@ export interface TrackPerformanceResponse {
   success: boolean;
   metricsProcessed: number;
   timestamp: string;
-  errors?: Array<{metricIndex: number, message: string}>;
+  errors?: PerformanceDataError[];
   recommendations?: string[];
+}
+
+/**
+ * Validation result structure
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors?: { field: string; message: string }[];
+  message?: string;
+}
+
+/**
+ * Type guards for runtime type safety
+ */
+export function isValidMetricType(type: string): type is MetricType {
+  return [
+    'render', 'interaction', 'load', 'memory', 'network', 
+    'resource', 'javascript', 'css', 'animation', 
+    'metric', 'summary', 'performance', 'webVital'
+  ].includes(type);
+}
+
+export function isValidWebVitalName(name: string): name is WebVitalName {
+  return ['CLS', 'FCP', 'LCP', 'TTFB', 'FID', 'INP'].includes(name);
+}
+
+export function isValidWebVitalCategory(category: string): type is WebVitalCategory {
+  return ['loading', 'interaction', 'visual_stability', 'responsiveness'].includes(category);
 }

@@ -1,212 +1,191 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
-import type { 
-  TrackPerformancePayload, 
-  TrackPerformanceResponse, 
-  PerformanceMetric,
-  WebVitalMetric 
-} from "./types.ts";
-
 /**
- * Edge Function: track-performance
+ * Performance Metrics Tracking Edge Function
  * 
- * Securely tracks performance metrics from client applications
- * and stores them in the database for analysis.
+ * This edge function receives performance metrics from clients and stores them in the database.
+ * It includes comprehensive validation and error handling.
  */
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { 
+  validatePerformancePayload 
+} from "./validation.ts";
+import { processMetrics, storePerformanceMetrics } from "./utils.ts";
+import { TrackPerformancePayload, PerformanceDataError } from "./types.ts";
 
-// Define CORS headers for browser compatibility
+// CORS headers for cross-origin requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Content-Type": "application/json"
 };
 
-serve(async (req) => {
+// Supabase client initialization
+function getSupabaseClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL") || "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  
+  // Only accept POST requests
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Method not allowed. Use POST."
+      }),
+      { 
+        status: 405, 
+        headers: corsHeaders 
+      }
+    );
+  }
 
   try {
     // Parse request body
-    const payload: TrackPerformancePayload = await req.json();
+    const requestData = await req.json();
     
-    // Validate the payload
-    if (!payload.metrics || !Array.isArray(payload.metrics) || payload.metrics.length === 0) {
-      throw new Error("Invalid payload: metrics array is required");
-    }
-
-    // Validate timestamp
-    if (!payload.timestamp || isNaN(Date.parse(payload.timestamp))) {
-      throw new Error("Invalid payload: timestamp must be a valid date string");
-    }
-
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    // Validate the request payload
+    const validation = validatePerformancePayload(requestData);
     
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Missing required environment variables");
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Process metrics
-    const errors: Array<{metricIndex: number, message: string}> = [];
-    const validMetrics: PerformanceMetric[] = [];
-    const validWebVitals: WebVitalMetric[] = [];
-
-    // Validate and sanitize each metric
-    payload.metrics.forEach((metric, index) => {
-      try {
-        // Required fields validation
-        if (!metric.metric_name || typeof metric.value !== 'number' || !metric.type) {
-          throw new Error("Missing required fields in metric");
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: validation.message || "Invalid payload",
+          details: validation.errors
+        }),
+        { 
+          status: 400, 
+          headers: corsHeaders 
         }
-
-        // Sanitize and format the metric
-        const sanitizedMetric: PerformanceMetric = {
-          ...metric,
-          timestamp: metric.timestamp || payload.timestamp,
-          user_id: metric.user_id || payload.userId,
-          session_id: metric.session_id || payload.sessionId,
-          environment: Deno.env.get("ENVIRONMENT") || "production"
-        };
-
-        validMetrics.push(sanitizedMetric);
-      } catch (error) {
-        errors.push({ metricIndex: index, message: error.message });
-        console.error(`Error processing metric at index ${index}:`, error);
-      }
-    });
-
-    // Process web vitals if present
-    if (payload.webVitals && Array.isArray(payload.webVitals)) {
-      payload.webVitals.forEach((vital, index) => {
-        try {
-          // Basic validation
-          if (!vital.name || typeof vital.value !== 'number' || !vital.category) {
-            throw new Error("Missing required fields in web vital");
-          }
-
-          validWebVitals.push(vital);
-        } catch (error) {
-          errors.push({ metricIndex: index, message: `Web vital error: ${error.message}` });
-          console.error(`Error processing web vital at index ${index}:`, error);
-        }
-      });
+      );
     }
 
-    // Ensure the performance_metrics table exists
-    await supabase.rpc('ensure_performance_metrics_table');
-
-    // Insert validated metrics into the database
-    if (validMetrics.length > 0) {
-      const { error: dbError } = await supabase
-        .from("performance_metrics")
-        .insert(validMetrics);
-
-      if (dbError) {
-        throw new Error(`Database error: ${dbError.message}`);
-      }
-
-      console.log(`Successfully processed ${validMetrics.length} metrics`);
-    }
-
-    // Insert web vitals if present
-    if (validWebVitals.length > 0) {
-      const { error: vitalError } = await supabase
-        .from("web_vitals")
-        .insert(validWebVitals.map(vital => ({
-          name: vital.name,
-          value: vital.value,
-          category: vital.category,
-          user_id: payload.userId,
-          client_timestamp: new Date(vital.timestamp).toISOString(),
-          rating: vital.rating
-        })));
-
-      if (vitalError) {
-        console.error(`Web vitals error: ${vitalError.message}`);
-        errors.push({ metricIndex: -1, message: `Web vitals error: ${vitalError.message}` });
-      } else {
-        console.log(`Successfully processed ${validWebVitals.length} web vitals`);
+    // Get authenticated user (if available)
+    const authHeader = req.headers.get('Authorization');
+    let userId = "anonymous";
+    
+    if (authHeader) {
+      const supabase = getSupabaseClient();
+      const { data: { user }, error } = await supabase.auth.getUser(authHeader.split(' ')[1]);
+      
+      if (!error && user) {
+        userId = user.id;
       }
     }
-
-    // Generate recommendations based on metrics
-    const recommendations = generateRecommendations(validMetrics, validWebVitals);
-
-    // Prepare response
-    const response: TrackPerformanceResponse = {
-      success: true,
-      metricsProcessed: validMetrics.length + validWebVitals.length,
-      timestamp: new Date().toISOString(),
-      recommendations,
-    };
-
-    if (errors.length > 0) {
-      response.success = validMetrics.length > 0 || validWebVitals.length > 0;
-      response.errors = errors;
+    
+    // Use session ID from payload if available
+    if (requestData.userId) {
+      userId = requestData.userId;
     }
-
-    // Return successful response
+    
+    // Process the validated payload
+    const payload = requestData as TrackPerformancePayload;
+    const processedData = processMetrics(payload, userId);
+    
+    // Store metrics in the database
+    const storageResult = await storePerformanceMetrics(userId, processedData);
+    
+    if (!storageResult.saved) {
+      throw new Error(storageResult.error || "Failed to save metrics");
+    }
+    
+    // Calculate any performance recommendations
+    const recommendations = generateRecommendations(payload);
+    
+    // Return success response
     return new Response(
-      JSON.stringify(response),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        success: true,
+        metricsProcessed: payload.metrics.length + (payload.webVitals?.length || 0),
+        timestamp: new Date().toISOString(),
+        recommendations: recommendations.length > 0 ? recommendations : undefined
+      }),
+      { 
+        status: 200, 
+        headers: corsHeaders 
+      }
     );
   } catch (error) {
-    console.error("Function error:", error);
+    // Log the error
+    console.error("Error processing performance metrics:", error);
     
     // Return error response
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message,
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString()
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        headers: corsHeaders 
       }
     );
   }
 });
 
 /**
- * Generates recommendations based on performance metrics and web vitals
+ * Generate performance recommendations based on metrics
  */
-function generateRecommendations(metrics: PerformanceMetric[], webVitals: WebVitalMetric[] = []): string[] {
+function generateRecommendations(payload: TrackPerformancePayload): string[] {
   const recommendations: string[] = [];
   
-  // Generate recommendations based on metrics
-  const slowRenders = metrics.filter(m => 
-    m.type === 'render' && m.value > 100); // 100ms threshold
+  // Check for slow rendering
+  const renderMetrics = payload.metrics.filter(m => m.type === 'render');
+  const slowRenders = renderMetrics.filter(m => m.value > 16);
   
   if (slowRenders.length > 0) {
-    const components = [...new Set(slowRenders.map(m => m.component_name).filter(Boolean))];
-    if (components.length > 0) {
-      recommendations.push(
-        `Consider optimizing these slow components: ${components.join(', ')}`
-      );
+    const components = [...new Set(slowRenders.map(m => m.component_name || 'Unknown'))];
+    if (components.length === 1) {
+      recommendations.push(`Consider optimizing the ${components[0]} component which is rendering slowly.`);
+    } else if (components.length > 1) {
+      recommendations.push(`Consider optimizing these slow rendering components: ${components.join(', ')}.`);
     }
   }
-
-  // Generate recommendations based on web vitals
-  if (webVitals.length > 0) {
-    const highCLS = webVitals.find(v => v.name === 'CLS' && v.value > 0.1);
-    if (highCLS) {
-      recommendations.push(
-        `Consider improving visual stability - CLS is ${highCLS.value.toFixed(2)}`
-      );
+  
+  // Check web vitals
+  if (payload.webVitals) {
+    const poorVitals = payload.webVitals.filter(v => v.rating === 'poor');
+    
+    if (poorVitals.length > 0) {
+      const vitalNames = [...new Set(poorVitals.map(v => v.name))];
+      recommendations.push(`Improve core web vitals: ${vitalNames.join(', ')}.`);
     }
-
-    const slowLCP = webVitals.find(v => v.name === 'LCP' && v.value > 2500);
-    if (slowLCP) {
-      recommendations.push(
-        `Consider improving loading performance - LCP is ${(slowLCP.value/1000).toFixed(2)}s`
-      );
+    
+    // Specific LCP recommendation
+    const lcp = payload.webVitals.find(v => v.name === 'LCP');
+    if (lcp && lcp.value > 2500) {
+      recommendations.push(`Your Largest Contentful Paint (${Math.round(lcp.value)}ms) exceeds the recommended 2.5s threshold.`);
+    }
+    
+    // Specific CLS recommendation
+    const cls = payload.webVitals.find(v => v.name === 'CLS');
+    if (cls && cls.value > 0.1) {
+      recommendations.push(`Your Cumulative Layout Shift (${cls.value.toFixed(3)}) exceeds the recommended 0.1 threshold.`);
+    }
+  }
+  
+  // Check memory usage
+  const memoryMetrics = payload.metrics.filter(m => m.type === 'memory');
+  if (memoryMetrics.length > 0) {
+    const highMemory = memoryMetrics.filter(m => m.value > 50000000); // 50MB
+    if (highMemory.length > 0) {
+      recommendations.push("Memory usage is high. Consider checking for memory leaks or optimizing resource usage.");
     }
   }
   

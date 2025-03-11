@@ -1,191 +1,357 @@
 
 /**
- * Metrics Collector
+ * Performance Metrics Collector
  * 
- * Service for collecting and tracking performance metrics.
+ * A utility to collect, validate, and report performance metrics.
  */
-import { PerformanceMetric, ComponentMetrics, MetricType } from './types';
-import { validatePerformanceMetric } from './validation';
-import { ValidationError } from '../validation/ValidationError';
-import { tryResult } from '../result/Result';
 
+import { 
+  PerformanceMetric, 
+  MetricType,
+  WebVitalMetric,
+  WebVitalCategory,
+  WebVitalRating
+} from './types';
+import { performanceMetricValidator, webVitalValidator } from './validation';
+import { ValidationError } from '../validation/ValidationError';
+import { throttle } from '../throttle';
+
+// Default collector configuration
+const DEFAULT_COLLECTOR_CONFIG = {
+  enabled: true,
+  throttleInterval: 1000,
+  batchSize: 10,
+  maxQueueSize: 100,
+  autoSendThreshold: 20,
+  sendEndpoint: '/api/performance-metrics',
+  debugLogging: false
+};
+
+/**
+ * Performance metrics collector class
+ */
 class MetricsCollector {
   private metrics: PerformanceMetric[] = [];
-  private componentMetrics = new Map<string, ComponentMetrics>();
-  private isEnabled: boolean = true;
-  private throttleInterval: number = 1000;
-  private throttleTimestamp: number = 0;
-
-  /**
-   * Track a component-specific metric
-   */
-  public trackComponentMetric(
-    componentName: string, 
-    metricName: string,
-    value: number,
-    type: MetricType = 'render'
-  ): void {
-    if (!this.isEnabled) return;
-
-    const now = Date.now();
-    if (now - this.throttleTimestamp < this.throttleInterval) {
-      return;
-    }
-    this.throttleTimestamp = now;
-
-    // Create and validate the metric
-    const rawMetric = {
-      component_name: componentName,
-      metric_name: metricName,
-      value,
-      timestamp: now,
-      category: type,
-      type
-    };
-
-    // Wrap validation in a try/result to avoid exceptions
-    const validationResult = tryResult(() => validatePerformanceMetric(rawMetric));
-    
-    if (validationResult.type === 'failure') {
-      console.error('Invalid metric:', validationResult.error);
-      return;
-    }
-
-    const metric = validationResult.value;
-    this.metrics.push(metric);
-    this.updateComponentMetrics(componentName, value, type);
+  private webVitals: WebVitalMetric[] = [];
+  private config = { ...DEFAULT_COLLECTOR_CONFIG };
+  private queueProcessing = false;
+  private sessionId: string;
+  
+  constructor() {
+    this.sessionId = this.generateSessionId();
+    this.collectThrottled = throttle(this.collectInternal, this.config.throttleInterval);
   }
-
+  
   /**
-   * Collect a general performance metric
+   * Generate a unique session ID
    */
-  public collect(
-    metricName: string,
-    value: number,
-    type: MetricType = 'metric', 
-    metadata?: Record<string, any>,
-    componentName?: string
-  ): void {
-    if (!this.isEnabled) return;
-    
-    // Create the raw metric
-    const rawMetric = {
-      metric_name: metricName,
-      value,
-      timestamp: Date.now(),
-      category: componentName ? 'component' : 'application',
-      type,
-      component_name: componentName,
-      metadata
-    };
-
-    // Validate the metric
-    const validationResult = tryResult(() => validatePerformanceMetric(rawMetric));
-    
-    if (validationResult.type === 'failure') {
-      console.error('Invalid metric:', validationResult.error);
-      return;
-    }
-    
-    const metric = validationResult.value;
-    this.metrics.push(metric);
-    
-    if (componentName && type === 'render') {
-      this.updateComponentMetrics(componentName, value, type);
-    }
+  private generateSessionId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
-
+  
   /**
-   * Update component metrics for tracking
+   * Set collector configuration
    */
-  private updateComponentMetrics(
-    componentName: string,
-    renderTime: number,
-    type: MetricType
-  ): void {
-    if (type !== 'render') return;
-
-    const existing = this.componentMetrics.get(componentName) || {
-      componentName,
-      renderCount: 0,
-      totalRenderTime: 0,
-      averageRenderTime: 0,
-      lastRenderTime: 0,
-      renderTimes: []
-    };
-
-    const updated: ComponentMetrics = {
-      ...existing,
-      renderCount: existing.renderCount + 1,
-      totalRenderTime: existing.totalRenderTime + renderTime,
-      lastRenderTime: renderTime,
-      averageRenderTime: (existing.totalRenderTime + renderTime) / (existing.renderCount + 1),
-      minRenderTime: Math.min(renderTime, existing.minRenderTime ?? renderTime),
-      maxRenderTime: Math.max(renderTime, existing.maxRenderTime ?? renderTime),
-      lastUpdated: Date.now()
-    };
-
-    // If first render, set first render time
-    if (existing.renderCount === 0) {
-      updated.firstRenderTime = renderTime;
-    }
-
-    // Keep track of render times history
-    if (!existing.renderTimes) {
-      updated.renderTimes = [renderTime];
-    } else if (existing.renderTimes.length < 10) {
-      updated.renderTimes = [...existing.renderTimes, renderTime];
-    } else {
-      updated.renderTimes = [...existing.renderTimes.slice(1), renderTime];
-    }
-
-    this.componentMetrics.set(componentName, updated);
+  public setConfig(config: Partial<typeof DEFAULT_COLLECTOR_CONFIG>): void {
+    this.config = { ...this.config, ...config };
+    // Re-create throttled function with new interval
+    this.collectThrottled = throttle(this.collectInternal, this.config.throttleInterval);
   }
-
-  /**
-   * Get all collected metrics
-   */
-  public getMetrics(): PerformanceMetric[] {
-    return [...this.metrics];
-  }
-
-  /**
-   * Get component metrics tracking data
-   */
-  public getComponentMetrics(): Map<string, ComponentMetrics> {
-    return new Map(this.componentMetrics);
-  }
-
-  /**
-   * Clear all tracked metrics
-   */
-  public clearMetrics(): void {
-    this.metrics = [];
-    this.componentMetrics.clear();
-  }
-
+  
   /**
    * Enable or disable metrics collection
    */
   public setEnabled(enabled: boolean): void {
-    this.isEnabled = enabled;
+    this.config.enabled = enabled;
   }
-
+  
   /**
-   * Set throttle interval for performance optimization
+   * Set throttle interval
    */
   public setThrottleInterval(interval: number): void {
-    this.throttleInterval = interval;
+    this.config.throttleInterval = interval;
+    this.collectThrottled = throttle(this.collectInternal, interval);
   }
-
+  
   /**
-   * Set auto-flush interval for the collector
-   * (This method exists for backward compatibility)
+   * Throttled version of collectInternal
+   * This is set in the constructor and when the throttle interval changes
    */
-  public setAutoFlushInterval(interval: number): void {
-    this.throttleInterval = interval;
+  private collectThrottled: (
+    metricName: string,
+    value: number,
+    type: MetricType,
+    metadata?: Record<string, any>,
+    componentName?: string
+  ) => void;
+  
+  /**
+   * Internal implementation of metric collection
+   */
+  private collectInternal(
+    metricName: string,
+    value: number,
+    type: MetricType,
+    metadata?: Record<string, any>,
+    componentName?: string
+  ): void {
+    if (!this.config.enabled) return;
+    
+    try {
+      const metric: PerformanceMetric = {
+        metric_name: metricName,
+        value: value,
+        type: type,
+        category: componentName ? 'component' : type,
+        timestamp: new Date().toISOString(),
+        component_name: componentName,
+        session_id: this.sessionId,
+        metadata: metadata
+      };
+      
+      // Validate metric before adding to queue
+      const validation = performanceMetricValidator(metric);
+      if (!validation.valid) {
+        if (this.config.debugLogging) {
+          console.error('Invalid metric:', metric, validation.errors || validation.error);
+        }
+        return;
+      }
+      
+      this.metrics.push(metric as PerformanceMetric);
+      
+      if (this.config.debugLogging) {
+        console.log('Collected metric:', metric);
+      }
+      
+      // Auto-send if we hit the threshold
+      if (this.metrics.length >= this.config.autoSendThreshold) {
+        this.sendMetrics();
+      }
+    } catch (error) {
+      if (this.config.debugLogging) {
+        console.error('Error collecting metric:', error);
+      }
+    }
+  }
+  
+  /**
+   * Collect a performance metric
+   */
+  public collect(
+    metricName: string,
+    value: number,
+    type: MetricType,
+    metadata?: Record<string, any>,
+    componentName?: string
+  ): void {
+    this.collectThrottled(metricName, value, type, metadata, componentName);
+  }
+  
+  /**
+   * Collect a web vital metric
+   */
+  public collectWebVital(
+    name: string,
+    value: number,
+    category: WebVitalCategory,
+    rating?: WebVitalRating
+  ): void {
+    if (!this.config.enabled) return;
+    
+    try {
+      const vital: WebVitalMetric = {
+        name,
+        value,
+        category,
+        timestamp: Date.now(),
+        rating
+      };
+      
+      // Validate web vital before adding
+      const validation = webVitalValidator(vital);
+      if (!validation.valid) {
+        if (this.config.debugLogging) {
+          console.error('Invalid web vital:', vital, validation.errors || validation.error);
+        }
+        return;
+      }
+      
+      this.webVitals.push(vital);
+      
+      if (this.config.debugLogging) {
+        console.log('Collected web vital:', vital);
+      }
+    } catch (error) {
+      if (this.config.debugLogging) {
+        console.error('Error collecting web vital:', error);
+      }
+    }
+  }
+  
+  /**
+   * Send collected metrics to the server
+   */
+  public async sendMetrics(): Promise<boolean> {
+    if (this.metrics.length === 0 && this.webVitals.length === 0) {
+      return true;
+    }
+    
+    if (this.queueProcessing) {
+      return false;
+    }
+    
+    try {
+      this.queueProcessing = true;
+      
+      const metricsToSend = [...this.metrics];
+      const vitalsToSend = [...this.webVitals];
+      
+      // Clear the queues
+      this.metrics = [];
+      this.webVitals = [];
+      
+      const payload = {
+        metrics: metricsToSend,
+        webVitals: vitalsToSend.length > 0 ? vitalsToSend : undefined,
+        sessionId: this.sessionId,
+        timestamp: new Date().toISOString(),
+        source: 'web',
+        deviceInfo: this.getDeviceInfo()
+      };
+      
+      if (this.config.debugLogging) {
+        console.log('Sending metrics:', payload);
+      }
+      
+      const response = await fetch(this.config.sendEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to send metrics: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (this.config.debugLogging) {
+        console.log('Metrics sent successfully:', result);
+      }
+      
+      return true;
+    } catch (error) {
+      if (this.config.debugLogging) {
+        console.error('Error sending metrics:', error);
+      }
+      
+      // Put metrics back in the queue
+      this.metrics = [...this.metrics, ...this.metrics];
+      this.webVitals = [...this.webVitals, ...this.webVitals];
+      
+      // Trim queues if they get too large
+      if (this.metrics.length > this.config.maxQueueSize) {
+        this.metrics = this.metrics.slice(-this.config.maxQueueSize);
+      }
+      
+      if (this.webVitals.length > this.config.maxQueueSize) {
+        this.webVitals = this.webVitals.slice(-this.config.maxQueueSize);
+      }
+      
+      return false;
+    } finally {
+      this.queueProcessing = false;
+    }
+  }
+  
+  /**
+   * Get current device information
+   */
+  private getDeviceInfo(): Record<string, any> {
+    const info: Record<string, any> = {
+      userAgent: navigator.userAgent,
+      deviceCategory: this.getDeviceCategory(),
+      screenWidth: window.innerWidth,
+      screenHeight: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio
+    };
+    
+    // Add connection information if available
+    if ('connection' in navigator) {
+      const conn = (navigator as any).connection;
+      if (conn) {
+        info.connection = {
+          effectiveType: conn.effectiveType,
+          downlink: conn.downlink,
+          rtt: conn.rtt,
+          saveData: conn.saveData
+        };
+      }
+    }
+    
+    // Add memory information if available
+    if ('memory' in performance) {
+      const memory = (performance as any).memory;
+      if (memory) {
+        info.memory = {
+          jsHeapSizeLimit: memory.jsHeapSizeLimit,
+          totalJSHeapSize: memory.totalJSHeapSize,
+          usedJSHeapSize: memory.usedJSHeapSize
+        };
+      }
+    }
+    
+    return info;
+  }
+  
+  /**
+   * Determine device category from user agent and screen size
+   */
+  private getDeviceCategory(): string {
+    const userAgent = navigator.userAgent;
+    const width = window.innerWidth;
+    
+    if (/Mobi|Android|iPhone|iPad|iPod/i.test(userAgent)) {
+      if (width > 768) {
+        return 'tablet';
+      }
+      return 'mobile';
+    }
+    
+    if (width < 768) {
+      return 'mobile';
+    } else if (width < 1024) {
+      return 'tablet';
+    } else {
+      return 'desktop';
+    }
+  }
+  
+  /**
+   * Clear all collected metrics
+   */
+  public clearMetrics(): void {
+    this.metrics = [];
+    this.webVitals = [];
+  }
+  
+  /**
+   * Get currently queued metrics count
+   */
+  public getQueueSize(): { metrics: number; webVitals: number } {
+    return {
+      metrics: this.metrics.length,
+      webVitals: this.webVitals.length
+    };
   }
 }
 
+/**
+ * Create and export a singleton instance
+ */
 export const metricsCollector = new MetricsCollector();
+
 export default metricsCollector;
