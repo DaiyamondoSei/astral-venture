@@ -1,27 +1,17 @@
 
 /**
- * Core Type System
+ * Core Types Barrel Exports
  * 
- * This barrel file exports all core type definitions and guards
- * to provide a unified import interface for the type system.
+ * This module provides centralized exports for core types.
  */
 
-// Export all types from base
-export * from './base';
+// Base types
+export * from './base/Primitives';
+export * from './base/Branded';
+export * from './base/Generic';
 
-// Export all guards
-export * from './guards';
+// Validation types
+export * from './validation/ValidationTypes';
 
-// Re-export commonly used validation types
-export { ValidationResult, ValidationErrorDetail } from '../validation/types';
-
-// Type utility functions for creating more complex types
-export function createTypedRecord<K extends string, V>(
-  keys: readonly K[],
-  valueCreator: (key: K) => V
-): Record<K, V> {
-  return keys.reduce((acc, key) => {
-    acc[key] = valueCreator(key);
-    return acc;
-  }, {} as Record<K, V>);
-}
+// Performance types
+export * from './performance/MetricTypes';

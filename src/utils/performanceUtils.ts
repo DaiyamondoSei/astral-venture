@@ -1,4 +1,3 @@
-
 /**
  * Performance utility functions and types
  * 
@@ -6,28 +5,53 @@
  * for measuring, analyzing, and optimizing application performance.
  */
 
-// Performance modes for the application
-export enum PerformanceMode {
-  AUTO = 'auto',       // Automatically determine based on device capabilities
-  LOW = 'low',         // Low-end mode with minimal effects
-  MEDIUM = 'medium',   // Balanced performance and visual effects
-  HIGH = 'high'        // Full visual effects, assumes powerful device
+import { 
+  DeviceCapability, 
+  PerformanceMode, 
+  RenderFrequency,
+  PerformanceMetric,
+  WebVitalMetric,
+  DeviceInfo 
+} from '../types/core/performance/MetricTypes';
+
+// Re-export types for backwards compatibility
+export { 
+  DeviceCapability, 
+  PerformanceMode, 
+  RenderFrequency 
+};
+
+// Export types needed by existing code
+export type { 
+  DeviceInfo, 
+  PerformanceMetric, 
+  WebVitalMetric 
+};
+
+export interface PerformanceReportPayload {
+  metrics: PerformanceMetric[];
+  webVitals?: WebVitalMetric[];
+  sessionId?: string;
+  userId?: string;
+  timestamp: string;
+  source: 'web' | 'mobile' | 'desktop';
+  deviceInfo?: DeviceInfo;
 }
 
-// Device capability levels
-export enum DeviceCapability {
-  LOW = 0,
-  MEDIUM = 1,
-  HIGH = 2,
-  ULTRA = 3
+export interface PerformanceConfig {
+  enabled: boolean;
+  targetFPS: number;
+  qualityLevel: string;
+  monitoringEnabled: boolean;
+  optimizationEnabled: boolean;
 }
 
-// Rendering frequency settings
-export enum RenderFrequency {
-  LOW = 'low',         // 30fps or lower
-  MEDIUM = 'medium',   // 30-45fps
-  HIGH = 'high',       // 45-60fps
-  VARIABLE = 'variable' // Adaptive based on device
+export interface PerformanceContextState {
+  deviceCapability: DeviceCapability;
+  performanceMode: PerformanceMode;
+  webGL2Support: boolean;
+  gpuCapability: number;
+  config: PerformanceConfig;
 }
 
 /**
