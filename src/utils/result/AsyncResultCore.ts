@@ -1,111 +1,116 @@
+
 /**
- * AsyncResult Core Functions
- * 
- * Core functions for working with AsyncResult types.
+ * Core utilities for working with AsyncResult types
  */
-
-import {
-  Result,
-  Success,
-  Failure,
-  success,
-  failure,
-  isSuccess,
-  isFailure
-} from './Result';
-import type { AsyncResult } from './AsyncResultTypes';
+import { Result, success, failure } from './Result';
+import { AsyncResult } from './AsyncResultTypes';
 
 /**
- * Maps a successful AsyncResult value using the provided function
+ * Maps the success value of an AsyncResult
+ * @param asyncResult The AsyncResult to map
+ * @param fn The function to apply to the success value
+ * @returns A new AsyncResult with the mapped success value
  */
 export async function mapAsync<T, U, E>(
-  resultPromise: AsyncResult<T, E>,
+  asyncResult: AsyncResult<T, E>,
   fn: (value: T) => U | Promise<U>
 ): AsyncResult<U, E> {
-  try {
-    const result = await resultPromise;
-    
-    if (isSuccess(result)) {
-      const mappedValue = await fn(result.value);
-      return success(mappedValue);
+  const result = await asyncResult;
+
+  if (result.type === 'success') {
+    try {
+      const mapped = await fn(result.value);
+      return success(mapped);
+    } catch (error) {
+      return failure(error as E);
     }
-    
-    return result;
-  } catch (error) {
-    return failure(error instanceof Error ? error as unknown as E : new Error(String(error)) as unknown as E);
   }
+
+  return result;
 }
 
 /**
- * Chains AsyncResults by applying a function that returns an AsyncResult
+ * Flat maps the success value of an AsyncResult
+ * @param asyncResult The AsyncResult to flat map
+ * @param fn The function to apply to the success value that returns a new AsyncResult
+ * @returns A new AsyncResult with the flat mapped success value
  */
 export async function flatMapAsync<T, U, E>(
-  resultPromise: AsyncResult<T, E>,
-  fn: (value: T) => AsyncResult<U, E>
+  asyncResult: AsyncResult<T, E>,
+  fn: (value: T) => AsyncResult<U, E> | Promise<AsyncResult<U, E>>
 ): AsyncResult<U, E> {
-  try {
-    const result = await resultPromise;
-    
-    if (isSuccess(result)) {
-      return fn(result.value);
+  const result = await asyncResult;
+
+  if (result.type === 'success') {
+    try {
+      return await fn(result.value);
+    } catch (error) {
+      return failure(error as E);
     }
-    
-    return result;
-  } catch (error) {
-    return failure(error instanceof Error ? error as unknown as E : new Error(String(error)) as unknown as E);
   }
+
+  return result;
 }
 
 /**
- * Applies a success or failure handler to an AsyncResult
+ * Folds an AsyncResult into a single value
+ * @param asyncResult The AsyncResult to fold
+ * @param onSuccess The function to apply to the success value
+ * @param onFailure The function to apply to the failure value
+ * @returns A promise of the folded value
  */
-export async function foldAsync<T, E, R>(
-  resultPromise: AsyncResult<T, E>,
-  successFn: (value: T) => R | Promise<R>,
-  failureFn: (error: E) => R | Promise<R>
-): Promise<R> {
-  const result = await resultPromise;
-  
-  if (isSuccess(result)) {
-    return successFn(result.value);
+export async function foldAsync<T, E, U>(
+  asyncResult: AsyncResult<T, E>,
+  onSuccess: (value: T) => U | Promise<U>,
+  onFailure: (error: E) => U | Promise<U>
+): Promise<U> {
+  const result = await asyncResult;
+
+  if (result.type === 'success') {
+    return onSuccess(result.value);
   } else {
-    return failureFn(result.error);
+    return onFailure(result.error);
   }
 }
 
 /**
- * Maps a failed AsyncResult's error to a different error type
+ * Maps the error of an AsyncResult
+ * @param asyncResult The AsyncResult to map
+ * @param fn The function to apply to the error
+ * @returns A new AsyncResult with the mapped error
  */
 export async function mapErrorAsync<T, E, F>(
-  resultPromise: AsyncResult<T, E>,
+  asyncResult: AsyncResult<T, E>,
   fn: (error: E) => F | Promise<F>
 ): AsyncResult<T, F> {
-  const result = await resultPromise;
-  
-  if (isFailure(result)) {
-    const mappedError = await fn(result.error);
-    return failure(mappedError);
+  const result = await asyncResult;
+
+  if (result.type === 'failure') {
+    try {
+      const mapped = await fn(result.error);
+      return failure(mapped);
+    } catch (error) {
+      return failure(error as F);
+    }
   }
-  
-  return success(result.value);
+
+  return result as unknown as AsyncResult<T, F>;
 }
 
 /**
- * Type-safe wrapper to ensure async operations consistently return AsyncResults
+ * Converts a function that may throw to one that returns an AsyncResult
+ * @param fn The function to convert
+ * @returns A function that returns an AsyncResult
  */
-export function asyncResultify<T, E = Error>(
-  fn: (...args: any[]) => Promise<T>,
-  errorMapper?: (error: unknown) => E
-): (...args: any[]) => AsyncResult<T, E> {
-  return async (...args: any[]) => {
+export function asyncResultify<T extends any[], R, E = Error>(
+  fn: (...args: T) => Promise<R>
+): (...args: T) => AsyncResult<R, E> {
+  return async (...args: T): AsyncResult<R, E> => {
     try {
       const result = await fn(...args);
       return success(result);
     } catch (error) {
-      if (errorMapper) {
-        return failure(errorMapper(error));
-      }
-      return failure(error instanceof Error ? error as unknown as E : new Error(String(error)) as unknown as E);
+      return failure(error as E);
     }
   };
 }

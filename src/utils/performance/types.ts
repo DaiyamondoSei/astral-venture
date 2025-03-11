@@ -1,16 +1,16 @@
 
 /**
- * Performance Monitoring Types
+ * Performance Monitoring System Types
  * 
- * Type definitions for the performance monitoring system.
+ * Comprehensive type definitions for the performance monitoring infrastructure.
  */
 
 // Types of metrics to track
-export type MetricType = 'render' | 'load' | 'interaction';
+export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network' | 'resource' | 'javascript' | 'css' | 'animation' | 'metric' | 'summary' | 'performance' | 'webVital';
 
 // Web vital metrics
-export type WebVitalName = 'fcp' | 'lcp' | 'cls' | 'fid' | 'ttfb' | 'inp';
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
+export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
+export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 'responsiveness';
 
 // Component metrics structure
 export interface ComponentMetrics {
@@ -19,9 +19,15 @@ export interface ComponentMetrics {
   totalRenderTime: number;
   averageRenderTime: number;
   lastRenderTime: number;
-  memoryUsage: number;
-  renderSizes: number[];
-  // Additional properties for backward compatibility and extended tracking
+  firstRenderTime?: number;
+  memoryUsage?: number;
+  renderSizes?: number[];
+  domSize?: {
+    width: number;
+    height: number;
+    elements?: number;
+  };
+  // Additional properties
   slowRenderCount?: number;
   renderTimes?: number[];
   minRenderTime?: number;
@@ -37,70 +43,29 @@ export interface WebVitalMetric {
   category: WebVitalCategory;
   timestamp: number;
   rating?: 'good' | 'needs-improvement' | 'poor';
+  attribution?: {
+    element?: string;
+    largestShiftTarget?: string;
+    largestShiftTime?: number;
+    loadState?: string;
+    navigationEntry?: string;
+    eventEntry?: string;
+  };
 }
 
 // General performance metric
 export interface PerformanceMetric {
-  componentName?: string;
-  component_name?: string; // For backward compatibility
-  metricName: string;
-  metric_name?: string; // For backward compatibility
+  component_name?: string;
+  metric_name: string;
   value: number;
-  timestamp: number;
+  timestamp: string | number;
   category: string;
-  type: string;
+  type: MetricType;
   user_id?: string;
   session_id?: string;
   page_url?: string;
-}
-
-// Performance tracking options for hooks
-export interface PerformanceTrackingOptions {
-  componentName: string;
-  metricType?: MetricType;
-  autoStart?: boolean;
-  slowThreshold?: number;
-  logSlowRenders?: boolean;
-  trackInteractions?: boolean;
-  trackSize?: boolean;
-  trackMemory?: boolean;
-}
-
-// Performance tracking result for hooks
-export interface PerformanceTrackingResult {
-  startTiming: () => void;
-  endTiming: () => void;
-  startInteractionTiming: (interactionName: string) => () => void;
-  trackInteraction?: (interactionName: string) => (() => void) | void;
-  getMetrics: () => ComponentMetrics | null;
-  recordSize: (domNode: HTMLElement | null) => void;
-}
-
-// Performance monitor configuration
-export interface PerformanceMonitorConfig {
-  enabled: boolean;
-  metricsEnabled: boolean;
-  slowRenderThreshold: number;
-  samplingRate: number;
-  reportingEndpoint?: string;
-  debugMode: boolean;
-  
-  // Extended config properties for adaptive performance
-  optimizationLevel?: 'high' | 'medium' | 'low' | 'auto';
-  throttleInterval?: number;
-  maxTrackedComponents?: number;
-  
-  // Feature flags
-  enablePerformanceTracking?: boolean;
-  enableRenderTracking?: boolean;
-  enableValidation?: boolean;
-  enablePropTracking?: boolean;
-  enableDebugLogging?: boolean;
-  
-  // Advanced features
-  intelligentProfiling?: boolean;
-  inactiveTabThrottling?: boolean;
-  batchUpdates?: boolean;
+  metadata?: Record<string, any>;
+  rating?: 'good' | 'needs-improvement' | 'poor';
 }
 
 // Device information for metrics reporting
@@ -129,67 +94,8 @@ export interface DeviceInfo {
 
 // Performance report payload
 export interface PerformanceReportPayload {
-  timestamp: number;
+  timestamp: string;
   session?: string;
   metrics: PerformanceMetric[];
   device?: DeviceInfo;
-}
-
-// Subscriber for metrics updates
-export type MetricsSubscriber = (metrics: Map<string, ComponentMetrics>) => void;
-
-// Web vitals for backward compatibility
-export interface WebVitals {
-  fcp: number;
-  lcp: number;
-  cls: number;
-  fid: number;
-  ttfb: number;
-  inp?: number;
-}
-
-// Adaptive optimization settings
-export interface AdaptiveSettings {
-  virtualization: boolean;
-  lazyLoading: boolean;
-  imageOptimization: boolean;
-  enableParticles?: boolean;
-  enableComplexAnimations?: boolean;
-  enableBlur?: boolean;
-  enableShadows?: boolean;
-  enableWebWorkers?: boolean;
-  enableHighResImages?: boolean;
-}
-
-// Component metric interface (for legacy support)
-export interface ComponentMetric {
-  componentName: string;
-  renderCount: number;
-  averageRenderTime: number;
-  lastRenderTime: number;
-  slowRenderCount: number;
-  lastUpdated: number;
-}
-
-// Performance monitor methods
-export interface IPerformanceMonitor {
-  setEnabled: (enabled: boolean) => void;
-  isEnabled: () => boolean;
-  setConfig: (config: Partial<PerformanceMonitorConfig>) => void;
-  getConfig: () => PerformanceMonitorConfig;
-  startMonitoring: () => void;
-  stopMonitoring: () => void;
-  addComponentMetric: (componentName: string, renderTime: number, type?: MetricType) => void;
-  addWebVital: (name: WebVitalName | string, value: number, category: WebVitalCategory) => void;
-  getAllMetrics: () => Map<string, ComponentMetrics>;
-  getMetric: (componentName: string) => ComponentMetrics | undefined;
-  clearMetrics: () => void;
-  subscribe: (callback: MetricsSubscriber) => () => void;
-  reportNow: () => Promise<boolean>;
-  getWebVitals: () => WebVitals;
-  getDeviceInfo: () => DeviceInfo;
-  getAdaptiveSettings: () => AdaptiveSettings;
-  setAdaptiveSettings: (settings: Partial<AdaptiveSettings>) => void;
-  detectDeviceCapability: () => 'low' | 'medium' | 'high';
-  recordRender: (componentName: string, renderTime: number) => void;
 }

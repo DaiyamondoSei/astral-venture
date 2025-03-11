@@ -1,14 +1,14 @@
 
-import { serve } from "std/server";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from "supabase";
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
 import type { TrackPerformancePayload, TrackPerformanceResponse, PerformanceMetric } from "./types.ts";
 
 /**
  * Edge Function: track-performance
  * 
  * Securely tracks performance metrics from client applications
- * and stores them in the database for analysis
+ * and stores them in the database for analysis.
  */
 
 // Define CORS headers for browser compatibility
@@ -24,11 +24,6 @@ serve(async (req) => {
   }
 
   try {
-    // Create Supabase client with admin privileges
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     // Parse request body
     const payload: TrackPerformancePayload = await req.json();
     
@@ -42,6 +37,16 @@ serve(async (req) => {
       throw new Error("Invalid payload: timestamp must be a valid date string");
     }
 
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing required environment variables");
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     // Process metrics
     const errors: Array<{metricIndex: number, message: string}> = [];
     const validMetrics: PerformanceMetric[] = [];
@@ -50,7 +55,7 @@ serve(async (req) => {
     payload.metrics.forEach((metric, index) => {
       try {
         // Required fields validation
-        if (!metric.metric_name || !metric.value || !metric.type || !metric.category) {
+        if (!metric.metric_name || typeof metric.value !== 'number' || !metric.type) {
           throw new Error("Missing required fields in metric");
         }
 
@@ -70,6 +75,9 @@ serve(async (req) => {
       }
     });
 
+    // Ensure the performance_metrics table exists
+    await supabase.rpc('ensure_performance_metrics_table');
+
     // Insert validated metrics into the database
     if (validMetrics.length > 0) {
       const { error: dbError } = await supabase
@@ -83,19 +91,15 @@ serve(async (req) => {
       console.log(`Successfully processed ${validMetrics.length} metrics`);
     }
 
-    // Track asynchronously in background
-    if (typeof EdgeRuntime?.waitUntil === 'function' && validMetrics.length > 0) {
-      EdgeRuntime.waitUntil(
-        analyzeMetricsInBackground(validMetrics, supabase)
-      );
-    }
+    // Generate recommendations based on metrics
+    const recommendations = generateRecommendations(validMetrics);
 
     // Prepare response
     const response: TrackPerformanceResponse = {
       success: true,
       metricsProcessed: validMetrics.length,
       timestamp: new Date().toISOString(),
-      recommendations: generateRecommendations(validMetrics),
+      recommendations,
     };
 
     if (errors.length > 0) {
@@ -125,45 +129,6 @@ serve(async (req) => {
     );
   }
 });
-
-/**
- * Performs background analysis on metrics
- */
-async function analyzeMetricsInBackground(
-  metrics: PerformanceMetric[], 
-  supabase: any
-): Promise<void> {
-  try {
-    // Group metrics for analysis
-    const webVitals = metrics.filter(m => 
-      ["FCP", "LCP", "CLS", "FID", "TTFB", "INP"].includes(m.metric_name));
-    
-    const componentMetrics = metrics.filter(m => 
-      m.type === 'render' && m.component_name);
-    
-    // Update performance summaries if needed
-    if (webVitals.length > 0 || componentMetrics.length > 0) {
-      const sessionId = metrics[0].session_id;
-      
-      if (sessionId) {
-        // Check for existing summary
-        const { data: existingData } = await supabase
-          .from("performance_summaries")
-          .select("id")
-          .eq("session_id", sessionId)
-          .maybeSingle();
-        
-        // Calculate summary data
-        // This would be expanded in a real implementation
-        
-        // Log completion
-        console.log(`Background analysis completed for session ${sessionId}`);
-      }
-    }
-  } catch (error) {
-    console.error("Background analysis error:", error);
-  }
-}
 
 /**
  * Generates recommendations based on performance metrics

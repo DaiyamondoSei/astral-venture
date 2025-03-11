@@ -5,7 +5,7 @@
 /**
  * Types of metrics that can be tracked
  */
-export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network' | 'resource' | 'javascript' | 'css' | 'animation';
+export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network' | 'resource' | 'javascript' | 'css' | 'animation' | 'metric' | 'summary' | 'performance' | 'webVital';
 
 /**
  * Performance metric record for database storage
@@ -21,8 +21,9 @@ export interface PerformanceMetric {
   session_id?: string;
   page_url?: string;
   device_info?: Record<string, any>;
-  bundle_version?: string;
+  metadata?: Record<string, any>;
   environment?: string;
+  rating?: 'good' | 'needs-improvement' | 'poor';
 }
 
 /**
@@ -32,10 +33,26 @@ export interface TrackPerformancePayload {
   metrics: PerformanceMetric[];
   sessionId?: string;
   userId?: string;
-  batchId?: string;
   timestamp: string;
   source: 'web' | 'mobile' | 'desktop';
-  appVersion?: string;
+  deviceInfo?: {
+    userAgent?: string;
+    deviceCategory?: string;
+    screenWidth?: number;
+    screenHeight?: number;
+    devicePixelRatio?: number;
+    connection?: {
+      effectiveType?: string;
+      downlink?: number;
+      rtt?: number;
+      saveData?: boolean;
+    };
+    memory?: {
+      jsHeapSizeLimit?: number;
+      totalJSHeapSize?: number;
+      usedJSHeapSize?: number;
+    };
+  };
 }
 
 /**

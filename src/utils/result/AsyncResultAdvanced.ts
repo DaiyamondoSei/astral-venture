@@ -1,160 +1,173 @@
 
 /**
- * AsyncResult Advanced Functions
- * 
- * Advanced functions for working with AsyncResult types.
+ * Advanced utilities for working with AsyncResult types
  */
-
-import {
-  Result,
-  success,
-  failure,
-  isSuccess,
-  isFailure
-} from './Result';
+import { Result, success, failure } from './Result';
 import { AsyncResult, RetryOptions, DEFAULT_RETRY_OPTIONS } from './AsyncResultTypes';
+import { mapAsync, flatMapAsync } from './AsyncResultCore';
 
 /**
- * Applies a recovery function to a failed AsyncResult
+ * Recovers from a failure by returning a default value
+ * @param asyncResult The AsyncResult to recover from
+ * @param defaultValue The default value to use in case of failure
+ * @returns A new AsyncResult with the recovered value
  */
 export async function recoverAsync<T, E>(
-  resultPromise: AsyncResult<T, E>,
-  fn: (error: E) => T | Promise<T>
-): Promise<T> {
-  const result = await resultPromise;
+  asyncResult: AsyncResult<T, E>,
+  defaultValue: T
+): AsyncResult<T, E> {
+  const result = await asyncResult;
   
-  if (isSuccess(result)) {
-    return result.value;
-  } else {
-    return fn(result.error);
+  if (result.type === 'failure') {
+    return success(defaultValue);
   }
+  
+  return result;
 }
 
 /**
- * Applies a recovery function that returns an AsyncResult to a failed AsyncResult
+ * Recovers from a failure by calling a function to provide a new value
+ * @param asyncResult The AsyncResult to recover from
+ * @param fn The function to call to provide a recovery value
+ * @returns A new AsyncResult with the recovered value
  */
-export async function recoverWithAsync<T, E, F>(
-  resultPromise: AsyncResult<T, E>,
-  fn: (error: E) => AsyncResult<T, F>
-): AsyncResult<T, F> {
-  const result = await resultPromise;
+export async function recoverWithAsync<T, E>(
+  asyncResult: AsyncResult<T, E>,
+  fn: (error: E) => T | Promise<T>
+): AsyncResult<T, E> {
+  const result = await asyncResult;
   
-  if (isSuccess(result)) {
-    return success(result.value);
-  } else {
-    return fn(result.error);
+  if (result.type === 'failure') {
+    try {
+      const recovery = await fn(result.error);
+      return success(recovery);
+    } catch (error) {
+      return failure(error as E);
+    }
   }
+  
+  return result;
 }
 
 /**
- * Combines multiple AsyncResults into a single AsyncResult containing an array of values
+ * Runs multiple AsyncResults in parallel and collects their results
+ * @param asyncResults An array of AsyncResults to run
+ * @returns A new AsyncResult with an array of the results
  */
 export async function allAsync<T, E>(
-  resultPromises: AsyncResult<T, E>[]
+  asyncResults: Array<AsyncResult<T, E>>
 ): AsyncResult<T[], E> {
   try {
-    const results = await Promise.all(resultPromises);
-    const values: T[] = [];
+    const results = await Promise.all(asyncResults);
     
+    // Check if any result is a failure
     for (const result of results) {
-      if (isFailure(result)) {
-        return result;
+      if (result.type === 'failure') {
+        return result as AsyncResult<any, E>;
       }
-      values.push(result.value);
     }
     
-    return success(values);
+    // All succeeded, map to values
+    return success(results.map(r => (r as Result<T, E> & { type: 'success' }).value));
   } catch (error) {
-    return failure(error instanceof Error ? error as unknown as E : new Error(String(error)) as unknown as E);
+    return failure(error as E);
   }
 }
 
 /**
- * Returns the first successful AsyncResult or the last failure
+ * Returns the first successful result from multiple AsyncResults
+ * @param asyncResults An array of AsyncResults to try
+ * @returns The first successful AsyncResult, or the last failure if all fail
  */
 export async function firstSuccessAsync<T, E>(
-  resultPromises: AsyncResult<T, E>[]
+  asyncResults: Array<AsyncResult<T, E>>
 ): AsyncResult<T, E> {
-  const results = await Promise.all(resultPromises);
+  let lastError: E | undefined;
   
-  for (const result of results) {
-    if (isSuccess(result)) {
-      return result;
+  for (const asyncResult of asyncResults) {
+    try {
+      const result = await asyncResult;
+      
+      if (result.type === 'success') {
+        return result;
+      }
+      
+      lastError = result.error;
+    } catch (error) {
+      lastError = error as E;
     }
   }
   
-  // Return the last failure if all failed
-  return results[results.length - 1];
+  // If we get here, all failed
+  return failure(lastError as E);
 }
 
 /**
- * Applies a timeout to an AsyncResult
+ * Adds a timeout to an AsyncResult
+ * @param asyncResult The AsyncResult to add a timeout to
+ * @param timeoutMs The timeout in milliseconds
+ * @param timeoutError The error to return on timeout
+ * @returns A new AsyncResult that fails if the timeout is reached
  */
 export async function withTimeout<T, E>(
-  resultPromise: AsyncResult<T, E>,
+  asyncResult: AsyncResult<T, E>,
   timeoutMs: number,
   timeoutError: E
 ): AsyncResult<T, E> {
-  try {
-    const timeoutPromise = new Promise<Result<T, E>>(
-      (_, reject) => setTimeout(() => reject(timeoutError), timeoutMs)
-    );
-    
-    return await Promise.race([resultPromise, timeoutPromise]);
-  } catch (error) {
-    if (error === timeoutError) {
-      return failure(timeoutError);
-    }
-    return failure(error instanceof Error ? error as unknown as E : new Error(String(error)) as unknown as E);
-  }
+  return Promise.race([
+    asyncResult,
+    new Promise<Result<T, E>>((resolve) => {
+      setTimeout(() => resolve(failure(timeoutError)), timeoutMs);
+    })
+  ]);
 }
 
 /**
- * Utility to wait a specified amount of time
- */
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-/**
- * Retries an AsyncResult operation with exponential backoff
+ * Retries an AsyncResult operation with backoff
+ * @param operation The operation to retry
+ * @param options The retry options
+ * @returns A new AsyncResult with the eventual result
  */
 export async function retryAsync<T, E>(
   operation: () => AsyncResult<T, E>,
   options: Partial<RetryOptions> = {}
 ): AsyncResult<T, E> {
   const config = { ...DEFAULT_RETRY_OPTIONS, ...options };
+  let currentDelay = config.initialDelayMs;
+  let attempts = 0;
+  let lastError: E | undefined;
   
-  let lastError: Result<T, E> = failure(new Error('Operation failed') as unknown as E);
-  let attempt = 0;
-  let delay = config.initialDelayMs;
-  
-  while (attempt < config.maxRetries) {
+  while (attempts < config.maxRetries) {
     try {
       const result = await operation();
       
-      if (isSuccess(result)) {
+      if (result.type === 'success') {
         return result;
       }
       
+      // Check if this error is retryable
       if (config.retryableErrors && !config.retryableErrors(result.error)) {
         return result;
       }
       
-      lastError = result;
+      lastError = result.error;
     } catch (error) {
-      lastError = failure(error instanceof Error ? error as unknown as E : new Error(String(error)) as unknown as E);
+      lastError = error as E;
       
+      // Check if this error is retryable
       if (config.retryableErrors && !config.retryableErrors(error)) {
-        return lastError;
+        return failure(error as E);
       }
     }
     
-    attempt++;
+    // Exponential backoff with jitter
+    const jitter = Math.random() * 0.1 * currentDelay;
+    await new Promise(resolve => setTimeout(resolve, currentDelay + jitter));
     
-    if (attempt < config.maxRetries) {
-      await wait(delay);
-      delay = Math.min(delay * config.backoffFactor, config.maxDelayMs);
-    }
+    // Increase delay, but cap at maxDelayMs
+    currentDelay = Math.min(currentDelay * config.backoffFactor, config.maxDelayMs);
+    attempts++;
   }
   
-  return lastError;
+  return failure(lastError as E);
 }

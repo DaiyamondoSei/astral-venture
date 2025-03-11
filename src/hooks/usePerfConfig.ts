@@ -1,11 +1,12 @@
 
 /**
  * Hook for accessing and updating performance configuration
+ * with advanced capability detection and adaptive settings
  */
-import { useContext, useState, useEffect, useMemo } from 'react';
+import { useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import PerformanceContext from '../contexts/PerformanceContext';
 import { Result, success, failure } from '../utils/result/Result';
-import { asyncResultify } from '../utils/result/AsyncResult';
+import { perfMetricsCollector } from '../utils/performance/perfMetricsCollector';
 
 /**
  * Comprehensive performance configuration interface
@@ -54,11 +55,24 @@ export const DEFAULT_PERF_CONFIG: PerfConfig = {
 };
 
 /**
+ * Cache for device capability to avoid repeated calculations
+ */
+let cachedCapability: 'low' | 'medium' | 'high' | null = null;
+let capabilityCacheTimestamp = 0;
+const CAPABILITY_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+/**
  * Detect device capability based on hardware and environment
  * @returns The detected device capability
  */
-function detectDeviceCapability(): 'low' | 'medium' | 'high' {
-  // Client-side detection
+export function detectDeviceCapability(): 'low' | 'medium' | 'high' {
+  // Use cached capability if still valid
+  const now = Date.now();
+  if (cachedCapability && (now - capabilityCacheTimestamp) < CAPABILITY_CACHE_DURATION) {
+    return cachedCapability;
+  }
+  
+  // Server-side detection fallback
   if (typeof window === 'undefined') {
     return 'medium';
   }
@@ -66,11 +80,13 @@ function detectDeviceCapability(): 'low' | 'medium' | 'high' {
   // Check for stored preference
   const storedCapability = localStorage.getItem('deviceCapability') as 'low' | 'medium' | 'high' | null;
   if (storedCapability && ['low', 'medium', 'high'].includes(storedCapability)) {
+    cachedCapability = storedCapability;
+    capabilityCacheTimestamp = now;
     return storedCapability;
   }
   
-  // Mobile detection
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  // More efficient mobile detection
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile/i.test(navigator.userAgent);
   
   // Device memory API (Chrome)
   const memory = (navigator as any).deviceMemory || 4;
@@ -79,13 +95,28 @@ function detectDeviceCapability(): 'low' | 'medium' | 'high' {
   const cores = navigator.hardwareConcurrency || 4;
   
   // Determine capability
+  let capability: 'low' | 'medium' | 'high';
+  
   if (isMobile && (memory < 4 || cores <= 4)) {
-    return 'low';
+    capability = 'low';
   } else if (memory >= 8 && cores >= 8) {
-    return 'high';
+    capability = 'high';
   } else {
-    return 'medium';
+    capability = 'medium';
   }
+  
+  // Cache capability
+  cachedCapability = capability;
+  capabilityCacheTimestamp = now;
+  
+  // Store for future use
+  try {
+    localStorage.setItem('deviceCapability', capability);
+  } catch (e) {
+    // Ignore storage errors
+  }
+  
+  return capability;
 }
 
 /**
@@ -115,10 +146,32 @@ export function usePerfConfig() {
     };
   }, [context, detectedCapability]);
   
+  // Update metrics collector configuration
+  useEffect(() => {
+    if (mergedConfig) {
+      perfMetricsCollector.setEnabled(mergedConfig.enableMetricsCollection);
+      perfMetricsCollector.setSamplingRate(mergedConfig.samplingRate);
+    }
+  }, [
+    mergedConfig.enableMetricsCollection,
+    mergedConfig.samplingRate
+  ]);
+  
   // Calculate derived properties
-  const isLowPerformance = useMemo(() => mergedConfig.deviceCapability === 'low', [mergedConfig.deviceCapability]);
-  const isMediumPerformance = useMemo(() => mergedConfig.deviceCapability === 'medium', [mergedConfig.deviceCapability]);
-  const isHighPerformance = useMemo(() => mergedConfig.deviceCapability === 'high', [mergedConfig.deviceCapability]);
+  const isLowPerformance = useMemo(() => 
+    mergedConfig.deviceCapability === 'low', 
+    [mergedConfig.deviceCapability]
+  );
+  
+  const isMediumPerformance = useMemo(() => 
+    mergedConfig.deviceCapability === 'medium', 
+    [mergedConfig.deviceCapability]
+  );
+  
+  const isHighPerformance = useMemo(() => 
+    mergedConfig.deviceCapability === 'high', 
+    [mergedConfig.deviceCapability]
+  );
   
   // Determine if simplified UI should be used
   const shouldUseSimplifiedUI = useMemo(() => {
@@ -126,17 +179,17 @@ export function usePerfConfig() {
            (mergedConfig.enableAdaptiveRendering && !isHighPerformance);
   }, [isLowPerformance, isHighPerformance, mergedConfig.enableAdaptiveRendering]);
   
-  // Check if we're in a context
+  // Standalone mode (no context)
   if (!context) {
     // Create a mini context for standalone usage
     const [config, setConfig] = useState<PerfConfig>(mergedConfig);
     
-    const updateConfig = (updates: Partial<PerfConfig>) => {
+    const updateConfig = useCallback((updates: Partial<PerfConfig>) => {
       setConfig(prevConfig => ({
         ...prevConfig,
         ...updates
       }));
-    };
+    }, []);
     
     return {
       config,

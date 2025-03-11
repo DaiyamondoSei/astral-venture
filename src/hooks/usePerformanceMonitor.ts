@@ -1,159 +1,290 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+/**
+ * Performance monitoring hook for React components
+ * 
+ * Provides comprehensive performance tracking with optimized memory usage
+ * and minimal runtime overhead.
+ */
+import { useRef, useEffect, useCallback, useState } from 'react';
+import { usePerfConfig } from './usePerfConfig';
+import { perfMetricsCollector } from '../utils/performance/perfMetricsCollector';
 
-interface PerformanceMetrics {
-  fps: number;
-  renderTime: number;
-  memoryUsage: number;
-  lastUpdate: number;
+export interface PerformanceData {
+  renderCount: number;
+  totalRenderTime: number;
+  averageRenderTime: number;
+  lastRenderTime: number;
+  firstRenderTime?: number;
+  slowRenderCount: number;
+  updateTimes: number[];
+  interactionTimes?: Record<string, number[]>;
+  domSize?: {
+    width: number;
+    height: number;
+    elements?: number;
+  };
+}
+
+export interface PerformanceMonitorOptions {
+  componentName: string;
+  trackMountTime?: boolean;
+  trackUpdateTime?: boolean;
+  trackInteractions?: boolean;
+  trackDomSize?: boolean;
+  slowThreshold?: number;
+  enableLogging?: boolean;
+  enableReporting?: boolean;
 }
 
 /**
- * Hook for monitoring application performance metrics
- * @param isMonitoring Toggle for enabling/disabling the monitoring
- * @returns Performance metrics and status information
+ * Hook for monitoring component performance
  */
-export function usePerformanceMonitor(isMonitoring: boolean) {
-  const [metrics, setMetrics] = useState<PerformanceMetrics>({
-    fps: 0,
-    renderTime: 0,
-    memoryUsage: 0,
-    lastUpdate: 0
-  });
+export function usePerformanceMonitor(options: PerformanceMonitorOptions) {
+  const {
+    componentName,
+    trackMountTime = true,
+    trackUpdateTime = true,
+    trackInteractions = false,
+    trackDomSize = false,
+    slowThreshold,
+    enableLogging = false,
+    enableReporting = true
+  } = options;
   
-  const [history, setHistory] = useState<PerformanceMetrics[]>([]);
-  const frameCountRef = useRef(0);
-  const lastTimeRef = useRef(0);
-  const rafIdRef = useRef<number>();
+  const { config } = usePerfConfig();
+  const enabled = config.enablePerformanceTracking && !!componentName;
   
-  // Optimize history updates with a memoized function
-  const updateHistory = useCallback((newMetrics: PerformanceMetrics) => {
-    setHistory(prev => {
-      // Limit history size to 20 entries
-      const newHistory = [...prev, newMetrics];
-      if (newHistory.length > 20) {
-        return newHistory.slice(-20);
-      }
-      return newHistory;
-    });
-  }, []);
+  // Use refs to avoid re-renders when updating metrics
+  const renderStartTimeRef = useRef<number | null>(null);
+  const renderCountRef = useRef<number>(0);
+  const totalRenderTimeRef = useRef<number>(0);
+  const firstRenderTimeRef = useRef<number | null>(null);
+  const lastRenderTimeRef = useRef<number | null>(null);
+  const slowRenderCountRef = useRef<number>(0);
+  const updateTimesRef = useRef<number[]>([]);
+  const interactionTimesRef = useRef<Record<string, number[]>>({});
+  const domSizeRef = useRef<{ width: number; height: number; elements?: number } | null>(null);
+  const componentRef = useRef<HTMLElement | null>(null);
+  const isMountedRef = useRef<boolean>(false);
   
-  // Logging function for performance issues
-  const logPerformanceIssue = useCallback((message: string, data?: any) => {
-    // Only log in development or if explicitly enabled
-    if (process.env.NODE_ENV === 'development' || localStorage.getItem('enablePerfLogs') === 'true') {
-      console.warn(`[Performance Monitor] ${message}`, data);
-    }
-  }, []);
+  // Get configured slow threshold
+  const effectiveSlowThreshold = slowThreshold ?? config.slowRenderThreshold;
   
-  // Optimized performance monitoring with throttling
-  useEffect(() => {
-    if (!isMonitoring) return;
+  // Start timing a render cycle
+  const startTiming = useCallback(() => {
+    if (!enabled) return;
+    renderStartTimeRef.current = performance.now();
+  }, [enabled]);
+  
+  // End timing a render cycle and record metrics
+  const endTiming = useCallback(() => {
+    if (!enabled || renderStartTimeRef.current === null) return;
     
-    try {
-      lastTimeRef.current = performance.now();
-      frameCountRef.current = 0;
+    const endTime = performance.now();
+    const renderTime = endTime - renderStartTimeRef.current;
+    
+    // Store basic timing info
+    renderCountRef.current += 1;
+    totalRenderTimeRef.current += renderTime;
+    lastRenderTimeRef.current = renderTime;
+    
+    // For first render
+    if (!isMountedRef.current) {
+      firstRenderTimeRef.current = renderTime;
       
-      // Throttle updates to reduce performance impact of the monitor itself
-      let lastUpdateTime = 0;
-      const updateInterval = 1000; // Update metrics once per second
-      
-      const measurePerformance = () => {
-        try {
-          const now = performance.now();
-          frameCountRef.current++;
-          
-          // Update metrics once per interval
-          if (now - lastUpdateTime >= updateInterval) {
-            lastUpdateTime = now;
-            const elapsed = now - lastTimeRef.current;
-            
-            // Only calculate if we have a meaningful time interval
-            if (elapsed >= 500) {
-              const fps = Math.round(frameCountRef.current * 1000 / elapsed);
-              const renderTime = parseFloat((performance.now() - now).toFixed(2));
-              
-              // Get memory usage if available
-              let memoryUsage = 0;
-              try {
-                // Try to access memory API (only available in some browsers)
-                if ((performance as any).memory) {
-                  memoryUsage = Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024));
-                  
-                  // Log warning if memory usage is high
-                  if (memoryUsage > 500) {
-                    logPerformanceIssue(`High memory usage detected: ${memoryUsage}MB`);
-                  }
-                }
-              } catch (e) {
-                // Ignore errors - memory API is not available in all browsers
-              }
-              
-              const newMetrics = {
-                fps,
-                renderTime,
-                memoryUsage,
-                lastUpdate: now
-              };
-              
-              // Log warning for low FPS
-              if (fps < 30) {
-                logPerformanceIssue(`Low FPS detected: ${fps}`);
-              }
-              
-              // Log warning for high render time
-              if (renderTime > 16) {
-                logPerformanceIssue(`High render time detected: ${renderTime}ms`);
-              }
-              
-              setMetrics(newMetrics);
-              updateHistory(newMetrics);
-              
-              frameCountRef.current = 0;
-              lastTimeRef.current = now;
-            }
-          }
-          
-          rafIdRef.current = requestAnimationFrame(measurePerformance);
-        } catch (innerError) {
-          console.error("Error in performance measurement loop:", innerError);
-          rafIdRef.current = requestAnimationFrame(measurePerformance);
-        }
-      };
-      
-      // Use requestIdleCallback if available to reduce impact on main thread
-      if (window.requestIdleCallback) {
-        window.requestIdleCallback(() => {
-          rafIdRef.current = requestAnimationFrame(measurePerformance);
+      if (trackMountTime && enableReporting) {
+        perfMetricsCollector.trackComponentRender(componentName, renderTime, {
+          phase: 'mount',
+          deviceCapability: config.deviceCapability
         });
-      } else {
-        rafIdRef.current = requestAnimationFrame(measurePerformance);
       }
       
-      return () => {
-        if (rafIdRef.current) {
-          cancelAnimationFrame(rafIdRef.current);
-        }
-      };
-    } catch (error) {
-      console.error("Failed to initialize performance monitoring:", error);
-      return () => {};
+      isMountedRef.current = true;
+      
+      if (enableLogging) {
+        console.log(`[Performance] 📊 ${componentName} mount: ${renderTime.toFixed(2)}ms`);
+      }
+    } 
+    // For subsequent updates
+    else if (trackUpdateTime) {
+      updateTimesRef.current.push(renderTime);
+      
+      if (enableReporting) {
+        perfMetricsCollector.trackComponentRender(componentName, renderTime, {
+          phase: 'update',
+          updateCount: renderCountRef.current,
+          deviceCapability: config.deviceCapability
+        });
+      }
+      
+      if (enableLogging) {
+        console.log(`[Performance] 🔄 ${componentName} update: ${renderTime.toFixed(2)}ms`);
+      }
     }
-  }, [isMonitoring, updateHistory, logPerformanceIssue]);
+    
+    // Check for slow renders
+    if (renderTime > effectiveSlowThreshold) {
+      slowRenderCountRef.current += 1;
+      
+      if (enableLogging) {
+        console.warn(
+          `[Performance] ⚠️ Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms ` +
+          `(threshold: ${effectiveSlowThreshold}ms)`
+        );
+      }
+    }
+    
+    // Reset timing
+    renderStartTimeRef.current = null;
+  }, [
+    enabled, 
+    componentName, 
+    trackMountTime, 
+    trackUpdateTime, 
+    effectiveSlowThreshold, 
+    enableLogging, 
+    enableReporting,
+    config.deviceCapability
+  ]);
   
-  // Get performance status label and color based on metrics
-  const getPerformanceStatus = useCallback(() => {
-    if (metrics.fps >= 55) return { label: "Excellent", color: "bg-green-500" };
-    if (metrics.fps >= 40) return { label: "Good", color: "bg-green-400" };
-    if (metrics.fps >= 30) return { label: "Fair", color: "bg-yellow-400" };
-    if (metrics.fps >= 20) return { label: "Poor", color: "bg-orange-400" };
-    return { label: "Critical", color: "bg-red-500" };
-  }, [metrics.fps]);
+  // Track an interaction timing
+  const trackInteraction = useCallback((interactionName: string) => {
+    if (!enabled || !trackInteractions) return () => {};
+    
+    const startTime = performance.now();
+    
+    return () => {
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      
+      // Initialize interaction array if needed
+      if (!interactionTimesRef.current[interactionName]) {
+        interactionTimesRef.current[interactionName] = [];
+      }
+      
+      // Record interaction time
+      interactionTimesRef.current[interactionName].push(duration);
+      
+      // Report the interaction
+      if (enableReporting) {
+        perfMetricsCollector.trackInteraction(
+          `${componentName}.${interactionName}`,
+          duration,
+          { deviceCapability: config.deviceCapability }
+        );
+      }
+      
+      if (enableLogging) {
+        console.log(
+          `[Performance] 👆 ${componentName} interaction '${interactionName}': ${duration.toFixed(2)}ms`
+        );
+      }
+    };
+  }, [
+    enabled, 
+    trackInteractions, 
+    componentName, 
+    enableLogging, 
+    enableReporting,
+    config.deviceCapability
+  ]);
+  
+  // Measure DOM element size
+  const measureDomSize = useCallback((element: HTMLElement | null) => {
+    if (!enabled || !trackDomSize || !element) return;
+    
+    // Store reference to the component DOM element
+    componentRef.current = element;
+    
+    // Get element dimensions
+    const rect = element.getBoundingClientRect();
+    
+    // Optionally count child elements
+    const elementCount = config.trackComponentSize ? element.querySelectorAll('*').length : undefined;
+    
+    // Store size info
+    domSizeRef.current = {
+      width: rect.width,
+      height: rect.height,
+      elements: elementCount
+    };
+    
+    if (enableLogging) {
+      console.log(
+        `[Performance] 📏 ${componentName} size: ${rect.width.toFixed(0)}×${rect.height.toFixed(0)}px` +
+        (elementCount ? `, ${elementCount} elements` : '')
+      );
+    }
+  }, [
+    enabled, 
+    trackDomSize, 
+    componentName, 
+    enableLogging,
+    config.trackComponentSize
+  ]);
+  
+  // Get the current performance data
+  const getPerformanceData = useCallback((): PerformanceData => {
+    const renderCount = renderCountRef.current;
+    const totalRenderTime = totalRenderTimeRef.current;
+    
+    return {
+      renderCount,
+      totalRenderTime,
+      averageRenderTime: renderCount > 0 ? totalRenderTime / renderCount : 0,
+      lastRenderTime: lastRenderTimeRef.current || 0,
+      firstRenderTime: firstRenderTimeRef.current,
+      slowRenderCount: slowRenderCountRef.current,
+      updateTimes: [...updateTimesRef.current],
+      interactionTimes: { ...interactionTimesRef.current },
+      domSize: domSizeRef.current || undefined
+    };
+  }, []);
+  
+  // Start timing for the initial render
+  useEffect(() => {
+    if (!enabled) return;
+    
+    startTiming();
+    
+    // End timing when the component mounts
+    return () => {
+      if (enabled) {
+        // Report final metrics
+        if (enableReporting && renderCountRef.current > 0) {
+          const data = getPerformanceData();
+          
+          perfMetricsCollector.addMetric({
+            component_name: componentName,
+            metric_name: 'componentSummary',
+            value: data.averageRenderTime,
+            category: 'component',
+            type: 'summary',
+            metadata: {
+              renderCount: data.renderCount,
+              slowRenderCount: data.slowRenderCount,
+              totalRenderTime: data.totalRenderTime,
+              firstRenderTime: data.firstRenderTime,
+              deviceCapability: config.deviceCapability
+            }
+          });
+        }
+        
+        if (enableLogging) {
+          console.log(`[Performance] 🏁 ${componentName} unmounted:`, getPerformanceData());
+        }
+      }
+    };
+  }, [enabled, componentName, enableLogging, enableReporting, getPerformanceData, startTiming, config.deviceCapability]);
   
   return {
-    metrics,
-    history,
-    status: getPerformanceStatus(),
-    logPerformanceIssue
+    startTiming,
+    endTiming,
+    trackInteraction,
+    measureDomSize,
+    getPerformanceData,
+    ref: componentRef
   };
 }
+
+export default usePerformanceMonitor;
