@@ -1,362 +1,275 @@
+
 /**
  * Performance Metrics Collector
  * 
- * A lightweight, efficient collection system for performance metrics
- * with automatic batching and sampling.
+ * Collects, processes, and manages performance metrics throughout the application
  */
-import { DeviceInfo, ComponentMetrics, PerformanceMetric } from './types';
-import { asyncResultify } from '../result/AsyncResult';
-import { Result, success, failure } from '../result/Result';
+import { ComponentMetrics, PerformanceMetric, WebVitalMetric } from './types';
 
-// Singleton pattern for metrics collection
+interface CollectorOptions {
+  enabled: boolean;
+  samplingRate: number;
+  maxMetricsPerBatch: number;
+  flushInterval: number;
+  debugMode: boolean;
+}
+
+const DEFAULT_OPTIONS: CollectorOptions = {
+  enabled: true,
+  samplingRate: 0.1, // Sample 10% of metrics by default
+  maxMetricsPerBatch: 50,
+  flushInterval: 10000, // 10 seconds
+  debugMode: false,
+};
+
+/**
+ * Performance metrics collector for the application
+ */
 class PerfMetricsCollector {
-  private metrics: PerformanceMetric[] = [];
-  private collectionEnabled: boolean = true;
-  private batchSizeLimit: number = 100;
-  private samplingRate: number = 1.0; // 100% by default
-  private flushInterval: number | null = null;
+  private options: CollectorOptions;
+  private componentMetrics: Map<string, ComponentMetrics> = new Map();
+  private metricsBatch: PerformanceMetric[] = [];
+  private webVitals: Map<string, WebVitalMetric> = new Map();
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private flushCallbacks: Array<(metrics: PerformanceMetric[]) => void> = [];
   private sessionId: string;
-  private deviceInfo: DeviceInfo | null = null;
-  
-  constructor() {
-    // Generate a unique session ID
-    this.sessionId = crypto.randomUUID();
-    
-    // Set default flush interval (30 seconds)
-    this.setFlushInterval(30000);
+
+  constructor(options: Partial<CollectorOptions> = {}) {
+    this.options = { ...DEFAULT_OPTIONS, ...options };
+    this.sessionId = this.generateSessionId();
+    this.setupAutomaticFlushing();
   }
-  
+
+  /**
+   * Generate a unique session ID
+   */
+  private generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+  /**
+   * Set up automatic flushing of metrics
+   */
+  private setupAutomaticFlushing(): void {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+    }
+
+    if (this.options.enabled) {
+      this.flushTimer = setInterval(() => {
+        this.flush();
+      }, this.options.flushInterval);
+    }
+  }
+
   /**
    * Enable or disable metrics collection
    */
   public setEnabled(enabled: boolean): void {
-    this.collectionEnabled = enabled;
+    this.options.enabled = enabled;
+    this.setupAutomaticFlushing();
     
-    // If disabling, flush any pending metrics
-    if (!enabled && this.metrics.length > 0) {
-      this.flush();
+    if (this.options.debugMode) {
+      console.log(`Performance metrics collection ${enabled ? 'enabled' : 'disabled'}`);
     }
   }
-  
+
   /**
-   * Configure sampling rate for metrics collection
-   * @param rate A value between 0 and 1 (e.g., 0.1 = collect 10% of metrics)
+   * Set the sampling rate for metrics collection
    */
   public setSamplingRate(rate: number): void {
-    this.samplingRate = Math.max(0, Math.min(1, rate));
-  }
-  
-  /**
-   * Set the batch size limit for metrics
-   * @param size The maximum number of metrics to collect before flushing
-   */
-  public setBatchSizeLimit(size: number): void {
-    this.batchSizeLimit = Math.max(1, size);
+    this.options.samplingRate = Math.max(0, Math.min(1, rate));
     
-    // If current batch exceeds new limit, flush
-    if (this.metrics.length >= this.batchSizeLimit) {
-      this.flush();
+    if (this.options.debugMode) {
+      console.log(`Performance metrics sampling rate set to ${this.options.samplingRate}`);
     }
   }
-  
+
   /**
-   * Set the automatic flush interval
-   * @param intervalMs The interval in milliseconds, or null to disable
+   * Record a component metric
    */
-  public setFlushInterval(intervalMs: number | null): void {
-    // Clear existing interval if any
-    if (this.flushInterval !== null) {
-      clearInterval(this.flushInterval as unknown as number);
-      this.flushInterval = null;
-    }
-    
-    // Set new interval if specified
-    if (intervalMs !== null && intervalMs > 0) {
-      this.flushInterval = setInterval(() => this.flush(), intervalMs) as unknown as number;
-    }
-  }
-  
-  /**
-   * Collect device information
-   */
-  public collectDeviceInfo(): DeviceInfo {
-    if (this.deviceInfo) {
-      return this.deviceInfo;
-    }
-    
-    const deviceInfo: DeviceInfo = {
-      userAgent: navigator.userAgent,
-      deviceCategory: this.detectDeviceCategory(),
-    };
-    
-    // Add screen information if available
-    if (typeof window !== 'undefined' && window.screen) {
-      deviceInfo.screenWidth = window.screen.width;
-      deviceInfo.screenHeight = window.screen.height;
-      deviceInfo.devicePixelRatio = window.devicePixelRatio;
-      deviceInfo.viewport = {
-        width: window.innerWidth,
-        height: window.innerHeight
-      };
-    }
-    
-    // Add connection information if available
-    if ('connection' in navigator) {
-      const connection = (navigator as any).connection;
-      if (connection) {
-        deviceInfo.connection = {
-          effectiveType: connection.effectiveType,
-          downlink: connection.downlink,
-          rtt: connection.rtt,
-          saveData: connection.saveData
-        };
-      }
-    }
-    
-    // Add memory information if available
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
-      if (memory) {
-        deviceInfo.memory = {
-          jsHeapSizeLimit: memory.jsHeapSizeLimit,
-          totalJSHeapSize: memory.totalJSHeapSize,
-          usedJSHeapSize: memory.usedJSHeapSize
-        };
-      }
-    }
-    
-    // Cache device info for this session
-    this.deviceInfo = deviceInfo;
-    
-    return deviceInfo;
-  }
-  
-  /**
-   * Add a performance metric to the collection
-   */
-  public addMetric(metric: Omit<PerformanceMetric, 'session_id' | 'timestamp' | 'device_info'>): void {
-    // Skip collection if disabled
-    if (!this.collectionEnabled) {
-      return;
-    }
-    
-    // Apply sampling
-    if (Math.random() > this.samplingRate) {
-      return;
-    }
-    
-    // Get current time
-    const timestamp = new Date().toISOString();
-    
-    // Add to collection
-    this.metrics.push({
-      ...metric,
-      session_id: this.sessionId,
-      timestamp,
-    });
-    
-    // Flush if batch size reached
-    if (this.metrics.length >= this.batchSizeLimit) {
-      this.flush();
-    }
-  }
-  
-  /**
-   * Track component render performance
-   */
-  public trackComponentRender(
+  public trackComponentMetric(
     componentName: string,
-    renderTime: number,
+    metricName: string,
+    value: number,
+    category: string = 'component',
     metadata?: Record<string, any>
   ): void {
-    this.addMetric({
+    if (!this.options.enabled || Math.random() > this.options.samplingRate) {
+      return;
+    }
+
+    // Store in component metrics for analysis
+    this.updateComponentMetrics(componentName, metricName, value);
+
+    // Add to batch for reporting
+    this.addToBatch({
       component_name: componentName,
-      metric_name: 'renderTime',
-      value: renderTime,
-      category: 'component',
-      type: 'render',
-      ...(metadata && { metadata })
-    });
-  }
-  
-  /**
-   * Track interaction performance (clicks, form submissions, etc.)
-   */
-  public trackInteraction(
-    name: string,
-    duration: number,
-    metadata?: Record<string, any>
-  ): void {
-    this.addMetric({
-      metric_name: name,
-      value: duration,
-      category: 'interaction',
-      type: 'interaction',
-      page_url: typeof window !== 'undefined' ? window.location.pathname : undefined,
-      ...(metadata && { metadata })
-    });
-  }
-  
-  /**
-   * Track web vital metric
-   */
-  public trackWebVital(
-    name: string,
-    value: number, 
-    category: string,
-    rating?: 'good' | 'needs-improvement' | 'poor'
-  ): void {
-    this.addMetric({
-      metric_name: name,
+      metric_name: metricName,
       value,
+      timestamp: new Date().toISOString(),
       category,
-      type: 'webVital',
-      ...(rating && { rating })
+      type: 'render',
+      session_id: this.sessionId,
+      page_url: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      metadata
     });
-  }
-  
-  /**
-   * Flush collected metrics to the backend
-   */
-  public async flush(): Promise<Result<void, Error>> {
-    if (this.metrics.length === 0) {
-      return success(undefined);
-    }
-    
-    try {
-      // Clone metrics and clear the collection
-      const metricsToSend = [...this.metrics];
-      this.metrics = [];
-      
-      // Use sendBeacon if available and page is unloading
-      if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator && document.visibilityState === 'hidden') {
-        this.sendWithBeacon(metricsToSend);
-        return success(undefined);
-      }
-      
-      // Otherwise use fetch
-      return await this.sendWithFetch(metricsToSend);
-    } catch (error) {
-      console.error('Error flushing metrics:', error);
-      
-      // Add back to collection for retry on next flush
-      if (this.collectionEnabled) {
-        this.metrics = [...this.metrics, ...this.metrics];
-      }
-      
-      return failure(error instanceof Error ? error : new Error('Unknown error flushing metrics'));
+
+    if (this.options.debugMode) {
+      console.log(`[Performance] ${componentName}.${metricName}: ${value}`);
     }
   }
-  
+
   /**
-   * Send metrics using Beacon API (for unload events)
+   * Update component metrics
    */
-  private sendWithBeacon(metrics: PerformanceMetric[]): boolean {
-    if (typeof navigator === 'undefined' || !('sendBeacon' in navigator)) {
-      return false;
-    }
+  private updateComponentMetrics(
+    componentName: string,
+    metricName: string,
+    value: number
+  ): void {
+    // Get or create component metrics
+    let metrics = this.componentMetrics.get(componentName);
     
-    try {
-      const payload = {
-        metrics,
-        sessionId: this.sessionId,
-        timestamp: new Date().toISOString(),
-        source: 'web',
-        deviceInfo: this.collectDeviceInfo()
+    if (!metrics) {
+      metrics = {
+        componentName,
+        renderCount: 0,
+        totalRenderTime: 0,
+        averageRenderTime: 0,
+        lastRenderTime: 0,
+        renderTimes: [],
+        slowRenderCount: 0,
+        lastUpdated: Date.now()
       };
+      this.componentMetrics.set(componentName, metrics);
+    }
+
+    // Update metrics based on metric name
+    if (metricName === 'renderTime') {
+      metrics.renderCount += 1;
+      metrics.totalRenderTime += value;
+      metrics.lastRenderTime = value;
+      metrics.averageRenderTime = metrics.totalRenderTime / metrics.renderCount;
       
-      const blob = new Blob([JSON.stringify(payload)], {
-        type: 'application/json'
-      });
+      // Track slow renders
+      if (value > 16) { // 16ms threshold (60fps)
+        metrics.slowRenderCount = (metrics.slowRenderCount || 0) + 1;
+      }
       
-      return navigator.sendBeacon('/api/track-performance', blob);
-    } catch (error) {
-      console.error('Error using sendBeacon:', error);
-      return false;
+      // Update min/max render times
+      if (!metrics.minRenderTime || value < metrics.minRenderTime) {
+        metrics.minRenderTime = value;
+      }
+      if (!metrics.maxRenderTime || value > metrics.maxRenderTime) {
+        metrics.maxRenderTime = value;
+      }
+      
+      // Store render times history
+      if (!metrics.renderTimes) {
+        metrics.renderTimes = [];
+      }
+      
+      if (metrics.renderTimes.length < 10) {
+        metrics.renderTimes.push(value);
+      } else {
+        metrics.renderTimes.shift();
+        metrics.renderTimes.push(value);
+      }
+    } else if (metricName === 'mountTime' && !metrics.firstRenderTime) {
+      metrics.firstRenderTime = value;
+    }
+    
+    metrics.lastUpdated = Date.now();
+    this.componentMetrics.set(componentName, metrics);
+  }
+
+  /**
+   * Add a metric to the batch for reporting
+   */
+  private addToBatch(metric: PerformanceMetric): void {
+    this.metricsBatch.push(metric);
+    
+    if (this.metricsBatch.length >= this.options.maxMetricsPerBatch) {
+      this.flush();
     }
   }
-  
+
   /**
-   * Send metrics using Fetch API
+   * Flush metrics to registered callbacks
    */
-  private async sendWithFetch(metrics: PerformanceMetric[]): Promise<Result<void, Error>> {
-    try {
-      // Call edge function if available
-      if (typeof window !== 'undefined' && 'supabase' in window) {
-        const { supabase } = await import('../../integrations/supabase/client');
-        
-        const { error } = await supabase.functions.invoke('track-performance', {
-          body: {
-            metrics,
-            sessionId: this.sessionId,
-            timestamp: new Date().toISOString(),
-            source: 'web',
-            deviceInfo: this.collectDeviceInfo()
-          }
-        });
-        
-        if (error) {
-          console.error('Error sending performance metrics:', error);
-          return failure(new Error(`Failed to send metrics: ${error.message}`));
-        }
-        
-        return success(undefined);
+  public flush(): void {
+    if (this.metricsBatch.length === 0) {
+      return;
+    }
+
+    // Create a copy of the batch
+    const metrics = [...this.metricsBatch];
+    this.metricsBatch = [];
+
+    // Call registered callbacks with the metrics
+    this.flushCallbacks.forEach(callback => {
+      try {
+        callback(metrics);
+      } catch (error) {
+        console.error('Error in performance metrics flush callback:', error);
       }
-      
-      // Fallback to direct API call
-      const response = await fetch('/api/track-performance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          metrics,
-          sessionId: this.sessionId,
-          timestamp: new Date().toISOString(),
-          deviceInfo: this.collectDeviceInfo()
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        return failure(new Error(`Failed to send metrics: ${errorText}`));
-      }
-      
-      return success(undefined);
-    } catch (error) {
-      return failure(error instanceof Error ? error : new Error('Failed to send metrics'));
+    });
+
+    if (this.options.debugMode) {
+      console.log(`[Performance] Flushed ${metrics.length} metrics`);
     }
   }
-  
+
   /**
-   * Detect device category based on user agent and screen size
+   * Get component metrics
    */
-  private detectDeviceCategory(): string {
-    if (typeof navigator === 'undefined') {
-      return 'unknown';
-    }
+  public getComponentMetrics(componentName: string): ComponentMetrics | null {
+    return this.componentMetrics.get(componentName) || null;
+  }
+
+  /**
+   * Get all component metrics
+   */
+  public getAllComponentMetrics(): Map<string, ComponentMetrics> {
+    return new Map(this.componentMetrics);
+  }
+
+  /**
+   * Get all metrics in a flattened format
+   */
+  public getAllMetrics(): Record<string, ComponentMetrics> {
+    const metrics: Record<string, ComponentMetrics> = {};
+    this.componentMetrics.forEach((value, key) => {
+      metrics[key] = { ...value };
+    });
+    return metrics;
+  }
+
+  /**
+   * Register a callback for metrics flushing
+   */
+  public onFlush(callback: (metrics: PerformanceMetric[]) => void): () => void {
+    this.flushCallbacks.push(callback);
     
-    const ua = navigator.userAgent;
-    
-    // Check for mobile devices
-    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
-      if (typeof window !== 'undefined' && window.screen) {
-        return window.screen.width < 768 ? 'mobile' : 'tablet';
-      }
-      return 'mobile';
-    }
-    
-    // Check for desktop devices
-    return 'desktop';
+    // Return unsubscribe function
+    return () => {
+      this.flushCallbacks = this.flushCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Clear all collected metrics
+   */
+  public clear(): void {
+    this.componentMetrics.clear();
+    this.metricsBatch = [];
+    this.webVitals.clear();
   }
 }
 
-// Create and export singleton instance
+// Create a singleton instance
 export const perfMetricsCollector = new PerfMetricsCollector();
 
-// Create AsyncResult-wrapped version of flush method
-export const flushMetricsAsync = asyncResultify(
-  perfMetricsCollector.flush.bind(perfMetricsCollector)
-);
-
-export default perfMetricsCollector;
+// Export class for testing or custom instances
+export default PerfMetricsCollector;

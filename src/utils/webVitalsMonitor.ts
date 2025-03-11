@@ -6,8 +6,8 @@
  */
 
 import { onCLS, onFCP, onFID, onINP, onLCP, onTTFB } from 'web-vitals';
-import { invokeEdgeFunction } from '@/utils/edgeFunctionHelper';
-import type { WebVitalMetric, PerformanceMetric, WebVitalCategory } from '@/utils/performance/types';
+import { invokeEdgeFunction } from './edgeFunctionHelper';
+import type { WebVitalMetric, PerformanceMetric, WebVitalCategory } from './performance/types';
 
 // Mapping of web vital names to categories
 const vitalCategories: Record<string, WebVitalCategory> = {
@@ -64,10 +64,14 @@ export const initWebVitals = (
       value: metric.value,
       category: vitalCategories[metric.name] || 'loading',
       timestamp: new Date().toISOString(),
-      type: 'load',
+      type: 'webVital',
       session_id: sessionId,
       page_url: window.location.href,
-      device_info: collectDeviceInfo()
+      metadata: {
+        deviceInfo: collectDeviceInfo(),
+        attribution: metric.attribution
+      },
+      rating: metric.rating
     };
     
     // Add to collected metrics
@@ -119,7 +123,8 @@ const sendCollectedMetrics = async (isUrgent = false): Promise<void> => {
         metrics: metricsToSend,
         sessionId,
         timestamp: new Date().toISOString(),
-        source: 'web'
+        source: 'web',
+        deviceInfo: collectDeviceInfo()
       };
       
       const blob = new Blob([JSON.stringify(payload)], {
@@ -138,7 +143,8 @@ const sendCollectedMetrics = async (isUrgent = false): Promise<void> => {
       metrics: metricsToSend,
       sessionId,
       timestamp: new Date().toISOString(),
-      source: 'web'
+      source: 'web',
+      deviceInfo: collectDeviceInfo()
     });
   } catch (error) {
     console.error('Failed to send performance metrics:', error);
@@ -213,19 +219,61 @@ const getDeviceCategory = (): 'mobile' | 'tablet' | 'desktop' | 'unknown' => {
 };
 
 /**
+ * Timing marks for custom performance metrics
+ */
+export const markStart = (name: string): void => {
+  performance.mark(`${name}-start`);
+};
+
+export const markEnd = (name: string): number => {
+  performance.mark(`${name}-end`);
+  
+  // Measure between the marks
+  performance.measure(name, `${name}-start`, `${name}-end`);
+  
+  // Get the duration
+  const entry = performance.getEntriesByName(name, 'measure')[0];
+  const duration = entry.duration;
+  
+  // Clear marks to avoid memory leaks
+  performance.clearMarks(`${name}-start`);
+  performance.clearMarks(`${name}-end`);
+  performance.clearMeasures(name);
+  
+  // Add to metrics
+  const metric: PerformanceMetric = {
+    metric_name: name,
+    value: duration,
+    type: 'performance',
+    category: 'custom',
+    timestamp: new Date().toISOString(),
+    session_id: sessionId,
+    page_url: window.location.href
+  };
+  
+  collectedMetrics.push(metric);
+  
+  // Schedule batch report
+  if (reportTimeout) clearTimeout(reportTimeout);
+  reportTimeout = setTimeout(() => sendCollectedMetrics(), 5000);
+  
+  return duration;
+};
+
+/**
  * Manually report a custom performance metric
  */
 export const reportPerformanceMetric = (
   name: string,
   value: number,
-  type: string,
-  category: string,
+  type: MetricType = 'metric',
+  category: string = 'custom',
   componentName?: string
 ): void => {
   const metric: PerformanceMetric = {
     metric_name: name,
     value,
-    type: type as any,
+    type,
     category,
     timestamp: new Date().toISOString(),
     session_id: sessionId,
@@ -250,5 +298,7 @@ export const flushMetrics = async (): Promise<void> => {
 export default {
   initWebVitals,
   reportPerformanceMetric,
+  markStart,
+  markEnd,
   flushMetrics
 };

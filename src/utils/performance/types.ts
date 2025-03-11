@@ -99,3 +99,30 @@ export interface PerformanceReportPayload {
   metrics: PerformanceMetric[];
   device?: DeviceInfo;
 }
+
+// Performance monitor configuration
+export interface PerformanceMonitorConfig {
+  enabled: boolean;
+  metricsEnabled: boolean;
+  slowRenderThreshold: number;
+  samplingRate: number;
+  debugMode: boolean;
+  reportingEndpoint?: string;
+  
+  // Advanced configuration
+  optimizationLevel: 'auto' | 'low' | 'medium' | 'high';
+  throttleInterval: number;
+  maxTrackedComponents: number;
+  
+  // Feature flags
+  enablePerformanceTracking: boolean;
+  enableRenderTracking: boolean;
+  enableValidation: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  
+  // Advanced features
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
+}

@@ -33,6 +33,19 @@ export interface PerfConfig {
   optimizeOffscreenRendering: boolean;
   batchStateUpdates: boolean;
   intelligentResourceLoading: boolean;
+  
+  // Feature flags
+  enableRenderTracking: boolean;
+  enableValidation: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  
+  // Advanced features
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
+  throttleInterval: number;
+  maxTrackedComponents: number;
 }
 
 /**
@@ -51,7 +64,20 @@ export const DEFAULT_PERF_CONFIG: PerfConfig = {
   trackComponentSize: true,
   optimizeOffscreenRendering: true,
   batchStateUpdates: true,
-  intelligentResourceLoading: false
+  intelligentResourceLoading: false,
+  
+  // Feature flags
+  enableRenderTracking: true,
+  enableValidation: true,
+  enablePropTracking: false,
+  enableDebugLogging: false,
+  
+  // Advanced features
+  intelligentProfiling: false,
+  inactiveTabThrottling: true,
+  batchUpdates: true,
+  throttleInterval: 1000,
+  maxTrackedComponents: 100
 };
 
 /**
@@ -179,6 +205,74 @@ export function usePerfConfig() {
            (mergedConfig.enableAdaptiveRendering && !isHighPerformance);
   }, [isLowPerformance, isHighPerformance, mergedConfig.enableAdaptiveRendering]);
   
+  /**
+   * Apply a preset configuration
+   */
+  const applyPreset = useCallback((presetName: 'comprehensive' | 'balanced' | 'minimal' | 'disabled') => {
+    if (!context) return;
+    
+    let updates: Partial<PerfConfig> = {};
+    
+    switch (presetName) {
+      case 'comprehensive':
+        updates = {
+          enableMetricsCollection: true,
+          enablePerformanceTracking: true,
+          enableRenderTracking: true,
+          enableValidation: true,
+          enablePropTracking: true,
+          enableDebugLogging: true,
+          samplingRate: 1.0,
+          intelligentProfiling: true,
+          debugMode: true
+        };
+        break;
+        
+      case 'balanced':
+        updates = {
+          enableMetricsCollection: true,
+          enablePerformanceTracking: true,
+          enableRenderTracking: true,
+          enableValidation: true,
+          enablePropTracking: false,
+          enableDebugLogging: false,
+          samplingRate: 0.3,
+          intelligentProfiling: false,
+          debugMode: false
+        };
+        break;
+        
+      case 'minimal':
+        updates = {
+          enableMetricsCollection: true,
+          enablePerformanceTracking: true,
+          enableRenderTracking: false,
+          enableValidation: false,
+          enablePropTracking: false,
+          enableDebugLogging: false,
+          samplingRate: 0.1,
+          intelligentProfiling: false,
+          debugMode: false
+        };
+        break;
+        
+      case 'disabled':
+        updates = {
+          enableMetricsCollection: false,
+          enablePerformanceTracking: false,
+          enableRenderTracking: false,
+          enableValidation: false,
+          enablePropTracking: false,
+          enableDebugLogging: false,
+          intelligentProfiling: false,
+          debugMode: false
+        };
+        break;
+    }
+    
+    context.updateConfig(updates);
+  }, [context]);
+  
   // Standalone mode (no context)
   if (!context) {
     // Create a mini context for standalone usage
@@ -198,7 +292,8 @@ export function usePerfConfig() {
       isLowPerformance,
       isMediumPerformance,
       isHighPerformance,
-      shouldUseSimplifiedUI
+      shouldUseSimplifiedUI,
+      applyPreset
     };
   }
   
@@ -210,6 +305,7 @@ export function usePerfConfig() {
     isLowPerformance,
     isMediumPerformance,
     isHighPerformance,
-    shouldUseSimplifiedUI
+    shouldUseSimplifiedUI,
+    applyPreset
   };
 }
