@@ -1,768 +1,451 @@
 
 /**
- * Common Validators
+ * Core Validators
  * 
- * This module provides a set of reusable validators for common data types
- * and constraints. These validators follow the Validator<T> pattern defined
- * in the validation type system.
+ * This module provides a set of reusable validation functions that can be
+ * composed to create complex validation logic.
  */
 
 import { 
   Validator, 
-  ValidationResult, 
+  ValidationContext, 
+  ValidationResult,
   ValidationErrorCode,
-  ValidationContext 
+  StringValidationOptions,
+  NumberValidationOptions
 } from '../../types/validation/types';
-import { 
-  isString, 
-  isNumber, 
-  isBoolean, 
-  isArray, 
-  isObject,
-  isEmail,
-  isUUID,
-  isURI,
-  isDefined,
-  isInteger,
-  isFiniteNumber,
-  isDate,
-  isISODateString,
-  matchesPattern
-} from '../../types/core/guards';
-import { ValidationError } from './ValidationError';
+
+import { isString, isNumber, isBoolean, isArray, isObject, isEmail, isURI } from '../../types/core/guards';
+
+// -------------------------------------------------------------------------
+// Core validators
+// -------------------------------------------------------------------------
 
 /**
- * Creates a required validator that checks if a value is defined
+ * Validates that a value is not undefined or null
  */
-export function required(fieldName: string): Validator<unknown> {
-  return (value: unknown, context?: ValidationContext): ValidationResult => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isDefined(value) || (isString(value) && value.trim() === '')) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} is required`,
-          code: ValidationErrorCode.REQUIRED,
-          rule: 'required'
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates a string validator
- */
-export function string(fieldName: string): Validator<string> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<string> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isString(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a string`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'string',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates a number validator
- */
-export function number(fieldName: string): Validator<number> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<number> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isNumber(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a number`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'number',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates an integer validator
- */
-export function integer(fieldName: string): Validator<number> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<number> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isInteger(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be an integer`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'integer',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates a boolean validator
- */
-export function boolean(fieldName: string): Validator<boolean> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<boolean> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isBoolean(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a boolean`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'boolean',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates an array validator
- */
-export function array<T>(
-  fieldName: string, 
-  itemValidator?: Validator<T>
-): Validator<T[]> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<T[]> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isArray(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be an array`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'array',
-          value
-        }
-      };
-    }
-    
-    if (itemValidator) {
-      const errors = [];
-      const validatedItems = [];
-      
-      for (let i = 0; i < value.length; i++) {
-        const itemPath = `${path}[${i}]`;
-        const itemContext = {
-          ...context,
-          fieldPath: itemPath,
-          parentValue: value
-        };
-        
-        const result = itemValidator(value[i], itemContext);
-        
-        if (!result.valid) {
-          errors.push(result.error);
-        } else {
-          validatedItems.push(result.data);
-        }
-      }
-      
-      if (errors.length > 0) {
-        return {
-          valid: false,
-          errors
-        };
-      }
-      
-      return { valid: true, data: validatedItems };
-    }
-    
-    return { valid: true, data: value as T[] };
-  };
-}
-
-/**
- * Creates an object validator
- */
-export function object<T>(
-  fieldName: string,
-  schema?: Record<string, Validator<any>>
-): Validator<T> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isObject(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be an object`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'object',
-          value
-        }
-      };
-    }
-    
-    if (schema) {
-      const errors = [];
-      const validatedObject: Record<string, any> = {};
-      
-      for (const [key, validator] of Object.entries(schema)) {
-        const propertyPath = path ? `${path}.${key}` : key;
-        const propertyContext = {
-          ...context,
-          fieldPath: propertyPath,
-          parentValue: value,
-          siblingValues: value as Record<string, unknown>
-        };
-        
-        const propertyValue = (value as Record<string, unknown>)[key];
-        const result = validator(propertyValue, propertyContext);
-        
-        if (!result.valid) {
-          errors.push(result.error);
-        } else if (result.data !== undefined) {
-          validatedObject[key] = result.data;
-        } else {
-          validatedObject[key] = propertyValue;
-        }
-      }
-      
-      if (errors.length > 0) {
-        return {
-          valid: false,
-          errors
-        };
-      }
-      
-      return { valid: true, data: validatedObject as T };
-    }
-    
-    return { valid: true, data: value as T };
-  };
-}
-
-/**
- * Creates an email validator
- */
-export function email(fieldName: string): Validator<string> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<string> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isEmail(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a valid email address`,
-          code: ValidationErrorCode.FORMAT_ERROR,
-          rule: 'email',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates a UUID validator
- */
-export function uuid(fieldName: string): Validator<string> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<string> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isUUID(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a valid UUID`,
-          code: ValidationErrorCode.FORMAT_ERROR,
-          rule: 'uuid',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates a URL validator
- */
-export function url(fieldName: string): Validator<string> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<string> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isURI(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a valid URL`,
-          code: ValidationErrorCode.FORMAT_ERROR,
-          rule: 'url',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates a date validator
- */
-export function date(fieldName: string): Validator<Date> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<Date> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (isDate(value)) {
-      return { valid: true, data: value };
-    }
-    
-    if (isString(value) && isISODateString(value)) {
-      return { valid: true, data: new Date(value) };
-    }
-    
+export const required: Validator = (value, context): ValidationResult => {
+  if (value === undefined || value === null) {
     return {
       valid: false,
       error: {
-        path,
-        field: path,
-        message: `${fieldName} must be a valid date`,
+        path: context?.fieldPath || '',
+        message: 'This field is required',
+        code: ValidationErrorCode.REQUIRED
+      }
+    };
+  }
+  
+  return { valid: true, validatedData: value };
+};
+
+/**
+ * Validates that a value is a string
+ */
+export const string: Validator<string> = (value, context): ValidationResult<string> => {
+  if (!isString(value)) {
+    return {
+      valid: false,
+      error: {
+        path: context?.fieldPath || '',
+        message: 'Must be a string',
         code: ValidationErrorCode.TYPE_ERROR,
-        rule: 'date',
+        type: 'string',
         value
       }
     };
-  };
-}
+  }
+  
+  return { valid: true, validatedData: value };
+};
 
 /**
- * Creates a pattern validator
+ * Creates a string validator with specified options
  */
-export function pattern(
-  fieldName: string, 
-  regex: RegExp, 
-  message?: string
+export function createStringValidator(
+  options: StringValidationOptions = {}
 ): Validator<string> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<string> => {
-    const path = context?.fieldPath || fieldName;
+  return (value, context): ValidationResult<string> => {
+    // First validate it's a string
+    const stringResult = string(value, context);
+    if (!stringResult.valid) {
+      return stringResult;
+    }
     
-    if (!isString(value)) {
+    let strValue = stringResult.validatedData!;
+    
+    // Apply transformations if needed
+    if (options.trim) {
+      strValue = strValue.trim();
+    }
+    
+    if (options.lowercase) {
+      strValue = strValue.toLowerCase();
+    }
+    
+    if (options.uppercase) {
+      strValue = strValue.toUpperCase();
+    }
+    
+    // Validate constraints
+    if (options.minLength !== undefined && strValue.length < options.minLength) {
       return {
         valid: false,
         error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a string`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'pattern',
-          value
+          path: context?.fieldPath || '',
+          message: `Must be at least ${options.minLength} characters`,
+          code: ValidationErrorCode.RANGE_ERROR,
+          value: strValue
         }
       };
     }
     
-    if (!matchesPattern(value, regex)) {
+    if (options.maxLength !== undefined && strValue.length > options.maxLength) {
       return {
         valid: false,
         error: {
-          path,
-          field: path,
-          message: message || `${fieldName} has invalid format`,
+          path: context?.fieldPath || '',
+          message: `Must be at most ${options.maxLength} characters`,
+          code: ValidationErrorCode.RANGE_ERROR,
+          value: strValue
+        }
+      };
+    }
+    
+    if (options.pattern && !options.pattern.test(strValue)) {
+      return {
+        valid: false,
+        error: {
+          path: context?.fieldPath || '',
+          message: options.patternMessage || 'Invalid format',
           code: ValidationErrorCode.PATTERN_ERROR,
-          rule: 'pattern',
-          value
+          value: strValue
         }
       };
     }
     
-    return { valid: true, data: value };
+    return { valid: true, validatedData: strValue };
   };
 }
 
 /**
- * Creates a minimum value validator
+ * Validates that a value is a number
  */
-export function min(fieldName: string, minValue: number): Validator<number> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<number> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isNumber(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a number`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'min',
-          value
-        }
-      };
-    }
-    
-    if (value < minValue) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be at least ${minValue}`,
-          code: ValidationErrorCode.RANGE_ERROR,
-          rule: 'min',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
+export const number: Validator<number> = (value, context): ValidationResult<number> => {
+  if (!isNumber(value)) {
+    return {
+      valid: false,
+      error: {
+        path: context?.fieldPath || '',
+        message: 'Must be a number',
+        code: ValidationErrorCode.TYPE_ERROR,
+        type: 'number',
+        value
+      }
+    };
+  }
+  
+  return { valid: true, validatedData: value };
+};
 
 /**
- * Creates a maximum value validator
+ * Creates a number validator with specified options
  */
-export function max(fieldName: string, maxValue: number): Validator<number> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<number> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isNumber(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a number`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'max',
-          value
-        }
-      };
-    }
-    
-    if (value > maxValue) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be at most ${maxValue}`,
-          code: ValidationErrorCode.RANGE_ERROR,
-          rule: 'max',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates a range validator
- */
-export function range(
-  fieldName: string, 
-  minValue: number, 
-  maxValue: number
+export function createNumberValidator(
+  options: NumberValidationOptions = {}
 ): Validator<number> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<number> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isNumber(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a number`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'range',
-          value
-        }
-      };
+  return (value, context): ValidationResult<number> => {
+    // First validate it's a number
+    const numberResult = number(value, context);
+    if (!numberResult.valid) {
+      return numberResult;
     }
     
-    if (value < minValue || value > maxValue) {
+    const numValue = numberResult.validatedData!;
+    
+    // Validate constraints
+    if (options.min !== undefined && numValue < options.min) {
       return {
         valid: false,
         error: {
-          path,
-          field: path,
-          message: `${fieldName} must be between ${minValue} and ${maxValue}`,
+          path: context?.fieldPath || '',
+          message: `Must be at least ${options.min}`,
           code: ValidationErrorCode.RANGE_ERROR,
-          rule: 'range',
-          value
+          value: numValue
         }
       };
     }
     
-    return { valid: true, data: value };
+    if (options.max !== undefined && numValue > options.max) {
+      return {
+        valid: false,
+        error: {
+          path: context?.fieldPath || '',
+          message: `Must be at most ${options.max}`,
+          code: ValidationErrorCode.RANGE_ERROR,
+          value: numValue
+        }
+      };
+    }
+    
+    if (options.integer && !Number.isInteger(numValue)) {
+      return {
+        valid: false,
+        error: {
+          path: context?.fieldPath || '',
+          message: 'Must be an integer',
+          code: ValidationErrorCode.FORMAT_ERROR,
+          value: numValue
+        }
+      };
+    }
+    
+    if (options.positive && numValue <= 0) {
+      return {
+        valid: false,
+        error: {
+          path: context?.fieldPath || '',
+          message: 'Must be positive',
+          code: ValidationErrorCode.RANGE_ERROR,
+          value: numValue
+        }
+      };
+    }
+    
+    if (options.negative && numValue >= 0) {
+      return {
+        valid: false,
+        error: {
+          path: context?.fieldPath || '',
+          message: 'Must be negative',
+          code: ValidationErrorCode.RANGE_ERROR,
+          value: numValue
+        }
+      };
+    }
+    
+    if (options.multipleOf && numValue % options.multipleOf !== 0) {
+      return {
+        valid: false,
+        error: {
+          path: context?.fieldPath || '',
+          message: `Must be a multiple of ${options.multipleOf}`,
+          code: ValidationErrorCode.CONSTRAINT_ERROR,
+          value: numValue
+        }
+      };
+    }
+    
+    return { valid: true, validatedData: numValue };
   };
 }
 
 /**
- * Creates a minimum length validator
+ * Validates that a value is a boolean
  */
-export function minLength(fieldName: string, minLength: number): Validator<string | unknown[]> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<string | unknown[]> => {
-    const path = context?.fieldPath || fieldName;
+export const boolean: Validator<boolean> = (value, context): ValidationResult<boolean> => {
+  if (!isBoolean(value)) {
+    return {
+      valid: false,
+      error: {
+        path: context?.fieldPath || '',
+        message: 'Must be a boolean',
+        code: ValidationErrorCode.TYPE_ERROR,
+        type: 'boolean',
+        value
+      }
+    };
+  }
+  
+  return { valid: true, validatedData: value };
+};
+
+/**
+ * Validates that a value is an array
+ */
+export const array: Validator<unknown[]> = (value, context): ValidationResult<unknown[]> => {
+  if (!isArray(value)) {
+    return {
+      valid: false,
+      error: {
+        path: context?.fieldPath || '',
+        message: 'Must be an array',
+        code: ValidationErrorCode.TYPE_ERROR,
+        type: 'array',
+        value
+      }
+    };
+  }
+  
+  return { valid: true, validatedData: value };
+};
+
+/**
+ * Validates that a value is an object
+ */
+export const object: Validator<Record<string, unknown>> = (value, context): ValidationResult<Record<string, unknown>> => {
+  if (!isObject(value)) {
+    return {
+      valid: false,
+      error: {
+        path: context?.fieldPath || '',
+        message: 'Must be an object',
+        code: ValidationErrorCode.TYPE_ERROR,
+        type: 'object',
+        value
+      }
+    };
+  }
+  
+  return { valid: true, validatedData: value };
+};
+
+/**
+ * Validates that a string is a valid email address
+ */
+export const email: Validator<string> = (value, context): ValidationResult<string> => {
+  // First validate it's a string
+  const stringResult = string(value, context);
+  if (!stringResult.valid) {
+    return stringResult;
+  }
+  
+  if (!isEmail(value)) {
+    return {
+      valid: false,
+      error: {
+        path: context?.fieldPath || '',
+        message: 'Must be a valid email address',
+        code: ValidationErrorCode.FORMAT_ERROR,
+        value
+      }
+    };
+  }
+  
+  return { valid: true, validatedData: value };
+};
+
+/**
+ * Validates that a string is a valid URL
+ */
+export const url: Validator<string> = (value, context): ValidationResult<string> => {
+  // First validate it's a string
+  const stringResult = string(value, context);
+  if (!stringResult.valid) {
+    return stringResult;
+  }
+  
+  if (!isURI(value)) {
+    return {
+      valid: false,
+      error: {
+        path: context?.fieldPath || '',
+        message: 'Must be a valid URL',
+        code: ValidationErrorCode.FORMAT_ERROR,
+        value
+      }
+    };
+  }
+  
+  return { valid: true, validatedData: value };
+};
+
+/**
+ * Validates that a value matches a pattern
+ */
+export function pattern(regex: RegExp, message = 'Invalid format'): Validator<string> {
+  return (value, context): ValidationResult<string> => {
+    // First validate it's a string
+    const stringResult = string(value, context);
+    if (!stringResult.valid) {
+      return stringResult;
+    }
     
-    if (!isString(value) && !isArray(value)) {
+    if (!regex.test(value)) {
       return {
         valid: false,
         error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a string or array`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'minLength',
+          path: context?.fieldPath || '',
+          message,
+          code: ValidationErrorCode.PATTERN_ERROR,
           value
         }
       };
     }
     
-    if (value.length < minLength) {
-      const type = isString(value) ? 'characters' : 'items';
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must have at least ${minLength} ${type}`,
-          code: ValidationErrorCode.RANGE_ERROR,
-          rule: 'minLength',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
+    return { valid: true, validatedData: value };
   };
 }
 
 /**
- * Creates a maximum length validator
+ * Validates that a value is in a set of allowed values
  */
-export function maxLength(fieldName: string, maxLength: number): Validator<string | unknown[]> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<string | unknown[]> => {
-    const path = context?.fieldPath || fieldName;
-    
-    if (!isString(value) && !isArray(value)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must be a string or array`,
-          code: ValidationErrorCode.TYPE_ERROR,
-          rule: 'maxLength',
-          value
-        }
-      };
-    }
-    
-    if (value.length > maxLength) {
-      const type = isString(value) ? 'characters' : 'items';
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: `${fieldName} must have at most ${maxLength} ${type}`,
-          code: ValidationErrorCode.RANGE_ERROR,
-          rule: 'maxLength',
-          value
-        }
-      };
-    }
-    
-    return { valid: true, data: value };
-  };
-}
-
-/**
- * Creates an enum validator
- */
-export function oneOf<T extends string | number>(
-  fieldName: string, 
-  allowedValues: readonly T[]
-): Validator<T> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
-    const path = context?.fieldPath || fieldName;
-    
+export function oneOf<T>(allowedValues: readonly T[], message?: string): Validator<T> {
+  return (value, context): ValidationResult<T> => {
     if (!allowedValues.includes(value as T)) {
       return {
         valid: false,
         error: {
-          path,
-          field: path,
-          message: `${fieldName} must be one of: ${allowedValues.join(', ')}`,
-          code: ValidationErrorCode.FORMAT_ERROR,
-          rule: 'oneOf',
+          path: context?.fieldPath || '',
+          message: message || `Must be one of: ${allowedValues.join(', ')}`,
+          code: ValidationErrorCode.CONSTRAINT_ERROR,
           value
         }
       };
     }
     
-    return { valid: true, data: value as T };
+    return { valid: true, validatedData: value as T };
   };
 }
 
 /**
- * Creates a custom validator
+ * Validates an object against a schema
  */
-export function custom<T>(
-  fieldName: string,
-  validationFn: (value: unknown, context?: ValidationContext) => boolean,
-  errorMessage: string
-): Validator<T> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
-    const path = context?.fieldPath || fieldName;
+export function validateObject<T>(
+  value: unknown,
+  schema: Record<string, Validator>,
+  options: { abortEarly?: boolean, allowUnknown?: boolean } = {}
+): ValidationResult<T> {
+  // First validate it's an object
+  const objectResult = object(value);
+  if (!objectResult.valid) {
+    return objectResult;
+  }
+  
+  const errors: ValidationResult['errors'] = [];
+  const validated: Record<string, unknown> = {};
+  
+  // Validate each field in the schema
+  for (const [key, validator] of Object.entries(schema)) {
+    const fieldValue = (value as Record<string, unknown>)[key];
+    const context: ValidationContext = {
+      fieldPath: key,
+      parentValue: value,
+      siblingValues: value as Record<string, unknown>
+    };
     
-    if (!validationFn(value, context)) {
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: errorMessage,
-          code: ValidationErrorCode.CUSTOM_ERROR,
-          rule: 'custom',
-          value
-        }
-      };
+    const fieldResult = validator(fieldValue, context);
+    
+    if (fieldResult.valid) {
+      validated[key] = fieldResult.validatedData;
+    } else {
+      if (options.abortEarly) {
+        return fieldResult;
+      }
+      
+      if (fieldResult.error) {
+        errors.push(fieldResult.error);
+      }
+      
+      if (fieldResult.errors) {
+        errors.push(...fieldResult.errors);
+      }
     }
-    
-    return { valid: true, data: value as T };
-  };
+  }
+  
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+  
+  return { valid: true, validatedData: validated as T };
 }
-
-/**
- * Creates an optional validator
- */
-export function optional<T>(validator: Validator<T>): Validator<T | undefined> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<T | undefined> => {
-    if (value === undefined || value === null || (isString(value) && value.trim() === '')) {
-      return { valid: true, data: undefined };
-    }
-    
-    return validator(value, context) as ValidationResult<T | undefined>;
-  };
-}
-
-/**
- * Creates a default value validator
- */
-export function defaultValue<T>(validator: Validator<T>, defaultVal: T): Validator<T> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
-    if (value === undefined || value === null || (isString(value) && value.trim() === '')) {
-      return { valid: true, data: defaultVal };
-    }
-    
-    return validator(value, context);
-  };
-}
-
-/**
- * Creates a transform validator
- */
-export function transform<T, R>(
-  validator: Validator<T>,
-  transformFn: (value: T) => R
-): Validator<R> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<R> => {
-    const result = validator(value, context);
-    
-    if (!result.valid) {
-      return result as ValidationResult<R>;
-    }
-    
-    try {
-      const transformed = transformFn(result.data as T);
-      return { valid: true, data: transformed };
-    } catch (error) {
-      const path = context?.fieldPath || '';
-      return {
-        valid: false,
-        error: {
-          path,
-          field: path,
-          message: error instanceof Error ? error.message : 'Transformation failed',
-          code: ValidationErrorCode.CUSTOM_ERROR,
-          rule: 'transform',
-          value
-        }
-      };
-    }
-  };
-}
-
-export default {
-  required,
-  string,
-  number,
-  integer,
-  boolean,
-  array,
-  object,
-  email,
-  uuid,
-  url,
-  date,
-  pattern,
-  min,
-  max,
-  range,
-  minLength,
-  maxLength,
-  oneOf,
-  custom,
-  optional,
-  defaultValue,
-  transform
-};

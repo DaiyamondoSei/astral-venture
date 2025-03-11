@@ -3,14 +3,25 @@
  * Validation Error Class
  * 
  * A specialized error type for validation failures with detailed error information.
+ * This class extends the standard Error class with validation-specific properties.
  */
 
 import { ValidationErrorDetail, ValidationErrorCode, ValidationSeverity } from '../../types/validation/types';
 
+/**
+ * ValidationError represents a validation failure with detailed context
+ */
 export class ValidationError extends Error {
+  /** Detailed information about the validation error(s) */
   public readonly details: ValidationErrorDetail[];
+  
+  /** Error code for programmatic handling */
   public readonly code: string;
+  
+  /** HTTP status code for API responses */
   public readonly httpStatus: number;
+  
+  /** Flag indicating this is an expected operational error */
   public readonly isOperational: boolean = true;
   
   // Legacy fields for backward compatibility
@@ -20,6 +31,14 @@ export class ValidationError extends Error {
   public readonly statusCode?: number;
   public readonly originalError?: unknown;
 
+  /**
+   * Create a new ValidationError
+   * 
+   * @param message - Human-readable error message
+   * @param details - Array of validation error details
+   * @param code - Error code for programmatic handling
+   * @param httpStatus - HTTP status code for API responses
+   */
   constructor(
     message: string,
     details: ValidationErrorDetail[] = [],
@@ -109,6 +128,10 @@ export class ValidationError extends Error {
 
   /**
    * Factory method to create ValidationError from API response
+   * 
+   * @param apiError - Error object from API response
+   * @param defaultMessage - Default message if not found in apiError
+   * @param statusCode - HTTP status code
    */
   public static fromApiError(
     apiError: any, 
@@ -148,9 +171,11 @@ export class ValidationError extends Error {
   public static isValidationError(error: unknown): error is ValidationError {
     return error instanceof ValidationError;
   }
-
+  
+  // Factory methods for common validation error types
+  
   /**
-   * Factory methods for common validation error types
+   * Create an error for a required field
    */
   static requiredError(field: string, message?: string): ValidationError {
     return new ValidationError(
@@ -165,6 +190,9 @@ export class ValidationError extends Error {
     );
   }
 
+  /**
+   * Create an error for a type mismatch
+   */
   static typeError(field: string, expectedType: string, message?: string): ValidationError {
     return new ValidationError(
       message || `${field} must be a ${expectedType}`,
@@ -179,6 +207,9 @@ export class ValidationError extends Error {
     );
   }
 
+  /**
+   * Create an error for a value out of range
+   */
   static rangeError(field: string, min?: number, max?: number, message?: string): ValidationError {
     let defaultMessage = `${field} is out of range`;
     if (min !== undefined && max !== undefined) {
@@ -201,6 +232,9 @@ export class ValidationError extends Error {
     );
   }
 
+  /**
+   * Create an error for an invalid format
+   */
   static formatError(field: string, format: string, message?: string): ValidationError {
     return new ValidationError(
       message || `${field} has invalid format`,

@@ -6,6 +6,8 @@
  * the application for consistent data validation.
  */
 
+import { AsyncResult, Result } from '../core/base';
+
 /**
  * Validation error severity levels
  */
@@ -19,15 +21,15 @@ export enum ValidationSeverity {
  * Validation error codes
  */
 export enum ValidationErrorCode {
-  REQUIRED = 'REQUIRED',
-  TYPE_ERROR = 'TYPE_ERROR',
-  FORMAT_ERROR = 'FORMAT_ERROR',
-  RANGE_ERROR = 'RANGE_ERROR',
-  PATTERN_ERROR = 'PATTERN_ERROR',
-  CONSTRAINT_ERROR = 'CONSTRAINT_ERROR',
-  CUSTOM_ERROR = 'CUSTOM_ERROR',
-  CONFIG_ERROR = 'CONFIG_ERROR',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+  REQUIRED = 'REQUIRED',         // Missing required field
+  TYPE_ERROR = 'TYPE_ERROR',     // Type mismatch
+  FORMAT_ERROR = 'FORMAT_ERROR', // Invalid format (e.g., email, date)
+  RANGE_ERROR = 'RANGE_ERROR',   // Value out of range
+  PATTERN_ERROR = 'PATTERN_ERROR', // Doesn't match pattern/regex
+  CONSTRAINT_ERROR = 'CONSTRAINT_ERROR', // Business rule violation
+  CUSTOM_ERROR = 'CUSTOM_ERROR', // Custom validation error
+  CONFIG_ERROR = 'CONFIG_ERROR', // Configuration error
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR' // Fallback error code
 }
 
 /**
@@ -54,7 +56,7 @@ export interface ValidationErrorDetail {
  */
 export interface ValidationResult<T = unknown> {
   valid: boolean;                     // Whether validation passed
-  data?: T;                           // The validated data if successful
+  validatedData?: T;                  // The validated data if successful
   error?: ValidationErrorDetail;      // Error details if validation failed
   errors?: ValidationErrorDetail[];   // Multiple errors if applicable
   metadata?: ValidationMetadata;      // Additional metadata about validation process
@@ -76,10 +78,15 @@ export interface ValidationMetadata {
 export type Validator<T = unknown> = (value: unknown, context?: ValidationContext) => ValidationResult<T>;
 
 /**
+ * Async validator function type
+ */
+export type AsyncValidator<T = unknown> = (value: unknown, context?: ValidationContext) => Promise<ValidationResult<T>>;
+
+/**
  * Validation schema type
  */
 export type ValidationSchema<T = Record<string, unknown>> = {
-  [K in keyof T]?: Validator<T[K]>;
+  [K in keyof T]?: Validator<T[K]> | AsyncValidator<T[K]>;
 };
 
 /**
@@ -138,6 +145,41 @@ export interface ValidationPipeline<T = unknown> {
 }
 
 /**
+ * String validation options
+ */
+export interface StringValidationOptions {
+  minLength?: number;
+  maxLength?: number;
+  pattern?: RegExp;
+  patternMessage?: string;
+  trim?: boolean;
+  lowercase?: boolean;
+  uppercase?: boolean;
+}
+
+/**
+ * Number validation options
+ */
+export interface NumberValidationOptions {
+  min?: number;
+  max?: number;
+  integer?: boolean;
+  positive?: boolean;
+  negative?: boolean;
+  multipleOf?: number;
+}
+
+/**
+ * Array validation options
+ */
+export interface ArrayValidationOptions<T = unknown> {
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+  itemValidator?: Validator<T>;
+}
+
+/**
  * Type guard for ValidationErrorDetail
  */
 export function isValidationErrorDetail(obj: unknown): obj is ValidationErrorDetail {
@@ -191,7 +233,7 @@ export function composeValidators<T>(...validators: Validator[]): Validator<T> {
         return result as ValidationResult<T>;
       }
     }
-    return { valid: true, data: value as T };
+    return { valid: true, validatedData: value as T };
   };
 }
 
@@ -204,7 +246,31 @@ export function createCustomValidator<T>(
 ): Validator<T> {
   return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
     if (validationFn(value, context)) {
-      return { valid: true, data: value as T };
+      return { valid: true, validatedData: value as T };
+    }
+    
+    return {
+      valid: false,
+      error: {
+        path: errorDetails.path || context?.fieldPath || '',
+        ...errorDetails
+      }
+    };
+  };
+}
+
+/**
+ * Create an async custom validator
+ */
+export function createAsyncValidator<T>(
+  validationFn: (value: unknown, context?: ValidationContext) => Promise<boolean>,
+  errorDetails: Omit<ValidationErrorDetail, 'path'> & { path?: string }
+): AsyncValidator<T> {
+  return async (value: unknown, context?: ValidationContext): Promise<ValidationResult<T>> => {
+    const isValid = await validationFn(value, context);
+    
+    if (isValid) {
+      return { valid: true, validatedData: value as T };
     }
     
     return {

@@ -1,6 +1,8 @@
 
 # Type Safety Implementation Guide
 
+This guide provides a comprehensive approach to implementing type safety in our application. It covers core type system organization, validation strategies, error handling, and testing approaches.
+
 ## 1. Core Type System Organization
 
 ### 1.1 Type Directory Structure
@@ -134,207 +136,104 @@ describe('Validation System', () => {
 });
 ```
 
-## 5. Core Type Definitions
+## 5. Brand Types for Type Safety
 
-### 5.1 Base Types
+Brand types allow you to create distinct types from primitive types, providing compile-time type safety:
+
 ```typescript
-// src/types/core/base.ts
+// Creating a branded type
+type Brand<K, T> = K & { __brand: T };
+type UserID = Brand<string, 'user-id'>;
 
-// Primitive type aliases for better semantics
-export type ID = string;
-export type ISO8601Date = string;
-export type UUID = string;
-export type Email = string;
-export type URI = string;
+// Creating a factory function with validation
+function createUserID(id: string): UserID {
+  if (!id.match(/^user_[a-z0-9]{24}$/)) {
+    throw new Error('Invalid user ID format');
+  }
+  return id as UserID;
+}
 
-// Common type patterns
-export type Optional<T> = T | null | undefined;
-export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
-export type AsyncResult<T, E = Error> = Promise<Result<T, E>>;
+// This prevents type confusion
+function getUser(id: UserID): User {
+  // Implementation
+}
 
-// Brand types for type safety
-export type Brand<K, T> = K & { __brand: T };
-export type UserID = Brand<string, 'user-id'>;
-export type SessionID = Brand<string, 'session-id'>;
+// Error: Type 'string' is not assignable to parameter of type 'UserID'
+getUser('some-string');
+
+// Valid usage
+const userId = createUserID('user_123456789012345678901234');
+getUser(userId);
 ```
 
-### 5.2 Type Guards
+## 6. Discriminated Unions for State
+
+Discriminated unions are a powerful pattern for handling different states:
+
 ```typescript
-// src/types/core/guards.ts
-import { Optional, UUID, Email, URI } from './base';
+// Define a discriminated union
+type RequestState<T> = 
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: Error };
 
-// Type guard for checking if a value is defined
-export function isDefined<T>(value: Optional<T>): value is T {
-  return value !== null && value !== undefined;
-}
-
-// Type guard for checking if a value is an object
-export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-// Type guard for checking if a value is an array
-export function isArray<T>(value: unknown): value is Array<T> {
-  return Array.isArray(value);
-}
-
-// Type guard for checking if a value is a string
-export function isString(value: unknown): value is string {
-  return typeof value === 'string';
-}
-
-// Type guard for checking if a value is a number
-export function isNumber(value: unknown): value is number {
-  return typeof value === 'number' && !isNaN(value);
-}
-
-// Type guard for checking if a value is a boolean
-export function isBoolean(value: unknown): value is boolean {
-  return typeof value === 'boolean';
-}
-
-// Type guard for checking if a value is a UUID
-export function isUUID(value: unknown): value is UUID {
-  if (!isString(value)) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-}
-
-// Type guard for checking if a value is an email
-export function isEmail(value: unknown): value is Email {
-  if (!isString(value)) return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-// Type guard for checking if a value is a URI
-export function isURI(value: unknown): value is URI {
-  if (!isString(value)) return false;
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
+// Use with exhaustive checking
+function renderData<T>(state: RequestState<T>) {
+  switch (state.status) {
+    case 'idle':
+      return <Placeholder />;
+    case 'loading':
+      return <LoadingSpinner />;
+    case 'success':
+      return <DataView data={state.data} />;
+    case 'error':
+      return <ErrorMessage error={state.error} />;
   }
 }
 ```
 
-## 6. Performance Metrics Types
+## 7. Utility Types
 
-### 6.1 Metric Types
+Utility types can help create more specific type constraints:
+
 ```typescript
-// src/types/performance/metrics.ts
+// Deep partial - allows partial nested objects
+type DeepPartial<T> = T extends object 
+  ? { [P in keyof T]?: DeepPartial<T[P]> } 
+  : T;
 
-export type MetricType = 
-  | 'render' 
-  | 'interaction' 
-  | 'load' 
-  | 'memory' 
-  | 'network' 
-  | 'resource' 
-  | 'javascript' 
-  | 'css' 
-  | 'animation' 
-  | 'metric' 
-  | 'summary' 
-  | 'performance' 
-  | 'webVital';
+// Non-empty array
+type NonEmptyArray<T> = [T, ...T[]];
 
-export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 'responsiveness';
-export type WebVitalRating = 'good' | 'needs-improvement' | 'poor';
-
-export interface PerformanceMetric {
-  component_name?: string;
-  metric_name: string;
-  value: number;
-  category: string;
-  timestamp: string | number;
-  type: MetricType;
-  user_id?: string;
-  session_id?: string;
-  page_url?: string;
-  device_info?: DeviceInfo;
-  metadata?: Record<string, any>;
-  environment?: string;
-  rating?: WebVitalRating;
-  id?: string;
-}
-
-export interface WebVitalMetric {
-  name: WebVitalName | string;
-  value: number;
-  category: WebVitalCategory;
-  timestamp: number;
-  rating?: WebVitalRating;
-  delta?: number;
-  id?: string;
-}
+// Require at least one property
+type RequireAtLeastOne<T, K extends keyof T = keyof T> = 
+  Pick<T, Exclude<keyof T, K>> 
+  & {
+    [P in K]-?: Required<Pick<T, P>> & Partial<Pick<T, Exclude<K, P>>>
+  }[K];
 ```
 
-### 6.2 Device Information Types
-```typescript
-// src/types/performance/device.ts
+## 8. Implementation Checklist
 
-export interface DeviceInfo {
-  userAgent?: string;
-  deviceCategory?: string;
-  screenWidth?: number;
-  screenHeight?: number;
-  devicePixelRatio?: number;
-  connection?: {
-    effectiveType?: string;
-    downlink?: number;
-    rtt?: number;
-    saveData?: boolean;
-  };
-  memory?: {
-    jsHeapSizeLimit?: number;
-    totalJSHeapSize?: number;
-    usedJSHeapSize?: number;
-  };
-}
+- [ ] Set up core type directory structure
+- [ ] Create base primitive types
+- [ ] Implement type guards
+- [ ] Create validation system types
+- [ ] Create error handling system
+- [ ] Set up performance monitoring
+- [ ] Implement testing strategy
+- [ ] Document type patterns
 
-export enum DeviceCategory {
-  MOBILE = 'mobile',
-  TABLET = 'tablet',
-  DESKTOP = 'desktop',
-  TV = 'tv',
-  WEARABLE = 'wearable',
-  UNKNOWN = 'unknown'
-}
+## 9. Best Practices Summary
 
-export enum ConnectionType {
-  WIFI = 'wifi',
-  CELLULAR = 'cellular',
-  ETHERNET = 'ethernet',
-  BLUETOOTH = 'bluetooth',
-  UNKNOWN = 'unknown'
-}
+1. Centralize types in dedicated directories
+2. Use explicit exports for all types
+3. Create runtime validation with type guards
+4. Use branded types for IDs and important identifiers
+5. Implement discriminated unions for state management
+6. Create comprehensive validation error handling
+7. Write tests for type validation
+8. Optimize performance with caching and fast-path checks
 
-export enum NetworkEffectiveType {
-  SLOW_2G = 'slow-2g',
-  _2G = '2g',
-  _3G = '3g',
-  _4G = '4g'
-}
-```
-
-## 7. Implementation Checklist
-
-### 7.1 Core Files
-- [ ] Create src/types/core/base.ts
-- [ ] Create src/types/core/guards.ts
-- [ ] Create src/types/core/index.ts (barrel exports)
-
-### 7.2 Validation Files
-- [ ] Create src/types/validation/index.ts
-- [ ] Create src/types/validation/types.ts
-- [ ] Create src/types/validation/guards.ts
-
-### 7.3 Performance Files
-- [ ] Create src/types/performance/index.ts
-- [ ] Create src/types/performance/metrics.ts
-- [ ] Create src/types/performance/device.ts
-
-### 7.4 Testing
-- [ ] Create src/types/__tests__/guards.test.ts
-- [ ] Create src/types/__tests__/validation.test.ts
+This comprehensive approach ensures type safety throughout the application while maintaining performance and developer productivity.
