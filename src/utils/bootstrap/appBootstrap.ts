@@ -70,8 +70,9 @@ export async function initializeApplication(): Promise<InitializationResult> {
   
   try {
     // Step 1: Initialize and validate configuration
-    const configValid = await initializeConfiguration(false);
-    if (!configValid) {
+    const configResult = await initializeConfiguration(true);
+    
+    if (!configResult.isValid) {
       console.error('Application bootstrap failed: Invalid configuration');
       
       toast({
@@ -86,7 +87,7 @@ export async function initializeApplication(): Promise<InitializationResult> {
         state: InitializationState.FAILED,
         error: new ValidationError(
           'Application configuration is invalid',
-          [{ path: 'config', message: 'Configuration validation failed' }],
+          configResult.errors.map(error => ({ path: 'config', message: error })),
           'CONFIG_VALIDATION_ERROR',
           500
         ),
@@ -110,24 +111,25 @@ export async function initializeApplication(): Promise<InitializationResult> {
     }
     
     // Step 3: Validate Supabase connection (if used) - non-blocking
-    checkSupabaseConnection().then(connected => {
+    try {
+      const connected = await checkSupabaseConnection();
       if (!connected) {
         console.warn('Unable to connect to Supabase. Some features may not work.');
         
         toast({
           title: 'Connection Warning',
           description: 'Unable to connect to backend services. Some features may not work properly.',
-          variant: 'destructive', // Changed from 'warning' to 'destructive'
+          variant: 'destructive',
         });
         
         warnings.push('Supabase connection failed');
       } else {
         console.log('Successfully connected to Supabase services');
       }
-    }).catch((err) => {
+    } catch (err) {
       console.warn('Error checking Supabase connection:', err);
       warnings.push('Supabase connection check failed');
-    });
+    }
     
     // Registration point for other critical services initialization
     

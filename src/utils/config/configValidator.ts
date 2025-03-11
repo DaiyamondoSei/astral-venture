@@ -86,7 +86,7 @@ function getEnvironmentVariables(): AppConfig {
  * 
  * @returns Validation result with overall validity and details
  */
-export function validateAppConfig(): boolean {
+export function validateAppConfig(): ConfigValidationResult {
   const env = getEnvironmentVariables();
   const result: ConfigValidationResult = {
     isValid: true,
@@ -118,7 +118,7 @@ export function validateAppConfig(): boolean {
     configCache[rule.key] = value !== undefined ? value : rule.fallback;
   }
 
-  return result.isValid;
+  return result;
 }
 
 /**

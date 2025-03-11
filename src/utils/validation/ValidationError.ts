@@ -16,11 +16,13 @@ export interface ValidationErrorDetail {
   rule?: string;
   code?: string;
   
-  // Legacy compatibility fields - redirected to core fields
-  field?: string; // Maps to path
+  // Metadata
+  details?: string;
+  statusCode?: number;
+  
+  // Legacy compatibility field - redirected to path
+  field?: string;
   expectedType?: string; // Maps to type
-  details?: string; // Additional details
-  statusCode?: number; // HTTP status mapping
 }
 
 export class ValidationError extends Error {

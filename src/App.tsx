@@ -34,7 +34,7 @@ function App() {
             toast({
               title: 'Initialization Warning',
               description: warning,
-              variant: 'destructive', // Changed from 'warning' to 'destructive'
+              variant: 'destructive',
             });
           });
         }

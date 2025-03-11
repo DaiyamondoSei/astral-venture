@@ -20,6 +20,13 @@ export interface AppConfigState {
   initializationTime: number | null;
 }
 
+/**
+ * Configuration initialization result
+ */
+export interface ConfigInitResult extends AppConfigState {
+  timestamp: number;
+}
+
 // Application configuration state singleton
 const configState: AppConfigState = {
   isValid: false,
@@ -32,33 +39,40 @@ const configState: AppConfigState = {
  * Initialize and validate all application configuration
  * This must be called before any service that requires configuration
  * 
- * @throws Error if configuration is invalid and throwOnError is true
- * @returns Promise that resolves to true if config is valid, false otherwise
+ * @param throwOnError Whether to throw an error when validation fails
+ * @returns Promise that resolves to config initialization result
  */
-export async function initializeConfiguration(throwOnError: boolean = true): Promise<boolean> {
+export async function initializeConfiguration(throwOnError: boolean = true): Promise<ConfigInitResult> {
   console.log('Initializing application configuration...');
   
   // Avoid multiple initializations
   if (configState.isInitialized) {
-    return configState.isValid;
+    return {
+      ...configState,
+      timestamp: Date.now()
+    };
   }
   
   const startTime = performance.now();
+  configState.errors = [];
   
   try {
     // 1. Run validation on all required configuration
-    const isValid = validateAppConfig();
+    const validationResult = validateAppConfig();
     
     // 2. Set configuration state
-    configState.isValid = isValid;
+    configState.isValid = validationResult.isValid;
     configState.isInitialized = true;
     configState.initializationTime = performance.now() - startTime;
+    configState.errors = [...validationResult.missingKeys.map(key => `Missing required config: ${key}`), 
+                         ...validationResult.invalidKeys.map(key => `Invalid config value: ${key}`)];
     
     // 3. Log the configuration status
-    if (isValid) {
+    if (validationResult.isValid) {
       console.log(`Configuration successfully validated in ${configState.initializationTime.toFixed(2)}ms`);
     } else {
-      console.error('Configuration validation failed');
+      console.error('Configuration validation failed:');
+      configState.errors.forEach(err => console.error(`- ${err}`));
       
       // Throw error if requested - this will prevent application startup
       if (throwOnError) {
@@ -71,14 +85,19 @@ export async function initializeConfiguration(throwOnError: boolean = true): Pro
       }
     }
     
-    return isValid;
+    return {
+      ...configState,
+      timestamp: Date.now()
+    };
   } catch (error) {
     configState.isValid = false;
     configState.isInitialized = true;
     configState.initializationTime = performance.now() - startTime;
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown configuration error';
-    configState.errors.push(errorMessage);
+    if (!configState.errors.includes(errorMessage)) {
+      configState.errors.push(errorMessage);
+    }
     
     console.error('Configuration initialization failed:', error);
     
@@ -88,11 +107,14 @@ export async function initializeConfiguration(throwOnError: boolean = true): Pro
       variant: 'destructive',
     });
     
-    if (throwOnError) {
+    if (throwOnError && error instanceof Error) {
       throw error;
     }
     
-    return false;
+    return {
+      ...configState,
+      timestamp: Date.now()
+    };
   }
 }
 

@@ -160,3 +160,36 @@ export interface AdaptiveSettings {
   enableWebWorkers?: boolean;
   enableHighResImages?: boolean;
 }
+
+// Component metric interface (for legacy support)
+export interface ComponentMetric {
+  componentName: string;
+  renderCount: number;
+  averageRenderTime: number;
+  lastRenderTime: number;
+  slowRenderCount: number;
+  lastUpdated: number;
+}
+
+// Performance monitor methods
+export interface IPerformanceMonitor {
+  setEnabled: (enabled: boolean) => void;
+  isEnabled: () => boolean;
+  setConfig: (config: Partial<PerformanceMonitorConfig>) => void;
+  getConfig: () => PerformanceMonitorConfig;
+  startMonitoring: () => void;
+  stopMonitoring: () => void;
+  addComponentMetric: (componentName: string, renderTime: number, type?: MetricType) => void;
+  addWebVital: (name: WebVitalName | string, value: number, category: WebVitalCategory) => void;
+  getAllMetrics: () => Map<string, ComponentMetrics>;
+  getMetric: (componentName: string) => ComponentMetrics | undefined;
+  clearMetrics: () => void;
+  subscribe: (callback: MetricsSubscriber) => () => void;
+  reportNow: () => Promise<boolean>;
+  getWebVitals: () => WebVitals;
+  getDeviceInfo: () => DeviceInfo;
+  getAdaptiveSettings: () => AdaptiveSettings;
+  setAdaptiveSettings: (settings: Partial<AdaptiveSettings>) => void;
+  detectDeviceCapability: () => 'low' | 'medium' | 'high';
+  recordRender: (componentName: string, renderTime: number) => void;
+}

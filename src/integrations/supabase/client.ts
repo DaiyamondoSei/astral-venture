@@ -2,12 +2,12 @@
 /**
  * Supabase Integration Client
  * 
- * This file re-exports the supabase client from lib/supabaseClient.ts
- * to maintain consistency across the application.
+ * This file provides a robust, type-safe Supabase client with proper error handling
+ * and configuration validation.
  */
 
 import {
-  supabase,
+  supabase as supabaseInstance,
   getSupabase,
   resetSupabaseClient,
   isUsingMockSupabaseClient,
@@ -19,7 +19,6 @@ import {
 
 // Re-export everything for consistent imports
 export {
-  supabase,
   getSupabase,
   resetSupabaseClient,
   isUsingMockSupabaseClient,
@@ -28,5 +27,14 @@ export {
   createRpcCaller,
   incrementEnergyPoints
 };
+
+/**
+ * The singleton Supabase client instance
+ * 
+ * This is properly initialized with validation and error handling.
+ * Always use this instance for database operations to maintain
+ * consistent error handling and connection management.
+ */
+export const supabase = supabaseInstance;
 
 export default supabase;

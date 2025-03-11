@@ -6,7 +6,7 @@
  * and configuration validation.
  */
 
-import { createClient, SupabaseClient, PostgrestFilterBuilder } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { toast } from '@/components/ui/use-toast';
 import { getValidatedConfig } from '@/utils/config/configValidator';
 import { ensureValidConfiguration } from '@/utils/bootstrap/configBootstrap';
@@ -24,24 +24,22 @@ class MockSupabaseClient {
     console.warn('Using mock Supabase client. Database operations will not work.');
   }
 
-  from() {
+  from(table: string) {
+    const mockQueryBuilder = this._createMockQueryBuilder();
     return {
-      select: () => this._createMockQueryBuilder(),
-      insert: () => ({ data: null, error: new Error('Mock Supabase client') }),
-      update: () => ({ data: null, error: new Error('Mock Supabase client') }),
-      delete: () => ({ data: null, error: new Error('Mock Supabase client') }),
-      upsert: () => ({ data: null, error: new Error('Mock Supabase client') }),
+      select: () => mockQueryBuilder,
+      insert: () => this._createMockResponse(null, new Error('Mock Supabase client')),
+      update: () => this._createMockResponse(null, new Error('Mock Supabase client')),
+      delete: () => this._createMockResponse(null, new Error('Mock Supabase client')),
+      upsert: () => this._createMockResponse(null, new Error('Mock Supabase client')),
     };
   }
 
-  // Create a mock query builder that mirrors the PostgrestFilterBuilder interface
+  // Create a mock query builder with all common methods
   _createMockQueryBuilder() {
-    const mockBuilder = {
-      order: () => mockBuilder,
-      limit: () => mockBuilder,
-      range: () => mockBuilder,
-      single: () => ({ data: null, error: new Error('Mock Supabase client') }),
-      maybeSingle: () => ({ data: null, error: new Error('Mock Supabase client') }),
+    const mockResponse = this._createMockResponse(null, new Error('Mock Supabase client'));
+    const mockBuilder: any = {
+      // Filters
       eq: () => mockBuilder,
       neq: () => mockBuilder,
       gt: () => mockBuilder,
@@ -65,13 +63,27 @@ class MockSupabaseClient {
       not: () => mockBuilder,
       or: () => mockBuilder,
       filter: () => mockBuilder,
-      then: (onFulfilled) => Promise.resolve(onFulfilled({ data: null, error: new Error('Mock Supabase client') }))
+      
+      // Modifiers
+      order: () => mockBuilder,
+      limit: () => mockBuilder,
+      range: () => mockBuilder,
+      
+      // Execution methods
+      single: () => mockResponse,
+      maybeSingle: () => mockResponse,
+      then: (onFulfilled: any) => Promise.resolve(onFulfilled(mockResponse)),
     };
     return mockBuilder;
   }
 
-  rpc() {
-    return { data: null, error: new Error('Mock Supabase client') };
+  // Create a consistent mock response structure
+  _createMockResponse(data: any, error: Error | null) {
+    return { data, error };
+  }
+
+  rpc(functionName: string, params?: Record<string, any>) {
+    return this._createMockResponse(null, new Error('Mock Supabase client'));
   }
 
   auth = {
@@ -176,7 +188,7 @@ export async function checkSupabaseConnection(): Promise<boolean> {
   
   try {
     // Simple health check query
-    const { error } = await supabase.from('user_profiles').select('id').limit(1);
+    const { error } = await getSupabase().from('user_profiles').select('id').limit(1);
     return !error;
   } catch (err) {
     console.error('Supabase connection check failed:', err);
@@ -222,6 +234,7 @@ export async function incrementEnergyPoints(
   points: number
 ): Promise<number | null> {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('user_profiles')
       .select('energy_points')
@@ -265,7 +278,7 @@ export async function callRpc<T = any>(
   params: Record<string, any> = {}
 ): Promise<T> {
   try {
-    const { data, error } = await supabase.rpc(functionName, params);
+    const { data, error } = await getSupabase().rpc(functionName, params);
     
     if (error) throw error;
     return data as T;
