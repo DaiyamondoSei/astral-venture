@@ -5,7 +5,7 @@
  * A specialized error type for validation failures with detailed error information.
  */
 
-import { ValidationErrorDetail, ValidationErrorCode, ValidationSeverity } from './types';
+import { ValidationErrorDetail, ValidationErrorCode, ValidationSeverity } from '../../types/validation/types';
 
 export class ValidationError extends Error {
   public readonly details: ValidationErrorDetail[];

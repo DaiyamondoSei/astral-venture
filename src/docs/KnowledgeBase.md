@@ -12,6 +12,8 @@ Type safety issues typically arise from:
 3. **Implicit Any Types**: Not specifying types explicitly
 4. **Loose TypeScript Configuration**: Not enabling strict mode
 5. **Missing Runtime Validation**: Assuming data structures are valid at runtime
+6. **Inconsistent Type Organization**: Scattering related types across different files
+7. **Poor Type Export Strategy**: Not centralizing type exports
 
 ## 2. Prevention Strategies
 
@@ -95,6 +97,30 @@ module.exports = {
 }
 ```
 
+### 2.4 Type Organization Strategies
+
+Follow these practices for organizing types:
+
+1. **Create Dedicated Type Directories**:
+   - Keep types in dedicated directories (`src/types/`)
+   - Organize by domain (`core`, `api`, `validation`, etc.)
+   - Use barrel files for exports (`index.ts`)
+
+2. **Centralize Common Types**:
+   - Put shared types in a central location
+   - Create reusable utility types
+   - Define enums in dedicated files
+
+3. **Co-locate Component Types with Components**:
+   - Keep component prop types in the same file as the component
+   - Export complex types for reuse
+   - Use type inference where appropriate
+
+4. **Version Types Properly**:
+   - Mark deprecated types with JSDoc comments
+   - Provide migration utilities for breaking changes
+   - Use interface extension for evolution
+
 ## 3. Runtime Type Safety
 
 ### 3.1 Type Guards
@@ -112,15 +138,39 @@ function isUser(value: unknown): value is User {
 }
 ```
 
-### 3.2 Validation Libraries
+### 3.2 Optimized Type Guards
 
-Consider using validation libraries:
+Create optimized type guards for better performance:
 
-```bash
-npm install zod
+```typescript
+function createOptimizedGuard<T>(
+  check: (value: unknown) => value is T,
+  errorMessage: string
+): (value: unknown) => value is T {
+  return (value: unknown): value is T => {
+    // Fast-path checks first
+    if (value === null || value === undefined) {
+      return false;
+    }
+    
+    return check(value);
+  };
+}
+
+// Usage
+const isOptimizedUser = createOptimizedGuard<User>(
+  (value): value is User => 
+    typeof value === 'object' && 
+    value !== null &&
+    'id' in value && 
+    'name' in value, 
+  'Invalid user object'
+);
 ```
 
-Example usage:
+### 3.3 Validation Libraries
+
+Consider using validation libraries:
 
 ```typescript
 import { z } from 'zod';
@@ -142,6 +192,52 @@ function processUser(data: unknown) {
   
   const user = result.data;
   // Now user is guaranteed to be valid
+}
+```
+
+### 3.4 Validation Pipeline
+
+Implement a multi-stage validation pipeline:
+
+```typescript
+interface ValidationPipeline<T> {
+  // Phase 1: Pre-validation (normalization/sanitization)
+  preValidate(data: unknown): ValidationResult;
+  
+  // Phase 2: Main validation (type/constraints)
+  validate(data: unknown): ValidationResult<T>;
+  
+  // Phase 3: Post-validation (business rules)
+  postValidate(data: T): ValidationResult<T>;
+}
+```
+
+### 3.5 Caching Validation Results
+
+Cache validation results for better performance:
+
+```typescript
+const validationCache = new WeakMap<object, ValidationResult>();
+
+function validateWithCache<T>(
+  data: unknown, 
+  validator: Validator<T>
+): ValidationResult<T> {
+  // Skip caching for primitives
+  if (typeof data !== 'object' || data === null) {
+    return validator(data);
+  }
+  
+  // Check if result is cached
+  const cached = validationCache.get(data);
+  if (cached) {
+    return cached as ValidationResult<T>;
+  }
+  
+  // Run validation and cache result
+  const result = validator(data);
+  validationCache.set(data, result);
+  return result;
 }
 ```
 
@@ -243,6 +339,34 @@ interface ButtonProps {
 }
 ```
 
+### 5.3 Generic Components
+
+Create flexible components with proper type constraints:
+
+```typescript
+interface ListProps<T extends { id: string }> {
+  items: T[];
+  renderItem: (item: T) => React.ReactNode;
+  keyExtractor?: (item: T) => string;
+}
+
+function List<T extends { id: string }>({ 
+  items, 
+  renderItem,
+  keyExtractor = (item) => item.id
+}: ListProps<T>) {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={keyExtractor(item)}>
+          {renderItem(item)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
 ## 6. Testing Strategy
 
 ### 6.1 Type Testing
@@ -297,73 +421,211 @@ describe('normalizeConnections', () => {
 });
 ```
 
-## 7. Documentation
+### 6.3 Type Guard Testing
 
-### 7.1 Architecture Documentation
+Test type guards with a variety of inputs:
 
-Create diagrams showing relationships between components:
+```typescript
+// __tests__/guards.test.ts
+import { isUser } from '../guards';
 
+describe('Type Guards', () => {
+  it('should correctly identify valid User objects', () => {
+    expect(isUser({ id: '1', name: 'John' })).toBe(true);
+    expect(isUser({ id: '1', name: 'John', age: 30 })).toBe(true);
+  });
+  
+  it('should reject invalid User objects', () => {
+    expect(isUser(null)).toBe(false);
+    expect(isUser({})).toBe(false);
+    expect(isUser({ id: '1' })).toBe(false);
+    expect(isUser({ name: 'John' })).toBe(false);
+  });
+});
 ```
-- Use tools like draw.io, Mermaid, or Excalidraw
-- Document data flow between components
-- Explain architectural decisions
-- Keep documentation updated as the codebase evolves
-```
 
-### 7.2 API Documentation
+## 7. Database Integration
 
-Generate API documentation from JSDoc comments:
+### 7.1 Type-Safe Database Access
 
-```bash
-# Using TypeDoc
-npm install --save-dev typedoc
+Define interfaces for database entities:
 
-# Add script to package.json
-"scripts": {
-  "docs": "typedoc --out docs src"
+```typescript
+interface UserRecord {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Type guard for database results
+function isUserRecord(data: unknown): data is UserRecord {
+  if (typeof data !== 'object' || data === null) return false;
+  
+  const record = data as Partial<UserRecord>;
+  return (
+    typeof record.id === 'string' &&
+    typeof record.email === 'string' &&
+    typeof record.created_at === 'string' &&
+    typeof record.updated_at === 'string'
+  );
+}
+
+// Type-safe database query
+async function getUserById(id: string): Promise<UserRecord> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .single();
+    
+  if (error) throw error;
+  if (!isUserRecord(data)) {
+    throw new Error('Database returned invalid user format');
+  }
+  
+  return data;
 }
 ```
 
-## 8. Code Review Checklist
+### 7.2 Query Result Validation
 
-Create a code review checklist:
+Validate database query results:
 
-- [ ] Does the code follow our naming conventions?
-- [ ] Are all functions typed properly with return types?
-- [ ] Are all props interfaces defined clearly?
-- [ ] Is there proper error handling for async operations?
-- [ ] Are there tests covering the changes?
-- [ ] Is the documentation updated?
-- [ ] Do the changes maintain backward compatibility?
-- [ ] Are there any type assertions or `any` types that could be improved?
+```typescript
+import { z } from 'zod';
 
-## 9. Continuous Integration
+// Define schema for User table
+const UserSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime()
+});
 
-Set up CI checks for type safety:
+type User = z.infer<typeof UserSchema>;
 
-```yaml
-# .github/workflows/type-check.yml
-name: Type Check
+// Type-safe database query with validation
+async function getUserById(id: string): Promise<User> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .single();
+    
+  if (error) throw error;
+  
+  // Validate the response
+  try {
+    return UserSchema.parse(data);
+  } catch (validationError) {
+    console.error('Database returned invalid data:', validationError);
+    throw new Error('Invalid user data returned from database');
+  }
+}
+```
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+## 8. Configuration Validation
 
-jobs:
-  type-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Use Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '16'
-      - name: Install dependencies
-        run: npm ci
-      - name: Type check
-        run: npx tsc --noEmit
+### 8.1 Environment Variables
+
+Validate environment variables at startup:
+
+```typescript
+function validateEnvironment(): void {
+  const requiredVars = [
+    'API_URL',
+    'AUTH_SECRET'
+  ];
+  
+  const missing = requiredVars.filter(
+    varName => !process.env[varName]
+  );
+  
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`
+    );
+  }
+}
+
+// Call at application startup
+validateEnvironment();
+```
+
+### 8.2 Type-Safe Configuration
+
+Create a type-safe accessor for environment variables:
+
+```typescript
+type ConfigKey = 
+  | 'API_URL'
+  | 'AUTH_SECRET'
+  | 'DEBUG_MODE';
+  
+function getConfig(key: ConfigKey): string {
+  const value = process.env[key];
+  if (value === undefined) {
+    throw new Error(`Missing configuration: ${key}`);
+  }
+  return value;
+}
+
+function getConfigBoolean(key: ConfigKey): boolean {
+  const value = getConfig(key).toLowerCase();
+  return value === 'true' || value === '1' || value === 'yes';
+}
+
+// Usage
+const apiUrl = getConfig('API_URL');
+const debugMode = getConfigBoolean('DEBUG_MODE');
+```
+
+## 9. Performance Considerations
+
+### 9.1 Type Guard Optimization
+
+Optimize type guards for performance:
+
+```typescript
+// Less efficient
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as any).id === 'string' &&
+    typeof (value as any).name === 'string'
+  );
+}
+
+// More efficient
+function isUser(value: unknown): value is User {
+  if (typeof value !== 'object' || value === null) return false;
+  
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.id === 'string' &&
+    typeof obj.name === 'string'
+  );
+}
+```
+
+### 9.2 Development-Only Validation
+
+Implement development-only validation:
+
+```typescript
+function validateUser(user: User): void {
+  // Only run in development
+  if (process.env.NODE_ENV !== 'production') {
+    if (typeof user.id !== 'string') {
+      console.warn('Invalid user: id must be a string');
+    }
+    if (typeof user.name !== 'string') {
+      console.warn('Invalid user: name must be a string');
+    }
+  }
+}
 ```
 
 By implementing these strategies, we can prevent type safety issues and ensure a more maintainable codebase.
