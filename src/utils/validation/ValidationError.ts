@@ -13,6 +13,9 @@ export interface ValidationErrorDetail {
   field?: string;
   expectedType?: string;
   rule?: string;
+  code?: string;
+  details?: string;
+  statusCode?: number;
 }
 
 export class ValidationError extends Error {
@@ -97,7 +100,8 @@ export class ValidationError extends Error {
    */
   public static fromApiError(
     apiError: any, 
-    defaultMessage = 'Validation failed'
+    defaultMessage = 'Validation failed',
+    statusCode = 400
   ): ValidationError {
     // Handle different API error formats
     if (apiError?.errors && Array.isArray(apiError.errors)) {
@@ -110,14 +114,21 @@ export class ValidationError extends Error {
           value: err.value,
           type: err.type,
           expectedType: err.expectedType,
-          rule: err.rule
-        }))
+          rule: err.rule,
+          code: err.code,
+          details: err.details,
+          statusCode: statusCode
+        })),
+        apiError.code || 'VALIDATION_ERROR',
+        statusCode
       );
     }
     
     return new ValidationError(
       apiError?.message || defaultMessage,
-      []
+      [],
+      apiError?.code || 'VALIDATION_ERROR',
+      statusCode
     );
   }
 
@@ -127,7 +138,13 @@ export class ValidationError extends Error {
   static requiredError(field: string, message?: string): ValidationError {
     return new ValidationError(
       message || `${field} is required`,
-      [{ path: field, field, message: message || `${field} is required`, rule: 'required' }]
+      [{ 
+        path: field, 
+        field, 
+        message: message || `${field} is required`, 
+        rule: 'required',
+        code: 'FIELD_REQUIRED'
+      }]
     );
   }
 
@@ -140,7 +157,8 @@ export class ValidationError extends Error {
         message: message || `${field} must be a ${expectedType}`, 
         expectedType,
         type: expectedType,
-        rule: 'type' 
+        rule: 'type',
+        code: 'TYPE_ERROR'
       }]
     );
   }
@@ -161,7 +179,8 @@ export class ValidationError extends Error {
         path: field, 
         field, 
         message: message || defaultMessage, 
-        rule: 'range' 
+        rule: 'range',
+        code: 'RANGE_ERROR'
       }]
     );
   }
@@ -173,7 +192,8 @@ export class ValidationError extends Error {
         path: field, 
         field, 
         message: message || `${field} has invalid format (expected: ${format})`, 
-        rule: 'format' 
+        rule: 'format',
+        code: 'FORMAT_ERROR'
       }]
     );
   }
@@ -185,7 +205,8 @@ export class ValidationError extends Error {
         path: field, 
         field, 
         message: message || `${field} has invalid schema`, 
-        rule: 'schema' 
+        rule: 'schema',
+        code: 'SCHEMA_ERROR'
       }]
     );
   }

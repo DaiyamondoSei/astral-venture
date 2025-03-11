@@ -111,6 +111,29 @@ export function getConfigValue(
 }
 
 /**
+ * Get a validated configuration value, throwing error if missing and required
+ * 
+ * @param name Configuration variable name
+ * @param fallback Optional fallback value (makes the config optional)
+ * @param env Environment object (defaults to import.meta.env)
+ * @returns The configuration value
+ * @throws Error if value is missing and no fallback provided
+ */
+export function getValidatedConfig(
+  name: string, 
+  fallback?: string,
+  env: Record<string, string> = import.meta.env
+): string {
+  const value = env[name] || fallback;
+  
+  if (value === undefined && fallback === undefined) {
+    throw new Error(`Missing required configuration: ${name}`);
+  }
+  
+  return value || '';
+}
+
+/**
  * Common validators for configuration values
  */
 export const ConfigValidators = {
@@ -212,21 +235,4 @@ export function validateAppConfig(): boolean {
   }
   
   return result.isValid;
-}
-
-/**
- * Gets a validated configuration value, logging warning if missing
- * 
- * @param name Configuration variable name
- * @param fallback Optional fallback value
- * @returns The configuration value or fallback
- */
-export function getValidatedConfig(name: string, fallback: string = ''): string {
-  const value = import.meta.env[name];
-  
-  if (!value && !fallback) {
-    console.warn(`Missing configuration for ${name} (no fallback provided)`);
-  }
-  
-  return value || fallback;
 }

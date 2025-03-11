@@ -7,7 +7,11 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import performanceMonitor from '@/utils/performance/performanceMonitor';
-import { MetricType, ComponentMetrics } from '@/utils/performance/types';
+import { 
+  PerformanceTrackingOptions, 
+  PerformanceTrackingResult, 
+  ComponentMetrics 
+} from '@/utils/performance/types';
 import { Brand } from '@/utils/types/advancedTypes';
 
 // Brand the component name for type safety
@@ -19,49 +23,6 @@ function createComponentName(name: string): ComponentName {
     throw new Error('Component name cannot be empty');
   }
   return name as ComponentName;
-}
-
-interface PerformanceTrackingOptions {
-  /** Name of the component being tracked */
-  componentName: string | ComponentName;
-  
-  /** Type of metric being tracked */
-  metricType?: MetricType;
-  
-  /** Whether to automatically track render time */
-  autoStart?: boolean;
-  
-  /** Threshold for slow render detection (ms) */
-  slowThreshold?: number;
-  
-  /** Whether to log slow renders to console */
-  logSlowRenders?: boolean;
-  
-  /** Whether to track interaction timings */
-  trackInteractions?: boolean;
-  
-  /** Whether to track component size information */
-  trackSize?: boolean;
-  
-  /** Whether to track memory usage */
-  trackMemory?: boolean;
-}
-
-interface PerformanceTrackingResult {
-  /** Start timing the render */
-  startTiming: () => void;
-  
-  /** End timing and record the render duration */
-  endTiming: () => void;
-  
-  /** Start timing an interaction */
-  startInteractionTiming: (interactionName: string) => () => void;
-  
-  /** Get current metrics for this component */
-  getMetrics: () => ComponentMetrics | null;
-  
-  /** Record component size */
-  recordSize: (domNode: HTMLElement | null) => void;
 }
 
 /**
@@ -101,11 +62,19 @@ export function usePerformanceTracking(
     if (trackMemory && (performance as any).memory) {
       const memoryInfo = (performance as any).memory;
       metricsRef.current = {
-        ...metricsRef.current as ComponentMetrics,
+        ...(metricsRef.current as ComponentMetrics || {
+          componentName: componentName as string,
+          renderCount: 0,
+          totalRenderTime: 0,
+          averageRenderTime: 0,
+          lastRenderTime: 0,
+          memoryUsage: 0,
+          renderSizes: []
+        }),
         memoryUsage: memoryInfo.usedJSHeapSize
       };
     }
-  }, [trackMemory]);
+  }, [trackMemory, componentName]);
   
   /**
    * End timing and record the render duration
@@ -120,7 +89,7 @@ export function usePerformanceTracking(
     
     // Add metric to performance monitor
     const metrics = performanceMonitor.addComponentMetric(
-      componentName,
+      componentName as string,
       duration,
       metricType
     );

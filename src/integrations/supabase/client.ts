@@ -6,14 +6,21 @@
  * This file exists for backward compatibility with existing code.
  */
 
-import { supabase, incrementEnergyPoints, callRpc, createRpcCaller } from '@/lib/supabaseClient';
+import { 
+  supabase, 
+  incrementEnergyPoints, 
+  callRpc, 
+  createRpcCaller,
+  checkSupabaseConnection
+} from '@/lib/supabaseClient';
 
 // Export the singleton instance and helper functions
 export { 
   supabase, 
   incrementEnergyPoints, 
   callRpc,
-  createRpcCaller
+  createRpcCaller,
+  checkSupabaseConnection
 };
 
 // Add deprecation warning in development

@@ -8,7 +8,14 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { toast } from '@/components/ui/use-toast';
-import { validateRequiredConfig } from '@/utils/config/configValidator';
+import { 
+  validateRequiredConfig, 
+  getValidatedConfig, 
+  validateAppConfig 
+} from '@/utils/config/configValidator';
+
+// Application has not been properly configured
+let configurationValid = false;
 
 // Configuration interface for type safety
 interface SupabaseConfig {
@@ -16,33 +23,39 @@ interface SupabaseConfig {
   supabaseAnonKey: string;
 }
 
-// Get configuration with validation
-function getValidatedConfig(): SupabaseConfig {
-  // Read config from environment
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  // Validate configuration
-  const isValid = validateRequiredConfig({
-    supabaseUrl,
-    supabaseAnonKey
-  });
-  
-  // Return validated config
-  return {
-    supabaseUrl: supabaseUrl as string,
-    supabaseAnonKey: supabaseAnonKey as string
-  };
-}
-
-// Create and initialize the client
+/**
+ * Initialize Supabase client with proper validation
+ * 
+ * @throws Error if required configuration is missing
+ */
 function initializeSupabaseClient(): SupabaseClient {
   try {
-    const config = getValidatedConfig();
+    // Run global config validation on first initialization
+    if (!configurationValid) {
+      configurationValid = validateAppConfig();
+      
+      if (!configurationValid) {
+        throw new Error(
+          'Application configuration failed validation. ' +
+          'Check console for specific missing or invalid values.'
+        );
+      }
+    }
+    
+    // Get configuration values with validation
+    const config: SupabaseConfig = {
+      supabaseUrl: getValidatedConfig('VITE_SUPABASE_URL'),
+      supabaseAnonKey: getValidatedConfig('VITE_SUPABASE_ANON_KEY')
+    };
+    
+    // Double-check config has all required values
+    validateRequiredConfig(config);
+    
+    // Create and return client
     return createClient(config.supabaseUrl, config.supabaseAnonKey);
   } catch (error) {
-    // Log error and show notification
-    console.error('Failed to initialize Supabase client:', error);
+    // Log detailed error for developers
+    console.error('[CRITICAL] Failed to initialize Supabase client:', error);
     
     // Show user-friendly error message
     toast({
@@ -51,42 +64,47 @@ function initializeSupabaseClient(): SupabaseClient {
       variant: 'destructive',
     });
     
-    // Throw a more descriptive error
+    // Re-throw with clear message - this should prevent app from proceeding with invalid config
     throw new Error(
       'Supabase initialization failed: Required configuration missing. ' +
-      'Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.'
+      'Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in the environment.'
     );
   }
 }
 
-// Create singleton instance
-export const supabase = initializeSupabaseClient();
-
 /**
- * Increments energy points for a user
- * 
- * @param userId User ID to increment points for
- * @param points Number of points to add
- * @returns New total points
+ * Check connection to Supabase is working
+ * @returns Promise resolving to true if connection is successful
  */
-export async function incrementEnergyPoints(
-  userId: string,
-  points: number
-): Promise<number> {
+export async function checkSupabaseConnection(): Promise<boolean> {
   try {
-    // Call the RPC function to increment points
-    const { data, error } = await supabase.rpc('increment_points', {
-      row_id: userId,
-      points_to_add: points
-    });
+    // Simple health check query
+    const { error } = await supabase.from('user_profiles').select('id').limit(1);
     
-    if (error) throw error;
-    return data as number;
-  } catch (error) {
-    console.error('Error incrementing energy points:', error);
-    throw error;
+    return !error;
+  } catch (err) {
+    console.error('Supabase connection check failed:', err);
+    return false;
   }
 }
+
+// Initialize singleton instance
+let supabaseInstance: SupabaseClient | null = null;
+
+/**
+ * Get the Supabase client instance, initializing it if necessary
+ * Using this getter pattern ensures proper error handling and validation
+ */
+export function getSupabase(): SupabaseClient {
+  if (!supabaseInstance) {
+    supabaseInstance = initializeSupabaseClient();
+  }
+  return supabaseInstance;
+}
+
+// Create and export the singleton instance
+// This maintains backward compatibility
+export const supabase = getSupabase();
 
 /**
  * Type-safe helper for calling RPC functions
@@ -126,6 +144,32 @@ export function createRpcCaller<TResult = any, TParams extends Record<string, an
   return async (params: TParams): Promise<TResult> => {
     return callRpc<TResult>(functionName, params);
   };
+}
+
+/**
+ * Increments energy points for a user
+ * 
+ * @param userId User ID to increment points for
+ * @param points Number of points to add
+ * @returns New total points
+ */
+export async function incrementEnergyPoints(
+  userId: string,
+  points: number
+): Promise<number> {
+  try {
+    // Call the RPC function to increment points
+    const { data, error } = await supabase.rpc('increment_points', {
+      row_id: userId,
+      points_to_add: points
+    });
+    
+    if (error) throw error;
+    return data as number;
+  } catch (error) {
+    console.error('Error incrementing energy points:', error);
+    throw error;
+  }
 }
 
 // Export singleton instance and helpers
