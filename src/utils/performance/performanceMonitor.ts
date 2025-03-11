@@ -5,8 +5,14 @@
  * Centralized system for tracking component and application performance metrics.
  */
 
-import { MetricType, WebVitalName, WebVitalCategory } from './types';
-import { ComponentMetrics, WebVitalMetric, PerformanceMetric } from './types';
+import { 
+  MetricType, 
+  WebVitalName, 
+  WebVitalCategory,
+  ComponentMetrics, 
+  WebVitalMetric, 
+  PerformanceMetric 
+} from './types';
 
 class PerformanceMonitor {
   private componentMetrics: Map<string, ComponentMetrics> = new Map();
@@ -14,6 +20,38 @@ class PerformanceMonitor {
   private isEnabled: boolean = true;
   private metricsCollectionEnabled: boolean = true;
   private slowRenderThreshold: number = 16; // 60fps threshold
+  private subscribers: ((metrics: Map<string, ComponentMetrics>) => void)[] = [];
+  
+  /**
+   * Start performance monitoring
+   */
+  public startMonitoring(): void {
+    this.isEnabled = true;
+    console.log('Performance monitoring started');
+  }
+  
+  /**
+   * Stop performance monitoring
+   */
+  public stopMonitoring(): void {
+    this.isEnabled = false;
+    console.log('Performance monitoring stopped');
+  }
+  
+  /**
+   * Record component render
+   * 
+   * @param componentName Name of the component 
+   * @param renderTime Time it took to render
+   * @param type Type of metric
+   */
+  public recordRender(
+    componentName: string,
+    renderTime: number,
+    type: MetricType = 'render'
+  ): ComponentMetrics {
+    return this.addComponentMetric(componentName, renderTime, type);
+  }
   
   /**
    * Add or update component metrics
@@ -64,6 +102,9 @@ class PerformanceMonitor {
     if (type === 'render' && renderTime > this.slowRenderThreshold) {
       console.warn(`Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`);
     }
+    
+    // Notify subscribers
+    this.notifySubscribers();
     
     return metrics;
   }
@@ -139,6 +180,7 @@ class PerformanceMonitor {
   public resetMetrics(): void {
     this.componentMetrics.clear();
     this.webVitals.clear();
+    this.notifySubscribers();
   }
   
   /**
@@ -169,6 +211,44 @@ class PerformanceMonitor {
   }
   
   /**
+   * Subscribe to metrics updates
+   * 
+   * @param callback Function to call when metrics change
+   * @returns Unsubscribe function
+   */
+  public subscribe(callback: (metrics: Map<string, ComponentMetrics>) => void): () => void {
+    this.subscribers.push(callback);
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
+  }
+  
+  /**
+   * Notify all subscribers of metrics changes
+   */
+  private notifySubscribers(): void {
+    for (const subscriber of this.subscribers) {
+      try {
+        subscriber(this.componentMetrics);
+      } catch (error) {
+        console.error('Error in performance metrics subscriber:', error);
+      }
+    }
+  }
+  
+  /**
+   * Get slowest components based on average render time
+   * 
+   * @param limit Maximum number of components to return
+   * @returns Array of slowest components
+   */
+  public getSlowestComponents(limit: number = 5): ComponentMetrics[] {
+    return Array.from(this.componentMetrics.values())
+      .sort((a, b) => b.averageRenderTime - a.averageRenderTime)
+      .slice(0, limit);
+  }
+  
+  /**
    * Get performance summary
    * 
    * @returns Object with performance summary
@@ -188,6 +268,13 @@ class PerformanceMonitor {
         .reduce((sum, metric) => sum + metric.averageRenderTime, 0) / 
         Math.max(1, componentCount)
     };
+  }
+  
+  /**
+   * Clear metrics for testing
+   */
+  public clearMetrics(): void {
+    this.resetMetrics();
   }
 }
 

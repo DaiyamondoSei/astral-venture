@@ -8,14 +8,8 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { toast } from '@/components/ui/use-toast';
-import { 
-  validateRequiredConfig, 
-  getValidatedConfig, 
-  validateAppConfig 
-} from '@/utils/config/configValidator';
-
-// Application has not been properly configured
-let configurationValid = false;
+import { getValidatedConfig } from '@/utils/config/configValidator';
+import { ensureValidConfiguration } from '@/utils/bootstrap/configBootstrap';
 
 // Configuration interface for type safety
 interface SupabaseConfig {
@@ -25,34 +19,28 @@ interface SupabaseConfig {
 
 /**
  * Initialize Supabase client with proper validation
+ * Requires that application configuration has been validated
  * 
  * @throws Error if required configuration is missing
  */
 function initializeSupabaseClient(): SupabaseClient {
   try {
-    // Run global config validation on first initialization
-    if (!configurationValid) {
-      configurationValid = validateAppConfig();
-      
-      if (!configurationValid) {
-        throw new Error(
-          'Application configuration failed validation. ' +
-          'Check console for specific missing or invalid values.'
-        );
-      }
-    }
+    // Check that configuration is valid before proceeding
+    ensureValidConfiguration();
     
     // Get configuration values with validation
-    const config: SupabaseConfig = {
-      supabaseUrl: getValidatedConfig('VITE_SUPABASE_URL'),
-      supabaseAnonKey: getValidatedConfig('VITE_SUPABASE_ANON_KEY')
-    };
+    const supabaseUrl = getValidatedConfig('VITE_SUPABASE_URL');
+    const supabaseAnonKey = getValidatedConfig('VITE_SUPABASE_ANON_KEY');
     
-    // Double-check config has all required values
-    validateRequiredConfig(config);
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error(
+        'Supabase configuration is missing. ' +
+        'Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.'
+      );
+    }
     
     // Create and return client
-    return createClient(config.supabaseUrl, config.supabaseAnonKey);
+    return createClient(supabaseUrl, supabaseAnonKey);
   } catch (error) {
     // Log detailed error for developers
     console.error('[CRITICAL] Failed to initialize Supabase client:', error);

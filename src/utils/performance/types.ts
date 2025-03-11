@@ -61,3 +61,31 @@ export interface PerformanceTrackingResult {
   getMetrics: () => ComponentMetrics | null;
   recordSize: (domNode: HTMLElement | null) => void;
 }
+
+// Performance monitor configuration
+export interface PerformanceMonitorConfig {
+  enabled: boolean;
+  metricsEnabled: boolean;
+  slowRenderThreshold: number;
+  samplingRate: number;
+  reportingEndpoint?: string;
+  debugMode: boolean;
+}
+
+// Device information for metrics reporting
+export interface DeviceInfo {
+  userAgent: string;
+  deviceCategory: string;
+  // Add other device info as needed
+}
+
+// Performance report payload
+export interface PerformanceReportPayload {
+  timestamp: number;
+  session?: string;
+  metrics: PerformanceMetric[];
+  device?: DeviceInfo;
+}
+
+// Subscriber for metrics updates
+export type MetricsSubscriber = (metrics: Map<string, ComponentMetrics>) => void;
