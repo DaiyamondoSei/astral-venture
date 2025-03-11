@@ -1,182 +1,142 @@
 
 /**
- * Configuration Bootstrap Module
+ * Application Bootstrap Configuration
  * 
- * Manages application configuration loading, validation, and initialization.
- * Implements a fail-fast pattern to prevent application startup with invalid configuration.
+ * Enforces configuration validation and prevents application startup
+ * with invalid configuration, implementing a fail-fast approach.
  */
 
-import { toast } from '@/components/ui/use-toast';
-import { validateAppConfig, getValidatedConfig } from '@/utils/config/configValidator';
+import { getValidatedConfig, validateConfig } from '@/utils/config/configValidator';
 import { ValidationError } from '@/utils/validation/ValidationError';
 
-/**
- * Application configuration state
- */
-export interface AppConfigState {
-  isValid: boolean;
-  isInitialized: boolean;
-  errors: string[];
-  initializationTime: number | null;
-}
+// Track bootstrap status
+let isConfigurationValid = false;
+let validationErrors: ValidationError | null = null;
+
+// Required configurations for app to function
+const REQUIRED_CONFIGS = [
+  'VITE_SUPABASE_URL',
+  'VITE_SUPABASE_ANON_KEY'
+];
 
 /**
- * Configuration initialization result
+ * Initialize and validate application configuration
+ * This should be called early in the application bootstrap process
  */
-export interface ConfigInitResult extends AppConfigState {
-  timestamp: number;
-}
-
-// Application configuration state singleton
-const configState: AppConfigState = {
-  isValid: false,
-  isInitialized: false,
-  errors: [],
-  initializationTime: null
-};
-
-/**
- * Initialize and validate all application configuration
- * This must be called before any service that requires configuration
- * 
- * @param throwOnError Whether to throw an error when validation fails
- * @returns Promise that resolves to config initialization result
- */
-export async function initializeConfiguration(throwOnError: boolean = true): Promise<ConfigInitResult> {
-  console.log('Initializing application configuration...');
-  
-  // Avoid multiple initializations
-  if (configState.isInitialized) {
-    return {
-      ...configState,
-      timestamp: Date.now()
-    };
-  }
-  
-  const startTime = performance.now();
-  configState.errors = [];
-  
+export function initializeConfiguration(): { isValid: boolean; errors: ValidationError | null } {
   try {
-    // 1. Run validation on all required configuration
-    const validationResult = validateAppConfig();
-    
-    // 2. Set configuration state
-    configState.isValid = validationResult.isValid;
-    configState.isInitialized = true;
-    configState.initializationTime = performance.now() - startTime;
-    configState.errors = [
-      ...validationResult.missingKeys.map(key => `Missing required config: ${key}`), 
-      ...validationResult.invalidKeys.map(key => `Invalid config value: ${key}`)
-    ];
-    
-    // 3. Log the configuration status
-    if (validationResult.isValid) {
-      console.log(`Configuration successfully validated in ${configState.initializationTime.toFixed(2)}ms`);
-    } else {
-      console.error('Configuration validation failed:');
-      configState.errors.forEach(err => console.error(`- ${err}`));
-      
-      // Throw error if requested - this will prevent application startup
-      if (throwOnError) {
-        const details = configState.errors.map(error => ({ 
-          path: 'config', 
-          message: error 
-        }));
-        
-        throw new ValidationError(
-          'Application configuration is invalid. Check console for details.',
-          details,
-          'CONFIG_VALIDATION_ERROR',
-          500
-        );
+    // Validate all required configurations
+    const validationResults = REQUIRED_CONFIGS.map(configKey => {
+      try {
+        const value = getValidatedConfig(configKey);
+        return { key: configKey, isValid: !!value, value };
+      } catch (error) {
+        return { key: configKey, isValid: false, error };
       }
-    }
-    
-    return {
-      ...configState,
-      timestamp: Date.now()
-    };
-  } catch (error) {
-    configState.isValid = false;
-    configState.isInitialized = true;
-    configState.initializationTime = performance.now() - startTime;
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown configuration error';
-    if (!configState.errors.includes(errorMessage)) {
-      configState.errors.push(errorMessage);
-    }
-    
-    console.error('Configuration initialization failed:', error);
-    
-    toast({
-      title: 'Configuration Error',
-      description: 'The application could not initialize properly due to configuration issues.',
-      variant: 'destructive',
     });
     
-    if (throwOnError && error instanceof Error) {
-      throw error;
+    // Check for any invalid configurations
+    const invalidConfigs = validationResults.filter(result => !result.isValid);
+    
+    if (invalidConfigs.length > 0) {
+      // Create detailed validation error
+      const details = invalidConfigs.map(config => ({
+        path: config.key,
+        message: `Missing or invalid configuration: ${config.key}`,
+        rule: 'required',
+        code: 'CONFIG_ERROR'
+      }));
+      
+      validationErrors = new ValidationError(
+        'Application configuration validation failed',
+        details,
+        'CONFIG_VALIDATION_ERROR',
+        500
+      );
+      
+      // Log detailed error for developers
+      console.error('[BOOTSTRAP] Configuration validation failed:', validationErrors);
+      console.error('Missing configurations:', invalidConfigs.map(c => c.key).join(', '));
+      console.error('Please check your environment variables and .env files');
+      
+      isConfigurationValid = false;
+    } else {
+      isConfigurationValid = true;
+      validationErrors = null;
     }
     
-    return {
-      ...configState,
-      timestamp: Date.now()
+    return { 
+      isValid: isConfigurationValid, 
+      errors: validationErrors 
+    };
+  } catch (error) {
+    // Handle unexpected errors during validation
+    console.error('[BOOTSTRAP] Unexpected error during configuration validation:', error);
+    
+    validationErrors = error instanceof ValidationError 
+      ? error 
+      : new ValidationError(
+          'Unexpected error during configuration validation',
+          [{
+            path: 'bootstrap',
+            message: error instanceof Error ? error.message : String(error),
+            rule: 'validation',
+            code: 'UNEXPECTED_ERROR'
+          }],
+          'BOOTSTRAP_ERROR',
+          500
+        );
+        
+    isConfigurationValid = false;
+    
+    return { 
+      isValid: false, 
+      errors: validationErrors 
     };
   }
 }
 
 /**
- * Check if configuration has been initialized and is valid
- * 
- * @throws Error if configuration is not initialized or is invalid
+ * Ensure valid configuration or throw a detailed error
+ * This implements a fail-fast approach to configuration validation
  */
 export function ensureValidConfiguration(): void {
-  if (!configState.isInitialized) {
-    throw new Error(
-      'Application configuration has not been initialized. ' +
-      'Call initializeConfiguration() before using any services.'
-    );
+  // If we haven't validated configuration yet, do so now
+  if (!isConfigurationValid && !validationErrors) {
+    const { isValid, errors } = initializeConfiguration();
+    
+    if (!isValid && errors) {
+      throw errors;
+    }
+  } else if (!isConfigurationValid && validationErrors) {
+    // We already know configuration is invalid
+    throw validationErrors;
   }
   
-  if (!configState.isValid) {
-    throw new ValidationError(
-      'Invalid configuration. The application cannot proceed.',
-      configState.errors.map(error => ({ path: 'config', message: error })),
-      'CONFIG_VALIDATION_ERROR',
-      500
-    );
+  // If we get here, configuration is valid
+}
+
+/**
+ * Check if a specific configuration key is valid
+ */
+export function isConfigValid(key: string): boolean {
+  try {
+    const value = getValidatedConfig(key);
+    return !!value;
+  } catch (error) {
+    return false;
   }
 }
 
 /**
- * Get the current configuration state
+ * Get the current validation status
  */
-export function getConfigurationState(): Readonly<AppConfigState> {
-  return { ...configState };
+export function getConfigurationStatus(): { isValid: boolean; errors: ValidationError | null } {
+  return {
+    isValid: isConfigurationValid,
+    errors: validationErrors
+  };
 }
 
-/**
- * Reset configuration state (primarily for testing)
- */
-export function resetConfigurationState(): void {
-  configState.isValid = false;
-  configState.isInitialized = false;
-  configState.errors = [];
-  configState.initializationTime = null;
-}
-
-/**
- * Get a specific configuration value with validation
- */
-export function getConfig<T>(key: string, defaultValue: T): T {
-  ensureValidConfiguration();
-  return getValidatedConfig(key) as unknown as T || defaultValue;
-}
-
-export default {
-  initializeConfiguration,
-  ensureValidConfiguration,
-  getConfigurationState,
-  resetConfigurationState,
-  getConfig
-};
+// Auto-initialize configuration on module import
+initializeConfiguration();

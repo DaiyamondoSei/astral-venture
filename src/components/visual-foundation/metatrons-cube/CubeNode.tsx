@@ -41,7 +41,7 @@ const CubeNode: React.FC<CubeNodeProps> = ({
       break;
   }
 
-  // Fixed animation variants to comply with framer-motion types
+  // Define proper animation variants that comply with framer-motion types
   const nodeVariants = {
     active: {
       scale: [1, 1.1, 1],

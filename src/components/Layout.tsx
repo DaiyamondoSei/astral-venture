@@ -54,8 +54,9 @@ const Layout: React.FC<LayoutProps> = ({
   }, [contentWidth]);
   
   const handleLayoutClick = () => {
-    const trackingFn = trackInteraction('layout-click');
-    if (trackingFn) trackingFn();
+    if (trackInteraction) {
+      trackInteraction('layout-click');
+    }
   };
   
   return (

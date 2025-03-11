@@ -9,7 +9,7 @@ interface LogoutButtonProps {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
-  onClick?: () => Promise<void>; // Added onClick prop to support external handlers
+  onClick?: () => Promise<void> | void; // Updated to support both async and sync handlers
 }
 
 const LogoutButton = ({ 
@@ -22,9 +22,20 @@ const LogoutButton = ({
   const navigate = useNavigate();
   
   const handleLogout = async () => {
-    if (onClick) {
-      await onClick();
-    } else {
+    try {
+      if (onClick) {
+        // Handle both async and sync onClick handlers
+        const result = onClick();
+        if (result instanceof Promise) {
+          await result;
+        }
+      } else {
+        await signOut();
+        navigate('/login');
+      }
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Use default logout as fallback if custom handler fails
       await signOut();
       navigate('/login');
     }
