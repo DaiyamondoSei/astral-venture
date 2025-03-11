@@ -1,8 +1,11 @@
-import { QualityLevel, PerformanceBoundaries, PerformanceSettings } from './performance/core/types';
 
-export type DeviceCapability = 'low' | 'medium' | 'high';
-export type PerformanceMode = 'quality' | 'balanced' | 'performance';
-export type RenderFrequency = 'low' | 'medium' | 'high';
+import { 
+  DeviceCapability, 
+  PerformanceMode, 
+  RenderFrequency, 
+  PerformanceSettings,
+  QualityLevel
+} from './performance/types';
 
 export const getPerformanceCategory = (capability: DeviceCapability): string => {
   switch (capability) {
@@ -63,14 +66,16 @@ export const getDefaultSettings = (capability: DeviceCapability): PerformanceSet
   }
 };
 
-export const getParticleCount = (capability: DeviceCapability): number => {
+export const getParticleCount = (capability: DeviceCapability, type: 'core' | 'background' = 'core'): number => {
+  const multiplier = type === 'background' ? 0.5 : 1;
+  
   switch (capability) {
     case 'high':
-      return 1000;
+      return Math.floor(1000 * multiplier);
     case 'medium':
-      return 500;
+      return Math.floor(500 * multiplier);
     case 'low':
-      return 200;
+      return Math.floor(200 * multiplier);
   }
 };
 
@@ -98,3 +103,54 @@ export const getGeometryDetail = (capability: DeviceCapability): number => {
       return 0.5;
   }
 };
+
+/**
+ * Detect device capability based on hardware and browser features
+ */
+export function detectDeviceCapability(): DeviceCapability {
+  // Only run in browser environment
+  if (typeof window === 'undefined') return 'medium';
+  
+  // Check for mobile devices
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+  
+  // Check for available memory (if available in the browser)
+  const lowMemory = (navigator as any).deviceMemory && (navigator as any).deviceMemory < 4;
+  
+  // Check for CPU cores
+  const lowCPU = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2;
+  
+  // Check for WebGL capabilities
+  let webGLSupport = 'high';
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) webGLSupport = 'low';
+    else {
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      if (debugInfo) {
+        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        if (renderer.includes('Intel')) webGLSupport = 'medium';
+      }
+    }
+  } catch (e) {
+    webGLSupport = 'low';
+  }
+  
+  // Determine capability level
+  if (isMobile && (lowMemory || lowCPU || webGLSupport === 'low')) {
+    return 'low';
+  } else if (
+    (navigator as any).deviceMemory &&
+    (navigator as any).deviceMemory >= 8 &&
+    navigator.hardwareConcurrency &&
+    navigator.hardwareConcurrency >= 8 &&
+    webGLSupport === 'high'
+  ) {
+    return 'high';
+  }
+  
+  return 'medium';
+}

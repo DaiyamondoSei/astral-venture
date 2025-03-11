@@ -1,141 +1,102 @@
 
 /**
- * Result Type - Represents either a successful result with a value or a failed result with an error
+ * Type-safe Result pattern implementation
+ * 
+ * The Result pattern provides a consistent way to handle operations
+ * that can succeed or fail, avoiding exceptions for expected failures.
  */
 
-export type Success<T> = {
+// Success result type
+export interface Success<T> {
   type: 'success';
   value: T;
-};
+}
 
-export type Failure<E> = {
+// Failure result type
+export interface Failure<E> {
   type: 'failure';
   error: E;
-};
+}
 
-export type Result<T, E> = Success<T> | Failure<E>;
+// Combined Result type
+export type Result<T, E = Error> = Success<T> | Failure<E>;
 
 /**
- * Creates a success result
- * @param value The value to wrap in a success result
- * @returns A Success result containing the value
+ * Create a success result
  */
 export function success<T>(value: T): Success<T> {
-  return {
-    type: 'success',
-    value
-  };
+  return { type: 'success', value };
 }
 
 /**
- * Creates a failure result
- * @param error The error to wrap in a failure result
- * @returns A Failure result containing the error
+ * Create a failure result
  */
 export function failure<E>(error: E): Failure<E> {
-  return {
-    type: 'failure',
-    error
-  };
+  return { type: 'failure', error };
 }
 
 /**
- * Maps the success value of a Result
- * @param result The Result to map
- * @param fn The function to apply to the success value
- * @returns A new Result with the mapped success value
+ * Check if result is success
+ */
+export function isSuccess<T, E>(result: Result<T, E>): result is Success<T> {
+  return result.type === 'success';
+}
+
+/**
+ * Check if result is failure
+ */
+export function isFailure<T, E>(result: Result<T, E>): result is Failure<E> {
+  return result.type === 'failure';
+}
+
+/**
+ * Map success value to a new value
  */
 export function map<T, U, E>(
   result: Result<T, E>,
-  fn: (value: T) => U
+  mapFn: (value: T) => U
 ): Result<U, E> {
-  if (result.type === 'success') {
-    return success(fn(result.value));
+  if (isSuccess(result)) {
+    return success(mapFn(result.value));
   }
   return result;
 }
 
 /**
- * Maps the error of a Result
- * @param result The Result to map
- * @param fn The function to apply to the error
- * @returns A new Result with the mapped error
+ * Handle both success and failure cases
  */
-export function mapError<T, E, F>(
-  result: Result<T, E>,
-  fn: (error: E) => F
-): Result<T, F> {
-  if (result.type === 'failure') {
-    return failure(fn(result.error));
-  }
-  return result as Result<T, F>;
-}
-
-/**
- * Flat maps the success value of a Result
- * @param result The Result to flat map
- * @param fn The function to apply to the success value that returns a new Result
- * @returns A new Result with the flat mapped success value
- */
-export function flatMap<T, U, E>(
-  result: Result<T, E>,
-  fn: (value: T) => Result<U, E>
-): Result<U, E> {
-  if (result.type === 'success') {
-    return fn(result.value);
-  }
-  return result;
-}
-
-/**
- * Folds a Result into a single value
- * @param result The Result to fold
- * @param onSuccess The function to apply to the success value
- * @param onFailure The function to apply to the failure value
- * @returns The folded value
- */
-export function fold<T, E, U>(
+export function match<T, E, U>(
   result: Result<T, E>,
   onSuccess: (value: T) => U,
   onFailure: (error: E) => U
 ): U {
-  if (result.type === 'success') {
+  if (isSuccess(result)) {
     return onSuccess(result.value);
-  } else {
-    return onFailure(result.error);
+  }
+  return onFailure(result.error);
+}
+
+/**
+ * Try to execute a function that might throw, and convert to Result
+ */
+export function tryResult<T>(fn: () => T): Result<T, Error> {
+  try {
+    return success(fn());
+  } catch (error) {
+    return failure(error instanceof Error ? error : new Error(String(error)));
   }
 }
 
 /**
- * Recovers from a failure by producing a new value
- * @param result The Result to recover from
- * @param fn The function to apply to the error to produce a new value
- * @returns A new Success result with the recovered value
+ * Try to execute an async function that might throw, and convert to Result
  */
-export function recover<T, E>(
-  result: Result<T, E>,
-  fn: (error: E) => T
-): Success<T> {
-  if (result.type === 'success') {
-    return result;
+export async function tryResultAsync<T>(
+  fn: () => Promise<T>
+): Promise<Result<T, Error>> {
+  try {
+    const value = await fn();
+    return success(value);
+  } catch (error) {
+    return failure(error instanceof Error ? error : new Error(String(error)));
   }
-  return success(fn(result.error));
-}
-
-/**
- * Converts a function that may throw to one that returns a Result
- * @param fn The function to convert
- * @returns A function that returns a Result
- */
-export function resultify<T extends any[], R, E = Error>(
-  fn: (...args: T) => R
-): (...args: T) => Result<R, E> {
-  return (...args: T): Result<R, E> => {
-    try {
-      const result = fn(...args);
-      return success(result);
-    } catch (error) {
-      return failure(error as E);
-    }
-  };
 }

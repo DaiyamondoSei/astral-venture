@@ -1,24 +1,63 @@
 
-import { ValidationResult, ValidationError, ValidatorFn } from './types';
+/**
+ * Validation Utilities
+ * 
+ * Type-safe validation utilities for runtime type checking.
+ */
+
+// Validation result type
+export interface ValidationResult {
+  valid: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+  errors?: ValidationErrorDetail[];
+}
+
+// Validation error detail
+export interface ValidationErrorDetail {
+  path: string;
+  message: string;
+  code: string;
+}
+
+// Type guard function type
+export type TypeGuardFunction<T> = (value: unknown) => value is T;
 
 /**
- * Combines multiple validators into a single validator
+ * Creates a validation result
  */
-export function combineValidators<T>(validators: ValidatorFn<T>[]): ValidatorFn<T> {
-  return (value: unknown): ValidationResult => {
-    const errors: ValidationError[] = [];
-    
-    for (const validator of validators) {
-      const result = validator(value);
-      if (!result.valid && result.errors) {
-        errors.push(...result.errors);
-      }
+export function createValidationResult(
+  valid: boolean,
+  errorCode?: string,
+  errorMessage?: string,
+  errors?: ValidationErrorDetail[]
+): ValidationResult {
+  return {
+    valid,
+    errorCode,
+    errorMessage,
+    errors
+  };
+}
+
+/**
+ * Required field validator
+ */
+export function required(field: string): (value: unknown) => ValidationResult {
+  return (value: unknown) => {
+    if (value === undefined || value === null) {
+      return {
+        valid: false,
+        errorCode: 'REQUIRED',
+        errorMessage: `${field} is required`,
+        errors: [{
+          path: field,
+          message: 'This field is required',
+          code: 'REQUIRED'
+        }]
+      };
     }
-    
-    return {
-      valid: errors.length === 0,
-      errors: errors.length > 0 ? errors : undefined
-    };
+    return { valid: true };
   };
 }
 
@@ -26,40 +65,104 @@ export function combineValidators<T>(validators: ValidatorFn<T>[]): ValidatorFn<
  * Creates a type guard validator
  */
 export function createTypeGuard<T>(
-  guard: (value: unknown) => value is T,
+  guard: TypeGuardFunction<T>,
   errorCode: string,
   errorMessage: string
-): ValidatorFn<T> {
-  return (value: unknown): ValidationResult => {
-    if (guard(value)) {
-      return { valid: true };
-    }
-    
-    return {
-      valid: false,
-      errors: [{
-        code: errorCode,
-        message: errorMessage,
-      }]
-    };
-  };
-}
-
-/**
- * Validates that a value is defined
- */
-export function required(fieldName: string): ValidatorFn<unknown> {
-  return (value: unknown): ValidationResult => {
-    if (value === undefined || value === null) {
+): (value: unknown) => ValidationResult {
+  return (value: unknown) => {
+    if (!guard(value)) {
       return {
         valid: false,
+        errorCode,
+        errorMessage,
         errors: [{
-          code: 'REQUIRED',
-          message: `${fieldName} is required`,
-          path: fieldName
+          path: '',
+          message: errorMessage,
+          code: errorCode
         }]
       };
     }
     return { valid: true };
   };
+}
+
+/**
+ * Combines multiple validators
+ */
+export function combineValidators(
+  validators: Array<(value: unknown) => ValidationResult>
+): (value: unknown) => ValidationResult {
+  return (value: unknown) => {
+    for (const validator of validators) {
+      const result = validator(value);
+      if (!result.valid) {
+        return result;
+      }
+    }
+    return { valid: true };
+  };
+}
+
+/**
+ * Runtime type validation for strings
+ */
+export function validateString(value: unknown, fieldName = 'value'): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} must be a string, got ${typeof value}`);
+  }
+  return value;
+}
+
+/**
+ * Runtime type validation for numbers
+ */
+export function validateNumber(value: unknown, fieldName = 'value'): number {
+  if (typeof value !== 'number' || isNaN(value)) {
+    throw new Error(`${fieldName} must be a number, got ${typeof value}`);
+  }
+  return value;
+}
+
+/**
+ * Runtime type validation for booleans
+ */
+export function validateBoolean(value: unknown, fieldName = 'value'): boolean {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${fieldName} must be a boolean, got ${typeof value}`);
+  }
+  return value;
+}
+
+/**
+ * Runtime type validation for objects
+ */
+export function validateObject(value: unknown, fieldName = 'value'): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error(`${fieldName} must be an object, got ${value === null ? 'null' : typeof value}`);
+  }
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Runtime type validation for arrays
+ */
+export function validateArray(value: unknown, fieldName = 'value'): unknown[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${fieldName} must be an array, got ${typeof value}`);
+  }
+  return value;
+}
+
+/**
+ * Runtime type validation for optional values
+ */
+export function validateOptional<T>(
+  value: unknown, 
+  validator: (v: unknown) => T, 
+  fieldName = 'value'
+): T | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return validator(value);
 }

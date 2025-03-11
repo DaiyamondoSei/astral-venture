@@ -14,7 +14,6 @@ import {
   WebVitalCategory,
   MetricType,
   PerformanceMetric,
-  DeviceInfo
 } from './types';
 
 /**
@@ -238,10 +237,10 @@ class PerformanceMonitor {
     if (!this.isEnabled || !this.config.metricsEnabled) return;
 
     // Normalize web vital name
-    const normalizedName = name.toLowerCase() as WebVitalName;
+    const normalizedName = name.toLowerCase();
     
     const webVital: WebVitalMetric = {
-      name: normalizedName as WebVitalName,
+      name: normalizedName,
       value,
       category,
       timestamp: Date.now()
@@ -362,10 +361,8 @@ class PerformanceMonitor {
       // Convert component metrics to reportable format
       this.componentMetrics.forEach((metric) => {
         metrics.push({
-          componentName: metric.componentName,
-          component_name: metric.componentName, // For backward compatibility
-          metricName: 'renderTime',
-          metric_name: 'renderTime', // For backward compatibility
+          component_name: metric.componentName,
+          metric_name: 'renderTime',
           value: metric.averageRenderTime,
           timestamp: Date.now(),
           category: 'component',
@@ -373,10 +370,8 @@ class PerformanceMonitor {
         });
         
         metrics.push({
-          componentName: metric.componentName,
-          component_name: metric.componentName, // For backward compatibility
-          metricName: 'renderCount',
-          metric_name: 'renderCount', // For backward compatibility
+          component_name: metric.componentName,
+          metric_name: 'renderCount',
           value: metric.renderCount,
           timestamp: Date.now(),
           category: 'component',
@@ -385,9 +380,7 @@ class PerformanceMonitor {
         
         if (metric.slowRenderCount) {
           metrics.push({
-            componentName: metric.componentName,
             component_name: metric.componentName,
-            metricName: 'slowRenderCount',
             metric_name: 'slowRenderCount',
             value: metric.slowRenderCount,
             timestamp: Date.now(),
@@ -400,8 +393,7 @@ class PerformanceMonitor {
       // Add web vitals
       this.webVitals.forEach((vital) => {
         metrics.push({
-          metricName: vital.name,
-          metric_name: vital.name, // For backward compatibility
+          metric_name: vital.name,
           value: vital.value,
           timestamp: vital.timestamp,
           category: vital.category,

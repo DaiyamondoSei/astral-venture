@@ -1,43 +1,43 @@
+
 /**
  * Core Performance Monitoring Types
  * 
  * Foundational type definitions for the performance monitoring infrastructure.
+ * These types are used across the performance monitoring system.
  */
 
-// Device capability classification
-export type DeviceCapability = 'low' | 'medium' | 'high';
+// Re-export the base types from the central types.ts file
+import {
+  DeviceCapability,
+  PerformanceMode,
+  RenderFrequency,
+  MetricType,
+  WebVitalName,
+  WebVitalCategory,
+  PerformanceMetric,
+  ComponentMetrics,
+  PerformanceMonitorConfig,
+  QualityLevel,
+  PerformanceSettings,
+  PerformanceBoundaries,
+  AdaptiveSettings
+} from '../types';
 
-// Performance mode settings
-export type PerformanceMode = 'quality' | 'balanced' | 'performance';
-
-// Quality level for adaptive rendering
-export interface QualityLevel {
-  level: number;
-  name: string;
-  description: string;
-  particleCount: number;
-  effectsEnabled: boolean;
-  animationComplexity: number;
-  geometryDetail: number;
-  textureResolution: number;
-}
-
-// Performance category boundaries
-export interface PerformanceBoundaries {
-  lowFPS: number;
-  mediumFPS: number;
-  highFPS: number;
-  criticalMemory: number;
-  highMemory: number;
-  mediumMemory: number;
-}
-
-// Types of metrics to track
-export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network' | 'resource' | 'javascript' | 'css' | 'animation' | 'metric' | 'summary' | 'performance' | 'webVital';
-
-// Web vital metrics
-export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 'responsiveness';
+export {
+  DeviceCapability,
+  PerformanceMode,
+  RenderFrequency,
+  MetricType,
+  WebVitalName,
+  WebVitalCategory,
+  PerformanceMetric,
+  ComponentMetrics,
+  PerformanceMonitorConfig,
+  QualityLevel,
+  PerformanceSettings,
+  PerformanceBoundaries,
+  AdaptiveSettings
+};
 
 // Base metric interface
 export interface BaseMetric<T> {
@@ -45,30 +45,6 @@ export interface BaseMetric<T> {
   value: T;
   timestamp: number;
   metadata?: Record<string, unknown>;
-}
-
-// Component metrics structure
-export interface ComponentMetrics {
-  componentName: string;
-  renderCount: number;
-  totalRenderTime: number;
-  averageRenderTime: number;
-  lastRenderTime: number;
-  firstRenderTime?: number;
-  memoryUsage?: number;
-  renderSizes?: number[];
-  domSize?: {
-    width: number;
-    height: number;
-    elements?: number;
-  };
-  // Additional properties
-  slowRenderCount?: number;
-  renderTimes?: number[];
-  minRenderTime?: number;
-  maxRenderTime?: number;
-  lastUpdated?: number;
-  metricType?: string;
 }
 
 // Web vital metric structure
@@ -85,21 +61,6 @@ export interface WebVitalMetric extends BaseMetric<number> {
     navigationEntry?: string;
     eventEntry?: string;
   };
-}
-
-// General performance metric
-export interface PerformanceMetric {
-  component_name?: string;
-  metric_name: string;
-  value: number;
-  timestamp: string | number;
-  category: string;
-  type: MetricType;
-  user_id?: string;
-  session_id?: string;
-  page_url?: string;
-  metadata?: Record<string, any>;
-  rating?: 'good' | 'needs-improvement' | 'poor';
 }
 
 // Device information for metrics reporting
@@ -132,31 +93,4 @@ export interface PerformanceReportPayload {
   session?: string;
   metrics: PerformanceMetric[];
   device?: DeviceInfo;
-}
-
-// Performance monitor configuration
-export interface PerformanceMonitorConfig {
-  enabled: boolean;
-  metricsEnabled: boolean;
-  slowRenderThreshold: number;
-  samplingRate: number;
-  debugMode: boolean;
-  reportingEndpoint?: string;
-  
-  // Advanced configuration
-  optimizationLevel: 'auto' | 'low' | 'medium' | 'high';
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  
-  // Feature flags
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  
-  // Advanced features
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
 }

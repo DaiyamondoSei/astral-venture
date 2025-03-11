@@ -3,13 +3,19 @@
  * Enhanced Performance Configuration Hook
  */
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { DeviceCapability } from '../utils/performanceUtils';
+import { 
+  DeviceCapability, 
+  PerformanceMode,
+  AdaptiveSettings,
+  QualityLevel
+} from '../utils/performance/types';
 import { Result, success } from '../utils/result/Result';
+import { detectDeviceCapability } from '../utils/performanceUtils';
 
 // Enhanced performance configuration with adaptive rendering
 export interface PerfConfig {
   // Core settings
-  deviceCapability: 'low' | 'medium' | 'high';
+  deviceCapability: DeviceCapability;
   useManualCapability: boolean;
   disableAnimations: boolean;
   disableEffects: boolean;
@@ -273,57 +279,6 @@ export function usePerfConfig(initialConfig: Partial<PerfConfig> = {}) {
     getConfigSummary,
     exportConfig
   };
-}
-
-/**
- * Detect device capability based on hardware and browser features
- */
-function detectDeviceCapability(): 'low' | 'medium' | 'high' {
-  // Only run in browser environment
-  if (typeof window === 'undefined') return 'medium';
-  
-  // Check for mobile devices
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
-  );
-  
-  // Check for available memory (if available in the browser)
-  const lowMemory = (navigator as any).deviceMemory && (navigator as any).deviceMemory < 4;
-  
-  // Check for CPU cores
-  const lowCPU = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2;
-  
-  // Check for WebGL capabilities
-  let webGLSupport = 'high';
-  try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    if (!gl) webGLSupport = 'low';
-    else {
-      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-      if (debugInfo) {
-        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-        if (renderer.includes('Intel')) webGLSupport = 'medium';
-      }
-    }
-  } catch (e) {
-    webGLSupport = 'low';
-  }
-  
-  // Determine capability level
-  if (isMobile && (lowMemory || lowCPU || webGLSupport === 'low')) {
-    return 'low';
-  } else if (
-    (navigator as any).deviceMemory &&
-    (navigator as any).deviceMemory >= 8 &&
-    navigator.hardwareConcurrency &&
-    navigator.hardwareConcurrency >= 8 &&
-    webGLSupport === 'high'
-  ) {
-    return 'high';
-  }
-  
-  return 'medium';
 }
 
 export default usePerfConfig;

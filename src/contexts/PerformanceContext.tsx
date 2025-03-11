@@ -5,10 +5,33 @@
  * React context for performance monitoring and optimization.
  */
 import React, { createContext, useContext, useEffect, useState, useMemo, ReactNode } from 'react';
-import { metricsCollector } from '../utils/performance/collectors/MetricsCollector';
-import { detectDeviceCapability } from '../utils/performance/core/utils';
-import { DeviceCapability, PerformanceMonitorConfig } from '../utils/performance/core/types';
-import { DEFAULT_MONITOR_CONFIG } from '../utils/performance/core/constants';
+import { metricsCollector } from '@/utils/performance/metricsCollector';
+import { detectDeviceCapability } from '@/utils/performanceUtils';
+import { 
+  DeviceCapability,
+  PerformanceMonitorConfig,
+  MetricType
+} from '@/utils/performance/types';
+
+// Default monitor configuration
+export const DEFAULT_MONITOR_CONFIG: PerformanceMonitorConfig = {
+  enabled: true,
+  metricsEnabled: true,
+  slowRenderThreshold: 16, // 60fps threshold
+  samplingRate: 0.1, // Sample 10% of metrics by default
+  optimizationLevel: 'auto',
+  throttleInterval: 1000,
+  maxTrackedComponents: 50,
+  enablePerformanceTracking: true,
+  enableRenderTracking: true,
+  enableValidation: true,
+  enablePropTracking: false,
+  enableDebugLogging: false,
+  intelligentProfiling: false,
+  inactiveTabThrottling: true,
+  batchUpdates: true,
+  debugMode: false
+};
 
 // Context state
 interface PerformanceContextState {
@@ -95,7 +118,7 @@ export function PerformanceProvider({
       if (metricsCollector) {
         metricsCollector.setEnabled(newConfig.enabled && newConfig.metricsEnabled);
         if (typeof newConfig.throttleInterval === 'number') {
-          metricsCollector.setAutoFlushInterval(newConfig.throttleInterval);
+          metricsCollector.setThrottleInterval(newConfig.throttleInterval);
         }
       }
       
@@ -111,10 +134,11 @@ export function PerformanceProvider({
     metadata?: Record<string, any>
   ) => {
     if (config.enabled && config.enablePerformanceTracking) {
+      const type: MetricType = metricName.includes('render') ? 'render' : 'metric';
       metricsCollector.collect(
         metricName,
         value,
-        metricName.includes('render') ? 'render' : 'metric',
+        type,
         metadata,
         componentName
       );
