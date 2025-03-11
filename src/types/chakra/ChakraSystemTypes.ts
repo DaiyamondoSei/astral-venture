@@ -1,136 +1,156 @@
 
 /**
- * Chakra System Architecture
+ * Chakra System Types
  * 
- * Core type definitions for the chakra system that handles
- * chakra activation, energy levels, and quantum states.
+ * Type definitions for the chakra system architecture
  */
 
-// Base types
-export type ChakraId = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-export type ChakraName = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third' | 'crown';
-export type ChakraColor = string;
-export type ActivationLevel = 0 | 0.2 | 0.4 | 0.6 | 0.8 | 1;
+export type ChakraType = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
+export type EnergyLevel = 'dormant' | 'awakening' | 'active' | 'balanced' | 'heightened' | 'transcendent';
+export type ActivationMethod = 'meditation' | 'breathwork' | 'movement' | 'sound' | 'visualization' | 'intention';
 
-// Chakra activation state
-export interface ChakraActivationState {
-  id: ChakraId;
-  name: ChakraName;
-  active: boolean;
-  activationLevel: ActivationLevel;
-  blockages: number;
-  resonanceQuality: number;
-  lastActivated: number | null;
+/**
+ * Status of a specific chakra including energy levels and blockages
+ */
+export interface ChakraStatus {
+  type: ChakraType;
+  energyLevel: EnergyLevel;
+  activationPercentage: number;
+  blockagePercentage: number;
+  dominantElement?: string;
+  associatedEmotions?: string[];
+  lastActivated?: string; // ISO date string
 }
 
-// Energy system
-export interface EnergyLevel {
-  chakraId: ChakraId;
-  currentLevel: number;
-  maxLevel: number;
-  flowRate: number;
-  blockagePoints: number[];
-}
-
-// Balance metrics
+/**
+ * Balance metrics across the chakra system
+ */
 export interface BalanceMetrics {
-  overallBalance: number;
-  chakraBalanceRatios: Record<ChakraId, number>;
-  harmonicResonance: number;
-  stabilityIndex: number;
+  overallBalance: number; // 0-100
+  energyDistribution: Record<ChakraType, number>;
+  dominantChakra?: ChakraType;
+  weakestChakra?: ChakraType;
+  recommendedFocus?: ChakraType[];
 }
 
-// Resonance patterns
+/**
+ * Energy resonance patterns between chakras
+ */
 export interface ResonancePattern {
-  patternId: string;
-  affectedChakras: ChakraId[];
-  resonanceStrength: number;
-  harmonicWaveform: string;
-  activeCycles: number;
+  sourceChakra: ChakraType;
+  targetChakra: ChakraType;
+  resonanceStrength: number; // 0-100
+  resonanceType: 'harmonic' | 'dissonant' | 'neutral';
+  visualEffect?: string;
 }
 
-// Quantum state types
-export interface EntanglementPair {
-  primaryChakra: ChakraId;
-  secondaryChakra: ChakraId;
-  entanglementStrength: number;
-  synchronizationRate: number;
-}
-
+/**
+ * Quantum entanglement between chakras
+ */
 export interface EntanglementState {
-  activePairs: EntanglementPair[];
-  entanglementMatrix: number[][];
-  coherenceIndex: number;
+  entangledChakras: [ChakraType, ChakraType][];
+  entanglementStrength: number; // 0-100
+  synchronicity: number; // 0-100
+  coherenceField?: boolean;
 }
 
+/**
+ * Superposition states in the chakra system
+ */
 export interface SuperpositionState {
-  activeChakras: ChakraId[];
-  potentialStates: number;
+  activeChakras: ChakraType[];
+  potentialStates: Record<string, number>; // State name to probability
+  waveFunction: number; // 0-100
   collapseThreshold: number;
-  probabilityDistribution: number[];
 }
 
+/**
+ * Metrics for system coherence
+ */
 export interface CoherenceMetrics {
-  overallCoherence: number;
-  phaseSynchronization: number;
-  quantumResonance: number;
-  stabilityFactor: number;
+  overallCoherence: number; // 0-100
+  stabilityIndex: number; // 0-100
+  harmonicResonance: number; // 0-100
+  entropyLevel: number; // 0-100
 }
 
-// Performance and tracking
+/**
+ * Historical record of chakra activations
+ */
 export interface ActivationRecord {
-  timestamp: number;
-  chakraId: ChakraId;
-  activationLevel: ActivationLevel;
-  duration: number;
-  energyInput: number;
-  energyOutput: number;
+  timestamp: string; // ISO date string
+  chakra: ChakraType;
+  method: ActivationMethod;
+  duration: number; // seconds
+  intensity: number; // 0-100
+  peakEnergy: number; // 0-100
+  insights?: string[];
 }
 
+/**
+ * Metrics for tracking progression over time
+ */
 export interface ProgressionMetrics {
-  overallProgress: number;
-  chakraProgression: Record<ChakraId, number>;
-  milestones: Array<{id: string; achieved: boolean; timestamp?: number}>;
-  projectedGrowthRate: number;
+  historicalBalance: Record<string, number>; // date to balance
+  awakening: Record<ChakraType, number>; // 0-100
+  totalActivationTime: Record<ChakraType, number>; // seconds
+  milestones: string[];
 }
 
+/**
+ * System performance statistics
+ */
 export interface PerformanceStats {
-  activationLatency: number;
-  energyEfficiency: number;
-  resonanceQuality: number;
-  stateTransitionSmoothness: number;
+  energyEfficiency: number; // 0-100
+  recoveryRate: number; // 0-100
+  adaptabilityIndex: number; // 0-100
+  resistanceFactors: string[];
 }
 
-// Core chakra system interface
+/**
+ * Complete chakra system configuration
+ */
 export interface ChakraSystem {
   // Core chakra management
   chakras: {
-    activationStates: ChakraActivationState[];
-    energyLevels: EnergyLevel[];
+    activationStates: Record<ChakraType, ChakraStatus>;
+    energyLevels: Record<ChakraType, EnergyLevel>;
     balanceMetrics: BalanceMetrics;
     resonancePatterns: ResonancePattern[];
   };
 
-  // Advanced features
-  quantumStates: {
+  // Advanced quantum features
+  quantumStates?: {
     entanglement: EntanglementState;
     superposition: SuperpositionState;
     coherence: CoherenceMetrics;
   };
 
   // Performance & Tracking
-  metrics: {
+  metrics?: {
     activationHistory: ActivationRecord[];
     progressionPath: ProgressionMetrics;
     performanceStats: PerformanceStats;
   };
 }
 
-// Component props for the chakra system
+/**
+ * Component props for the ChakraSystem component
+ */
 export interface ChakraSystemProps {
-  system?: Partial<ChakraSystem>;
-  energyPoints: number;
-  activatedChakras?: number[];
-  onActivationChange?: (activatedChakras: number[]) => void;
-  className?: string;
+  // Core configuration
+  config?: Partial<ChakraSystem>;
+  
+  // Activation control
+  activeChakras?: ChakraType[];
+  
+  // Visualization options
+  showResonance?: boolean;
+  showQuantumEffects?: boolean;
+  detailLevel?: 'basic' | 'detailed' | 'advanced';
+  
+  // Events
+  onChakraActivation?: (chakra: ChakraType, level: EnergyLevel) => void;
+  onBalanceChange?: (metrics: BalanceMetrics) => void;
+  onQuantumEvent?: (event: string, data: any) => void;
 }

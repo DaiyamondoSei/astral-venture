@@ -1,127 +1,115 @@
 
 /**
- * Visual System Architecture
+ * Visual System Types
  * 
- * Core type definitions for the visualization system that handles
- * rendering, state management, and animations for cosmic visualizations.
+ * Type definitions for the visualization system architecture
  */
 
-// Rendering engine types
 export type RenderingEngine = 'svg' | 'canvas' | 'webgl';
+export type VisualStateLevel = 'inactive' | 'low' | 'medium' | 'high' | 'transcendent';
 
-// Performance settings types
-export interface PerformanceSettings {
-  adaptiveQuality: boolean;
-  performanceMetrics: boolean;
-  simplifiedForLowEnd: boolean;
-  webglFallback: boolean;
-  maxParticleCount: number;
-  animationFrameLimit: number;
-}
-
-// Visual state types for different consciousness levels
-export interface BaseVisualState {
+/**
+ * Visual state configuration with type-safe properties
+ */
+export interface VisualState {
   active: boolean;
   intensity: number;
-  transitionProgress: number;
-  colorPalette: string[];
+  level: VisualStateLevel;
+  transitionDuration: number;
+  particleCount?: number;
+  glowIntensity?: number;
+  colorPalette?: string[];
 }
 
-export interface TranscendenceState extends BaseVisualState {
-  waveAmplitude: number;
-  waveFrequency: number;
-  radianceLevel: number;
-}
-
-export interface InfinityState extends BaseVisualState {
-  dimensionDepth: number;
-  omnidirectionalFlow: boolean;
-  universalConnectivity: number;
-}
-
-export interface IlluminationState extends BaseVisualState {
-  glowIntensity: number;
-  rayCount: number;
-  pulseRate: number;
-}
-
-export interface FractalState extends BaseVisualState {
-  complexity: number;
-  iterations: number;
-  patternType: 'mandelbrot' | 'julia' | 'cosmic' | 'chakra';
-}
-
-export interface VisualStates {
-  transcendence: TranscendenceState;
-  infinity: InfinityState;
-  illumination: IlluminationState;
-  fractal: FractalState;
-}
-
-// Animation system types
-export type TransitionType = 'fade' | 'morph' | 'expand' | 'pulse' | 'quantum';
-
+/**
+ * Configuration for visual transitions
+ */
 export interface TransitionConfig {
-  type: TransitionType;
   duration: number;
-  easing: string;
-  delayBetweenElements?: number;
+  easing: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+  staggered: boolean;
+  staggerDelay?: number;
 }
 
-export interface ParticleConfig {
-  count: number;
-  size: number;
-  color: string;
-  speed: number;
-  lifespan: number;
-  blendMode: string;
-}
-
+/**
+ * Particle system configuration
+ */
 export interface ParticleSystem {
-  enabled: boolean;
-  configs: Record<string, ParticleConfig>;
-  adaptiveParticleReduction: boolean;
+  count: number;
+  size: number | [number, number]; // Fixed size or range
+  speed: number | [number, number]; // Fixed speed or range
+  lifespan: number | [number, number]; // Fixed lifespan or range
+  colors: string[];
+  blendMode?: string;
+  motionPattern?: 'random' | 'directed' | 'spiral' | 'quantum';
 }
 
-export interface GlowConfig {
-  intensity: number;
-  color: string;
-  radius: number;
-  pulseRate?: number;
-}
-
+/**
+ * Glow effects configuration
+ */
 export interface GlowSystem {
-  enabled: boolean;
-  configs: Record<string, GlowConfig>;
-  performanceOptimized: boolean;
+  intensity: number;
+  radius: number;
+  color: string;
+  pulsate: boolean;
+  pulsateFrequency?: number;
+  composite?: string;
 }
 
-// Animation system
-export interface AnimationSystem {
-  transitions: TransitionConfig;
-  particles: ParticleSystem;
-  glowEffects: GlowSystem;
+/**
+ * Performance metrics and adaptation settings
+ */
+export interface PerformanceSettings {
+  adaptiveQuality: boolean;
+  measurePerformance: boolean;
+  targetFrameRate: number;
+  dropQualityThreshold: number;
+  recoveryDelay: number;
 }
 
-// Main visualization system interface
+/**
+ * Complete visualization system configuration
+ */
 export interface VisualizationSystem {
-  // Core rendering layers
+  // Core rendering configuration
   renderingEngine: RenderingEngine;
   performanceSettings: PerformanceSettings;
   
   // Visual states
-  visualStates: VisualStates;
+  visualStates: {
+    transcendence: VisualState;
+    infinity: VisualState;
+    illumination: VisualState;
+    fractal: VisualState;
+  };
   
   // Animation system
-  animations: AnimationSystem;
+  animations: {
+    transitions: TransitionConfig;
+    particles: ParticleSystem;
+    glowEffects: GlowSystem;
+  };
 }
 
-// Component props for the visualization system
-export interface VisualizationProps {
-  system?: Partial<VisualizationSystem>;
-  energyPoints: number;
-  activatedChakras?: number[];
-  className?: string;
-  onVisualizationRendered?: () => void;
-  deviceCapability?: 'low' | 'medium' | 'high';
+/**
+ * Component props for the VisualSystem component
+ */
+export interface VisualSystemProps {
+  // Core configuration
+  config?: Partial<VisualizationSystem>;
+  
+  // Visual state control
+  activeStates?: string[];
+  backgroundIntensity?: string;
+  
+  // Appearance
+  showBackground?: boolean; 
+  showMetatronsCube?: boolean;
+  showParticles?: boolean;
+  
+  // Chakra-related
+  chakraActivations?: Record<string, number>;
+  
+  // Events
+  onStateChange?: (state: string, active: boolean) => void;
 }
