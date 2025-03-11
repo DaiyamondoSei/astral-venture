@@ -1,152 +1,235 @@
 
+/**
+ * Integrated Visual and Chakra System Component
+ * 
+ * This component combines chakra visualization with advanced visual effects,
+ * adapting to device performance capabilities.
+ */
 import React, { useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useIntegratedSystemState } from '@/hooks/useIntegratedSystemState';
-import type { ChakraType } from '@/types/chakra/ChakraSystemTypes';
-import { isSuccess } from '@/utils/result/Result';
+import { motion } from 'framer-motion';
+import { useIntegratedSystemState } from '../../hooks/useIntegratedSystemState';
+import { ChakraType } from '../../types/chakra/ChakraTypes';
+import QuantumParticles from '../effects/quantum-particles/QuantumParticles';
+import InteractiveEnergyField from '../effects/energy-field/InteractiveEnergyField';
+import { usePerfConfig } from '../../hooks/usePerfConfig';
 
-interface IntegratedSystemProps {
-  initialEngine?: 'svg' | 'canvas' | 'webgl';
-  chakraActivations?: Record<ChakraType, number>;
-  showQuantumEffects?: boolean;
-  adaptToPerformance?: boolean;
+export interface IntegratedSystemProps {
+  // Initial chakra activation values (0-1)
+  initialActivation?: Record<ChakraType, number>;
+  
+  // Visual style and behavior options
+  showParticles?: boolean;
+  showEnergyField?: boolean;
+  showChakraLabels?: boolean;
+  interactive?: boolean;
+  animationLevel?: 'minimal' | 'standard' | 'enhanced';
+  
+  // Size and layout
+  width?: number | string;
+  height?: number | string;
   className?: string;
+  style?: React.CSSProperties;
+  
+  // Event callbacks
+  onChakraActivated?: (chakra: ChakraType, level: number) => void;
+  onSystemStateChange?: (systemState: any) => void;
 }
 
-export const IntegratedSystem: React.FC<IntegratedSystemProps> = ({
-  initialEngine = 'svg',
-  chakraActivations = {},
-  showQuantumEffects = false,
-  adaptToPerformance = true,
-  className = ''
+/**
+ * IntegratedSystem component combining chakra and quantum visualizations
+ */
+const IntegratedSystem: React.FC<IntegratedSystemProps> = ({
+  initialActivation = {},
+  showParticles = true,
+  showEnergyField = true,
+  showChakraLabels = true,
+  interactive = true,
+  animationLevel = 'standard',
+  width = '100%',
+  height = '500px',
+  className = '',
+  style = {},
+  onChakraActivated,
+  onSystemStateChange
 }) => {
-  // Initialize integrated system state
-  const systemResult = useIntegratedSystemState({
-    initialVisualEngine: initialEngine,
-    chakraActivations,
-    enableQuantumEffects: showQuantumEffects,
-    adaptToPerformance
-  });
-
-  // Early return for failure case
-  if (!isSuccess(systemResult)) {
-    console.error('Failed to initialize integrated system:', systemResult.error);
-    return null;
-  }
-
+  // Get performance configuration
+  const { shouldUseSimplifiedUI } = usePerfConfig();
+  
+  // Initialize the integrated system state
   const {
+    chakraState,
     visualSystem,
-    chakraSystem,
-    renderingQuality,
-    synchronizeChakraToVisual
-  } = systemResult.value;
-
-  // Synchronize chakra and visual states
+    chakraColors,
+    systemActivity,
+    updateActivationLevels,
+    updateChakraVisualization,
+    isLowPerformance
+  } = useIntegratedSystemState({
+    initialChakraState: {
+      activationLevels: initialActivation
+    },
+    adaptToPerformance: true,
+    interactiveMode: interactive
+  });
+  
+  // Apply initial activation values
   useEffect(() => {
-    synchronizeChakraToVisual();
-  }, [chakraSystem.chakras.activationStates, synchronizeChakraToVisual]);
-
-  // Generate particle effect styles based on quality
-  const particleStyles = useMemo(() => ({
-    count: renderingQuality === 'low' ? 50 : renderingQuality === 'medium' ? 100 : 200,
-    blur: renderingQuality === 'low' ? '0px' : renderingQuality === 'medium' ? '1px' : '2px',
-    scale: renderingQuality === 'low' ? 0.8 : renderingQuality === 'medium' ? 1 : 1.2
-  }), [renderingQuality]);
-
+    if (Object.keys(initialActivation).length > 0) {
+      updateChakraVisualization(initialActivation);
+    }
+  }, [initialActivation, updateChakraVisualization]);
+  
+  // Notify parent component about system state changes
+  useEffect(() => {
+    onSystemStateChange?.(chakraState.systemState);
+  }, [chakraState.systemState, onSystemStateChange]);
+  
+  // Calculate particle configuration based on system state and performance
+  const particleConfig = useMemo(() => {
+    const baseCount = isLowPerformance ? 30 : (shouldUseSimplifiedUI ? 60 : 100);
+    
+    return {
+      count: Math.round(baseCount * (0.5 + systemActivity * 0.5)),
+      speed: 0.5 + systemActivity * 1.5,
+      size: 2 + systemActivity * 2,
+      opacity: 0.6 + systemActivity * 0.3,
+      colors: Object.values(chakraColors).length > 0 
+        ? Object.values(chakraColors) 
+        : ['#8b5cf6']
+    };
+  }, [isLowPerformance, shouldUseSimplifiedUI, systemActivity, chakraColors]);
+  
+  // Handle chakra interaction
+  const handleChakraInteraction = (chakra: ChakraType, level: number) => {
+    if (!interactive) return;
+    
+    // Update chakra activation level
+    updateActivationLevels({ [chakra]: level });
+    
+    // Notify parent component
+    onChakraActivated?.(chakra, level);
+  };
+  
+  // Handle energy field interaction
+  const handleEnergyFieldInteraction = (intensity: number, position: { x: number, y: number }) => {
+    if (!interactive) return;
+    
+    // Map position to chakra (simplified mapping based on vertical position)
+    const normalizedY = 1 - (position.y / (typeof height === 'number' ? height : 500));
+    
+    // Determine which chakra to activate based on vertical position
+    let targetChakra: ChakraType;
+    
+    if (normalizedY < 0.14) targetChakra = 'root';
+    else if (normalizedY < 0.28) targetChakra = 'sacral';
+    else if (normalizedY < 0.42) targetChakra = 'solar';
+    else if (normalizedY < 0.58) targetChakra = 'heart';
+    else if (normalizedY < 0.72) targetChakra = 'throat';
+    else if (normalizedY < 0.86) targetChakra = 'third';
+    else targetChakra = 'crown';
+    
+    // Update the targeted chakra with an intensity based on the interaction
+    const updatedLevel = Math.min(1, chakraState.activationLevels[targetChakra] + intensity * 0.2);
+    handleChakraInteraction(targetChakra, updatedLevel);
+  };
+  
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
-      {/* Background Layer */}
-      <motion.div
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1 }}
-      />
-
-      {/* Particle Effects Layer */}
-      <AnimatePresence>
-        {visualSystem.visualStates.transcendence.active && (
-          <motion.div
-            className="absolute inset-0 pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            {/* Particle effects here */}
-            <div 
-              className="absolute inset-0"
-              style={{
-                background: `radial-gradient(circle at 50% 50%, 
-                  rgba(138, 43, 226, 0.2), 
-                  rgba(0, 0, 0, 0)
-                )`,
-                filter: `blur(${particleStyles.blur})`
-              }}
-            />
-          </motion.div>
+    <motion.div 
+      className={`relative overflow-hidden rounded-lg ${className}`}
+      style={{ 
+        width, 
+        height, 
+        background: 'linear-gradient(to bottom, #1a1a2e, #16213e, #0f3460)',
+        ...style 
+      }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.8 }}
+    >
+      {/* Background effects */}
+      <div className="absolute inset-0 z-0">
+        {showParticles && systemActivity > 0.1 && (
+          <QuantumParticles
+            count={particleConfig.count}
+            speed={particleConfig.speed}
+            size={particleConfig.size}
+            opacity={particleConfig.opacity}
+            colors={particleConfig.colors}
+            interactive={interactive}
+          />
         )}
-      </AnimatePresence>
-
-      {/* Chakra Visualization Layer */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        {Object.entries(chakraSystem.chakras.activationStates).map(([chakra, status]) => (
-          <motion.div
-            key={chakra}
-            className="absolute"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ 
-              scale: status.activationPercentage > 0 ? 1 : 0.8,
-              opacity: status.activationPercentage / 100
-            }}
-            transition={{ duration: 0.5 }}
-          >
-            {/* Chakra visualization here */}
-            <div 
-              className={`rounded-full ${
-                status.activationPercentage > 80 ? 'bg-purple-500' :
-                status.activationPercentage > 60 ? 'bg-blue-500' :
-                status.activationPercentage > 40 ? 'bg-green-500' :
-                status.activationPercentage > 20 ? 'bg-yellow-500' :
-                'bg-gray-500'
-              }`}
-              style={{
-                width: `${Math.max(20, status.activationPercentage/2)}px`,
-                height: `${Math.max(20, status.activationPercentage/2)}px`,
-                filter: `blur(${particleStyles.blur})`,
-                transform: `scale(${particleStyles.scale})`
-              }}
-            />
-          </motion.div>
-        ))}
       </div>
-
-      {/* Quantum Effects Layer */}
-      {showQuantumEffects && chakraSystem.quantumStates && (
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Quantum visualization effects here */}
-          <motion.div
-            className="absolute inset-0"
-            animate={{
-              opacity: [0.3, 0.7, 0.3],
-              scale: [1, 1.1, 1]
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            style={{
-              background: `radial-gradient(circle at 50% 50%, 
-                rgba(0, 191, 255, 0.1), 
-                rgba(0, 0, 0, 0)
-              )`,
-              filter: `blur(${particleStyles.blur})`
-            }}
+      
+      {/* Interactive energy field */}
+      {showEnergyField && (
+        <div className="absolute inset-0 z-10">
+          <InteractiveEnergyField
+            intensity={systemActivity}
+            colors={Object.values(chakraColors)}
+            responsive={true}
+            interactive={interactive}
+            onInteraction={handleEnergyFieldInteraction}
           />
         </div>
       )}
-    </div>
+      
+      {/* Chakra visualization */}
+      <div className="absolute inset-0 z-20 flex items-center justify-center">
+        <div className="h-full flex flex-col justify-between py-8">
+          {/* Render chakra points from top (crown) to bottom (root) */}
+          {['crown', 'third', 'throat', 'heart', 'solar', 'sacral', 'root'].map((chakra) => {
+            const chakraType = chakra as ChakraType;
+            const activation = chakraState.activationLevels[chakraType] || 0;
+            const color = chakraColors[chakraType] || '#888';
+            
+            return (
+              <div key={chakra} className="flex items-center">
+                <motion.div
+                  className="rounded-full relative"
+                  style={{
+                    backgroundColor: color,
+                    boxShadow: activation > 0.3 ? `0 0 ${activation * 20}px ${color}` : 'none',
+                  }}
+                  animate={{
+                    width: 20 + activation * 20,
+                    height: 20 + activation * 20,
+                    opacity: 0.2 + activation * 0.8,
+                    scale: [1, 1 + activation * 0.1, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  onClick={() => interactive && handleChakraInteraction(
+                    chakraType,
+                    activation < 0.5 ? 0.8 : 0.2 // Toggle activation
+                  )}
+                />
+                
+                {showChakraLabels && (
+                  <div className="ml-4 text-white opacity-90">
+                    <div className="font-bold capitalize">{chakra}</div>
+                    <div className="text-xs opacity-70">
+                      {Math.round(activation * 100)}% active
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      
+      {/* Overlay for system metrics */}
+      {interactive && (
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 p-2 rounded text-xs text-white">
+          <div>Balance: {Math.round(chakraState.systemState.balance * 100)}%</div>
+          <div>Energy: {Math.round(chakraState.systemState.totalEnergy * 14)}%</div>
+          <div>Flow: {chakraState.energyFlow.direction}</div>
+        </div>
+      )}
+    </motion.div>
   );
 };
 

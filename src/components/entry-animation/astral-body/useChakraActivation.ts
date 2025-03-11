@@ -1,6 +1,16 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChakraActivation } from './ChakraPoints';
+
+/**
+ * Interface defining chakra activation options
+ */
+export interface ChakraActivationOptions {
+  userDream?: string | null;
+  dominantTheme?: string | null;
+  initialActivation?: Partial<ChakraActivation>;
+  deepAnalysisEnabled?: boolean;
+}
 
 /**
  * useChakraActivation Hook
@@ -140,4 +150,59 @@ export const useChakraActivation = (
   );
   
   return [chakras, activatedCount];
+};
+
+/**
+ * Advanced version of the hook with additional options and capabilities
+ */
+export const useAdvancedChakraActivation = (
+  options: ChakraActivationOptions
+): [ChakraActivation, number, (chakraKey: keyof ChakraActivation, active: boolean) => void] => {
+  const { userDream, dominantTheme, initialActivation, deepAnalysisEnabled = false } = options;
+  
+  // Initialize with any provided initial activations
+  const initialState: ChakraActivation = { 
+    root: initialActivation?.root || false, 
+    sacral: initialActivation?.sacral || false, 
+    solar: initialActivation?.solar || false, 
+    heart: initialActivation?.heart || false, 
+    throat: initialActivation?.throat || false, 
+    third: initialActivation?.third || false,
+    crown: initialActivation?.crown || false 
+  };
+  
+  const [chakras, setChakras] = useState<ChakraActivation>(initialState);
+  
+  // Use the base hook for initial analysis
+  const [analysisResult, baseActivatedCount] = useChakraActivation(userDream, dominantTheme);
+  
+  // Merge the analysis result with the current state
+  useEffect(() => {
+    if (userDream || dominantTheme) {
+      setChakras(current => ({
+        ...current,
+        ...analysisResult
+      }));
+    }
+  }, [analysisResult, userDream, dominantTheme]);
+  
+  // Provide a function to manually update specific chakras
+  const updateChakraState = useCallback((
+    chakraKey: keyof ChakraActivation, 
+    active: boolean
+  ) => {
+    setChakras(current => ({
+      ...current,
+      [chakraKey]: active
+    }));
+  }, []);
+  
+  // Calculate activated count
+  const activatedCount = useMemo(() => 
+    Object.values(chakras).filter(Boolean).length,
+    [chakras]
+  );
+  
+  // Return state, count, and update function
+  return [chakras, activatedCount, updateChakraState];
 };

@@ -1,437 +1,466 @@
 
+/**
+ * Hook for managing the integrated visual and chakra systems
+ */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePerfConfig } from './usePerfConfig';
-import { Result, success, failure } from '../utils/result/Result';
-import { asyncResultify } from '../utils/result/AsyncResult';
-
-import type { 
+import { ChakraSystem, ChakraType } from '../types/chakra/ChakraTypes';
+import { 
   VisualizationSystem, 
-  VisualState, 
-  RenderingEngine 
+  ChakraVisualizationState,
+  VisualState
 } from '../types/visualization/VisualSystemTypes';
 
-import type {
-  ChakraSystem,
-  ChakraType,
-  EnergyLevel,
-  ChakraStatus
-} from '../types/chakra/ChakraSystemTypes';
+// Default states
+const DEFAULT_VISUAL_STATE: VisualState = {
+  active: false,
+  intensity: 0.5,
+  color: '#7c3aed',
+  opacity: 0.8,
+  scale: 1,
+  rotation: 0
+};
 
-// Default visual states
-const DEFAULT_VISUAL_STATES: Record<string, VisualState> = {
-  transcendence: {
-    active: false,
-    intensity: 0,
-    level: 'inactive',
-    transitionDuration: 1000,
-    glowIntensity: 0.7,
-    particleCount: 150,
-    colorPalette: ['#8A2BE2', '#9370DB', '#E6E6FA']
+const DEFAULT_VISUAL_SYSTEM: VisualizationSystem = {
+  visualStates: {
+    transcendence: { ...DEFAULT_VISUAL_STATE, color: '#8b5cf6' },
+    infinity: { ...DEFAULT_VISUAL_STATE, color: '#3b82f6' },
+    illumination: { ...DEFAULT_VISUAL_STATE, color: '#f59e0b' },
+    fractal: { ...DEFAULT_VISUAL_STATE, color: '#10b981' }
   },
-  infinity: {
-    active: false,
-    intensity: 0,
-    level: 'inactive',
-    transitionDuration: 1500,
-    glowIntensity: 0.9,
-    particleCount: 200,
-    colorPalette: ['#00BFFF', '#1E90FF', '#87CEFA']
+  renderingEngine: {
+    useWebGL: true,
+    useSVGOptimization: true,
+    useCanvasForEffects: true,
+    useOffscreenRendering: false,
+    useHardwareAcceleration: true
   },
-  illumination: {
-    active: false,
-    intensity: 0,
-    level: 'inactive',
-    transitionDuration: 800,
-    glowIntensity: 0.6,
+  performanceSettings: {
+    targetFPS: 60,
+    qualityLevel: 'high',
+    useSimplifiedEffects: false,
+    disableBlur: false,
+    disableShadows: false,
     particleCount: 100,
-    colorPalette: ['#FFD700', '#FFA500', '#FFFFE0']
+    maxAnimationsPerFrame: 20
   },
-  fractal: {
-    active: false,
-    intensity: 0,
-    level: 'inactive',
-    transitionDuration: 1200,
-    glowIntensity: 0.5,
-    particleCount: 120,
-    colorPalette: ['#32CD32', '#7CFC00', '#98FB98']
+  animations: {
+    primary: {
+      duration: 'normal',
+      timingFunction: 'ease-out',
+      transitionType: 'fade',
+      enableParallax: true,
+      enableStaggering: true,
+      staggerAmount: 0.05
+    },
+    secondary: {
+      duration: 'fast',
+      timingFunction: 'ease-in-out',
+      transitionType: 'pulse',
+      enableParallax: false,
+      enableStaggering: true,
+      staggerAmount: 0.02
+    },
+    background: {
+      duration: 'slow',
+      timingFunction: 'linear',
+      transitionType: 'fade',
+      enableParallax: true,
+      enableStaggering: false,
+      staggerAmount: 0
+    },
+    particles: {
+      count: 100,
+      size: 3,
+      speed: 1,
+      color: '#8b5cf6',
+      opacity: 0.6,
+      variability: 0.3
+    },
+    glow: {
+      radius: 20,
+      intensity: 0.7,
+      color: '#8b5cf6',
+      pulseRate: 0.5
+    }
   }
 };
 
-// Default chakra states
-const DEFAULT_CHAKRA_STATES: Record<ChakraType, ChakraStatus> = {
-  'root': {
-    type: 'root',
-    energyLevel: 'dormant',
-    activationPercentage: 0,
-    blockagePercentage: 0,
-    dominantElement: 'earth',
-    associatedEmotions: ['security', 'stability']
+// Empty chakra activation levels
+const EMPTY_ACTIVATION_LEVELS: Record<ChakraType, number> = {
+  root: 0,
+  sacral: 0,
+  solar: 0,
+  heart: 0,
+  throat: 0,
+  third: 0,
+  crown: 0
+};
+
+// Default chakra visualization state
+const DEFAULT_CHAKRA_VISUALIZATION: ChakraVisualizationState = {
+  activationLevels: EMPTY_ACTIVATION_LEVELS,
+  resonancePatterns: [],
+  energyFlow: {
+    direction: 'balanced',
+    flowRate: 0,
+    dominantChakra: null
   },
-  'sacral': {
-    type: 'sacral',
-    energyLevel: 'dormant',
-    activationPercentage: 0,
-    blockagePercentage: 0,
-    dominantElement: 'water',
-    associatedEmotions: ['creativity', 'passion']
-  },
-  'solar': {
-    type: 'solar',
-    energyLevel: 'dormant',
-    activationPercentage: 0,
-    blockagePercentage: 0,
-    dominantElement: 'fire',
-    associatedEmotions: ['confidence', 'power']
-  },
-  'heart': {
-    type: 'heart',
-    energyLevel: 'dormant',
-    activationPercentage: 0,
-    blockagePercentage: 0,
-    dominantElement: 'air',
-    associatedEmotions: ['love', 'compassion']
-  },
-  'throat': {
-    type: 'throat',
-    energyLevel: 'dormant',
-    activationPercentage: 0,
-    blockagePercentage: 0,
-    dominantElement: 'ether',
-    associatedEmotions: ['expression', 'truth']
-  },
-  'third-eye': {
-    type: 'third-eye',
-    energyLevel: 'dormant',
-    activationPercentage: 0,
-    blockagePercentage: 0,
-    dominantElement: 'light',
-    associatedEmotions: ['intuition', 'insight']
-  },
-  'crown': {
-    type: 'crown',
-    energyLevel: 'dormant',
-    activationPercentage: 0,
-    blockagePercentage: 0,
-    dominantElement: 'cosmic',
-    associatedEmotions: ['consciousness', 'connection']
+  systemState: {
+    balance: 0.5,
+    coherence: 0.5,
+    totalEnergy: 0,
+    harmonization: 0.5
   }
 };
 
-export interface IntegratedSystemOptions {
-  initialVisualEngine?: RenderingEngine;
+export interface UseIntegratedSystemOptions {
+  initialChakraState?: Partial<ChakraVisualizationState>;
+  initialVisualSystem?: Partial<VisualizationSystem>;
   adaptToPerformance?: boolean;
-  detailLevel?: 'low' | 'medium' | 'high';
-  trackPerformance?: boolean;
-  chakraActivations?: Record<ChakraType, number>;
-  enableQuantumEffects?: boolean;
-}
-
-export interface IntegratedSystemResult {
-  // Visual system state
-  visualSystem: VisualizationSystem;
-  updateVisualState: (stateName: string, updates: Partial<VisualState>) => void;
-  setActiveVisualStates: (stateNames: string[]) => void;
-  
-  // Chakra system state
-  chakraSystem: ChakraSystem;
-  updateChakraActivation: (chakra: ChakraType, activationPercentage: number) => void;
-  getChakraStatus: (chakra: ChakraType) => ChakraStatus;
-  
-  // Integration features
-  synchronizeChakraToVisual: (mapping?: Record<ChakraType, string>) => void;
-  adaptToDeviceCapability: () => void;
-  
-  // Performance
-  renderingQuality: 'low' | 'medium' | 'high';
-  isPerformanceConstrained: boolean;
-  
-  // Utility
-  resetSystem: () => void;
+  interactiveMode?: boolean;
 }
 
 /**
- * Hook for managing the integrated visual and chakra systems
- * 
- * Provides a unified interface for controlling both systems simultaneously,
- * with automatic performance optimization and type safety.
+ * Hook for integrating chakra and visual systems with performance adaptation
  */
-export function useIntegratedSystemState(
-  options: IntegratedSystemOptions = {}
-): Result<IntegratedSystemResult, Error> {
+export function useIntegratedSystemState(options: UseIntegratedSystemOptions = {}) {
   const {
-    initialVisualEngine = 'svg',
+    initialChakraState,
+    initialVisualSystem,
     adaptToPerformance = true,
-    detailLevel = 'medium',
-    trackPerformance = true,
-    chakraActivations = {},
-    enableQuantumEffects = false
+    interactiveMode = true
   } = options;
-
-  // Get performance configuration
-  const perfConfig = usePerfConfig();
-  const { deviceCapability, isLowPerformance, shouldUseSimplifiedUI } = perfConfig;
   
-  // Determine rendering quality based on performance
-  const renderingQuality = useMemo((): 'low' | 'medium' | 'high' => {
-    if (!adaptToPerformance) return detailLevel;
-    
-    if (isLowPerformance || shouldUseSimplifiedUI) {
-      return 'low';
-    } else if (deviceCapability === 'high' && detailLevel === 'high') {
-      return 'high';
-    }
-    
-    return 'medium';
-  }, [adaptToPerformance, detailLevel, isLowPerformance,
-      shouldUseSimplifiedUI, deviceCapability]);
-
-  // Initialize core state
+  // Access performance configuration
+  const perfConfig = usePerfConfig();
+  
+  // Initialize the chakra visualization state
+  const [chakraState, setChakraState] = useState<ChakraVisualizationState>({
+    ...DEFAULT_CHAKRA_VISUALIZATION,
+    ...initialChakraState
+  });
+  
+  // Initialize the visual system
   const [visualSystem, setVisualSystem] = useState<VisualizationSystem>({
-    renderingEngine: initialVisualEngine,
-    performanceSettings: {
-      adaptiveQuality: adaptToPerformance,
-      measurePerformance: trackPerformance,
-      targetFrameRate: 60,
-      dropQualityThreshold: 45,
-      recoveryDelay: 5000
-    },
-    visualStates: DEFAULT_VISUAL_STATES,
-    animations: {
-      transitions: {
-        duration: 1000,
-        easing: 'ease-out',
-        staggered: true,
-        staggerDelay: 100
-      },
-      particles: {
-        count: renderingQuality === 'low' ? 50 : renderingQuality === 'medium' ? 100 : 200,
-        size: [1, 3],
-        speed: [0.5, 2],
-        lifespan: [2000, 5000],
-        colors: ['#8A2BE2', '#00BFFF', '#FFD700'],
-        motionPattern: enableQuantumEffects ? 'quantum' : 'random'
-      },
-      glowEffects: {
-        intensity: renderingQuality === 'low' ? 0.3 : renderingQuality === 'medium' ? 0.6 : 0.9,
-        radius: renderingQuality === 'low' ? 10 : renderingQuality === 'medium' ? 20 : 30,
-        color: '#FFFFFF',
-        pulsate: true,
-        pulsateFrequency: 2000
+    ...DEFAULT_VISUAL_SYSTEM,
+    ...initialVisualSystem
+  });
+  
+  // Apply performance adaptations when device capability or config changes
+  useEffect(() => {
+    if (!adaptToPerformance) return;
+    
+    // Adapt visualizations based on performance capability
+    const adaptedSystem = { ...visualSystem };
+    
+    if (perfConfig.isLowPerformance) {
+      // Optimize for low-end devices
+      adaptedSystem.performanceSettings.qualityLevel = 'low';
+      adaptedSystem.performanceSettings.useSimplifiedEffects = true;
+      adaptedSystem.performanceSettings.disableBlur = true;
+      adaptedSystem.performanceSettings.disableShadows = true;
+      adaptedSystem.performanceSettings.particleCount = 20;
+      adaptedSystem.performanceSettings.maxAnimationsPerFrame = 5;
+      adaptedSystem.animations.particles.count = 20;
+      adaptedSystem.animations.primary.enableParallax = false;
+      adaptedSystem.animations.secondary.enableStaggering = false;
+      adaptedSystem.renderingEngine.useWebGL = false;
+      adaptedSystem.renderingEngine.useOffscreenRendering = false;
+      
+    } else if (perfConfig.isMediumPerformance) {
+      // Balanced settings for medium performance
+      adaptedSystem.performanceSettings.qualityLevel = 'medium';
+      adaptedSystem.performanceSettings.useSimplifiedEffects = false;
+      adaptedSystem.performanceSettings.disableBlur = false;
+      adaptedSystem.performanceSettings.disableShadows = false;
+      adaptedSystem.performanceSettings.particleCount = 50;
+      adaptedSystem.performanceSettings.maxAnimationsPerFrame = 10;
+      adaptedSystem.animations.particles.count = 50;
+      adaptedSystem.renderingEngine.useWebGL = true;
+      
+    } else if (perfConfig.isHighPerformance) {
+      // Full experience for high-end devices
+      adaptedSystem.performanceSettings.qualityLevel = 'high';
+      adaptedSystem.performanceSettings.particleCount = 150;
+      adaptedSystem.performanceSettings.maxAnimationsPerFrame = 30;
+      adaptedSystem.animations.particles.count = 150;
+      adaptedSystem.renderingEngine.useWebGL = true;
+      adaptedSystem.renderingEngine.useOffscreenRendering = true;
+    }
+    
+    // Update the system with adapted settings
+    setVisualSystem(adaptedSystem);
+    
+  }, [
+    perfConfig.isLowPerformance, 
+    perfConfig.isMediumPerformance, 
+    perfConfig.isHighPerformance,
+    adaptToPerformance,
+    visualSystem
+  ]);
+  
+  // Update chakra activation levels
+  const updateActivationLevels = useCallback((
+    newLevels: Partial<Record<ChakraType, number>>
+  ) => {
+    setChakraState(prev => ({
+      ...prev,
+      activationLevels: {
+        ...prev.activationLevels,
+        ...newLevels
+      }
+    }));
+  }, []);
+  
+  // Calculate resonance patterns between chakras
+  const calculateResonance = useCallback((
+    activationLevels: Record<ChakraType, number>
+  ) => {
+    const resonancePatterns = [];
+    const chakraTypes: ChakraType[] = ['root', 'sacral', 'solar', 'heart', 'throat', 'third', 'crown'];
+    
+    // Natural resonance pairs
+    const naturalPairs: Array<[ChakraType, ChakraType]> = [
+      ['root', 'crown'],
+      ['sacral', 'throat'],
+      ['solar', 'third'],
+      ['heart', 'heart'] // Heart resonates with itself
+    ];
+    
+    // Calculate resonance for natural pairs
+    for (const [source, target] of naturalPairs) {
+      const sourceLevel = activationLevels[source];
+      const targetLevel = activationLevels[target];
+      
+      if (sourceLevel > 0.3 && targetLevel > 0.3) {
+        const strength = Math.min(1, (sourceLevel + targetLevel) / 1.8);
+        resonancePatterns.push({
+          source,
+          target,
+          strength,
+          harmony: true
+        });
       }
     }
-  });
-
-  const [chakraSystem, setChakraSystem] = useState<ChakraSystem>({
-    chakras: {
-      activationStates: DEFAULT_CHAKRA_STATES,
-      energyLevels: Object.keys(DEFAULT_CHAKRA_STATES).reduce((acc, chakra) => ({
-        ...acc,
-        [chakra]: 'dormant'
-      }), {} as Record<ChakraType, EnergyLevel>),
-      balanceMetrics: {
-        overallBalance: 0,
-        energyDistribution: Object.keys(DEFAULT_CHAKRA_STATES).reduce((acc, chakra) => ({
-          ...acc,
-          [chakra]: 0
-        }), {} as Record<ChakraType, number>)
-      },
-      resonancePatterns: []
-    },
-    quantumStates: enableQuantumEffects ? {
-      entanglement: {
-        entangledChakras: [],
-        entanglementStrength: 0,
-        synchronicity: 0
-      },
-      superposition: {
-        activeChakras: [],
-        potentialStates: {},
-        waveFunction: 0,
-        collapseThreshold: 0.7
-      },
-      coherence: {
-        overallCoherence: 0,
-        stabilityIndex: 0,
-        harmonicResonance: 0,
-        entropyLevel: 0
+    
+    // Add some additional resonance based on energy levels
+    for (let i = 0; i < chakraTypes.length - 1; i++) {
+      const source = chakraTypes[i];
+      const target = chakraTypes[i + 1];
+      const sourceLevel = activationLevels[source];
+      const targetLevel = activationLevels[target];
+      
+      // Adjacent chakras often resonate
+      if (sourceLevel > 0.4 && targetLevel > 0.4) {
+        const strength = Math.min(1, (sourceLevel + targetLevel) / 2 - 0.2);
+        if (strength > 0.3) {
+          resonancePatterns.push({
+            source,
+            target,
+            strength,
+            harmony: Math.abs(sourceLevel - targetLevel) < 0.3 // Harmony if levels are close
+          });
+        }
       }
-    } : undefined,
-    metrics: trackPerformance ? {
-      activationHistory: [],
-      progressionPath: {
-        historicalBalance: {},
-        awakening: Object.keys(DEFAULT_CHAKRA_STATES).reduce((acc, chakra) => ({
-          ...acc,
-          [chakra]: 0
-        }), {} as Record<ChakraType, number>),
-        totalActivationTime: Object.keys(DEFAULT_CHAKRA_STATES).reduce((acc, chakra) => ({
-          ...acc,
-          [chakra]: 0
-        }), {} as Record<ChakraType, number>),
-        milestones: []
-      },
-      performanceStats: {
-        energyEfficiency: 100,
-        recoveryRate: 100,
-        adaptabilityIndex: 100,
-        resistanceFactors: []
-      }
-    } : undefined
-  });
-
-  // Update chakra activation
-  const updateChakraActivation = useCallback((
-    chakra: ChakraType,
-    activationPercentage: number
+    }
+    
+    return resonancePatterns;
+  }, []);
+  
+  // Calculate the overall system state
+  const calculateSystemState = useCallback((
+    activationLevels: Record<ChakraType, number>,
+    resonancePatterns: Array<any>
   ) => {
-    setChakraSystem(prev => {
-      const newActivationStates = {
-        ...prev.chakras.activationStates,
-        [chakra]: {
-          ...prev.chakras.activationStates[chakra],
-          activationPercentage,
-          energyLevel: activationPercentage > 80 ? 'transcendent' :
-                      activationPercentage > 60 ? 'heightened' :
-                      activationPercentage > 40 ? 'balanced' :
-                      activationPercentage > 20 ? 'active' :
-                      activationPercentage > 0 ? 'awakening' : 'dormant'
-        }
+    // Calculate total energy
+    const totalEnergy = Object.values(activationLevels).reduce((sum, level) => sum + level, 0);
+    
+    // Calculate balance (how evenly distributed the energy is)
+    const chakraCount = Object.keys(activationLevels).length;
+    const idealEnergyPerChakra = totalEnergy / chakraCount;
+    
+    const deviations = Object.values(activationLevels).map(level => 
+      Math.abs(level - idealEnergyPerChakra)
+    );
+    
+    const totalDeviation = deviations.reduce((sum, dev) => sum + dev, 0);
+    const maxPossibleDeviation = totalEnergy; // Worst case: all energy in one chakra
+    
+    // Higher value means better balance
+    const balance = 1 - (totalDeviation / maxPossibleDeviation || 0);
+    
+    // Calculate coherence based on resonance patterns
+    const harmonicResonances = resonancePatterns.filter(pattern => pattern.harmony);
+    const coherence = resonancePatterns.length > 0 
+      ? harmonicResonances.length / resonancePatterns.length 
+      : 0.5;
+    
+    // Calculate harmonization (combined metric)
+    const harmonization = (balance + coherence) / 2;
+    
+    return {
+      balance,
+      coherence,
+      totalEnergy,
+      harmonization
+    };
+  }, []);
+  
+  // Find the dominant chakra
+  const findDominantChakra = useCallback((
+    activationLevels: Record<ChakraType, number>
+  ): ChakraType | null => {
+    let dominant: ChakraType | null = null;
+    let maxLevel = 0;
+    
+    for (const [chakra, level] of Object.entries(activationLevels)) {
+      if (level > maxLevel) {
+        maxLevel = level;
+        dominant = chakra as ChakraType;
+      }
+    }
+    
+    // Only return a dominant chakra if its activation is significant
+    return maxLevel > 0.4 ? dominant : null;
+  }, []);
+  
+  // Determine energy flow direction
+  const determineFlowDirection = useCallback((
+    activationLevels: Record<ChakraType, number>
+  ): 'ascending' | 'descending' | 'balanced' => {
+    const lowerChakras = ['root', 'sacral', 'solar'];
+    const upperChakras = ['throat', 'third', 'crown'];
+    
+    const lowerTotal = lowerChakras.reduce((sum, chakra) => sum + activationLevels[chakra], 0);
+    const upperTotal = upperChakras.reduce((sum, chakra) => sum + activationLevels[chakra], 0);
+    const heartLevel = activationLevels.heart;
+    
+    // Calculate the difference as a percentage of total energy
+    const totalEnergy = lowerTotal + upperTotal + heartLevel;
+    if (totalEnergy < 0.5) return 'balanced'; // Not enough energy to determine
+    
+    const difference = (upperTotal - lowerTotal) / totalEnergy;
+    
+    if (difference > 0.2) return 'ascending';
+    if (difference < -0.2) return 'descending';
+    return 'balanced';
+  }, []);
+  
+  // Update the chakra visualization based on new activation levels
+  const updateChakraVisualization = useCallback((
+    activationLevels: Partial<Record<ChakraType, number>>
+  ) => {
+    setChakraState(prev => {
+      // Merge new activation levels
+      const updatedLevels = {
+        ...prev.activationLevels,
+        ...activationLevels
       };
-
+      
+      // Calculate resonance patterns
+      const resonancePatterns = calculateResonance(updatedLevels);
+      
+      // Find dominant chakra
+      const dominantChakra = findDominantChakra(updatedLevels);
+      
+      // Determine flow direction
+      const direction = determineFlowDirection(updatedLevels);
+      
+      // Calculate flow rate based on total energy
+      const totalEnergy = Object.values(updatedLevels).reduce((sum, level) => sum + level, 0);
+      const flowRate = totalEnergy / 7; // 7 chakras as denominator for normalization
+      
+      // Calculate system state
+      const systemState = calculateSystemState(updatedLevels, resonancePatterns);
+      
+      // Return updated state
       return {
-        ...prev,
-        chakras: {
-          ...prev.chakras,
-          activationStates: newActivationStates,
-          energyLevels: Object.keys(newActivationStates).reduce((acc, key) => ({
-            ...acc,
-            [key]: newActivationStates[key as ChakraType].energyLevel
-          }), {} as Record<ChakraType, EnergyLevel>)
-        }
+        activationLevels: updatedLevels,
+        resonancePatterns,
+        energyFlow: {
+          direction,
+          flowRate,
+          dominantChakra
+        },
+        systemState
       };
     });
-  }, []);
-
-  // Update visual state
+  }, [
+    calculateResonance,
+    calculateSystemState,
+    findDominantChakra,
+    determineFlowDirection
+  ]);
+  
+  // Update a specific visual state
   const updateVisualState = useCallback((
-    stateName: string,
+    stateKey: keyof VisualizationSystem['visualStates'],
     updates: Partial<VisualState>
   ) => {
     setVisualSystem(prev => ({
       ...prev,
       visualStates: {
         ...prev.visualStates,
-        [stateName]: {
-          ...prev.visualStates[stateName],
+        [stateKey]: {
+          ...prev.visualStates[stateKey],
           ...updates
         }
       }
     }));
   }, []);
-
-  // Set active visual states
-  const setActiveVisualStates = useCallback((stateNames: string[]) => {
-    setVisualSystem(prev => ({
-      ...prev,
-      visualStates: Object.keys(prev.visualStates).reduce((acc, key) => ({
-        ...acc,
-        [key]: {
-          ...prev.visualStates[key],
-          active: stateNames.includes(key)
-        }
-      }), prev.visualStates)
-    }));
-  }, []);
-
-  // Get chakra status
-  const getChakraStatus = useCallback((chakra: ChakraType): ChakraStatus => {
-    return chakraSystem.chakras.activationStates[chakra];
-  }, [chakraSystem.chakras.activationStates]);
-
-  // Synchronize chakra states to visual states
-  const synchronizeChakraToVisual = useCallback((
-    mapping: Record<ChakraType, string> = {
-      root: 'fractal',
-      sacral: 'illumination',
-      solar: 'infinity',
-      heart: 'transcendence',
-      throat: 'illumination',
-      'third-eye': 'infinity',
-      crown: 'transcendence'
-    }
+  
+  // Update performance settings
+  const updatePerformanceSettings = useCallback((
+    updates: Partial<VisualizationSystem['performanceSettings']>
   ) => {
-    const activeVisualStates = new Set<string>();
-    
-    Object.entries(chakraSystem.chakras.activationStates).forEach(([chakra, status]) => {
-      if (status.activationPercentage > 40) {
-        const visualState = mapping[chakra as ChakraType];
-        if (visualState) {
-          activeVisualStates.add(visualState);
-        }
-      }
-    });
-    
-    setActiveVisualStates(Array.from(activeVisualStates));
-  }, [chakraSystem.chakras.activationStates, setActiveVisualStates]);
-
-  // Adapt to device capability
-  const adaptToDeviceCapability = useCallback(() => {
-    if (!adaptToPerformance) return;
-
-    const quality = renderingQuality;
-    
     setVisualSystem(prev => ({
       ...prev,
-      animations: {
-        ...prev.animations,
-        particles: {
-          ...prev.animations.particles,
-          count: quality === 'low' ? 50 : quality === 'medium' ? 100 : 200,
-        },
-        glowEffects: {
-          ...prev.animations.glowEffects,
-          intensity: quality === 'low' ? 0.3 : quality === 'medium' ? 0.6 : 0.9,
-          radius: quality === 'low' ? 10 : quality === 'medium' ? 20 : 30
-        }
-      }
-    }));
-  }, [adaptToPerformance, renderingQuality]);
-
-  // Reset systems to default state
-  const resetSystem = useCallback(() => {
-    setVisualSystem(prev => ({
-      ...prev,
-      visualStates: DEFAULT_VISUAL_STATES
-    }));
-    
-    setChakraSystem(prev => ({
-      ...prev,
-      chakras: {
-        ...prev.chakras,
-        activationStates: DEFAULT_CHAKRA_STATES
+      performanceSettings: {
+        ...prev.performanceSettings,
+        ...updates
       }
     }));
   }, []);
-
-  // Initialize chakra activations from props
-  useEffect(() => {
-    Object.entries(chakraActivations).forEach(([chakra, activation]) => {
-      updateChakraActivation(chakra as ChakraType, activation);
-    });
-  }, [chakraActivations, updateChakraActivation]);
-
-  // Return success result with system state and methods
-  return success({
+  
+  // Derive colors for visualization based on active chakras
+  const chakraColors = useMemo(() => {
+    const colorMap: Record<ChakraType, string> = {
+      root: '#ff0000',
+      sacral: '#ff8c00',
+      solar: '#ffff00',
+      heart: '#00ff00',
+      throat: '#00bfff',
+      third: '#0000ff',
+      crown: '#8a2be2'
+    };
+    
+    // Calculate weighted color values based on activation levels
+    return Object.entries(chakraState.activationLevels).reduce((result, [chakra, level]) => {
+      if (level > 0.2) {
+        result[chakra as ChakraType] = colorMap[chakra as ChakraType];
+      }
+      return result;
+    }, {} as Record<ChakraType, string>);
+  }, [chakraState.activationLevels]);
+  
+  // Calculate overall system activity level for animations
+  const systemActivity = useMemo(() => {
+    const { totalEnergy, harmonization } = chakraState.systemState;
+    return (totalEnergy / 7) * 0.7 + harmonization * 0.3;
+  }, [chakraState.systemState]);
+  
+  return {
+    chakraState,
     visualSystem,
+    chakraColors,
+    systemActivity,
+    updateActivationLevels,
+    updateChakraVisualization,
     updateVisualState,
-    setActiveVisualStates,
-    chakraSystem,
-    updateChakraActivation,
-    getChakraStatus,
-    synchronizeChakraToVisual,
-    adaptToDeviceCapability,
-    renderingQuality,
-    isPerformanceConstrained: isLowPerformance || shouldUseSimplifiedUI,
-    resetSystem
-  });
+    updatePerformanceSettings,
+    isLowPerformance: perfConfig.isLowPerformance,
+    isMediumPerformance: perfConfig.isMediumPerformance,
+    isHighPerformance: perfConfig.isHighPerformance
+  };
 }

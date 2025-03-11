@@ -7,6 +7,9 @@ import PerformanceContext from '../contexts/PerformanceContext';
 import { Result, success, failure } from '../utils/result/Result';
 import { asyncResultify } from '../utils/result/AsyncResult';
 
+/**
+ * Comprehensive performance configuration interface
+ */
 export interface PerfConfig {
   // Core configuration
   enableMetricsCollection: boolean;
@@ -28,9 +31,12 @@ export interface PerfConfig {
   trackComponentSize: boolean;
   optimizeOffscreenRendering: boolean;
   batchStateUpdates: boolean;
-  intelligentResourceLoadingn: boolean;
+  intelligentResourceLoading: boolean;
 }
 
+/**
+ * Default performance configuration
+ */
 export const DEFAULT_PERF_CONFIG: PerfConfig = {
   enableMetricsCollection: true,
   enablePerformanceTracking: true,
@@ -44,11 +50,12 @@ export const DEFAULT_PERF_CONFIG: PerfConfig = {
   trackComponentSize: true,
   optimizeOffscreenRendering: true,
   batchStateUpdates: true,
-  intelligentResourceLoadingn: false
+  intelligentResourceLoading: false
 };
 
 /**
- * Detect device capability
+ * Detect device capability based on hardware and environment
+ * @returns The detected device capability
  */
 function detectDeviceCapability(): 'low' | 'medium' | 'high' {
   // Client-side detection
@@ -83,6 +90,7 @@ function detectDeviceCapability(): 'low' | 'medium' | 'high' {
 
 /**
  * Hook for accessing and updating performance configuration
+ * with device capability detection and derived properties
  */
 export function usePerfConfig() {
   const context = useContext(PerformanceContext);
