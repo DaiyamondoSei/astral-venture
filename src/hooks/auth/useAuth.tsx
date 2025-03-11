@@ -1,16 +1,25 @@
 
+/**
+ * Custom hook for accessing authentication context
+ * 
+ * Provides access to user authentication state and methods for login, logout, etc.
+ */
+
 import { useContext } from 'react';
-import AuthContext, { IAuthContext } from '@/contexts/AuthContext';
+import { AuthContext } from '@/contexts/AuthContext';
+import type { IAuthContext, UseAuthProps } from './types';
 
 /**
- * Hook for consuming the AuthContext throughout the application
+ * Custom hook for accessing authentication context
  * 
- * @returns The auth context containing user state and authentication methods
+ * @param options - Configuration options for authentication behavior
+ * @returns The authentication context with user state and authentication methods
+ * @throws Error if used outside an AuthProvider
  */
-export function useAuth(): IAuthContext {
+export function useAuth(options: UseAuthProps = {}): IAuthContext {
   const context = useContext(AuthContext);
   
-  if (context === null) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   

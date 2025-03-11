@@ -111,3 +111,37 @@ export async function getPerformanceSummary(
 ) {
   return callRpc('get_performance_summary', { timeframe });
 }
+
+/**
+ * Increments the user's energy points
+ * 
+ * @param userId The user ID to increment points for
+ * @param points The number of points to add
+ * @returns A promise that resolves to the new total after incrementing
+ */
+export async function incrementEnergyPoints(userId: string, points: number): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc('increment_points', {
+      row_id: userId,
+      points_to_add: points
+    });
+    
+    if (error) {
+      console.error('Error incrementing energy points:', error);
+      throw error;
+    }
+    
+    // Also record in history table for tracking
+    await supabase.from('energy_points_history').insert({
+      user_id: userId,
+      points_added: points,
+      new_total: data,
+      source: 'activity'
+    });
+    
+    return data;
+  } catch (err) {
+    console.error('Unexpected error incrementing energy points:', err);
+    throw err;
+  }
+}

@@ -1,63 +1,66 @@
 
-import React, { useEffect } from 'react';
-import { ProgressCircle } from './ProgressCircle';
-import { EntryAnimation } from './EntryAnimation';
-import { motion } from 'framer-motion';
-import { markStart, markEnd } from '@/utils/webVitalsMonitor';
+import React, { useEffect, useState } from 'react';
+import GlowEffect from './GlowEffect';
+import EntryAnimation from './EntryAnimation';
 
-export const LoadingScreen: React.FC<{ 
-  progress: number; 
-  message?: string; 
-  onComplete?: () => void; 
-  showAnimation?: boolean;
-}> = ({ 
-  progress, 
-  message = "Loading...", 
-  onComplete, 
-  showAnimation = true 
+const LoadingScreen: React.FC<{ onComplete?: () => void, progress?: number, message?: string, showAnimation?: boolean }> = ({ 
+  onComplete,
+  progress = 0,
+  message = "Loading...",
+  showAnimation = true
 }) => {
+  const [loadingProgress, setLoadingProgress] = useState(progress);
+  
+  // Simulate loading progress
   useEffect(() => {
-    // Mark load start
-    markStart('app_loading');
+    const interval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          onComplete && onComplete();
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 150);
     
-    // When progress reaches 100, mark load completion and call onComplete
-    if (progress >= 100 && onComplete) {
-      markEnd('app_loading', 'navigation');
-      const timer = setTimeout(() => {
-        onComplete();
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [progress, onComplete]);
-
+    // Performance mark for loading start
+    performance.mark("loading-screen:start");
+    
+    return () => {
+      clearInterval(interval);
+      // Performance mark for loading end
+      performance.mark("loading-screen:end");
+      performance.measure("loading-screen", "loading-screen:start", "loading-screen:end");
+    };
+  }, [onComplete]);
+  
+  // Render loading animation
   return (
-    <motion.div 
-      className="fixed inset-0 bg-background flex flex-col items-center justify-center z-50"
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      {showAnimation ? (
-        <div className="w-full max-w-xl">
-          <EntryAnimation />
+    <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center">
+      <div className="text-center">
+        {showAnimation ? (
+          <EntryAnimation initialState="orb" />
+        ) : (
+          <GlowEffect className="w-20 h-20 rounded-full bg-quantum-500" animation="pulse" />
+        )}
+        
+        <div className="mt-8 relative w-64 h-1 bg-gray-800 rounded-full overflow-hidden">
+          <div 
+            className="absolute top-0 left-0 h-full bg-quantum-500 transition-all duration-300"
+            style={{ width: `${loadingProgress}%` }}
+          />
         </div>
-      ) : (
-        <div className="w-24 h-24 mb-8">
-          <ProgressCircle progress={progress} />
-        </div>
-      )}
-      
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="mt-8 text-center"
-      >
-        <h2 className="text-2xl font-light mb-2">{message}</h2>
-        <p className="text-muted-foreground">{progress.toFixed(0)}% complete</p>
-      </motion.div>
-    </motion.div>
+        
+        <p className="mt-4 text-quantum-100 animate-pulse">
+          {message}
+        </p>
+        
+        <p className="text-sm text-quantum-300 mt-2">
+          {loadingProgress}%
+        </p>
+      </div>
+    </div>
   );
 };
 

@@ -5,10 +5,10 @@
  * @deprecated Use the singleton client from '@/lib/supabaseClient' instead
  */
 
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, incrementEnergyPoints } from '@/lib/supabaseClient';
 
-// Export the singleton instance
-export { supabase };
+// Export the singleton instance and helper functions
+export { supabase, incrementEnergyPoints };
 
 // Add deprecation warning in development
 if (process.env.NODE_ENV === 'development') {

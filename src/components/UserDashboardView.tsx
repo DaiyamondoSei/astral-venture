@@ -1,143 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import UserDashboardCards from '@/components/UserDashboardCards';
-import MainContent from '@/components/MainContent';
-import ChakraActivationManager from '@/components/ChakraActivationManager';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import UserStats from '@/components/dashboard/UserStats';
-import { useLogout } from '@/hooks/useLogout';
-import SacredHomePage from '@/components/home/SacredHomePage';
-import { toast } from '@/components/ui/use-toast';
-import ErrorBoundary from '@/components/ErrorBoundary';
+import React from 'react';
+import Layout from '@/components/Layout';
+import UserProfilePanel from '@/components/panels/UserProfilePanel';
+import AchievementsPanel from '@/components/panels/AchievementsPanel';
+import ReflectionsPanel from '@/components/panels/ReflectionsPanel';
+import LogoutButton from '@/components/LogoutButton';
+import { useAuth } from '@/hooks/auth/useAuth';
 
 interface UserDashboardViewProps {
-  user: any;
-  userProfile: any;
-  todayChallenge: any;
-  userStreak: { current: number; longest: number };
-  activatedChakras: number[];
-  onLogout?: () => void;
-  updateStreak: (newStreak: number) => Promise<number | undefined>;
-  updateActivatedChakras: (newActivatedChakras: number[]) => void;
-  updateUserProfile: (newData: any) => void;
-  onChallengeComplete: (pointsEarned: number) => void;
+  onLogout: () => void;
 }
 
-const UserDashboardView: React.FC<UserDashboardViewProps> = ({
-  user,
-  userProfile,
-  todayChallenge,
-  userStreak = { current: 0, longest: 0 },
-  activatedChakras = [],
-  onLogout,
-  updateStreak,
-  updateActivatedChakras,
-  updateUserProfile,
-  onChallengeComplete
-}) => {
-  const { handleLogout } = useLogout(user?.id);
-  const [activeView, setActiveView] = useState<'sacred-home' | 'traditional'>('sacred-home');
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  
-  useEffect(() => {
-    console.log("UserDashboardView mounted with:", {
-      userExists: !!user,
-      userProfileExists: !!userProfile,
-      userId: user?.id,
-      activatedChakras,
-      userStreak,
-      activeView
-    });
-    
-    if (user && !userProfile) {
-      toast({
-        title: "Profile data unavailable",
-        description: "Unable to load your profile data. Please try refreshing the page.",
-        variant: "destructive"
-      });
-    }
-  }, [user, userProfile, activatedChakras, userStreak, activeView]);
-  
-  const logoutHandler = onLogout || handleLogout;
-  
-  const handleNodeSelect = (nodeId: string) => {
-    console.log("Node selected:", nodeId);
-    setSelectedNode(nodeId);
-    
-    if (nodeId === 'chakras') {
-      setActiveView('traditional');
-    }
-  };
+const UserDashboardView: React.FC<UserDashboardViewProps> = ({ onLogout }) => {
+  const { logout } = useAuth();
 
-  const safeUserStreak = userStreak || { current: 0, longest: 0 };
-  const safeActivatedChakras = activatedChakras || [];
-  const safeUserProfile = userProfile || (user ? {
-    username: user.email?.split('@')[0] || 'Seeker',
-    astral_level: 1,
-    energy_points: 0
-  } : null);
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center p-8 bg-black/30 rounded-lg">
-          <h2 className="text-2xl mb-4">User data not available</h2>
-          <p>Please try logging in again</p>
-          <button
-            onClick={logoutHandler}
-            className="mt-4 px-4 py-2 bg-primary rounded-md"
-          >
-            Return to Login
-          </button>
-        </div>
-      </div>
-    );
+  // Fix for line 37 where handleLogout is called with an argument but expects none
+  const handleUserLogout = async () => {
+    await logout();
   }
 
   return (
-    <ErrorBoundary>
-      {activeView === 'sacred-home' ? (
-        <SacredHomePage
-          user={user}
-          userProfile={safeUserProfile}
-          userStreak={safeUserStreak}
-          activatedChakras={safeActivatedChakras}
-          onLogout={logoutHandler}
-          onNodeSelect={handleNodeSelect}
-        />
-      ) : (
-        <DashboardLayout
-          username={safeUserProfile?.username || user?.email?.split('@')[0] || 'Seeker'}
-          astralLevel={safeUserProfile?.astral_level || 1}
-          onLogout={logoutHandler}
-        >
-          <UserStats
-            energyPoints={safeUserProfile?.energy_points || 0}
-            streakDays={safeUserStreak.current}
-            activatedChakras={safeActivatedChakras}
-          />
-          
-          <ChakraActivationManager 
-            userId={user.id}
-            userStreak={safeUserStreak}
-            activatedChakras={safeActivatedChakras}
-            updateStreak={updateStreak}
-            updateActivatedChakras={updateActivatedChakras}
-            updateUserProfile={updateUserProfile}
-          />
-          
-          <UserDashboardCards 
-            energyPoints={safeUserProfile?.energy_points || 0}
-            astralLevel={safeUserProfile?.astral_level || 1}
-            todayChallenge={todayChallenge}
-          />
-          
-          <MainContent 
-            userProfile={safeUserProfile}
-            onChallengeComplete={onChallengeComplete}
-          />
-        </DashboardLayout>
-      )}
-    </ErrorBoundary>
+    <Layout className="min-h-screen flex flex-col">
+      <div className="container mx-auto px-4 py-8 flex-grow">
+        <h1 className="text-3xl font-semibold text-white mb-6">Your Astral Dashboard</h1>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <UserProfilePanel />
+          <AchievementsPanel />
+          <ReflectionsPanel />
+        </div>
+      </div>
+
+      <footer className="container mx-auto px-4 py-4 text-center text-gray-500">
+        <LogoutButton onClick={handleUserLogout} />
+        <p>&copy; {new Date().getFullYear()} Quantum Leap. All rights reserved.</p>
+      </footer>
+    </Layout>
   );
 };
 

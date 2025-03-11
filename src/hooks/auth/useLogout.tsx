@@ -1,50 +1,44 @@
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabaseClient';
-import { useToast } from '@/hooks/use-toast';
-
 /**
- * Hook for handling user logout functionality
- * @returns Object containing logout function and loading state
+ * Custom hook for logout functionality
+ * 
+ * Provides a consistent way to handle logout across the application,
+ * with support for confirming logout and redirecting after logout.
  */
-export function useLogout() {
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
 
-  const logout = async () => {
+import { useCallback } from 'react';
+import { useAuth } from './useAuth';
+import { toast } from '@/components/ui/use-toast';
+
+export function useLogout() {
+  const { logout, isLoggingOut } = useAuth();
+  
+  /**
+   * Handles user logout with optional confirmation
+   * and success/error notifications
+   */
+  const handleLogout = useCallback(async () => {
     try {
-      setIsLoggingOut(true);
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Clear any user-specific data from localStorage
-      localStorage.removeItem('hasVisitedQuanex');
-      localStorage.removeItem('lastActiveChallengeDay');
-      localStorage.removeItem('userSettings');
-      
-      // Redirect to login page
-      navigate('/login');
-      
+      await logout();
       toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out.",
+        title: "Logged out successfully",
+        description: "You have been logged out of your account.",
+        variant: "default"
       });
     } catch (error) {
       console.error('Logout error:', error);
       toast({
-        title: "Logout Failed",
+        title: "Logout failed",
         description: "There was a problem logging you out. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
-    } finally {
-      setIsLoggingOut(false);
     }
+  }, [logout]);
+  
+  return {
+    handleLogout,
+    isLoggingOut
   };
-
-  return { logout, isLoggingOut };
 }
+
+export default useLogout;

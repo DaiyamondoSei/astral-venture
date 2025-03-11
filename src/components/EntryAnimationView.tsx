@@ -1,97 +1,87 @@
-
 import React, { useState, useEffect } from 'react';
-import { User } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
 import LoadingScreen from '@/components/LoadingScreen';
-import OrbToAstralTransition from '@/components/OrbToAstralTransition';
-import { 
-  CosmicBackground, 
-  GlassmorphicContainer 
-} from '@/components/visual-foundation';
 
 interface EntryAnimationViewProps {
-  user: User | null;
-  onComplete: () => void;
-  showTestButton?: boolean;
+  progress: number;
+  message?: string;
+  onComplete?: () => void;
+  showAnimation?: boolean;
 }
 
 const EntryAnimationView: React.FC<EntryAnimationViewProps> = ({
-  user,
+  progress,
+  message = "Loading...",
   onComplete,
-  showTestButton = false
+  showAnimation = true
 }) => {
-  const [stage, setStage] = useState<'loading' | 'transition' | 'complete'>('loading');
-  
-  // Progress through the stages
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    if (stage === 'loading') {
-      // After loading is done, move to transition
-      // This will be triggered by the LoadingScreen component's onLoadComplete
-    } else if (stage === 'transition') {
-      // The transition will automatically call onComplete when it finishes
+    if (progress >= 100) {
+      const timer = setTimeout(() => {
+        setLoading(false);
+        onComplete && onComplete();
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
-  }, [stage]);
-  
-  const handleLoadingComplete = () => {
-    setStage('transition');
+  }, [progress, onComplete]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+        delayChildren: 0.3,
+        staggerChildren: 0.2,
+      },
+    },
   };
-  
-  const handleTransitionComplete = () => {
-    setStage('complete');
-    onComplete();
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 50 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.5,
+      },
+    },
   };
-  
-  // Skip directly to dashboard (for testing)
-  const handleSkip = () => {
-    onComplete();
+
+  const finishLoading = () => {
+    setLoading(false);
+    onComplete && onComplete();
+  };
+
+  const renderLoadingScreen = () => {
+    if (loading) {
+      return <LoadingScreen onComplete={finishLoading} />;
+    }
+    return null;
   };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden">
-      {/* Background */}
-      <CosmicBackground intensity="high" />
-      
-      {/* Current stage content */}
-      {stage === 'loading' && (
-        <LoadingScreen onLoadComplete={handleLoadingComplete} />
-      )}
-      
-      {stage === 'transition' && (
-        <motion.div 
-          className="w-full h-full flex flex-col items-center justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
-        >
-          <OrbToAstralTransition onComplete={handleTransitionComplete} />
-          
-          {/* User welcome message */}
-          <GlassmorphicContainer 
-            className="px-8 py-4 mt-24 text-center"
-            variant="quantum"
-            intensity="medium"
-            withGlow
-          >
-            <h2 className="text-xl font-medium text-white">
-              {user ? `Welcome, ${user.email}` : 'Welcome, Explorer'}
-            </h2>
-            <p className="text-white/80 mt-2">
-              Calibrating your quantum consciousness field...
-            </p>
-          </GlassmorphicContainer>
+    <motion.div
+      className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {renderLoadingScreen()}
+      {!loading && (
+        <motion.div className="text-center" variants={itemVariants}>
+          <h1 className="text-4xl font-bold text-white mb-4">
+            {message}
+          </h1>
+          <p className="text-lg text-gray-300">
+            Completed!
+          </p>
         </motion.div>
       )}
-      
-      {/* Test button for easier development */}
-      {showTestButton && (
-        <div className="absolute bottom-4 right-4 z-50">
-          <Button onClick={handleSkip} variant="outline">
-            Skip Animation
-          </Button>
-        </div>
-      )}
-    </div>
+    </motion.div>
   );
 };
 

@@ -1,132 +1,67 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useLogout } from '@/hooks/useLogout';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/auth/useAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useUserStreak } from '@/hooks/useUserStreak';
+import { useLogout } from '@/hooks/auth/useLogout';
+import { toast } from '@/components/ui/use-toast';
 
-// Hook to manage authentication state and actions
+/**
+ * Custom hook for managing authentication state
+ * Combines data from auth context, user profile, and streak in one place
+ */
 export function useAuthStateManager() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { logout, isLoggingOut } = useLogout();
+  const auth = useAuth();
+  const { userProfile, todayChallenge, isLoading: profileLoading, updateUserProfile } = useUserProfile();
+  const { userStreak, activatedChakras, updateStreak, updateActivatedChakras } = useUserStreak();
+  const { handleLogout } = useLogout();
+  const [loadAttempts, setLoadAttempts] = useState(0);
+  const [hasCompletedLoading, setHasCompletedLoading] = useState(false);
 
-  // Initialize auth state on mount
+  // Try to reload if profile data isn't loading but user exists and profile is null
   useEffect(() => {
-    const initializeAuthState = async () => {
-      try {
-        // Get current session
-        const { data } = await supabase.auth.getSession();
-        const session = data.session;
-
-        if (session) {
-          setUser(session.user);
-          setIsAuthenticated(true);
-        } else {
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      } catch (error) {
-        console.error('Error initializing auth state:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeAuthState();
-
-    // Set up auth state change listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          setUser(session.user);
-          setIsAuthenticated(true);
-          navigate('/dashboard');
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setIsAuthenticated(false);
-          navigate('/login');
-        }
-      }
-    );
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [navigate]);
-
-  // Login function
-  const login = useCallback(async (email: string, password: string) => {
-    try {
-      setIsLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Auth state will update via the listener, which will redirect to dashboard
+    if (auth.user && !auth.isLoading && !profileLoading && !userProfile && loadAttempts < 3) {
       toast({
-        title: 'Login Successful',
-        description: 'Welcome back to your journey.',
+        title: "Loading profile data",
+        description: "Retrieving your data..."
       });
-    } catch (error: any) {
-      toast({
-        title: 'Login Failed',
-        description: error.message || 'Check your credentials and try again.',
-        variant: 'destructive',
-      });
-      return false;
-    } finally {
-      setIsLoading(false);
+      
+      // Increment attempts and try reloading
+      setLoadAttempts(loadAttempts + 1);
+      
+      // Wait and reload the page to try again
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+      return () => clearTimeout(timer);
     }
-    return true;
-  }, [toast]);
-
-  // Register function
-  const register = useCallback(async (email: string, password: string) => {
-    try {
-      setIsLoading(true);
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: 'Registration Successful',
-        description: 'Please check your email to verify your account.',
-      });
-      return true;
-    } catch (error: any) {
-      toast({
-        title: 'Registration Failed',
-        description: error.message || 'Please try again with a different email.',
-        variant: 'destructive',
-      });
-      return false;
-    } finally {
-      setIsLoading(false);
+    
+    // Profile loading is complete when all data is loaded or all attempts are exhausted
+    if (!auth.isLoading && !profileLoading) {
+      setHasCompletedLoading(true);
     }
-  }, [toast]);
+  }, [auth.user, auth.isLoading, profileLoading, userProfile, loadAttempts]);
 
   return {
-    user,
-    isAuthenticated,
-    isLoading,
-    login,
-    logout,
-    register,
-    isLoggingOut
+    user: auth.user,
+    userProfile,
+    todayChallenge,
+    userStreak,
+    activatedChakras,
+    isAuthenticated: auth.isAuthenticated,
+    isLoading: auth.isLoading,
+    profileLoading,
+    hasCompletedLoading,
+    handleLogout,
+    login: auth.login,
+    logout: auth.logout,
+    register: auth.register,
+    isLoggingOut: auth.isLoggingOut,
+    updateStreak,
+    updateActivatedChakras,
+    updateUserProfile,
+    loadAttempts
   };
 }
 
