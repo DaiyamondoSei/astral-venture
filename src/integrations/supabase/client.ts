@@ -23,3 +23,5 @@ if (process.env.NODE_ENV === 'development') {
     'Please import from "@/lib/supabaseClient" instead for better consistency.'
   );
 }
+
+export default supabase;

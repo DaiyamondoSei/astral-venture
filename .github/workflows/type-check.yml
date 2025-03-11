@@ -1,5 +1,5 @@
 
-name: TypeScript Type Check
+name: TypeScript Type Check and Validation
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   type-check:
-    name: Type Check
+    name: Type Check and Configuration Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -28,7 +28,7 @@ jobs:
         run: |
           # Create temporary validation script
           echo "
-          import { validateAppConfig } from './src/utils/config/configValidator';
+          import { validateAppConfig } from './src/utils/config/configValidator.js';
           
           // Run validation
           const isValid = validateAppConfig();
@@ -66,3 +66,26 @@ jobs:
         with:
           name: bundle-analysis
           path: bundle-analysis.html
+
+      - name: Check for type errors in edge functions
+        run: |
+          # Create a temporary tsconfig for Deno files
+          echo '{
+            "compilerOptions": {
+              "target": "esnext",
+              "module": "esnext",
+              "moduleResolution": "node",
+              "lib": ["esnext"],
+              "strict": true,
+              "noImplicitAny": true,
+              "strictNullChecks": true,
+              "noImplicitThis": true,
+              "allowJs": true,
+              "checkJs": true
+            },
+            "include": ["supabase/functions/**/*.ts"]
+          }' > tsconfig.deno.json
+          
+          # Run type check on edge functions
+          npx typescript-deno-plugin
+          npx tsc -p tsconfig.deno.json --noEmit || echo "Edge functions have type errors. This is currently informational only."

@@ -8,15 +8,14 @@
 
 import { toast } from '@/components/ui/use-toast';
 
+// Configuration validation result type
 export interface ConfigValidationResult {
   isValid: boolean;
   missingVars: string[];
   invalidVars: Array<{name: string; issue: string}>;
 }
 
-/**
- * Configuration requirements definition
- */
+// Configuration requirement definition
 export interface ConfigRequirement {
   name: string;
   required: boolean;
@@ -74,6 +73,25 @@ export function validateConfig(
   }
   
   return result;
+}
+
+/**
+ * Simplified validation for common configuration objects
+ * Throws an error if any required configuration is missing
+ * 
+ * @param config Configuration object to validate
+ * @returns true if valid, throws error otherwise
+ */
+export function validateRequiredConfig(config: Record<string, unknown>): boolean {
+  const missingKeys = Object.entries(config)
+    .filter(([_, value]) => value === undefined || value === null || value === '')
+    .map(([key]) => key);
+    
+  if (missingKeys.length > 0) {
+    throw new Error(`Missing required configuration: ${missingKeys.join(', ')}`);
+  }
+  
+  return true;
 }
 
 /**

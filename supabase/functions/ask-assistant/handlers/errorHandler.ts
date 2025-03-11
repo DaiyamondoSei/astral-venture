@@ -7,13 +7,20 @@ import {
   createErrorResponse,
   ErrorCode,
   logEvent,
-  ErrorHandlingOptions
 } from "../../shared/responseUtils.ts";
+
+export interface ErrorHandlingOptions {
+  includeStack?: boolean;
+  customMessage?: string;
+  defaultStatus?: number;
+  context?: string;
+}
 
 /**
  * Format OpenAI API errors into a standardized response
  * 
  * @param error The error object from OpenAI
+ * @param options Error handling options
  * @returns Formatted error response
  */
 export function handleOpenAIError(error: any, options: ErrorHandlingOptions = {}): Response {
@@ -186,6 +193,10 @@ export function handleUnexpectedError(error: any, options: ErrorHandlingOptions 
 
 /**
  * Main error handler function for edge functions
+ * 
+ * @param error The error object
+ * @param options Error handling options
+ * @returns Standardized error response
  */
 export function handleError(error: any, options: ErrorHandlingOptions = {}): Response {
   // Check for specific error types

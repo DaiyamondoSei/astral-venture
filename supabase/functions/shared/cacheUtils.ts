@@ -104,3 +104,97 @@ export function createPartitionedCacheKey(key: string, buckets: number = 16): st
   const bucket = parseInt(hash.substring(0, 2), 16) % buckets;
   return `bucket${bucket}:${key}`;
 }
+
+/**
+ * Simple in-memory cache implementation with expiration
+ */
+export class MemoryCache {
+  private cache: Map<string, { value: any, expires: number }> = new Map();
+  
+  /**
+   * Set a value in the cache
+   * 
+   * @param key Cache key
+   * @param value Value to store
+   * @param ttlMs Time to live in milliseconds
+   */
+  set(key: string, value: any, ttlMs: number = 60000): void {
+    this.cache.set(key, {
+      value,
+      expires: Date.now() + ttlMs
+    });
+  }
+  
+  /**
+   * Get a value from the cache
+   * 
+   * @param key Cache key
+   * @returns Cached value or null if not found or expired
+   */
+  get(key: string): any {
+    const item = this.cache.get(key);
+    
+    // Return null if item doesn't exist
+    if (!item) return null;
+    
+    // Return null if item has expired
+    if (item.expires < Date.now()) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return item.value;
+  }
+  
+  /**
+   * Delete a value from the cache
+   * 
+   * @param key Cache key
+   */
+  delete(key: string): void {
+    this.cache.delete(key);
+  }
+  
+  /**
+   * Clear all expired items from the cache
+   */
+  cleanup(): void {
+    const now = Date.now();
+    for (const [key, item] of this.cache.entries()) {
+      if (item.expires < now) {
+        this.cache.delete(key);
+      }
+    }
+  }
+  
+  /**
+   * Get an item from cache or compute it if not found
+   * 
+   * @param key Cache key
+   * @param producer Function to produce the value if not in cache
+   * @param ttlMs Time to live in milliseconds
+   * @returns Value from cache or computed value
+   */
+  async getOrSet<T>(
+    key: string, 
+    producer: () => Promise<T>,
+    ttlMs: number = 60000
+  ): Promise<T> {
+    // Try to get from cache first
+    const cached = this.get(key);
+    if (cached !== null) {
+      return cached as T;
+    }
+    
+    // If not in cache, compute the value
+    const value = await producer();
+    
+    // Store in cache
+    this.set(key, value, ttlMs);
+    
+    return value;
+  }
+}
+
+// Export a singleton instance for common use
+export const globalCache = new MemoryCache();
