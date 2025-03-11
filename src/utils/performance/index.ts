@@ -1,21 +1,18 @@
 
 /**
- * Performance Monitoring System
+ * Performance Monitoring and Optimization System
  * 
- * Centralized exports for performance monitoring
+ * Entry point for the performance monitoring and optimization system.
  */
 
-// Export the main performance monitor
-export { performanceMonitor } from './performanceMonitor';
-export { default as performanceMonitor } from './performanceMonitor';
+// Export core types
+export * from './core/types';
+export * from './core/constants';
+export * from './core/utils';
 
-// Export types
-export * from './types';
+// Export collectors
+export { metricsCollector } from './collectors/MetricsCollector';
 
-// Export utility functions
-export { default as withPerformanceTracking } from './withPerformanceTracking';
-export { default as RenderAnalyzer } from './RenderAnalyzer';
-export { default as metricsReporter } from './metricsReporter';
-
-// Re-export for backward compatibility
-export { performanceMonitor as PerformanceMonitor } from './performanceMonitor';
+// Export default instance
+import { metricsCollector } from './collectors/MetricsCollector';
+export default metricsCollector;

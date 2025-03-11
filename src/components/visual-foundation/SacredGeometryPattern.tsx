@@ -1,337 +1,308 @@
 
 /**
- * SacredGeometryPattern Component
+ * Sacred Geometry Pattern Component
  * 
- * Renders various sacred geometry patterns with adaptive quality based on device capabilities.
+ * Renders various sacred geometry patterns with adaptive quality based on device capability.
  */
 import React, { useMemo } from 'react';
-import { cn } from '@/lib/utils';
-import { usePerfConfig } from '@/hooks/usePerfConfig';
-import * as geometryUtils from '@/utils/geometryUtils';
+import { usePerformance } from '../../contexts/PerformanceContext';
+import { 
+  generateMetatronsCube, 
+  generateFlowerOfLife,
+  GeometryPattern
+} from '../../utils/geometry/geometryUtils';
 
-export type PatternType = 
-  | 'flower-of-life'
-  | 'seed-of-life'
-  | 'metatrons-cube'
-  | 'sri-yantra'
-  | 'vesica-piscis'
-  | 'fibonacci-spiral';
+export type GeometryPatternType = 
+  | 'metatronsCube' 
+  | 'flowerOfLife' 
+  | 'seedOfLife' 
+  | 'treeOfLife' 
+  | 'sriYantra';
+
+export type PatternTheme = 
+  | 'default' 
+  | 'cosmic' 
+  | 'chakra' 
+  | 'energy' 
+  | 'spiritual' 
+  | 'quantum';
 
 interface SacredGeometryPatternProps {
-  className?: string;
-  pattern: PatternType;
+  type?: GeometryPatternType;
   size?: number;
-  color?: string;
-  strokeWidth?: number;
-  fill?: string;
-  animated?: boolean;
+  theme?: PatternTheme;
+  detail?: number;
+  animate?: boolean;
   interactive?: boolean;
+  showLabels?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-/**
- * SacredGeometryPattern renders various sacred geometry patterns
- */
-const SacredGeometryPattern: React.FC<SacredGeometryPatternProps> = ({
-  className,
-  pattern,
+export const SacredGeometryPattern: React.FC<SacredGeometryPatternProps> = ({
+  type = 'metatronsCube',
   size = 300,
-  color = 'currentColor',
-  strokeWidth = 1,
-  fill = 'none',
-  animated = true,
-  interactive = false
+  theme = 'default',
+  detail: userDetail,
+  animate = true,
+  interactive = true,
+  showLabels = false,
+  className = '',
+  style = {}
 }) => {
-  const { effectiveQualityLevel, config } = usePerfConfig();
+  const { qualityLevel, isLowPerformance } = usePerformance();
   
-  // Determine pattern detail level based on quality
+  // Calculate detail level based on quality level
   const detailLevel = useMemo(() => {
-    switch (effectiveQualityLevel) {
-      case 1: return 1;
-      case 2: return 2;
-      case 3: return 3;
-      case 4: return 4;
-      case 5:
-      default: return 5;
-    }
-  }, [effectiveQualityLevel]);
+    if (userDetail !== undefined) return userDetail;
+    
+    // Map quality levels to detail levels
+    const detailMap = {
+      1: 1, // Low
+      2: 2, // Medium
+      3: 3, // High
+      4: 4, // Ultra
+      5: 5  // Extreme
+    };
+    
+    return detailMap[qualityLevel] || 3;
+  }, [qualityLevel, userDetail]);
   
-  // Generate pattern based on type
-  const patternElements = useMemo(() => {
-    const radius = size / 3;
+  // Generate the geometry pattern
+  const geometryData = useMemo((): GeometryPattern => {
+    const radius = size * 0.4;
     const centerX = size / 2;
     const centerY = size / 2;
     
-    switch (pattern) {
-      case 'flower-of-life': {
-        const { circles } = geometryUtils.generateFlowerOfLife(
-          Math.min(3, detailLevel),
-          radius / 2,
-          centerX,
-          centerY
-        );
-        
-        return (
-          <>
-            {circles.map((circle, index) => (
-              <circle
-                key={`circle-${index}`}
-                cx={circle.x}
-                cy={circle.y}
-                r={circle.r}
-                stroke={color}
-                strokeWidth={strokeWidth}
-                fill={fill}
-                className={animated ? "transition-all duration-300" : ""}
-              />
-            ))}
-          </>
-        );
-      }
-      
-      case 'seed-of-life': {
-        const { circles } = geometryUtils.generateSeedOfLife(
-          radius / 1.8,
-          centerX,
-          centerY
-        );
-        
-        return (
-          <>
-            {circles.map((circle, index) => (
-              <circle
-                key={`circle-${index}`}
-                cx={circle.x}
-                cy={circle.y}
-                r={circle.r}
-                stroke={color}
-                strokeWidth={strokeWidth}
-                fill={fill}
-                className={animated ? "transition-all duration-300" : ""}
-              />
-            ))}
-          </>
-        );
-      }
-      
-      case 'metatrons-cube': {
-        const { nodes, connections } = geometryUtils.generateMetatronsCube(
-          radius / 2,
-          detailLevel,
-          centerX,
-          centerY
-        );
-        
-        return (
-          <>
-            {connections.map((connection, index) => {
-              const source = nodes.find(n => n.id === connection.from);
-              const target = nodes.find(n => n.id === connection.to);
-              
-              if (!source || !target) return null;
-              
-              return (
-                <line
-                  key={`line-${index}`}
-                  x1={source.x}
-                  y1={source.y}
-                  x2={target.x}
-                  y2={target.y}
-                  stroke={color}
-                  strokeWidth={strokeWidth * 0.8}
-                  className={animated ? "transition-all duration-500" : ""}
-                />
-              );
-            })}
-            
-            {nodes.map((node, index) => (
-              <circle
-                key={`node-${index}`}
-                cx={node.x}
-                cy={node.y}
-                r={node.size}
-                fill={color}
-                className={animated ? "transition-all duration-300" : ""}
-              />
-            ))}
-          </>
-        );
-      }
-      
-      case 'sri-yantra': {
-        const { triangles, circles, bindu } = geometryUtils.generateSriYantra(
-          radius * 1.5,
-          centerX,
-          centerY
-        );
-        
-        return (
-          <>
-            {/* Draw circles */}
-            {circles.map((circle, index) => (
-              <circle
-                key={`circle-${index}`}
-                cx={circle.x}
-                cy={circle.y}
-                r={circle.r}
-                stroke={color}
-                strokeWidth={strokeWidth}
-                fill="none"
-                className={animated ? "transition-all duration-300" : ""}
-              />
-            ))}
-            
-            {/* Draw triangles */}
-            {triangles.map((triangle, index) => (
-              <polygon
-                key={`triangle-${index}`}
-                points={triangle.points.map(p => `${p.x},${p.y}`).join(' ')}
-                stroke={color}
-                strokeWidth={strokeWidth}
-                fill="none"
-                className={animated ? "transition-all duration-300" : ""}
-              />
-            ))}
-            
-            {/* Draw bindu (center point) */}
-            <circle
-              cx={bindu.x}
-              cy={bindu.y}
-              r={bindu.r}
-              fill={color}
-              className={animated ? "transition-all duration-300" : ""}
-            />
-          </>
-        );
-      }
-      
-      case 'vesica-piscis': {
-        const { circles, intersectionPoints } = geometryUtils.generateVesicaPiscis(
-          radius,
-          0.5,
-          centerX,
-          centerY
-        );
-        
-        return (
-          <>
-            {/* Draw circles */}
-            {circles.map((circle, index) => (
-              <circle
-                key={`circle-${index}`}
-                cx={circle.x}
-                cy={circle.y}
-                r={circle.r}
-                stroke={color}
-                strokeWidth={strokeWidth}
-                fill="none"
-                className={animated ? "transition-all duration-300" : ""}
-              />
-            ))}
-            
-            {/* Draw intersection points */}
-            {intersectionPoints.map((point, index) => (
-              <circle
-                key={`point-${index}`}
-                cx={point.x}
-                cy={point.y}
-                r={4}
-                fill={color}
-                className={animated ? "transition-all duration-300" : ""}
-              />
-            ))}
-          </>
-        );
-      }
-      
-      case 'fibonacci-spiral': {
-        const pointsCount = 25 * detailLevel;
-        const spiralPoints = geometryUtils.generateFibonacciSpiral(
-          detailLevel,
-          pointsCount,
-          radius / 25,
-          centerX,
-          centerY
-        );
-        
-        // Create a path from the points
-        let pathData = `M ${spiralPoints[0].x} ${spiralPoints[0].y}`;
-        for (let i = 1; i < spiralPoints.length; i++) {
-          pathData += ` L ${spiralPoints[i].x} ${spiralPoints[i].y}`;
-        }
-        
-        return (
-          <>
-            <path
-              d={pathData}
-              stroke={color}
-              strokeWidth={strokeWidth}
-              fill="none"
-              className={animated ? "transition-all duration-300" : ""}
-            />
-            
-            {/* Draw golden rectangles if detail level is high enough */}
-            {detailLevel >= 3 && (
-              <>
-                {[1, 2, 3, 5, 8, 13, 21].map((size, index) => {
-                  const normSize = size * radius / 40;
-                  return (
-                    <rect
-                      key={`rect-${index}`}
-                      x={centerX}
-                      y={centerY}
-                      width={normSize}
-                      height={normSize * geometryUtils.PHI}
-                      stroke={color}
-                      strokeWidth={strokeWidth * 0.5}
-                      fill="none"
-                      opacity={0.5}
-                      className={animated ? "transition-all duration-300" : ""}
-                    />
-                  );
-                })}
-              </>
-            )}
-          </>
-        );
-      }
-      
+    switch (type) {
+      case 'metatronsCube':
+        return generateMetatronsCube(radius, detailLevel, centerX, centerY);
+      case 'flowerOfLife':
+        return generateFlowerOfLife(radius, detailLevel, centerX, centerY);
+      // Add more pattern types as needed
       default:
-        return null;
+        return generateMetatronsCube(radius, detailLevel, centerX, centerY);
     }
-  }, [pattern, size, color, strokeWidth, fill, animated, detailLevel]);
+  }, [type, size, detailLevel]);
   
-  // Apply animations based on configuration and props
-  const animationClasses = useMemo(() => {
-    if (!animated || config.disableAnimations) return "";
+  // Calculate colors based on theme
+  const colors = useMemo(() => {
+    switch (theme) {
+      case 'cosmic':
+        return {
+          background: '#0a0728',
+          primary: '#5d4dff',
+          secondary: '#a991ff',
+          tertiary: '#ff49e2',
+          nodes: '#ffffff',
+          glow: 'rgba(93, 77, 255, 0.8)'
+        };
+      case 'chakra':
+        return {
+          background: '#1a1a2e',
+          primary: '#e94560',
+          secondary: '#ffbd69',
+          tertiary: '#36eee0',
+          nodes: '#ffffff',
+          glow: 'rgba(233, 69, 96, 0.8)'
+        };
+      case 'energy':
+        return {
+          background: '#10002b',
+          primary: '#7b2cbf',
+          secondary: '#c77dff',
+          tertiary: '#e0aaff',
+          nodes: '#ffffff',
+          glow: 'rgba(123, 44, 191, 0.8)'
+        };
+      case 'spiritual':
+        return {
+          background: '#03071e',
+          primary: '#ffba08',
+          secondary: '#faa307',
+          tertiary: '#f48c06',
+          nodes: '#ffffff',
+          glow: 'rgba(255, 186, 8, 0.8)'
+        };
+      case 'quantum':
+        return {
+          background: '#000814',
+          primary: '#48cae4',
+          secondary: '#90e0ef',
+          tertiary: '#ade8f4',
+          nodes: '#ffffff',
+          glow: 'rgba(72, 202, 228, 0.8)'
+        };
+      case 'default':
+      default:
+        return {
+          background: '#0a0a0a',
+          primary: '#4cc9f0',
+          secondary: '#4895ef',
+          tertiary: '#4361ee',
+          nodes: '#ffffff',
+          glow: 'rgba(76, 201, 240, 0.8)'
+        };
+    }
+  }, [theme]);
+  
+  // Calculate animation settings based on performance
+  const animations = useMemo(() => {
+    if (!animate) return { enabled: false };
     
-    return interactive 
-      ? "transform transition-transform duration-1000 hover:scale-105"
-      : "animate-[pulse_8s_ease-in-out_infinite]";
-  }, [animated, interactive, config.disableAnimations]);
+    return {
+      enabled: true,
+      duration: isLowPerformance ? '3s' : '2s',
+      nodeAnimation: isLowPerformance ? 'none' : 'pulse 3s infinite alternate',
+      lineAnimation: isLowPerformance ? 'none' : 'glow 2s infinite alternate',
+      animationCount: isLowPerformance ? 3 : geometryData.nodes.length
+    };
+  }, [animate, isLowPerformance, geometryData.nodes.length]);
   
+  // Render pattern
   return (
-    <div className={cn("relative", className)}>
+    <div 
+      className={`sacred-geometry-pattern ${className}`}
+      style={{
+        width: size,
+        height: size,
+        position: 'relative',
+        background: colors.background,
+        borderRadius: '50%',
+        overflow: 'hidden',
+        ...style
+      }}
+    >
       <svg 
         width={size} 
         height={size} 
         viewBox={`0 0 ${size} ${size}`}
-        className={cn("transition-opacity duration-500", animationClasses)}
+        style={{ position: 'absolute', top: 0, left: 0 }}
       >
-        {/* Add filters for glow effects if enabled and quality level permits */}
-        {detailLevel >= 3 && (
-          <defs>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
-        )}
+        {/* Render connections */}
+        {geometryData.connections.map((connection, index) => {
+          // Find connected nodes
+          const fromNode = geometryData.nodes.find(n => n.id === connection.from);
+          const toNode = geometryData.nodes.find(n => n.id === connection.to);
+          
+          if (!fromNode || !toNode) return null;
+          
+          // Determine line color based on connection type
+          let color = colors.primary;
+          let width = 1;
+          let opacity = 0.6;
+          
+          if (connection.type === 'secondary') {
+            color = colors.secondary;
+            width = 0.8;
+            opacity = 0.5;
+          } else if (connection.type === 'tertiary') {
+            color = colors.tertiary;
+            width = 0.6;
+            opacity = 0.4;
+          } else if (connection.type === 'energy') {
+            color = colors.tertiary;
+            width = 0.5;
+            opacity = 0.3;
+          } else if (connection.type === 'resonance') {
+            color = colors.secondary;
+            width = 0.4;
+            opacity = 0.2;
+          }
+          
+          // Apply connection width if specified
+          if (connection.width) {
+            width = connection.width;
+          }
+          
+          // Skip inactive connections if not all should be shown
+          if (!connection.active && detailLevel < 4) return null;
+          
+          return (
+            <line
+              key={`connection-${index}`}
+              x1={fromNode.x}
+              y1={fromNode.y}
+              x2={toNode.x}
+              y2={toNode.y}
+              stroke={color}
+              strokeWidth={width}
+              opacity={opacity}
+              style={{
+                animation: animations.enabled && index % 3 === 0 
+                  ? animations.lineAnimation 
+                  : 'none'
+              }}
+            />
+          );
+        })}
         
-        {/* Render the pattern elements */}
-        <g filter={detailLevel >= 3 ? "url(#glow)" : ""}>
-          {patternElements}
-        </g>
+        {/* Render nodes */}
+        {geometryData.nodes.map((node, index) => {
+          // Skip rendering some nodes in low detail mode
+          if (!node.active && detailLevel < 3) return null;
+          
+          // Determine node size
+          const nodeSize = node.size || 3;
+          
+          // Calculate node opacity and color
+          let opacity = 0.8;
+          let fill = colors.nodes;
+          
+          if (node.energy) {
+            opacity = 0.5 + (node.energy * 0.5);
+          }
+          
+          return (
+            <circle
+              key={`node-${node.id}`}
+              cx={node.x}
+              cy={node.y}
+              r={nodeSize}
+              fill={fill}
+              opacity={opacity}
+              style={{
+                animation: animations.enabled && index < animations.animationCount
+                  ? animations.nodeAnimation
+                  : 'none',
+                filter: `drop-shadow(0 0 ${nodeSize / 2}px ${colors.glow})`
+              }}
+            />
+          );
+        })}
+        
+        {/* Render labels if enabled */}
+        {showLabels && geometryData.nodes.map((node) => {
+          if (!node.active || !node.id.includes('hex')) return null;
+          
+          return (
+            <text
+              key={`label-${node.id}`}
+              x={node.x}
+              y={node.y + 15}
+              textAnchor="middle"
+              fill={colors.nodes}
+              fontSize="10"
+              opacity={0.8}
+            >
+              {node.id}
+            </text>
+          );
+        })}
       </svg>
+      
+      {/* Add CSS for animations */}
+      <style jsx>{`
+        @keyframes pulse {
+          0% { opacity: 0.4; r: ${isLowPerformance ? '2' : '2'}; }
+          100% { opacity: 0.9; r: ${isLowPerformance ? '3' : '4'}; }
+        }
+        
+        @keyframes glow {
+          0% { stroke-opacity: 0.3; }
+          100% { stroke-opacity: 0.8; }
+        }
+      `}</style>
     </div>
   );
 };
