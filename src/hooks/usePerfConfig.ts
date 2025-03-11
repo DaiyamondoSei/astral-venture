@@ -1,10 +1,12 @@
 
 /**
- * Hook for managing performance configuration
+ * Enhanced Performance Configuration Hook
  */
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { DeviceCapability } from '../utils/performanceUtils';
+import { Result, success } from '../utils/result/Result';
 
+// Enhanced performance configuration with adaptive rendering
 export interface PerfConfig {
   // Core settings
   deviceCapability: 'low' | 'medium' | 'high';
@@ -28,8 +30,16 @@ export interface PerfConfig {
   intelligentProfiling: boolean;
   inactiveTabThrottling: boolean;
   batchUpdates: boolean;
+  
+  // Enhanced features (Phase 1)
+  enableAdaptiveRendering: boolean;
+  adaptiveQualityLevels: number;
+  enableProgressiveEnhancement: boolean;
+  resourceOptimizationLevel: 'none' | 'conservative' | 'aggressive';
+  metricsPersistence: boolean;
 }
 
+// Enhanced default configuration
 export const DEFAULT_PERF_CONFIG: PerfConfig = {
   deviceCapability: 'medium',
   useManualCapability: false,
@@ -48,10 +58,17 @@ export const DEFAULT_PERF_CONFIG: PerfConfig = {
   
   intelligentProfiling: false,
   inactiveTabThrottling: true,
-  batchUpdates: true
+  batchUpdates: true,
+  
+  // Enhanced defaults (Phase 1)
+  enableAdaptiveRendering: true,
+  adaptiveQualityLevels: 3,
+  enableProgressiveEnhancement: true,
+  resourceOptimizationLevel: 'conservative',
+  metricsPersistence: true
 };
 
-// Preset configurations for different performance profiles
+// Enhanced presets with new configuration options
 const PRESETS = {
   comprehensive: {
     ...DEFAULT_PERF_CONFIG,
@@ -61,7 +78,9 @@ const PRESETS = {
     enableValidation: true,
     enablePropTracking: true,
     enableDebugLogging: true,
-    intelligentProfiling: true
+    intelligentProfiling: true,
+    adaptiveQualityLevels: 5,
+    resourceOptimizationLevel: 'aggressive'
   },
   balanced: {
     ...DEFAULT_PERF_CONFIG,
@@ -70,7 +89,9 @@ const PRESETS = {
     enableRenderTracking: true,
     enableValidation: true,
     enablePropTracking: false,
-    enableDebugLogging: false
+    enableDebugLogging: false,
+    adaptiveQualityLevels: 3,
+    resourceOptimizationLevel: 'conservative'
   },
   minimal: {
     ...DEFAULT_PERF_CONFIG,
@@ -79,7 +100,9 @@ const PRESETS = {
     enableRenderTracking: false,
     enableValidation: false,
     enablePropTracking: false,
-    enableDebugLogging: false
+    enableDebugLogging: false,
+    adaptiveQualityLevels: 2,
+    resourceOptimizationLevel: 'conservative'
   },
   disabled: {
     ...DEFAULT_PERF_CONFIG,
@@ -87,20 +110,36 @@ const PRESETS = {
     enableRenderTracking: false,
     enableValidation: false,
     enablePropTracking: false,
-    enableDebugLogging: false
+    enableDebugLogging: false,
+    enableAdaptiveRendering: false,
+    enableProgressiveEnhancement: false,
+    resourceOptimizationLevel: 'none'
   }
 };
 
 export type PresetName = 'comprehensive' | 'balanced' | 'minimal' | 'disabled';
+export type OptimizationTarget = 'performance' | 'quality' | 'balanced';
 
 /**
- * Hook for managing performance configuration
+ * Enhanced hook for managing performance configuration
  */
 export function usePerfConfig(initialConfig: Partial<PerfConfig> = {}) {
+  // Initialize with enhanced defaults and provided values
   const [config, setConfig] = useState<PerfConfig>({
     ...DEFAULT_PERF_CONFIG,
     ...initialConfig
   });
+  
+  // Detect device capability on mount
+  useEffect(() => {
+    if (!config.useManualCapability) {
+      const detectedCapability = detectDeviceCapability();
+      setConfig(prev => ({
+        ...prev,
+        deviceCapability: detectedCapability
+      }));
+    }
+  }, [config.useManualCapability]);
   
   /**
    * Update configuration with partial updates
@@ -122,15 +161,103 @@ export function usePerfConfig(initialConfig: Partial<PerfConfig> = {}) {
     }
   }, []);
   
+  /**
+   * Optimize configuration for a specific target
+   */
+  const optimizeFor = useCallback((target: OptimizationTarget) => {
+    switch (target) {
+      case 'performance':
+        setConfig(prev => ({
+          ...prev,
+          disableAnimations: prev.deviceCapability !== 'high',
+          disableEffects: prev.deviceCapability !== 'high',
+          samplingRate: 0.05,
+          enablePropTracking: false,
+          intelligentProfiling: true,
+          adaptiveQualityLevels: 2,
+          resourceOptimizationLevel: 'aggressive'
+        }));
+        break;
+      case 'quality':
+        setConfig(prev => ({
+          ...prev,
+          disableAnimations: false,
+          disableEffects: false,
+          samplingRate: 0.2,
+          adaptiveQualityLevels: 5,
+          resourceOptimizationLevel: 'conservative'
+        }));
+        break;
+      case 'balanced':
+      default:
+        applyPreset('balanced');
+        break;
+    }
+  }, [applyPreset]);
+  
+  /**
+   * Get configuration summary
+   */
+  const getConfigSummary = useCallback((): Record<string, any> => {
+    return {
+      deviceTier: config.deviceCapability,
+      animationsEnabled: !config.disableAnimations,
+      effectsEnabled: !config.disableEffects,
+      adaptiveRenderingEnabled: config.enableAdaptiveRendering,
+      qualityLevels: config.adaptiveQualityLevels,
+      optimizationLevel: config.resourceOptimizationLevel,
+      trackingEnabled: config.enablePerformanceTracking
+    };
+  }, [config]);
+  
+  /**
+   * Export configuration to JSON
+   */
+  const exportConfig = useCallback((): Result<string, Error> => {
+    try {
+      return success(JSON.stringify(config, null, 2));
+    } catch (error) {
+      return {
+        type: 'failure',
+        error: error instanceof Error ? error : new Error('Failed to export configuration')
+      };
+    }
+  }, [config]);
+  
   // Derived state for UI-level flags
   const isLowPerformance = useMemo(() => config.deviceCapability === 'low', [config.deviceCapability]);
   const isMediumPerformance = useMemo(() => config.deviceCapability === 'medium', [config.deviceCapability]);
   const isHighPerformance = useMemo(() => config.deviceCapability === 'high', [config.deviceCapability]);
   
-  // Should we use simplified UI based on device capability?
+  // Should we use simplified UI based on device capability and adaptive rendering?
   const shouldUseSimplifiedUI = useMemo(() => {
-    return isLowPerformance || (config.disableEffects && !isHighPerformance);
-  }, [isLowPerformance, isHighPerformance, config.disableEffects]);
+    if (!config.enableAdaptiveRendering) {
+      // If adaptive rendering is disabled, use simplified UI only for low performance devices
+      return isLowPerformance;
+    }
+    
+    // With adaptive rendering, use simplified UI for low and potentially medium devices
+    return isLowPerformance || 
+           (isMediumPerformance && (config.disableEffects || config.adaptiveQualityLevels < 3));
+  }, [
+    isLowPerformance, 
+    isMediumPerformance, 
+    config.disableEffects, 
+    config.enableAdaptiveRendering, 
+    config.adaptiveQualityLevels
+  ]);
+  
+  // Get the effective quality level based on configuration
+  const effectiveQualityLevel = useMemo(() => {
+    if (isHighPerformance && !config.disableEffects) return config.adaptiveQualityLevels;
+    if (isMediumPerformance && !config.disableEffects) return Math.max(1, config.adaptiveQualityLevels - 1);
+    return 1; // Lowest quality for low performance or when effects are disabled
+  }, [
+    isHighPerformance, 
+    isMediumPerformance, 
+    config.disableEffects, 
+    config.adaptiveQualityLevels
+  ]);
   
   return {
     config,
@@ -140,8 +267,63 @@ export function usePerfConfig(initialConfig: Partial<PerfConfig> = {}) {
     isMediumPerformance,
     isHighPerformance,
     shouldUseSimplifiedUI,
-    applyPreset
+    effectiveQualityLevel,
+    applyPreset,
+    optimizeFor,
+    getConfigSummary,
+    exportConfig
   };
+}
+
+/**
+ * Detect device capability based on hardware and browser features
+ */
+function detectDeviceCapability(): 'low' | 'medium' | 'high' {
+  // Only run in browser environment
+  if (typeof window === 'undefined') return 'medium';
+  
+  // Check for mobile devices
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+  
+  // Check for available memory (if available in the browser)
+  const lowMemory = (navigator as any).deviceMemory && (navigator as any).deviceMemory < 4;
+  
+  // Check for CPU cores
+  const lowCPU = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2;
+  
+  // Check for WebGL capabilities
+  let webGLSupport = 'high';
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) webGLSupport = 'low';
+    else {
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      if (debugInfo) {
+        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        if (renderer.includes('Intel')) webGLSupport = 'medium';
+      }
+    }
+  } catch (e) {
+    webGLSupport = 'low';
+  }
+  
+  // Determine capability level
+  if (isMobile && (lowMemory || lowCPU || webGLSupport === 'low')) {
+    return 'low';
+  } else if (
+    (navigator as any).deviceMemory &&
+    (navigator as any).deviceMemory >= 8 &&
+    navigator.hardwareConcurrency &&
+    navigator.hardwareConcurrency >= 8 &&
+    webGLSupport === 'high'
+  ) {
+    return 'high';
+  }
+  
+  return 'medium';
 }
 
 export default usePerfConfig;

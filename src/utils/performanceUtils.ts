@@ -1,214 +1,257 @@
 
-// Import required modules and types
-import { performanceMonitor } from '@/utils/performance/performanceMonitor';
+/**
+ * Performance Utilities
+ * 
+ * Utilities for performance classification, adaptive rendering, and resource optimization.
+ */
+
+// Device capability classification
+export type DeviceCapability = 'low' | 'medium' | 'high';
+
+// Quality level for adaptive rendering
+export interface QualityLevel {
+  level: number;
+  name: string;
+  description: string;
+  particleCount: number;
+  effectsEnabled: boolean;
+  animationComplexity: number;
+  geometryDetail: number;
+  textureResolution: number;
+}
+
+// Performance category boundaries
+export interface PerformanceBoundaries {
+  lowFPS: number;
+  mediumFPS: number;
+  highFPS: number;
+  criticalMemory: number;
+  highMemory: number;
+  mediumMemory: number;
+}
+
+// Default quality levels
+export const DEFAULT_QUALITY_LEVELS: QualityLevel[] = [
+  {
+    level: 1,
+    name: 'Low',
+    description: 'Minimal visual effects, optimized for low-end devices',
+    particleCount: 50,
+    effectsEnabled: false,
+    animationComplexity: 1,
+    geometryDetail: 1,
+    textureResolution: 1
+  },
+  {
+    level: 2,
+    name: 'Medium',
+    description: 'Balanced visual effects, suitable for most devices',
+    particleCount: 200,
+    effectsEnabled: true,
+    animationComplexity: 2,
+    geometryDetail: 2,
+    textureResolution: 2
+  },
+  {
+    level: 3,
+    name: 'High',
+    description: 'Enhanced visual effects with moderate complexity',
+    particleCount: 500,
+    effectsEnabled: true,
+    animationComplexity: 3,
+    geometryDetail: 3,
+    textureResolution: 3
+  },
+  {
+    level: 4,
+    name: 'Ultra',
+    description: 'Maximum visual quality with full effects',
+    particleCount: 1000,
+    effectsEnabled: true,
+    animationComplexity: 4,
+    geometryDetail: 4,
+    textureResolution: 4
+  },
+  {
+    level: 5,
+    name: 'Extreme',
+    description: 'Exceptional visual quality for high-end devices',
+    particleCount: 2000,
+    effectsEnabled: true,
+    animationComplexity: 5,
+    geometryDetail: 5,
+    textureResolution: 5
+  }
+];
+
+// Default performance boundaries
+export const DEFAULT_PERFORMANCE_BOUNDARIES: PerformanceBoundaries = {
+  lowFPS: 30,
+  mediumFPS: 45,
+  highFPS: 60,
+  criticalMemory: 500 * 1024 * 1024, // 500MB
+  highMemory: 350 * 1024 * 1024, // 350MB
+  mediumMemory: 200 * 1024 * 1024 // 200MB
+};
 
 /**
- * Performance category enumeration for device capability
+ * Get quality level settings based on level index
  */
-export enum DeviceCapability {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high'
+export function getQualityLevel(level: number): QualityLevel {
+  // Ensure level is within bounds
+  const boundedLevel = Math.max(1, Math.min(level, DEFAULT_QUALITY_LEVELS.length));
+  return DEFAULT_QUALITY_LEVELS[boundedLevel - 1];
 }
 
 /**
- * Performance mode type (auto or explicit capability)
+ * Calculate recommended quality level based on device capability and performance metrics
  */
-export type PerformanceMode = DeviceCapability | 'auto';
-
-/**
- * Render frequency classification
- */
-export enum RenderFrequency {
-  NORMAL = 'normal',
-  FREQUENT = 'frequent',
-  EXCESSIVE = 'excessive'
-}
-
-// Cache for performance category to avoid recalculating
-let cachedPerformanceCategory: DeviceCapability | null = null;
-let categoryCacheTime = 0;
-const CACHE_TTL = 60000; // 1 minute cache time
-
-/**
- * Determine device performance category based on various factors
- * Optimized with caching to avoid frequent recalculation
- */
-export function getPerformanceCategory(): DeviceCapability {
-  const now = Date.now();
-  
-  // Return cached value if still valid
-  if (cachedPerformanceCategory && (now - categoryCacheTime < CACHE_TTL)) {
-    return cachedPerformanceCategory;
-  }
-  
-  // Check if running in a browser environment
-  if (typeof window === 'undefined') {
-    return DeviceCapability.MEDIUM;
-  }
-
-  // Check for stored performance override
-  const storedCategory = localStorage.getItem('performanceCategory');
-  if (storedCategory === 'low' || storedCategory === 'medium' || storedCategory === 'high') {
-    cachedPerformanceCategory = storedCategory as DeviceCapability;
-    categoryCacheTime = now;
-    return cachedPerformanceCategory;
-  }
-
-  // Check for device memory API (Chrome)
-  const memory = (navigator as any).deviceMemory || 4;
-  
-  // Check for mobile device - using a more efficient regex pattern
-  const isMobile = /Android|iPhone|iPad|iPod|IEMobile/i.test(navigator.userAgent);
-  
-  // Determine performance category based on device characteristics
-  if (memory >= 8 && !isMobile) {
-    cachedPerformanceCategory = DeviceCapability.HIGH;
-  } else if (memory <= 2 || isMobile) {
-    cachedPerformanceCategory = DeviceCapability.LOW;
-  } else {
-    cachedPerformanceCategory = DeviceCapability.MEDIUM;
-  }
-  
-  // Cache the calculation time
-  categoryCacheTime = now;
-  return cachedPerformanceCategory;
-}
-
-// Cache for throttled functions to avoid recreating them
-const throttledFunctionsCache = new Map<string, {
-  func: Function,
-  limit: number,
-  throttledFunc: Function
-}>();
-
-/**
- * Generic throttle function with function caching for better performance
- */
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => ReturnType<T> | undefined {
-  // Generate a unique key for the function
-  const funcKey = func.toString() + limit;
-  
-  // Check if we have a cached version
-  const cached = throttledFunctionsCache.get(funcKey);
-  if (cached && cached.limit === limit) {
-    return cached.throttledFunc as (...args: Parameters<T>) => ReturnType<T> | undefined;
-  }
-  
-  let inThrottle: boolean = false;
-  let lastResult: ReturnType<T>;
-  
-  const throttledFunc = function(this: any, ...args: Parameters<T>): ReturnType<T> | undefined {
-    if (!inThrottle) {
-      lastResult = func.apply(this, args);
-      inThrottle = true;
-      
-      setTimeout(() => {
-        inThrottle = false;
-      }, limit);
-    }
-    
-    return lastResult;
-  };
-  
-  // Cache the throttled function
-  throttledFunctionsCache.set(funcKey, {
-    func,
-    limit,
-    throttledFunc
-  });
-  
-  return throttledFunc;
-}
-
-/**
- * Throttle function with performance-adaptive timing
- * Optimized to avoid redundant calculations
- */
-export function throttleForPerformance<T extends (...args: any[]) => any>(
-  func: T,
-  baseLimit: number = 100
-): (...args: Parameters<T>) => ReturnType<T> | undefined {
-  const performanceCategory = getPerformanceCategory();
-  
-  // Use a switch for better performance than multiple ternary operators
-  let multiplier;
-  switch (performanceCategory) {
-    case DeviceCapability.LOW:
-      multiplier = 2;
+export function calculateRecommendedQualityLevel(
+  deviceCapability: DeviceCapability,
+  fps?: number,
+  memoryUsage?: number
+): number {
+  // Base level on device capability
+  let baseLevel: number;
+  switch (deviceCapability) {
+    case 'high':
+      baseLevel = 4;
       break;
-    case DeviceCapability.MEDIUM:
-      multiplier = 1.5;
+    case 'medium':
+      baseLevel = 2;
       break;
+    case 'low':
     default:
-      multiplier = 1;
+      baseLevel = 1;
+      break;
   }
   
-  return throttle(func, Math.floor(baseLimit * multiplier));
+  // Adjust based on FPS if available
+  if (fps !== undefined) {
+    if (fps < DEFAULT_PERFORMANCE_BOUNDARIES.lowFPS) {
+      baseLevel = Math.max(1, baseLevel - 2);
+    } else if (fps < DEFAULT_PERFORMANCE_BOUNDARIES.mediumFPS) {
+      baseLevel = Math.max(1, baseLevel - 1);
+    } else if (fps > DEFAULT_PERFORMANCE_BOUNDARIES.highFPS) {
+      baseLevel = Math.min(5, baseLevel + 1);
+    }
+  }
+  
+  // Adjust based on memory usage if available
+  if (memoryUsage !== undefined) {
+    if (memoryUsage > DEFAULT_PERFORMANCE_BOUNDARIES.criticalMemory) {
+      baseLevel = 1; // Critical memory usage, force lowest quality
+    } else if (memoryUsage > DEFAULT_PERFORMANCE_BOUNDARIES.highMemory) {
+      baseLevel = Math.max(1, baseLevel - 1);
+    }
+  }
+  
+  return baseLevel;
 }
 
 /**
- * Monitor performance metrics
+ * Get particle count based on quality level and effect type
  */
-export function monitorPerformance() {
-  console.log('Starting performance monitoring');
-  // Initialize performance monitoring
-  performanceMonitor.startMonitoring();
+export function getParticleCount(
+  qualityLevel: number,
+  effectType: 'background' | 'interaction' | 'core' = 'background'
+): number {
+  const level = getQualityLevel(qualityLevel);
+  const baseCount = level.particleCount;
+  
+  switch (effectType) {
+    case 'interaction':
+      return Math.floor(baseCount * 0.5); // Fewer particles for interactions
+    case 'core':
+      return Math.floor(baseCount * 1.5); // More particles for core effects
+    case 'background':
+    default:
+      return baseCount;
+  }
 }
 
 /**
- * Get FPS estimation based on render timing
- * Optimized to avoid division by zero and unnecessary calculations
+ * Get geometry detail level based on quality setting
  */
-export function estimateFPS(renderTime: number): number {
-  if (renderTime <= 0) return 60;
-  // Avoid using Math.min for simple comparison
-  const fps = Math.floor(1000 / renderTime);
-  return fps > 60 ? 60 : fps;
+export function getGeometryDetail(qualityLevel: number): {
+  vertices: number;
+  segments: number;
+  resolution: number;
+} {
+  const level = getQualityLevel(qualityLevel);
+  const baseDetail = level.geometryDetail;
+  
+  return {
+    vertices: 4 + (baseDetail * 2), // 6, 8, 10, 12, 14
+    segments: 3 + baseDetail, // 4, 5, 6, 7, 8
+    resolution: baseDetail // 1, 2, 3, 4, 5
+  };
 }
 
-// Cache for feature enablement decisions
-const featureEnablementCache = new Map<string, {
-  result: boolean,
-  timestamp: number
-}>();
-
 /**
- * Determine if a feature should be enabled based on performance
- * Optimized with caching to improve performance
+ * Determine if a specific visual feature should be enabled based on quality level
  */
 export function shouldEnableFeature(
-  feature: string, 
-  minCategory: DeviceCapability = DeviceCapability.LOW
+  feature: 'particles' | 'glow' | 'shadows' | 'reflections' | 'distortions',
+  qualityLevel: number
 ): boolean {
-  // Check cache first
-  const cacheKey = `${feature}:${minCategory}`;
-  const cached = featureEnablementCache.get(cacheKey);
-  const now = Date.now();
+  const level = getQualityLevel(qualityLevel);
   
-  if (cached && (now - cached.timestamp < CACHE_TTL)) {
-    return cached.result;
+  switch (feature) {
+    case 'particles':
+      return level.level >= 1; // Enabled at all levels
+    case 'glow':
+      return level.level >= 2; // Medium and above
+    case 'shadows':
+      return level.level >= 3; // High and above
+    case 'reflections':
+      return level.level >= 4; // Ultra and above
+    case 'distortions':
+      return level.level >= 5; // Only at Extreme
+    default:
+      return false;
+  }
+}
+
+/**
+ * Get animation complexity parameters based on quality level
+ */
+export function getAnimationComplexity(qualityLevel: number): {
+  framerate: number;
+  steps: number;
+  interpolation: 'linear' | 'cubic' | 'spring';
+} {
+  const level = getQualityLevel(qualityLevel);
+  const complexity = level.animationComplexity;
+  
+  let interpolation: 'linear' | 'cubic' | 'spring';
+  switch (complexity) {
+    case 1:
+      interpolation = 'linear';
+      break;
+    case 2:
+    case 3:
+      interpolation = 'cubic';
+      break;
+    default:
+      interpolation = 'spring';
+      break;
   }
   
-  const currentCategory = getPerformanceCategory();
-  
-  // Map categories to numeric values for comparison
-  const categoryValues = {
-    [DeviceCapability.LOW]: 1,
-    [DeviceCapability.MEDIUM]: 2,
-    [DeviceCapability.HIGH]: 3
+  return {
+    framerate: 30 + (complexity * 10), // 40, 50, 60, 70, 80
+    steps: 2 + complexity, // 3, 4, 5, 6, 7
+    interpolation
   };
-  
-  const result = categoryValues[currentCategory] >= categoryValues[minCategory];
-  
-  // Cache the result
-  featureEnablementCache.set(cacheKey, {
-    result,
-    timestamp: now
-  });
-  
-  return result;
 }
+
+export default {
+  getQualityLevel,
+  calculateRecommendedQualityLevel,
+  getParticleCount,
+  getGeometryDetail,
+  shouldEnableFeature,
+  getAnimationComplexity,
+  DEFAULT_QUALITY_LEVELS,
+  DEFAULT_PERFORMANCE_BOUNDARIES
+};
