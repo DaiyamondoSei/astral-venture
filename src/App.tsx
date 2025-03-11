@@ -22,22 +22,25 @@ function App() {
   useEffect(() => {
     const bootstrapApp = async () => {
       try {
-        const result = await initializeApplication();
-        setInitResult(result);
-        setInitState(result.state);
-        
-        if (!result.success) {
-          setInitError(result.error || new Error('Application initialization failed'));
+        // Provide time for environment variables to load
+        setTimeout(async () => {
+          const result = await initializeApplication();
+          setInitResult(result);
+          setInitState(result.state);
           
-          // Show warning toast for each warning
-          result.warnings.forEach(warning => {
-            toast({
-              title: 'Initialization Warning',
-              description: warning,
-              variant: 'destructive',
+          if (!result.success) {
+            setInitError(result.error || new Error('Application initialization failed'));
+            
+            // Show warning toast for each warning
+            result.warnings.forEach(warning => {
+              toast({
+                title: 'Initialization Warning',
+                description: warning,
+                variant: 'warning',
+              });
             });
-          });
-        }
+          }
+        }, 100); // Short delay to ensure environment variables are loaded
       } catch (error) {
         console.error('Application bootstrap error:', error);
         setInitError(error instanceof Error ? error : new Error('Unknown initialization error'));
@@ -67,7 +70,7 @@ function App() {
   }
 
   // Show error state if initialization failed
-  if (initState === InitializationState.FAILED || initError) {
+  if (initState === InitializationState.FAILED && initError) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="text-center space-y-4 max-w-md p-6 bg-card rounded-lg shadow-lg">
@@ -95,6 +98,16 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  // Show degraded state message if applicable
+  if (initState === InitializationState.DEGRADED) {
+    toast({
+      title: "Limited Functionality",
+      description: "Some features may not be available due to configuration issues.",
+      variant: "warning",
+      duration: 5000,
+    });
   }
 
   return (

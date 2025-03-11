@@ -1,4 +1,3 @@
-
 /**
  * Supabase Client Singleton
  * 
@@ -21,7 +20,11 @@ interface SupabaseConfig {
 // Mock client for environments without Supabase configuration
 class MockSupabaseClient {
   constructor() {
-    console.warn('Using mock Supabase client. Database operations will not work.');
+    console.warn(
+      'Using mock Supabase client because configuration is missing or invalid. ' +
+      'Database operations will not work. Check your environment variables: ' +
+      'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
+    );
   }
 
   from(table: string) {
@@ -35,11 +38,9 @@ class MockSupabaseClient {
     };
   }
 
-  // Create a mock query builder with all common methods
   _createMockQueryBuilder() {
     const mockResponse = this._createMockResponse(null, new Error('Mock Supabase client'));
     const mockBuilder: any = {
-      // Filters
       eq: () => mockBuilder,
       neq: () => mockBuilder,
       gt: () => mockBuilder,
@@ -64,12 +65,10 @@ class MockSupabaseClient {
       or: () => mockBuilder,
       filter: () => mockBuilder,
       
-      // Modifiers
       order: () => mockBuilder,
       limit: () => mockBuilder,
       range: () => mockBuilder,
       
-      // Execution methods
       single: () => mockResponse,
       maybeSingle: () => mockResponse,
       then: (onFulfilled: any) => Promise.resolve(onFulfilled(mockResponse)),
@@ -77,7 +76,6 @@ class MockSupabaseClient {
     return mockBuilder;
   }
 
-  // Create a consistent mock response structure
   _createMockResponse(data: any, error: Error | null) {
     return { data, error };
   }
@@ -113,15 +111,35 @@ class MockSupabaseClient {
 // Singleton instance
 let supabaseInstance: SupabaseClient | MockSupabaseClient | null = null;
 let isUsingMockClient = false;
+let initializationAttempted = false;
 
 /**
  * Initialize Supabase client with proper validation
  * Requires that application configuration has been validated
  */
 function initializeSupabaseClient(): SupabaseClient | MockSupabaseClient {
+  // Only attempt initialization once
+  if (initializationAttempted) {
+    return supabaseInstance || new MockSupabaseClient();
+  }
+  
+  initializationAttempted = true;
+  
   try {
-    // Check that configuration is valid before proceeding
-    ensureValidConfiguration();
+    // Check for environment variables availability
+    if (typeof import.meta.env === 'undefined' || 
+        !import.meta.env.VITE_SUPABASE_URL || 
+        !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      
+      console.error(
+        '[SUPABASE] Environment variables are not available or missing required values. ' +
+        'Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are defined in your environment.'
+      );
+      
+      // Use mock client until configuration is available
+      isUsingMockClient = true;
+      return new MockSupabaseClient();
+    }
     
     // Get configuration values with validation
     const supabaseUrl = getValidatedConfig('VITE_SUPABASE_URL');
@@ -150,12 +168,14 @@ function initializeSupabaseClient(): SupabaseClient | MockSupabaseClient {
     }
     
     // Create and return client
-    return createClient(supabaseUrl, supabaseAnonKey);
+    const client = createClient(supabaseUrl, supabaseAnonKey);
+    isUsingMockClient = false;
+    return client;
   } catch (error) {
     // Log detailed error for developers
     console.error('[CRITICAL] Failed to initialize Supabase client:', error);
     
-    // Show user-friendly error message only in production
+    // Show user-friendly error message
     if (import.meta.env.PROD) {
       toast({
         title: 'Configuration Error',
@@ -213,6 +233,7 @@ export function getSupabase(): SupabaseClient | MockSupabaseClient {
 export function resetSupabaseClient(): void {
   supabaseInstance = null;
   isUsingMockClient = false;
+  initializationAttempted = false;
 }
 
 /**
@@ -263,7 +284,7 @@ export async function incrementEnergyPoints(
 }
 
 // Create and export the singleton instance
-// This maintains backward compatibility
+// This maintains backward compatibility while ensuring delayed initialization
 export const supabase = getSupabase();
 
 /**

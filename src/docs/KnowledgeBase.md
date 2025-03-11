@@ -1,4 +1,3 @@
-
 # Knowledge Base: Preventing and Resolving Type Issues
 
 This knowledge base document outlines strategies for preventing and resolving type safety issues in our codebase.
@@ -628,4 +627,242 @@ function validateUser(user: User): void {
 }
 ```
 
-By implementing these strategies, we can prevent type safety issues and ensure a more maintainable codebase.
+## 10. Error Prevention Patterns
+
+### 10.1 Environment Variable Handling
+
+Best practices for environment variables:
+
+```typescript
+// 1. Define explicit interface for environment variables
+interface AppEnvironment {
+  VITE_API_URL: string;
+  VITE_AUTH_KEY: string;
+  VITE_DEBUG_MODE?: string;
+}
+
+// 2. Create validation function
+function validateEnvironment(): { valid: boolean; missing: string[] } {
+  const required: (keyof AppEnvironment)[] = ['VITE_API_URL', 'VITE_AUTH_KEY'];
+  const env = import.meta.env;
+  
+  const missing = required.filter(key => !env[key]);
+  return {
+    valid: missing.length === 0,
+    missing
+  };
+}
+
+// 3. Create safe accessor
+function getEnvVar<K extends keyof AppEnvironment>(key: K): string {
+  const value = import.meta.env[key];
+  if (!value) {
+    console.warn(`Environment variable ${key} is missing`);
+    return '';
+  }
+  return value as string;
+}
+
+// 4. Implement delayed initialization
+function initializeApp() {
+  // Wait for environment to be fully loaded
+  setTimeout(() => {
+    const { valid, missing } = validateEnvironment();
+    if (!valid) {
+      console.error(`Missing environment variables: ${missing.join(', ')}`);
+    }
+  }, 100);
+}
+```
+
+### 10.2 Client Initialization Patterns
+
+Implement proper client initialization:
+
+```typescript
+// Safe client initialization pattern
+let clientInstance: ApiClient | null = null;
+let initializationAttempted = false;
+
+function getClient(): ApiClient {
+  if (!clientInstance && !initializationAttempted) {
+    initializationAttempted = true;
+    try {
+      // Check prerequisites
+      const apiUrl = getEnvVar('VITE_API_URL');
+      if (!apiUrl) {
+        throw new Error('API URL is required');
+      }
+      
+      // Create real client
+      clientInstance = new ApiClient(apiUrl);
+    } catch (error) {
+      console.error('Failed to initialize client:', error);
+      // Create fallback/mock client
+      clientInstance = new MockApiClient();
+    }
+  }
+  
+  // Always return something usable
+  return clientInstance || new MockApiClient();
+}
+
+// Usage
+const client = getClient();
+```
+
+### 10.3 Mock Client Implementation
+
+Create effective mock clients:
+
+```typescript
+// Comprehensive mock client
+class MockApiClient {
+  constructor() {
+    console.warn(
+      'Using mock API client. Real API operations will not work. ' +
+      'Check your environment configuration.'
+    );
+  }
+  
+  // Mock all public methods
+  async getUsers(): Promise<User[]> {
+    return [{ id: 'mock-1', name: 'Mock User' }];
+  }
+  
+  async createUser(user: Partial<User>): Promise<User> {
+    return { id: 'mock-new', name: user.name || 'New Mock User' };
+  }
+  
+  // Implement thorough error reporting
+  async riskyOperation(): Promise<void> {
+    throw new Error(
+      'This operation cannot be performed with mock client. ' +
+      'Configure real client to use this feature.'
+    );
+  }
+}
+```
+
+### 10.4 Bootstrap Process
+
+Implement a robust application bootstrap process:
+
+```typescript
+// Define initialization states
+enum InitState {
+  PENDING,
+  IN_PROGRESS,
+  SUCCESS,
+  DEGRADED,
+  FAILED
+}
+
+// Track initialization state
+let appInitState = InitState.PENDING;
+let initializationPromise: Promise<void> | null = null;
+
+// Single initialization pattern with caching
+async function initializeApp(): Promise<void> {
+  // Return cached promise if in progress
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+  
+  // Create and cache initialization promise
+  initializationPromise = initializeAppInternal();
+  return initializationPromise;
+}
+
+// Internal initialization with graceful degradation
+async function initializeAppInternal(): Promise<void> {
+  appInitState = InitState.IN_PROGRESS;
+  
+  try {
+    // Step 1: Load and validate configuration
+    const configValid = validateConfiguration();
+    if (!configValid) {
+      appInitState = InitState.DEGRADED;
+    }
+    
+    // Step 2: Initialize critical services
+    const servicesInitialized = await initializeCriticalServices();
+    if (!servicesInitialized) {
+      appInitState = InitState.DEGRADED;
+    }
+    
+    // Step 3: Initialize non-critical features
+    try {
+      await initializeFeatures();
+    } catch (error) {
+      console.warn('Non-critical features failed to initialize:', error);
+      // Don't change init state for non-critical failures
+    }
+    
+    // Set final state if not already DEGRADED
+    if (appInitState !== InitState.DEGRADED) {
+      appInitState = InitState.SUCCESS;
+    }
+  } catch (error) {
+    console.error('Application initialization failed:', error);
+    appInitState = InitState.FAILED;
+    throw error;
+  }
+}
+
+// Usage in component
+function AppRoot() {
+  const [initState, setInitState] = useState(InitState.PENDING);
+  
+  useEffect(() => {
+    initializeApp()
+      .then(() => setInitState(appInitState))
+      .catch(() => setInitState(InitState.FAILED));
+  }, []);
+  
+  // Render appropriate UI based on initialization state
+  if (initState === InitState.PENDING || initState === InitState.IN_PROGRESS) {
+    return <LoadingScreen />;
+  }
+  
+  if (initState === InitState.FAILED) {
+    return <ErrorScreen />;
+  }
+  
+  return (
+    <>
+      {initState === InitState.DEGRADED && <DegradedBanner />}
+      <MainApp />
+    </>
+  );
+}
+```
+
+### 10.5 Defensive Data Handling
+
+Implement defensive data access patterns:
+
+```typescript
+// Safe data access
+function getNestedProperty<T>(obj: unknown, path: string, defaultValue: T): T {
+  if (!obj) return defaultValue;
+  
+  const parts = path.split('.');
+  let current: any = obj;
+  
+  for (const part of parts) {
+    if (current === null || current === undefined) {
+      return defaultValue;
+    }
+    
+    current = current[part];
+  }
+  
+  return (current === undefined || current === null) ? defaultValue : current;
+}
+
+// Usage
+const userName = getNestedProperty(userData, 'profile.name', 'Unknown User');
+```
+
+By implementing these error prevention patterns, we can significantly reduce the likelihood of encountering configuration-related issues and improve application resilience.
