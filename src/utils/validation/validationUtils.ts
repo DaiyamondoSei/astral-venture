@@ -1,16 +1,17 @@
-
 /**
  * Validation Utilities
  * 
  * Provides type-safe validation primitives for runtime type checking.
  */
 
-import { ValidationError, ValidationErrorDetail } from './ValidationError';
+import { ValidationError } from './ValidationError';
 import { 
   ValidationResult, 
   Validator, 
   ValidationSchema, 
-  ValidationOptions 
+  ValidationOptions,
+  ValidationErrorCode,
+  ValidationContext
 } from './types';
 
 /**
@@ -25,7 +26,7 @@ export const required = (field: string): Validator => {
           path: field,
           message: `${field} is required`,
           rule: 'required',
-          code: 'REQUIRED'
+          code: ValidationErrorCode.REQUIRED
         }
       };
     }
@@ -38,8 +39,8 @@ export const required = (field: string): Validator => {
  */
 export function createTypeGuard<T>(
   guard: (value: unknown) => value is T,
-  code: string,
-  message: string
+  code: string = ValidationErrorCode.TYPE_ERROR,
+  message: string = 'Invalid type'
 ): Validator<T> {
   return (value: unknown): ValidationResult<T> => {
     if (!guard(value)) {
@@ -61,9 +62,9 @@ export function createTypeGuard<T>(
  * Combine multiple validators
  */
 export function combineValidators<T>(validators: Validator[]): Validator<T> {
-  return (value: unknown): ValidationResult<T> => {
+  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
     for (const validator of validators) {
-      const result = validator(value);
+      const result = validator(value, context);
       if (!result.valid) {
         return result as ValidationResult<T>;
       }
@@ -86,6 +87,98 @@ export const isArray = <T>(itemGuard?: (item: unknown) => item is T) =>
   };
 export const isObject = (value: unknown): value is Record<string, unknown> => 
   typeof value === 'object' && value !== null && !Array.isArray(value);
+export const isDate = (value: unknown): value is Date => 
+  value instanceof Date && !isNaN(value.getTime());
+
+/**
+ * Extended validator for string patterns (regex)
+ */
+export const matchesPattern = (pattern: RegExp, errorMessage: string): Validator<string> => {
+  return (value: unknown): ValidationResult<string> => {
+    if (typeof value !== 'string') {
+      return {
+        valid: false,
+        error: {
+          path: '',
+          message: 'Value must be a string',
+          code: ValidationErrorCode.TYPE_ERROR,
+          rule: 'type'
+        }
+      };
+    }
+    
+    if (!pattern.test(value)) {
+      return {
+        valid: false,
+        error: {
+          path: '',
+          message: errorMessage,
+          code: ValidationErrorCode.PATTERN_ERROR,
+          rule: 'pattern'
+        }
+      };
+    }
+    
+    return { valid: true, validatedData: value };
+  };
+};
+
+/**
+ * String length validator
+ */
+export const hasLength = (options: { min?: number; max?: number; exact?: number }): Validator<string> => {
+  return (value: unknown): ValidationResult<string> => {
+    if (typeof value !== 'string') {
+      return {
+        valid: false,
+        error: {
+          path: '',
+          message: 'Value must be a string',
+          code: ValidationErrorCode.TYPE_ERROR,
+          rule: 'type'
+        }
+      };
+    }
+    
+    if (options.exact !== undefined && value.length !== options.exact) {
+      return {
+        valid: false,
+        error: {
+          path: '',
+          message: `Value must be exactly ${options.exact} characters`,
+          code: ValidationErrorCode.RANGE_ERROR,
+          rule: 'exactLength'
+        }
+      };
+    }
+    
+    if (options.min !== undefined && value.length < options.min) {
+      return {
+        valid: false,
+        error: {
+          path: '',
+          message: `Value must be at least ${options.min} characters`,
+          code: ValidationErrorCode.RANGE_ERROR,
+          rule: 'minLength'
+        }
+      };
+    }
+    
+    if (options.max !== undefined && value.length > options.max) {
+      return {
+        valid: false,
+        error: {
+          path: '',
+          message: `Value must be at most ${options.max} characters`,
+          code: ValidationErrorCode.RANGE_ERROR,
+          rule: 'maxLength'
+        }
+      };
+    }
+    
+    return { valid: true, validatedData: value };
+  };
+};
 
 /**
  * Validate unknown data against a schema
@@ -99,18 +192,25 @@ export function validateData<T>(
   if (!isObject(data)) {
     throw new ValidationError(
       'Invalid data format', 
-      [{ path: '', message: 'Expected an object', code: 'TYPE_ERROR' }]
+      [{ path: '', message: 'Expected an object', code: ValidationErrorCode.TYPE_ERROR }]
     );
   }
 
-  const errors: ValidationErrorDetail[] = [];
+  const errors = [];
   const result: Record<string, unknown> = {};
 
   for (const [field, validator] of Object.entries(schema)) {
     if (!validator) continue;
     
     const fieldValue = data[field];
-    const validationResult = validator(fieldValue);
+    const context: ValidationContext = {
+      fieldPath: field,
+      parentValue: data,
+      options,
+      root: data
+    };
+    
+    const validationResult = validator(fieldValue, context);
     
     if (!validationResult.valid && validationResult.error) {
       errors.push({
@@ -133,7 +233,7 @@ export function validateData<T>(
           errors.push({
             path: key,
             message: `Unknown field: ${key}`,
-            code: 'UNKNOWN_FIELD'
+            code: ValidationErrorCode.UNKNOWN_ERROR
           });
         } else {
           result[key] = value;
@@ -173,8 +273,14 @@ export function getProperty<T>(
 /**
  * Create schema validator function from schema object
  */
-export function createSchemaValidator<T>(schema: ValidationSchema<T>): Validator<T> {
-  return (data: unknown): ValidationResult<T> => {
+export function createSchemaValidator<T>(schema: ValidationSchema<T> | Validator<T>): Validator<T> {
+  // If schema is already a validator function, return it
+  if (typeof schema === 'function') {
+    return schema;
+  }
+  
+  // Otherwise, create a validator from the schema object
+  return (data: unknown, context?: ValidationContext): ValidationResult<T> => {
     try {
       const validated = validateData<T>(data, schema);
       return { valid: true, validatedData: validated };
@@ -195,3 +301,44 @@ export function createSchemaValidator<T>(schema: ValidationSchema<T>): Validator
     }
   };
 }
+
+/**
+ * Create a custom validation function
+ */
+export function createValidator<T>(
+  validationFn: (value: unknown, context?: ValidationContext) => { valid: boolean; message?: string; },
+  errorCode: string = ValidationErrorCode.CUSTOM_ERROR
+): Validator<T> {
+  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
+    const result = validationFn(value, context);
+    if (!result.valid) {
+      return {
+        valid: false,
+        error: {
+          path: context?.fieldPath || '',
+          message: result.message || 'Validation failed',
+          code: errorCode
+        }
+      };
+    }
+    return { valid: true, validatedData: value as T };
+  };
+}
+
+export default {
+  required,
+  createTypeGuard,
+  combineValidators,
+  isString,
+  isNumber,
+  isBoolean,
+  isArray,
+  isObject,
+  isDate,
+  matchesPattern,
+  hasLength,
+  validateData,
+  getProperty,
+  createSchemaValidator,
+  createValidator
+};

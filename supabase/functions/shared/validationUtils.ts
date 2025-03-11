@@ -8,12 +8,28 @@
 /**
  * Type definitions for validation errors
  */
+export enum ValidationErrorCode {
+  REQUIRED = 'REQUIRED',
+  TYPE_ERROR = 'TYPE_ERROR',
+  FORMAT_ERROR = 'FORMAT_ERROR',
+  RANGE_ERROR = 'RANGE_ERROR',
+  PATTERN_ERROR = 'PATTERN_ERROR',
+  CONSTRAINT_ERROR = 'CONSTRAINT_ERROR',
+  CUSTOM_ERROR = 'CUSTOM_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+}
+
+/**
+ * ValidationErrorDetail interface
+ */
 export interface ValidationErrorDetail {
   path: string;
   message: string;
   code?: string;
   rule?: string;
   value?: unknown;
+  type?: string;
+  field?: string;  // For backward compatibility
 }
 
 export class ValidationError extends Error {
@@ -24,7 +40,7 @@ export class ValidationError extends Error {
   constructor(
     message: string,
     details: ValidationErrorDetail[] = [],
-    code: string = 'VALIDATION_ERROR',
+    code: string = ValidationErrorCode.UNKNOWN_ERROR,
     statusCode: number = 400
   ) {
     super(message);
@@ -39,6 +55,17 @@ export class ValidationError extends Error {
   
   static isValidationError(error: unknown): error is ValidationError {
     return error instanceof ValidationError;
+  }
+  
+  /**
+   * Create formatted error for response
+   */
+  toResponseFormat(): { message: string; details: ValidationErrorDetail[]; code: string } {
+    return {
+      message: this.message,
+      details: this.details,
+      code: this.code
+    };
   }
 }
 
@@ -69,7 +96,8 @@ export function validateString(value: unknown, fieldName: string): string {
       [{ 
         path: fieldName, 
         message: `${fieldName} must be a string`,
-        value
+        value,
+        code: ValidationErrorCode.TYPE_ERROR
       }]
     );
   }
@@ -86,7 +114,8 @@ export function validateNumber(value: unknown, fieldName: string): number {
       [{ 
         path: fieldName, 
         message: `${fieldName} must be a valid number`,
-        value
+        value,
+        code: ValidationErrorCode.TYPE_ERROR
       }]
     );
   }
@@ -103,7 +132,8 @@ export function validateBoolean(value: unknown, fieldName: string): boolean {
       [{ 
         path: fieldName, 
         message: `${fieldName} must be a boolean`,
-        value
+        value,
+        code: ValidationErrorCode.TYPE_ERROR
       }]
     );
   }
@@ -120,7 +150,8 @@ export function validateArray(value: unknown, fieldName: string): unknown[] {
       [{ 
         path: fieldName, 
         message: `${fieldName} must be an array`,
-        value
+        value,
+        code: ValidationErrorCode.TYPE_ERROR
       }]
     );
   }
@@ -137,7 +168,8 @@ export function validateObject(value: unknown, fieldName: string): Record<string
       [{ 
         path: fieldName, 
         message: `${fieldName} must be an object`,
-        value
+        value,
+        code: ValidationErrorCode.TYPE_ERROR
       }]
     );
   }
@@ -158,11 +190,38 @@ export function validateEnum<T extends string>(
       [{ 
         path: fieldName, 
         message: `${fieldName} must be one of: ${allowedValues.join(', ')}`,
-        value
+        value,
+        code: ValidationErrorCode.FORMAT_ERROR
       }]
     );
   }
   return value as T;
+}
+
+/**
+ * Validates that a string matches a pattern
+ */
+export function validatePattern(
+  value: unknown,
+  pattern: RegExp,
+  fieldName: string,
+  customMessage?: string
+): string {
+  const strValue = validateString(value, fieldName);
+  
+  if (!pattern.test(strValue)) {
+    throw new ValidationError(
+      customMessage || `${fieldName} has invalid format`,
+      [{ 
+        path: fieldName, 
+        message: customMessage || `${fieldName} has invalid format`,
+        value,
+        code: ValidationErrorCode.PATTERN_ERROR
+      }]
+    );
+  }
+  
+  return strValue;
 }
 
 /**
@@ -186,8 +245,139 @@ export function safeValidate<T>(
       success: false, 
       error: { 
         path: '',
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? error.message : String(error),
+        code: ValidationErrorCode.UNKNOWN_ERROR
       }
     };
   }
 }
+
+/**
+ * Creates a standard error response for API endpoints
+ */
+export function createErrorResponse(
+  error: unknown,
+  status: number = 400,
+  headers: Record<string, string> = {}
+): Response {
+  if (ValidationError.isValidationError(error)) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.toResponseFormat(),
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: error.statusCode || status,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        }
+      }
+    );
+  }
+  
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+        code: ValidationErrorCode.UNKNOWN_ERROR
+      },
+      timestamp: new Date().toISOString()
+    }),
+    {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      }
+    }
+  );
+}
+
+/**
+ * Creates a standard success response for API endpoints
+ */
+export function createSuccessResponse(
+  data: unknown,
+  headers: Record<string, string> = {},
+  status: number = 200
+): Response {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data,
+      timestamp: new Date().toISOString()
+    }),
+    {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      }
+    }
+  );
+}
+
+/**
+ * Validates request payload against a schema
+ */
+export function validateRequest<T>(
+  request: Request,
+  requiredFields: string[] = []
+): Promise<T> {
+  return request.json()
+    .then((data: unknown) => {
+      // Check if data is an object
+      if (typeof data !== 'object' || data === null) {
+        throw new ValidationError(
+          'Invalid request format', 
+          [{ path: '', message: 'Request body must be a JSON object', code: ValidationErrorCode.TYPE_ERROR }]
+        );
+      }
+      
+      // Check required fields
+      const { isValid, missingParams } = validateRequiredParams(data as Record<string, unknown>, requiredFields);
+      
+      if (!isValid) {
+        throw new ValidationError(
+          'Missing required parameters',
+          missingParams.map(param => ({
+            path: param,
+            message: `${param} is required`,
+            code: ValidationErrorCode.REQUIRED
+          }))
+        );
+      }
+      
+      return data as T;
+    })
+    .catch(error => {
+      if (ValidationError.isValidationError(error)) {
+        throw error;
+      }
+      
+      throw new ValidationError(
+        'Failed to parse request body',
+        [{ path: '', message: error instanceof Error ? error.message : String(error), code: ValidationErrorCode.TYPE_ERROR }]
+      );
+    });
+}
+
+export default {
+  ValidationError,
+  ValidationErrorCode,
+  validateRequiredParams,
+  validateString,
+  validateNumber,
+  validateBoolean,
+  validateArray,
+  validateObject,
+  validateEnum,
+  validatePattern,
+  safeValidate,
+  createErrorResponse,
+  createSuccessResponse,
+  validateRequest
+};

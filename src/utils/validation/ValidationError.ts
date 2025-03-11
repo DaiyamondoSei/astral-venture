@@ -5,7 +5,7 @@
  * A specialized error type for validation failures with detailed error information.
  */
 
-import { ValidationErrorDetail } from './types';
+import { ValidationErrorDetail, ValidationErrorCode, ValidationSeverity } from './types';
 
 export class ValidationError extends Error {
   public readonly details: ValidationErrorDetail[];
@@ -23,7 +23,7 @@ export class ValidationError extends Error {
   constructor(
     message: string,
     details: ValidationErrorDetail[] = [],
-    code: string = 'VALIDATION_ERROR', 
+    code: string = ValidationErrorCode.UNKNOWN_ERROR, 
     httpStatus: number = 400
   ) {
     super(message);
@@ -39,7 +39,9 @@ export class ValidationError extends Error {
         // Copy all other properties
         ...detail,
         // Ensure field exists for backward compatibility
-        field: detail.field || detail.path
+        field: detail.field || detail.path,
+        // Ensure severity is set
+        severity: detail.severity || ValidationSeverity.ERROR
       };
       return normalizedDetail;
     });
@@ -125,9 +127,9 @@ export class ValidationError extends Error {
           type: err.type,
           code: err.code,
           rule: err.rule,
-          statusCode: statusCode
+          severity: err.severity || ValidationSeverity.ERROR
         })),
-        apiError.code || 'VALIDATION_ERROR',
+        apiError.code || ValidationErrorCode.UNKNOWN_ERROR,
         statusCode
       );
     }
@@ -135,7 +137,7 @@ export class ValidationError extends Error {
     return new ValidationError(
       apiError?.message || defaultMessage,
       [],
-      apiError?.code || 'VALIDATION_ERROR',
+      apiError?.code || ValidationErrorCode.UNKNOWN_ERROR,
       statusCode
     );
   }
@@ -158,7 +160,7 @@ export class ValidationError extends Error {
         field, 
         message: message || `${field} is required`, 
         rule: 'required',
-        code: 'FIELD_REQUIRED'
+        code: ValidationErrorCode.REQUIRED
       }]
     );
   }
@@ -172,7 +174,7 @@ export class ValidationError extends Error {
         message: message || `${field} must be a ${expectedType}`, 
         type: expectedType,
         rule: 'type',
-        code: 'TYPE_ERROR'
+        code: ValidationErrorCode.TYPE_ERROR
       }]
     );
   }
@@ -194,7 +196,7 @@ export class ValidationError extends Error {
         field, 
         message: message || defaultMessage, 
         rule: 'range',
-        code: 'RANGE_ERROR'
+        code: ValidationErrorCode.RANGE_ERROR
       }]
     );
   }
@@ -207,7 +209,7 @@ export class ValidationError extends Error {
         field, 
         message: message || `${field} has invalid format (expected: ${format})`, 
         rule: 'format',
-        code: 'FORMAT_ERROR'
+        code: ValidationErrorCode.FORMAT_ERROR
       }]
     );
   }

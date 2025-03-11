@@ -5,6 +5,7 @@
  * This module provides centralized type definitions for the performance monitoring system.
  */
 
+// Basic Classification Types
 // Device capability classification
 export type DeviceCapability = 'low' | 'medium' | 'high';
 
@@ -17,8 +18,22 @@ export type RenderFrequency = 'low' | 'medium' | 'high';
 // Quality level settings
 export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
 
+// Metric Types
 // Types of metrics to track
-export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network' | 'resource' | 'javascript' | 'css' | 'animation' | 'metric' | 'summary' | 'performance' | 'webVital';
+export type MetricType = 
+  | 'render' 
+  | 'interaction' 
+  | 'load' 
+  | 'memory' 
+  | 'network' 
+  | 'resource' 
+  | 'javascript' 
+  | 'css' 
+  | 'animation' 
+  | 'metric' 
+  | 'summary' 
+  | 'performance' 
+  | 'webVital';
 
 // Web vital metrics
 export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
@@ -27,13 +42,16 @@ export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 
 // Web vital rating types
 export type WebVitalRating = 'good' | 'needs-improvement' | 'poor';
 
+// Core Metric Interfaces
 // Web vital metric structure
 export interface WebVitalMetric {
-  name: string;
+  name: WebVitalName | string;
   value: number;
   category: WebVitalCategory;
   timestamp: number;
   rating?: WebVitalRating;
+  delta?: number;
+  id?: string;
 }
 
 // Performance metric structure
@@ -49,6 +67,7 @@ export interface PerformanceMetric {
   page_url?: string;
   metadata?: Record<string, any>;
   rating?: WebVitalRating;
+  id?: string;
 }
 
 // Component metrics structure
@@ -73,8 +92,10 @@ export interface ComponentMetrics {
   maxRenderTime?: number;
   lastUpdated?: number;
   metricType?: string;
+  id?: string;
 }
 
+// Configuration Interfaces
 // Performance settings based on device capability
 export interface PerformanceSettings {
   targetFPS: number;
@@ -84,6 +105,8 @@ export interface PerformanceSettings {
   disableShadows: boolean;
   particleCount: number;
   maxAnimationsPerFrame: number;
+  optimizationEnabled?: boolean;
+  id?: string;
 }
 
 // Performance monitor configuration
@@ -94,6 +117,7 @@ export interface PerformanceMonitorConfig {
   samplingRate: number;
   debugMode?: boolean;
   reportingEndpoint?: string;
+  logSlowRenders?: boolean;
   
   // Advanced configuration
   optimizationLevel?: 'auto' | 'low' | 'medium' | 'high';
@@ -111,6 +135,7 @@ export interface PerformanceMonitorConfig {
   intelligentProfiling?: boolean;
   inactiveTabThrottling?: boolean;
   batchUpdates?: boolean;
+  id?: string;
 }
 
 // Adaptive rendering settings
@@ -122,6 +147,7 @@ export interface AdaptiveSettings {
   useSimplifiedEffects: boolean;
   disableBlur: boolean;
   disableShadows: boolean;
+  id?: string;
 }
 
 // Performance boundaries for different capability levels
@@ -132,6 +158,23 @@ export interface PerformanceBoundaries {
   criticalMemory: number;
   highMemory: number;
   mediumMemory: number;
+  id?: string;
+}
+
+// Performance tracking options for hooks and components
+export interface PerformanceTrackingOptions {
+  enabled?: boolean;
+  componentName?: string;
+  trackProps?: boolean;
+  trackRenders?: boolean;
+  trackEffects?: boolean;
+  trackMounts?: boolean;
+  debugMode?: boolean;
+  samplingRate?: number;
+  slowRenderThreshold?: number;
+  logSlowRenders?: boolean;
+  reportMetrics?: boolean;
+  id?: string;
 }
 
 // Performance metric validation interface
@@ -140,5 +183,81 @@ export interface MetricValidation {
   validateWebVital: (vital: WebVitalMetric) => boolean;
   isValidMetricType: (type: string) => type is MetricType;
   isValidWebVitalName: (name: string) => name is WebVitalName;
-  isValidWebVitalCategory: (category: string) => category is WebVitalCategory;
+  isValidWebVitalCategory: (category: string) => type is WebVitalCategory;
 }
+
+// Type guards for runtime validation
+/**
+ * Check if a string is a valid MetricType
+ */
+export function isValidMetricType(type: string): type is MetricType {
+  return [
+    'render', 'interaction', 'load', 'memory', 'network', 
+    'resource', 'javascript', 'css', 'animation', 
+    'metric', 'summary', 'performance', 'webVital'
+  ].includes(type as MetricType);
+}
+
+/**
+ * Check if a string is a valid WebVitalName
+ */
+export function isValidWebVitalName(name: string): name is WebVitalName {
+  return ['CLS', 'FCP', 'LCP', 'TTFB', 'FID', 'INP'].includes(name as WebVitalName);
+}
+
+/**
+ * Check if a string is a valid WebVitalCategory
+ */
+export function isValidWebVitalCategory(category: string): category is WebVitalCategory {
+  return [
+    'loading', 'interaction', 'visual_stability', 'responsiveness'
+  ].includes(category as WebVitalCategory);
+}
+
+/**
+ * Check if an object is a valid PerformanceMetric
+ */
+export function isPerformanceMetric(obj: unknown): obj is PerformanceMetric {
+  return typeof obj === 'object' && 
+    obj !== null && 
+    'metric_name' in obj && 
+    'value' in obj && 
+    'category' in obj && 
+    'type' in obj && 
+    'timestamp' in obj;
+}
+
+/**
+ * Check if an object is a valid WebVitalMetric
+ */
+export function isWebVitalMetric(obj: unknown): obj is WebVitalMetric {
+  return typeof obj === 'object' && 
+    obj !== null && 
+    'name' in obj && 
+    'value' in obj && 
+    'category' in obj && 
+    'timestamp' in obj;
+}
+
+/**
+ * Check if an object is a valid ComponentMetrics
+ */
+export function isComponentMetrics(obj: unknown): obj is ComponentMetrics {
+  return typeof obj === 'object' && 
+    obj !== null && 
+    'componentName' in obj && 
+    'renderCount' in obj && 
+    'totalRenderTime' in obj && 
+    'averageRenderTime' in obj && 
+    'lastRenderTime' in obj;
+}
+
+// Export all the types and utilities
+export default {
+  isValidMetricType,
+  isValidWebVitalName,
+  isValidWebVitalCategory,
+  isPerformanceMetric,
+  isWebVitalMetric,
+  isComponentMetrics
+};

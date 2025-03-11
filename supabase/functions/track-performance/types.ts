@@ -5,7 +5,20 @@
 /**
  * Types of metrics that can be tracked
  */
-export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network' | 'resource' | 'javascript' | 'css' | 'animation' | 'metric' | 'summary' | 'performance' | 'webVital';
+export type MetricType = 
+  | 'render' 
+  | 'interaction' 
+  | 'load' 
+  | 'memory' 
+  | 'network' 
+  | 'resource' 
+  | 'javascript' 
+  | 'css' 
+  | 'animation' 
+  | 'metric' 
+  | 'summary' 
+  | 'performance' 
+  | 'webVital';
 
 /**
  * Web vital metrics
@@ -44,11 +57,13 @@ export interface DeviceInfo {
  * Web vital metric structure
  */
 export interface WebVitalMetric {
-  name: string;
+  name: WebVitalName | string;
   value: number;
   category: WebVitalCategory;
   timestamp: number;
   rating?: WebVitalRating;
+  delta?: number;
+  id?: string;
 }
 
 /**
@@ -68,6 +83,7 @@ export interface PerformanceMetric {
   metadata?: Record<string, any>;
   environment?: string;
   rating?: WebVitalRating;
+  id?: string;
 }
 
 /**
@@ -114,6 +130,17 @@ export interface ValidationResult {
 }
 
 /**
+ * Error codes for performance tracking
+ */
+export enum ErrorCode {
+  INVALID_METRIC = 'INVALID_METRIC',
+  INVALID_PAYLOAD = 'INVALID_PAYLOAD',
+  STORAGE_ERROR = 'STORAGE_ERROR',
+  SERVER_ERROR = 'SERVER_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+}
+
+/**
  * Type guards for runtime type safety
  */
 export function isValidMetricType(type: string): type is MetricType {
@@ -121,13 +148,44 @@ export function isValidMetricType(type: string): type is MetricType {
     'render', 'interaction', 'load', 'memory', 'network', 
     'resource', 'javascript', 'css', 'animation', 
     'metric', 'summary', 'performance', 'webVital'
-  ].includes(type);
+  ].includes(type as MetricType);
 }
 
 export function isValidWebVitalName(name: string): name is WebVitalName {
-  return ['CLS', 'FCP', 'LCP', 'TTFB', 'FID', 'INP'].includes(name);
+  return ['CLS', 'FCP', 'LCP', 'TTFB', 'FID', 'INP'].includes(name as WebVitalName);
 }
 
-export function isValidWebVitalCategory(category: string): type is WebVitalCategory {
-  return ['loading', 'interaction', 'visual_stability', 'responsiveness'].includes(category);
+export function isValidWebVitalCategory(category: string): category is WebVitalCategory {
+  return [
+    'loading', 'interaction', 'visual_stability', 'responsiveness'
+  ].includes(category as WebVitalCategory);
+}
+
+export function isValidRating(rating: string): rating is WebVitalRating {
+  return ['good', 'needs-improvement', 'poor'].includes(rating as WebVitalRating);
+}
+
+export function isPerformanceMetric(obj: unknown): obj is PerformanceMetric {
+  if (typeof obj !== 'object' || obj === null) return false;
+  
+  const metric = obj as Partial<PerformanceMetric>;
+  return (
+    typeof metric.metric_name === 'string' &&
+    typeof metric.value === 'number' &&
+    typeof metric.category === 'string' &&
+    typeof metric.type === 'string' &&
+    (typeof metric.timestamp === 'string' || typeof metric.timestamp === 'number')
+  );
+}
+
+export function isWebVitalMetric(obj: unknown): obj is WebVitalMetric {
+  if (typeof obj !== 'object' || obj === null) return false;
+  
+  const vital = obj as Partial<WebVitalMetric>;
+  return (
+    typeof vital.name === 'string' &&
+    typeof vital.value === 'number' &&
+    typeof vital.category === 'string' &&
+    typeof vital.timestamp === 'number'
+  );
 }
