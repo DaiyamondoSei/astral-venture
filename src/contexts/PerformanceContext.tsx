@@ -1,126 +1,32 @@
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { PerfConfig } from '../hooks/usePerfConfig';
+import { usePerformanceTracking, PerformanceData } from '../hooks/usePerformanceTracking';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-import { DeviceCapability, PerformanceMode, getPerformanceCategory } from '@/utils/performanceUtils';
-
-interface PerformanceContextType {
-  isLowPerformance: boolean;
-  isMediumPerformance: boolean;
-  deviceCapability: DeviceCapability;
-  fpsTarget: number;
-  enableAnimations: boolean;
-  enableParticles: boolean;
-  enableBlur: boolean;
-  enableShadows: boolean;
-  enableGlow: boolean;
-  enableComplexAnimations: boolean;
-  performanceCategory: DeviceCapability;
-  setPerformanceCategory: (category: DeviceCapability) => void;
-  setManualPerformanceMode: (mode: PerformanceMode) => void;
-  startMonitoring: () => void;
-  stopMonitoring: () => void;
+interface PerformanceMetric {
+  componentName: string;
+  metricName: string;
+  value: number;
+  timestamp: number;
+  metadata?: Record<string, any>;
 }
 
-// Create context with default values
-const PerformanceContext = createContext<PerformanceContextType>({
-  isLowPerformance: false,
-  isMediumPerformance: false,
-  deviceCapability: DeviceCapability.MEDIUM,
-  fpsTarget: 60,
-  enableAnimations: true,
-  enableParticles: true,
-  enableBlur: true,
-  enableShadows: true,
-  enableGlow: true,
-  enableComplexAnimations: true,
-  performanceCategory: DeviceCapability.MEDIUM,
-  setPerformanceCategory: () => {},
-  setManualPerformanceMode: () => {},
-  startMonitoring: () => {},
-  stopMonitoring: () => {}
-});
+interface PerformanceContextType {
+  // Configuration
+  config: PerfConfig;
+  updateConfig: (updates: Partial<PerfConfig>) => void;
+  
+  // Metrics tracking
+  trackMetric: (componentName: string, metricName: string, value: number, metadata?: Record<string, any>) => void;
+  trackEvent: (eventName: string, metadata?: Record<string, any>) => void;
+  getMetrics: (componentName?: string) => PerformanceMetric[];
+  
+  // Performance data
+  getComponentStats: (componentName: string) => PerformanceData | null;
+  getAllComponentStats: () => Record<string, PerformanceData>;
+}
 
-export const PerformanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [performanceCategory, setPerformanceCategory] = useState<DeviceCapability>(DeviceCapability.MEDIUM);
-  const [isInitialized, setIsInitialized] = useState(false);
+const PerformanceContext = createContext<PerformanceContextType | null>(null);
 
-  // Initialize performance settings based on device capability
-  useEffect(() => {
-    if (!isInitialized) {
-      const detectedCategory = getPerformanceCategory();
-      setPerformanceCategory(detectedCategory);
-      setIsInitialized(true);
-    }
-  }, [isInitialized]);
-
-  // Start performance monitoring
-  const startMonitoring = () => {
-    performanceMonitor.startMonitoring();
-  };
-
-  // Stop performance monitoring
-  const stopMonitoring = () => {
-    performanceMonitor.stopMonitoring();
-  };
-
-  // Set manual performance mode 
-  const setManualPerformanceMode = (mode: PerformanceMode) => {
-    if (mode === 'auto') {
-      const detectedCategory = getPerformanceCategory();
-      setPerformanceCategory(detectedCategory);
-    } else {
-      // Convert string mode to DeviceCapability enum
-      if (mode === 'low') {
-        setPerformanceCategory(DeviceCapability.LOW);
-      } else if (mode === 'medium') {
-        setPerformanceCategory(DeviceCapability.MEDIUM);
-      } else if (mode === 'high') {
-        setPerformanceCategory(DeviceCapability.HIGH);
-      } else {
-        // If it's already a DeviceCapability enum value
-        setPerformanceCategory(mode);
-      }
-    }
-  };
-
-  // Determine feature availability based on performance category
-  const isLowPerformance = performanceCategory === DeviceCapability.LOW;
-  const isMediumPerformance = performanceCategory === DeviceCapability.MEDIUM;
-  const fpsTarget = isLowPerformance ? 30 : 60;
-  const enableAnimations = performanceCategory !== DeviceCapability.LOW;
-  const enableParticles = performanceCategory === DeviceCapability.HIGH;
-  const enableBlur = performanceCategory !== DeviceCapability.LOW;
-  const enableShadows = performanceCategory !== DeviceCapability.LOW;
-  const enableGlow = performanceCategory === DeviceCapability.HIGH;
-  const enableComplexAnimations = performanceCategory === DeviceCapability.HIGH;
-
-  // Value object to be provided by context
-  const contextValue = {
-    isLowPerformance,
-    isMediumPerformance,
-    deviceCapability: performanceCategory,
-    fpsTarget,
-    enableAnimations,
-    enableParticles,
-    enableBlur,
-    enableShadows,
-    enableGlow,
-    enableComplexAnimations,
-    performanceCategory,
-    setPerformanceCategory,
-    setManualPerformanceMode,
-    startMonitoring,
-    stopMonitoring
-  };
-
-  return (
-    <PerformanceContext.Provider value={contextValue}>
-      {children}
-    </PerformanceContext.Provider>
-  );
-};
-
-// Custom hook for using the performance context
 export const usePerformance = () => {
   const context = useContext(PerformanceContext);
   if (!context) {
@@ -128,3 +34,139 @@ export const usePerformance = () => {
   }
   return context;
 };
+
+interface PerformanceProviderProps {
+  children: ReactNode;
+  initialConfig: PerfConfig;
+}
+
+export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ 
+  children, 
+  initialConfig 
+}) => {
+  const [config, setConfig] = useState<PerfConfig>(initialConfig);
+  const [metrics, setMetrics] = useState<PerformanceMetric[]>([]);
+  const [componentStats, setComponentStats] = useState<Record<string, PerformanceData>>({});
+  
+  // Use the performance tracking hook for the provider itself
+  const { getPerformanceData } = usePerformanceTracking({
+    componentName: 'PerformanceProvider',
+    trackMountTime: true,
+    trackUpdateTime: true
+  });
+  
+  // Update configuration
+  const updateConfig = (updates: Partial<PerfConfig>) => {
+    setConfig(prev => ({ ...prev, ...updates }));
+  };
+  
+  // Track a performance metric
+  const trackMetric = (
+    componentName: string, 
+    metricName: string, 
+    value: number,
+    metadata?: Record<string, any>
+  ) => {
+    const newMetric: PerformanceMetric = {
+      componentName,
+      metricName,
+      value,
+      timestamp: Date.now(),
+      metadata
+    };
+    
+    setMetrics(prev => [...prev, newMetric]);
+    
+    // Optionally send metrics to backend
+    if (config.enableMetricsCollection) {
+      submitMetricsToBackend([newMetric]);
+    }
+  };
+  
+  // Track a performance event
+  const trackEvent = (
+    eventName: string,
+    metadata?: Record<string, any>
+  ) => {
+    // Event tracking is a special case of metric tracking
+    trackMetric('app', eventName, 1, metadata);
+  };
+  
+  // Get metrics for a specific component or all metrics
+  const getMetrics = (componentName?: string): PerformanceMetric[] => {
+    if (componentName) {
+      return metrics.filter(m => m.componentName === componentName);
+    }
+    return metrics;
+  };
+  
+  // Get performance stats for a specific component
+  const getComponentStats = (componentName: string): PerformanceData | null => {
+    return componentStats[componentName] || null;
+  };
+  
+  // Get performance stats for all components
+  const getAllComponentStats = (): Record<string, PerformanceData> => {
+    return componentStats;
+  };
+  
+  // Update component stats
+  const updateComponentStats = (name: string, data: PerformanceData) => {
+    setComponentStats(prev => ({
+      ...prev,
+      [name]: data
+    }));
+  };
+  
+  // Submit metrics to backend
+  const submitMetricsToBackend = async (metricsToSubmit: PerformanceMetric[]) => {
+    if (!config.enableMetricsCollection || metricsToSubmit.length === 0) {
+      return;
+    }
+    
+    try {
+      // Don't await to avoid blocking
+      fetch('/api/performance-metrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metrics: metricsToSubmit }),
+        // Use keepalive to ensure the request completes even if page is unloading
+        keepalive: true
+      });
+    } catch (error) {
+      // Silently fail - we don't want performance monitoring to affect the app
+      console.error('Error submitting performance metrics:', error);
+    }
+  };
+  
+  // Register this provider's metrics on unmount
+  useEffect(() => {
+    return () => {
+      const providerData = getPerformanceData();
+      updateComponentStats('PerformanceProvider', providerData);
+      
+      // Flush metrics on unmount
+      if (config.enableMetricsCollection && metrics.length > 0) {
+        submitMetricsToBackend(metrics);
+      }
+    };
+  }, [metrics, config.enableMetricsCollection]);
+  
+  const contextValue: PerformanceContextType = {
+    config,
+    updateConfig,
+    trackMetric,
+    trackEvent,
+    getMetrics,
+    getComponentStats,
+    getAllComponentStats
+  };
+  
+  return (
+    <PerformanceContext.Provider value={contextValue}>
+      {children}
+    </PerformanceContext.Provider>
+  );
+};
+
+export default PerformanceContext;
