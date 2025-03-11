@@ -1,155 +1,95 @@
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useAchievementTracker } from './hooks/achievement/useAchievementTracker';
-import { useAchievementNotification } from './hooks/useAchievementNotification';
-import AchievementNotification from './AchievementNotification';
-import AchievementProgressTracker from './AchievementProgressTracker';
-import { StepInteraction } from '@/types/achievement';
-import { useUserStreak } from '@/hooks/useUserStreak';
-import { getPerformanceCategory, DeviceCapability } from '@/utils/performanceUtils';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { IAchievementData } from './hooks/achievement/types';
+import { AchievementState } from './hooks/achievement';
+import { DeviceCapability, detectDeviceCapability } from '@/utils/performanceUtils';
+import { usePerformanceContext } from '@/contexts/PerformanceContext';
 
 interface AchievementLayerProps {
-  userId: string;
-  completedSteps: Record<string, boolean>;
-  stepInteractions: StepInteraction[];
-  totalPoints?: number;
-  reflectionCount?: number;
-  meditationMinutes?: number;
-  wisdomResourcesCount?: number;
+  achievementState: AchievementState;
 }
 
-const AchievementLayer: React.FC<AchievementLayerProps> = ({
-  userId,
-  completedSteps,
-  stepInteractions,
-  totalPoints = 0,
-  reflectionCount = 0,
-  meditationMinutes = 0,
-  wisdomResourcesCount = 0
+/**
+ * AchievementLayer displays achievement notifications and manages their animations
+ */
+export const AchievementLayer: React.FC<AchievementLayerProps> = ({ 
+  achievementState 
 }) => {
-  const [lastShowTime, setLastShowTime] = useState<number>(0);
-  const [hasInitialized, setHasInitialized] = useState<boolean>(false);
-  const devicePerformance = useMemo(() => getPerformanceCategory() as DeviceCapability, []);
+  const { currentAchievement, dismissAchievement } = achievementState;
+  const [isVisible, setIsVisible] = useState(false);
+  const { deviceCapability } = usePerformanceContext();
   
-  // Get user streak data from hook
-  const { userStreak, activatedChakras } = useUserStreak(userId);
-  
-  // Memoize achievement tracker inputs to prevent unnecessary recalculations
-  const trackerProps = useMemo(() => ({
-    achievementList: [],  // This will be filled from inside the hook
-    onUnlock: undefined,  // Will be handled internally
-    onProgress: undefined // Will be handled internally
-  }), []);
-  
-  // Extra data passed to internal tracker component
-  const extraTrackerData = {
-    userId, 
-    completedSteps, 
-    stepInteractions,
-    currentStreak: userStreak.current,
-    reflectionCount,
-    meditationMinutes,
-    totalPoints,
-    uniqueChakrasActivated: activatedChakras.length,
-    wisdomResourcesExplored: wisdomResourcesCount
-  };
-  
-  // Get achievement data and operations using the hook structure
-  const { 
-    earnedAchievements, 
-    dismissAchievement, 
-    getTotalPoints,
-    getProgressPercentage,
-    progressTracking
-  } = useAchievementTracker(trackerProps, extraTrackerData);
-
-  // Handle achievement notifications and progress tracker visibility
-  const {
-    currentNotification,
-    showProgressTracker,
-    handleDismiss,
-    showProgress
-  } = useAchievementNotification(earnedAchievements, dismissAchievement);
-  
-  // Memoize the visibility check function for better performance
-  const shouldShowProgressTracker = useCallback(() => {
-    const now = Date.now();
-    const timeSinceLastShow = now - lastShowTime;
-    
-    // Don't show too frequently (throttle based on device performance)
-    const minTimeBetweenShows = devicePerformance === DeviceCapability.LOW 
-      ? 120000  // 2 minutes for low-end devices
-      : devicePerformance === DeviceCapability.MEDIUM
-        ? 90000  // 1.5 minutes for medium devices
-        : 60000; // 1 minute for high-end devices
-        
-    return timeSinceLastShow > minTimeBetweenShows;
-  }, [lastShowTime, devicePerformance]);
-  
-  // Only show progress tracker on initial mount, not repeatedly
+  // Auto-dismiss after a delay
   useEffect(() => {
-    if (!hasInitialized && userId) {
-      if (shouldShowProgressTracker()) {
-        // Adjust display time based on device performance
-        const displayTime = devicePerformance === DeviceCapability.LOW ? 3000 : 5000;
-        const cleanup = showProgress(displayTime);
-        setLastShowTime(Date.now());
-        setHasInitialized(true);
-        return cleanup;
-      }
-    }
-  }, [hasInitialized, userId, shouldShowProgressTracker, showProgress, devicePerformance]);
-
-  // Show the progress tracker only after significant changes
-  useEffect(() => {
-    if (hasInitialized && progressTracking && userId) {
-      // Only check if enough time has passed since last show
-      if (shouldShowProgressTracker()) {
-        // Check for significant changes to minimize unnecessary displays
-        const hasSignificantChange = 
-          progressTracking.streakDays > 2 || 
-          progressTracking.reflections > 2 || 
-          progressTracking.meditation_minutes > 10 ||
-          progressTracking.total_energy_points > 50;
-          
-        if (hasSignificantChange) {
-          // Adjust display time based on device performance
-          const displayTime = devicePerformance === DeviceCapability.LOW ? 3000 : 5000;
-          const cleanup = showProgress(displayTime);
-          setLastShowTime(Date.now());
-          return cleanup;
-        }
-      }
-    }
-  }, [
-    progressTracking, 
-    hasInitialized, 
-    userId, 
-    shouldShowProgressTracker, 
-    showProgress, 
-    devicePerformance
-  ]);
-
-  return (
-    <>
-      {/* Display the current achievement notification if available */}
-      {currentNotification && (
-        <AchievementNotification
-          achievement={currentNotification}
-          onDismiss={handleDismiss}
-        />
-      )}
+    if (currentAchievement) {
+      setIsVisible(true);
       
-      {/* Show progress tracker after earning achievements or when specified */}
-      {showProgressTracker && (
-        <AchievementProgressTracker
-          progressPercentage={getProgressPercentage()}
-          totalPoints={getTotalPoints()}
-          streakDays={userStreak.current}
-        />
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+        
+        // Delay actual dismissal to allow exit animation
+        setTimeout(() => {
+          if (dismissAchievement) dismissAchievement();
+        }, 500);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentAchievement, dismissAchievement]);
+  
+  // No achievement to display
+  if (!currentAchievement) return null;
+  
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
+          <motion.div
+            className="mt-4 pointer-events-auto"
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            transition={{ type: 'spring', damping: 15, stiffness: 150 }}
+          >
+            <div className="bg-gradient-to-r from-indigo-900/80 to-purple-900/80 backdrop-blur-md border border-indigo-500/30 rounded-lg p-4 shadow-lg flex items-center">
+              {/* Icon/Badge */}
+              <div className="w-12 h-12 flex items-center justify-center bg-indigo-600 rounded-full mr-4">
+                <span className="text-xl text-white">🏆</span>
+              </div>
+              
+              {/* Content */}
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white">
+                  Achievement Unlocked!
+                </h3>
+                <h4 className="text-md text-indigo-200 font-medium">
+                  {currentAchievement.title}
+                </h4>
+                <p className="text-sm text-indigo-100">
+                  {currentAchievement.description}
+                </p>
+                <div className="text-xs text-indigo-200 mt-1">
+                  +{currentAchievement.points} points
+                </div>
+              </div>
+              
+              {/* Close button */}
+              <button
+                onClick={() => setIsVisible(false)}
+                className="ml-2 text-indigo-200 hover:text-white"
+                aria-label="Dismiss achievement notification"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
-    </>
+    </AnimatePresence>
   );
 };
 
-export default React.memo(AchievementLayer);
+export default AchievementLayer;

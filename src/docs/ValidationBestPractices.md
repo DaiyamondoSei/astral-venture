@@ -1,555 +1,562 @@
-
 # Validation Best Practices
 
-This document outlines best practices for implementing robust validation throughout the application.
+This document outlines the best practices for implementing validation in our application. It covers both runtime validation for user data and compiler-enforced type validation for our internal APIs.
 
-## 1. Validation Principles
+## 1. Validation System Architecture
 
-### 1.1 Key Validation Principles
+### 1.1 Three-Layer Validation Architecture
 
-1. **Validate at system boundaries**: Always validate data as it enters your system (API requests, user input, files)
-2. **Fail fast**: Validate early and return errors immediately 
-3. **Provide specific error messages**: Help users understand and fix validation issues
-4. **Separate validation from business logic**: Keep validation decoupled from application logic
-5. **Create reusable validators**: Build a library of reusable validation functions
-6. **Consistent error format**: Use a consistent error structure across the application
+Our validation system follows a three-layer architecture:
 
-### 1.2 Validation Architecture
+1. **Core Type Layer**: TypeScript type definitions that provide compile-time checking
+2. **Runtime Validation Layer**: Functions that validate data at runtime
+3. **UI Validation Layer**: Form validation for user inputs with feedback
 
-```
-┌────────────────┐     ┌──────────────────┐     ┌────────────────┐
-│  Pre-validate  │────▶│  Main Validation  │────▶│  Post-validate │
-│  (Sanitize)    │     │  (Type/Constraints)│     │  (Rules)       │
-└────────────────┘     └──────────────────┘     └────────────────┘
-         │                      │                        │
-         ▼                      ▼                        ▼
-┌────────────────┐     ┌──────────────────┐     ┌────────────────┐
-│  Clean Input   │     │ Type-Safe Data   │     │Validated Data  │
-└────────────────┘     └──────────────────┘     └────────────────┘
-```
+This architecture ensures that validation is consistent at all levels of the application.
 
-## 2. Validation Implementation
+### 1.2 Validation Pipeline
 
-### 2.1 Validation Result Pattern
+Every significant validation should go through a pipeline with distinct phases:
+
+1. **Pre-validation**: Sanitize and normalize input data
+2. **Main validation**: Validate type constraints and structure
+3. **Post-validation**: Apply business rules and domain-specific logic
 
 ```typescript
-// Consistent validation result structure
-interface ValidationResult<T = unknown> {
-  valid: boolean;                     // Whether validation passed
-  data?: T;                           // The validated data if successful
-  error?: ValidationErrorDetail;      // Error details if validation failed
-  errors?: ValidationErrorDetail[];   // Multiple errors if applicable
-  metadata?: ValidationMetadata;      // Additional metadata
-}
-
-// Detailed error information
-interface ValidationErrorDetail {
-  path: string;        // Path to the field with error
-  message: string;     // User-friendly error message
-  code?: string;       // Error code for programmatic handling
-  rule?: string;       // Validation rule that failed
-  value?: unknown;     // Value that failed validation
-  type?: string;       // Expected type
-  severity?: ValidationSeverity; // Error severity level
-}
-```
-
-### 2.2 Validator Functions
-
-```typescript
-// Type for validator functions
-type Validator<T = unknown> = (
-  value: unknown, 
-  context?: ValidationContext
-) => ValidationResult<T>;
-
-// Composing validators
-function composeValidators<T>(...validators: Validator[]): Validator<T> {
-  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
-    for (const validator of validators) {
-      const result = validator(value, context);
-      if (!result.valid) {
-        return result as ValidationResult<T>;
-      }
+class UserValidationPipeline extends ValidationPipeline<User> {
+  preValidate(data: unknown): ValidationResult {
+    // Normalize emails to lowercase, trim strings, etc.
+    if (!isObject(data)) return { valid: true };
+    
+    const normalized = { ...data };
+    if (isString(data.email)) normalized.email = data.email.toLowerCase().trim();
+    if (isString(data.name)) normalized.name = data.name.trim();
+    
+    return { valid: true, validatedData: normalized };
+  }
+  
+  validate(data: unknown): ValidationResult<User> {
+    // Type and constraint validation
+    if (!isObject(data)) {
+      return createValidationError('User must be an object', 'user');
     }
-    return { valid: true, data: value as T };
-  };
-}
-
-// Example validator
-const nameValidator: Validator<string> = (value, context) => {
-  if (typeof value !== 'string') {
-    return {
-      valid: false,
-      error: {
-        path: context?.fieldPath || 'name',
-        message: 'Name must be a string',
-        type: 'string',
-        value,
-        code: 'TYPE_ERROR'
-      }
-    };
-  }
-  
-  if (value.trim() === '') {
-    return {
-      valid: false,
-      error: {
-        path: context?.fieldPath || 'name',
-        message: 'Name cannot be empty',
-        value,
-        code: 'REQUIRED'
-      }
-    };
-  }
-  
-  return { valid: true, data: value };
-};
-```
-
-### 2.3 Schema-Based Validation
-
-```typescript
-// Schema definition
-const userSchema: ValidationSchema<User> = {
-  name: nameValidator,
-  email: emailValidator,
-  age: ageValidator
-};
-
-// Validating against schema
-function validateObject<T>(
-  data: unknown, 
-  schema: ValidationSchema<T>,
-  options?: ValidationOptions
-): ValidationResult<T> {
-  if (!isObject(data)) {
-    return {
-      valid: false,
-      error: {
-        path: '',
-        message: 'Data must be an object',
-        type: 'object',
-        value: data,
-        code: 'TYPE_ERROR'
-      }
-    };
-  }
-  
-  const errors: ValidationErrorDetail[] = [];
-  const validatedData: Record<string, any> = {};
-  
-  for (const [key, validator] of Object.entries(schema)) {
-    if (!validator) continue;
     
-    const context: ValidationContext = {
-      fieldPath: key,
-      parentValue: data,
-      options,
-      root: data,
-      siblingValues: data as Record<string, unknown>
-    };
-    
-    const result = validator(data[key], context);
-    
-    if (result.valid && result.data !== undefined) {
-      validatedData[key] = result.data;
-    } else if (!result.valid) {
-      if (options?.abortEarly) {
-        return result;
-      }
-      if (result.error) {
-        errors.push(result.error);
-      }
-      if (result.errors) {
-        errors.push(...result.errors);
-      }
+    // Check required fields
+    if (!isString(data.id)) {
+      return createValidationError('User ID is required and must be a string', 'id');
     }
-  }
-  
-  if (errors.length > 0) {
-    return { valid: false, errors };
-  }
-  
-  return { valid: true, data: validatedData as T };
-}
-```
-
-## 3. Validation Error Handling
-
-### 3.1 ValidationError Class
-
-```typescript
-class ValidationError extends Error {
-  public readonly details: ValidationErrorDetail[];
-  public readonly code: string;
-  
-  constructor(
-    message: string,
-    details: ValidationErrorDetail[] = [],
-    code: string = 'VALIDATION_ERROR'
-  ) {
-    super(message);
-    this.name = 'ValidationError';
-    this.details = details;
-    this.code = code;
     
-    // This is needed to make instanceof work correctly
-    Object.setPrototypeOf(this, ValidationError.prototype);
+    // ... other validations
+    
+    return createValidationSuccess(data as User);
   }
   
-  // Get errors formatted for UI display
-  public getFormattedErrors(): Record<string, string> {
-    return this.details.reduce((acc, detail) => {
-      acc[detail.path] = detail.message;
-      return acc;
-    }, {});
+  postValidate(user: User): ValidationResult<User> {
+    // Business rule validation
+    if (user.role === 'admin' && !user.securityClearance) {
+      return createValidationError(
+        'Admin users must have security clearance',
+        'securityClearance'
+      );
+    }
+    
+    return createValidationSuccess(user);
   }
 }
 ```
 
-### 3.2 Error Handling Pattern
+## 2. Type Safety Best Practices
+
+### 2.1 Branded Types for Safe IDs
+
+Use branded types for identifiers to prevent mixing different ID types:
 
 ```typescript
-try {
-  const result = validateUser(userData);
-  if (!result.valid) {
-    throw new ValidationError(
-      'Invalid user data',
-      result.errors || [result.error]
-    );
+// Definition
+type Brand<K, T> = K & { __brand: T };
+type UserID = Brand<string, 'user-id'>;
+type OrderID = Brand<string, 'order-id'>;
+
+// Validation and creation
+function createUserID(id: string): UserID {
+  if (!id.match(/^user_[a-z0-9]+$/)) {
+    throw new Error('Invalid user ID format');
   }
-  
-  // Proceed with valid data
-  const user = result.data;
-  
-} catch (error) {
-  if (error instanceof ValidationError) {
-    // Handle validation errors (show to user)
-    const formErrors = error.getFormattedErrors();
-    displayErrors(formErrors);
+  return id as UserID;
+}
+
+// Type-safe usage
+function getUser(id: UserID): User { /* ... */ }
+function getOrder(id: OrderID): Order { /* ... */ }
+
+// This would fail at compile-time:
+// getUser(orderId); // Error: Type 'OrderID' is not assignable to parameter of type 'UserID'
+```
+
+### 2.2 Exhaustive Pattern Matching
+
+Always use exhaustive pattern matching with discriminated unions:
+
+```typescript
+type Status = 'pending' | 'active' | 'suspended' | 'cancelled';
+
+function getStatusColor(status: Status): string {
+  switch (status) {
+    case 'pending':
+      return 'yellow';
+    case 'active':
+      return 'green';
+    case 'suspended':
+      return 'orange';
+    case 'cancelled':
+      return 'red';
+    default:
+      // This ensures we've covered all cases
+      const exhaustiveCheck: never = status;
+      throw new Error(`Unhandled status: ${exhaustiveCheck}`);
+  }
+}
+```
+
+### 2.3 Type-Safe API Responses
+
+Create structured API response types with type guards:
+
+```typescript
+// Type definition
+type ApiResponse<T> = 
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: ApiError };
+
+// Type guard
+function isSuccessResponse<T>(response: ApiResponse<T>): response is { status: 'success'; data: T } {
+  return response.status === 'success';
+}
+
+// Usage
+function handleApiResponse<T>(response: ApiResponse<T>): T {
+  if (isSuccessResponse(response)) {
+    return response.data; // TypeScript knows this is type T
   } else {
-    // Handle other errors
-    logError(error);
-    showGenericErrorMessage();
+    throw new Error(`API Error: ${response.error.message}`);
   }
 }
 ```
 
-## 4. Form Validation
+## 3. Runtime Validation Strategies
 
-### 4.1 React Hook Form Integration
+### 3.1 Validation Guard Composition
+
+Build complex validators by composing smaller ones:
 
 ```typescript
-import { useForm } from 'react-hook-form';
+// Base validators
+const validateEmail = createValidator<string>(
+  (value) => isString(value) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+  'Invalid email format'
+);
 
-// Define validation schema
-const userSchema = {
-  name: nameValidator,
-  email: emailValidator,
-  age: ageValidator
-};
+const validatePasswordStrength = createValidator<string>(
+  (value) => isString(value) && value.length >= 8 && /[A-Z]/.test(value) && /[0-9]/.test(value),
+  'Password must be at least 8 characters with uppercase letter and number'
+);
 
-// Custom validator for react-hook-form
-function validateWithSchema<T>(schema: ValidationSchema<T>) {
-  return async (data: unknown) => {
-    const result = validateObject(data, schema);
-    
-    if (!result.valid) {
-      // Convert to format expected by react-hook-form
-      const errors = {};
-      result.errors?.forEach(error => {
-        errors[error.path] = { 
-          type: error.code || 'validation',
-          message: error.message 
-        };
-      });
-      return errors;
-    }
-    
-    return true;
-  };
-}
-
-// In component
-function UserForm() {
-  const { register, handleSubmit, errors } = useForm({
-    resolver: validateWithSchema(userSchema)
-  });
-  
-  const onSubmit = (data) => {
-    // Data is validated and type-safe
-    createUser(data);
-  };
-  
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <input {...register('name')} />
-      {errors.name && <span>{errors.name.message}</span>}
-      
-      <input {...register('email')} />
-      {errors.email && <span>{errors.email.message}</span>}
-      
-      <input {...register('age')} type="number" />
-      {errors.age && <span>{errors.age.message}</span>}
-      
-      <button type="submit">Submit</button>
-    </form>
-  );
-}
+// Combined validator
+const validateRegistration = createObjectValidator({
+  email: validateEmail,
+  password: validatePasswordStrength,
+  confirmPassword: createValidator<string>(
+    (value, data) => value === data.password,
+    'Passwords must match'
+  )
+});
 ```
 
-## 5. API Validation
+### 3.2 Progressive Validation
 
-### 5.1 Request Validation
+Implement progressive validation that validates as the user inputs data:
 
 ```typescript
-// API endpoint with validation
-async function handleUserCreate(req, res) {
-  try {
-    // Validate request body
-    const result = validateObject(req.body, userSchema);
+function useProgressiveValidation<T>(schema: ValidationSchema<T>) {
+  const [data, setData] = useState<Partial<T>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  
+  // Only validate fields that have been touched
+  const validateField = (fieldName: keyof T, value: unknown) => {
+    if (!touchedFields[fieldName as string]) return;
     
-    if (!result.valid) {
-      return res.status(400).json({
-        success: false,
-        errors: result.errors || [result.error]
+    const validator = schema[fieldName];
+    if (!validator) return;
+    
+    const result = validator(value);
+    if (!result.valid && result.error) {
+      setErrors(prev => ({ ...prev, [fieldName]: result.error.message }));
+    } else {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName as string];
+        return newErrors;
       });
     }
-    
-    // Proceed with valid data
-    const user = result.data;
-    const createdUser = await createUser(user);
-    
-    return res.status(201).json({
-      success: true,
-      data: createdUser
+  };
+  
+  // Handle field changes
+  const handleChange = (fieldName: keyof T, value: unknown) => {
+    setData(prev => {
+      const newData = { ...prev, [fieldName]: value };
+      validateField(fieldName, value);
+      return newData;
     });
-    
-  } catch (error) {
-    // Handle unexpected errors
-    console.error('User creation error:', error);
-    
-    return res.status(500).json({
-      success: false,
-      error: 'Server error'
+  };
+  
+  // Mark field as touched when it loses focus
+  const handleBlur = (fieldName: keyof T) => {
+    setTouchedFields(prev => {
+      const newTouched = { ...prev, [fieldName]: true };
+      validateField(fieldName, data[fieldName]);
+      return newTouched;
     });
-  }
+  };
+  
+  return { data, errors, handleChange, handleBlur };
 }
 ```
 
-### 5.2 Response Validation
+### 3.3 Validation Caching
+
+Cache validation results for expensive validations:
 
 ```typescript
-// Validate API responses
-async function fetchUser(id: string): Promise<User> {
-  const response = await fetch(`/api/users/${id}`);
-  const data = await response.json();
-  
-  // Validate response data
-  const result = validateObject(data, userSchema);
-  
-  if (!result.valid) {
-    throw new ValidationError(
-      'Invalid response data',
-      result.errors || [result.error]
-    );
-  }
-  
-  return result.data;
-}
-```
-
-## 6. Advanced Validation Techniques
-
-### 6.1 Cross-Field Validation
-
-```typescript
-// Password validation with confirmation
-const passwordSchema = {
-  password: passwordValidator,
-  confirmPassword: (value, context) => {
-    if (value !== context.siblingValues.password) {
-      return {
-        valid: false,
-        error: {
-          path: context.fieldPath || 'confirmPassword',
-          message: 'Passwords do not match',
-          code: 'CONSTRAINT_ERROR'
-        }
-      };
-    }
-    return { valid: true, data: value };
-  }
-};
-```
-
-### 6.2 Conditional Validation
-
-```typescript
-// Conditional validation
-const paymentSchema = {
-  method: paymentMethodValidator,
-  cardNumber: (value, context) => {
-    if (context.siblingValues.method === 'credit-card') {
-      // Only validate card number if payment method is credit card
-      return cardNumberValidator(value, context);
-    }
-    return { valid: true, data: value };
-  }
-};
-```
-
-### 6.3 Async Validation
-
-```typescript
-// Async validation (e.g., checking if email is already taken)
-const asyncEmailValidator: AsyncValidator<string> = async (value, context) => {
-  if (typeof value !== 'string') {
-    return {
-      valid: false,
-      error: {
-        path: context?.fieldPath || 'email',
-        message: 'Email must be a string',
-        type: 'string',
-        value,
-        code: 'TYPE_ERROR'
-      }
-    };
-  }
-  
-  if (!isValidEmail(value)) {
-    return {
-      valid: false,
-      error: {
-        path: context?.fieldPath || 'email',
-        message: 'Invalid email format',
-        value,
-        code: 'FORMAT_ERROR'
-      }
-    };
-  }
-  
-  // Check if email is already taken
-  const isEmailTaken = await checkEmailExists(value);
-  
-  if (isEmailTaken) {
-    return {
-      valid: false,
-      error: {
-        path: context?.fieldPath || 'email',
-        message: 'Email is already taken',
-        value,
-        code: 'CONSTRAINT_ERROR'
-      }
-    };
-  }
-  
-  return { valid: true, data: value };
-};
-```
-
-## 7. Performance Considerations
-
-### 7.1 Validation Caching
-
-```typescript
-// Cache validation results for expensive validators
 const validationCache = new WeakMap<object, ValidationResult>();
 
 function validateWithCache<T>(
   data: unknown, 
-  validator: Validator<T>
+  validator: Validator<T>,
+  cacheKey?: string
 ): ValidationResult<T> {
-  if (!isObject(data)) {
-    return validator(data);
+  // Use object identity for caching if no cache key provided
+  if (isObject(data) && !cacheKey) {
+    const cached = validationCache.get(data);
+    if (cached) return cached as ValidationResult<T>;
+    
+    const result = validator(data);
+    validationCache.set(data, result);
+    return result;
   }
   
-  const cached = validationCache.get(data);
-  if (cached) {
-    return cached as ValidationResult<T>;
+  // Use cache key for non-object values or explicit keys
+  if (cacheKey) {
+    const key = `${cacheKey}:${JSON.stringify(data)}`;
+    const cached = localStorage.getItem(key);
+    if (cached) {
+      try {
+        return JSON.parse(cached) as ValidationResult<T>;
+      } catch {
+        // Ignore cache errors and revalidate
+      }
+    }
+    
+    const result = validator(data);
+    try {
+      localStorage.setItem(key, JSON.stringify(result));
+    } catch {
+      // Ignore storage errors
+    }
+    return result;
   }
   
-  const result = validator(data);
-  validationCache.set(data, result);
-  return result;
+  // Fallback to direct validation
+  return validator(data);
 }
 ```
 
-### 7.2 Optimized Validators
+## 4. Error Handling Best Practices
+
+### 4.1 Structured Validation Errors
+
+Create structured error objects with detailed information:
 
 ```typescript
-// Optimized string validator with fast-path checks
-function createStringValidator(
-  options: StringValidationOptions = {}
-): Validator<string> {
-  return (value, context) => {
-    // Fast path for common cases
-    if (typeof value === 'string') {
-      if (options.minLength !== undefined && value.length < options.minLength) {
-        return {
-          valid: false,
-          error: {
-            path: context?.fieldPath || '',
-            message: `Must be at least ${options.minLength} characters`,
-            value,
-            code: 'LENGTH_ERROR'
-          }
-        };
-      }
-      
-      if (options.maxLength !== undefined && value.length > options.maxLength) {
-        return {
-          valid: false,
-          error: {
-            path: context?.fieldPath || '',
-            message: `Must be at most ${options.maxLength} characters`,
-            value,
-            code: 'LENGTH_ERROR'
-          }
-        };
-      }
-      
-      if (options.pattern && !options.pattern.test(value)) {
-        return {
-          valid: false,
-          error: {
-            path: context?.fieldPath || '',
-            message: options.patternMessage || 'Invalid format',
-            value,
-            code: 'PATTERN_ERROR'
-          }
-        };
-      }
-      
-      return { valid: true, data: value };
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly details: ValidationErrorDetail[],
+    public readonly code: ValidationErrorCode,
+    public readonly httpStatus: number = 400
+  ) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+  
+  // Helper to get field-specific error messages
+  public getFieldErrors(): Record<string, string> {
+    return this.details.reduce((acc, detail) => {
+      acc[detail.path] = detail.message;
+      return acc;
+    }, {} as Record<string, string>);
+  }
+  
+  // Convert to API response format
+  public toApiResponse(): ApiErrorResponse {
+    return {
+      status: 'error',
+      code: this.code,
+      message: this.message,
+      details: this.details
+    };
+  }
+}
+```
+
+### 4.2 Custom Error Factories
+
+Create factory functions for common error types:
+
+```typescript
+// Factory functions for common validation error types
+ValidationError.required = (field: string, message?: string) => 
+  new ValidationError(
+    message || `${field} is required`,
+    [{ path: field, message: message || `${field} is required`, code: ValidationErrorCode.REQUIRED }],
+    ValidationErrorCode.REQUIRED
+  );
+
+ValidationError.invalidFormat = (field: string, format: string, message?: string) => 
+  new ValidationError(
+    message || `${field} has invalid format`,
+    [{ path: field, message: message || `${field} must be in ${format} format`, code: ValidationErrorCode.FORMAT_ERROR }],
+    ValidationErrorCode.FORMAT_ERROR
+  );
+
+// Usage
+throw ValidationError.required('email');
+throw ValidationError.invalidFormat('email', 'example@domain.com', 'Please enter a valid email address');
+```
+
+### 4.3 Error Translation for UI
+
+Translate validation errors into user-friendly messages:
+
+```typescript
+const errorMessages = {
+  required: (field: string) => `Please enter your ${field}`,
+  email: () => 'Please enter a valid email address',
+  password: {
+    minLength: (min: number) => `Password must be at least ${min} characters`,
+    uppercase: () => 'Password must include at least one uppercase letter',
+    number: () => 'Password must include at least one number'
+  }
+};
+
+function translateValidationError(error: ValidationError): Record<string, string> {
+  return error.details.reduce((acc, detail) => {
+    const fieldName = detail.path;
+    let message = detail.message;
+    
+    // Use custom messages if available
+    if (detail.code === ValidationErrorCode.REQUIRED && errorMessages.required) {
+      message = errorMessages.required(fieldName);
+    } else if (fieldName === 'email' && detail.code === ValidationErrorCode.FORMAT_ERROR && errorMessages.email) {
+      message = errorMessages.email();
     }
     
-    return {
-      valid: false,
-      error: {
-        path: context?.fieldPath || '',
-        message: 'Must be a string',
-        type: 'string',
-        value,
-        code: 'TYPE_ERROR'
-      }
+    acc[fieldName] = message;
+    return acc;
+  }, {} as Record<string, string>);
+}
+```
+
+## 5. Testing Validation
+
+### 5.1 Type Testing
+
+Use TypeScript's type system to test type definitions:
+
+```typescript
+// src/types/__tests__/types.test.ts
+import { expectType, expectError } from 'tsd';
+
+// Test that UserID is not assignable to OrderID
+expectError<OrderID>('user_123' as UserID);
+
+// Test that validated data has the correct type
+const user = validateUser({ id: 'user_123', name: 'Test User' });
+expectType<User>(user);
+```
+
+### 5.2 Validation Unit Tests
+
+Test both valid and invalid cases for each validator:
+
+```typescript
+describe('Email Validator', () => {
+  // Test valid emails
+  test.each([
+    'user@example.com',
+    'user.name@example.co.uk',
+    'user+tag@example.com'
+  ])('validates correct email: %s', (email) => {
+    const result = validateEmail(email, 'email');
+    expect(result.valid).toBe(true);
+  });
+  
+  // Test invalid emails
+  test.each([
+    'user',
+    'user@',
+    '@example.com',
+    'user@example'
+  ])('rejects incorrect email: %s', (email) => {
+    const result = validateEmail(email, 'email');
+    expect(result.valid).toBe(false);
+    expect(result.error?.path).toBe('email');
+    expect(result.error?.code).toBe(ValidationErrorCode.FORMAT_ERROR);
+  });
+});
+```
+
+### 5.3 Validation Integration Tests
+
+Test the complete validation pipeline:
+
+```typescript
+describe('Registration Validation Pipeline', () => {
+  const pipeline = new UserRegistrationPipeline();
+  
+  test('validates complete registration data', () => {
+    const data = {
+      email: 'user@example.com',
+      password: 'Password123',
+      confirmPassword: 'Password123',
+      name: 'Test User'
     };
+    
+    const result = pipeline.validateAll(data);
+    expect(result.valid).toBe(true);
+    expect(result.validatedData).toEqual({
+      email: 'user@example.com',
+      password: 'Password123',
+      confirmPassword: 'Password123',
+      name: 'Test User'
+    });
+  });
+  
+  test('rejects registration with mismatched passwords', () => {
+    const data = {
+      email: 'user@example.com',
+      password: 'Password123',
+      confirmPassword: 'Password456',
+      name: 'Test User'
+    };
+    
+    const result = pipeline.validateAll(data);
+    expect(result.valid).toBe(false);
+    expect(result.errors?.some(e => e.path === 'confirmPassword')).toBe(true);
+  });
+});
+```
+
+## 6. Performance Considerations
+
+### 6.1 Fast Path Optimization
+
+Implement fast-path checks for common validation scenarios:
+
+```typescript
+function validateObject<T extends Record<string, unknown>>(
+  value: unknown,
+  fieldName = 'value'
+): T {
+  // Fast path: null check
+  if (value === null || value === undefined) {
+    throw ValidationError.required(fieldName);
+  }
+  
+  // Fast path: type check
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw ValidationError.invalidType(fieldName, 'object');
+  }
+  
+  return value as T;
+}
+```
+
+### 6.2 Lazy Validation
+
+Implement lazy validation for expensive checks:
+
+```typescript
+function createLazyValidator<T>(
+  validator: Validator<T>,
+  options: { validateOnFirstAccess?: boolean } = {}
+): Validator<T> {
+  let cachedResult: ValidationResult<T> | null = null;
+  let validated = false;
+  
+  return (value: unknown, context?: ValidationContext): ValidationResult<T> => {
+    // Return cached result if available
+    if (validated && cachedResult) {
+      return cachedResult;
+    }
+    
+    // Perform validation
+    cachedResult = validator(value, context);
+    validated = true;
+    
+    return cachedResult;
   };
 }
 ```
 
-## 8. Best Practices Summary
+### 6.3 Incremental Validation
 
-1. **Validate at boundaries**: Always validate data as it enters your system
-2. **Use a consistent validation pattern**: Structure validation results consistently
-3. **Provide detailed error information**: Include path, message, code, and value
-4. **Create reusable validators**: Build a library of common validation functions
-5. **Compose validators**: Combine simple validators into complex validation logic
-6. **Handle validation errors gracefully**: Convert validation errors to user-friendly messages
-7. **Implement performance optimizations**: Use caching and fast-path checks for performance
-8. **Test validation logic**: Create comprehensive tests for validation logic
-9. **Document validation requirements**: Clearly document validation rules and error codes
-10. **Separate validation from business logic**: Keep validation decoupled from application logic
+For large objects, implement incremental validation that only validates changed fields:
 
-By following these validation best practices, you can create a robust, maintainable, and user-friendly validation system.
+```typescript
+function incrementalValidate<T extends Record<string, unknown>>(
+  data: T,
+  schema: ValidationSchema<T>,
+  previousData?: T,
+  touchedFields?: Set<keyof T>
+): ValidationResult<T> {
+  const errors: ValidationErrorDetail[] = [];
+  const validatedData = { ...data };
+  
+  // Determine which fields to validate
+  const fieldsToValidate = touchedFields 
+    ? [...touchedFields] 
+    : previousData 
+      ? Object.keys(data).filter(key => 
+          data[key] !== previousData[key]
+        ) as (keyof T)[]
+      : Object.keys(data) as (keyof T)[];
+  
+  // Validate only the relevant fields
+  for (const field of fieldsToValidate) {
+    const validator = schema[field];
+    if (!validator) continue;
+    
+    const result = validator(data[field]);
+    if (!result.valid && result.error) {
+      errors.push(result.error);
+    }
+  }
+  
+  return errors.length === 0
+    ? { valid: true, validatedData }
+    : { valid: false, errors };
+}
+```
+
+## 7. Summary
+
+Validation is a critical part of any robust application. By following these best practices, we can ensure:
+
+1. **Type Safety**: Compile-time checking of our code
+2. **Data Integrity**: Runtime validation of external inputs
+3. **User Experience**: Clear feedback on validation errors
+4. **Performance**: Efficient validation that doesn't slow down the application
+5. **Maintainability**: Structured approach to validation that is easy to extend
+
+Remember that validation is not just about checking inputs - it's about creating a system that guides users and developers towards correct usage patterns.

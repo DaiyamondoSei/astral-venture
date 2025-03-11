@@ -214,7 +214,128 @@ type RequireAtLeastOne<T, K extends keyof T = keyof T> =
   }[K];
 ```
 
-## 8. Implementation Checklist
+## 8. Validation Best Practices
+
+### 8.1 Multi-Phase Validation
+
+Always structure validation in multiple phases:
+
+1. **Pre-validation**: Sanitize and normalize data
+   ```typescript
+   function preValidate(data: unknown): unknown {
+     // Convert empty strings to null
+     if (isObject(data)) {
+       return Object.entries(data).reduce((acc, [key, value]) => {
+         acc[key] = value === '' ? null : value;
+         return acc;
+       }, {} as Record<string, unknown>);
+     }
+     return data;
+   }
+   ```
+
+2. **Schema Validation**: Validate structure and types
+   ```typescript
+   const userSchema = {
+     id: validateString,
+     email: validateEmail,
+     age: validateNumber
+   };
+   ```
+
+3. **Business Rule Validation**: Apply domain-specific rules
+   ```typescript
+   function validateBusinessRules(user: User): ValidationResult<User> {
+     // Check that user is of legal age for specific regions
+     if (user.region === 'US' && user.age < 21) {
+       return createValidationError('User must be 21 or older in the US', 'age');
+     }
+     return createValidationSuccess(user);
+   }
+   ```
+
+### 8.2 Error Reporting Best Practices
+
+Validation errors should be:
+
+1. **Actionable**: Tell the user how to fix the issue
+2. **Contextual**: Include field name and relevant context
+3. **Categorized**: Use error codes for programmatic handling
+4. **Detailed**: Include all the information needed to fix the error
+
+Example:
+```typescript
+// Bad error message
+throw new Error("Invalid input");
+
+// Good error message
+throw new ValidationError(
+  "Email address is invalid",
+  [{
+    path: 'email',
+    message: 'Email address must be in a valid format (e.g., user@example.com)',
+    rule: 'format',
+    code: ValidationErrorCode.FORMAT_ERROR,
+    severity: ValidationSeverity.ERROR
+  }],
+  ValidationErrorCode.FORMAT_ERROR
+);
+```
+
+### 8.3 Validation Performance Tips
+
+1. **Early Returns**: Check simple validations first
+   ```typescript
+   function validateUser(user: unknown): ValidationResult<User> {
+     // Check null/undefined first (fast check)
+     if (user === null || user === undefined) {
+       return createValidationError('User is required', 'user');
+     }
+     
+     // Only then do more expensive object checks
+     if (!isObject(user)) {
+       return createValidationError('User must be an object', 'user');
+     }
+     
+     // ... more validations
+   }
+   ```
+
+2. **Caching Validation Results**: Use WeakMap for object validators
+3. **Tiered Validation**: Perform cheap validations before expensive ones
+4. **Validation Compilation**: Pre-compile validation schemas
+5. **Avoid Redundant Validation**: Only validate when data changes
+
+### 8.4 Type Guard Composition
+
+Combine type guards to create complex validations:
+
+```typescript
+// Base type guards
+const isString = (value: unknown): value is string => typeof value === 'string';
+const isNumber = (value: unknown): value is number => typeof value === 'number' && !isNaN(value);
+
+// Composed type guard
+function isUser(value: unknown): value is User {
+  return (
+    isObject(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    (value.age === undefined || isNumber(value.age))
+  );
+}
+
+// Type guard factory
+function createIsArrayOf<T>(itemGuard: (item: unknown) => item is T) {
+  return (value: unknown): value is T[] => 
+    Array.isArray(value) && value.every(itemGuard);
+}
+
+// Usage
+const isUserArray = createIsArrayOf(isUser);
+```
+
+## 9. Implementation Checklist
 
 - [ ] Set up core type directory structure
 - [ ] Create base primitive types
@@ -225,7 +346,7 @@ type RequireAtLeastOne<T, K extends keyof T = keyof T> =
 - [ ] Implement testing strategy
 - [ ] Document type patterns
 
-## 9. Best Practices Summary
+## 10. Best Practices Summary
 
 1. Centralize types in dedicated directories
 2. Use explicit exports for all types
@@ -235,5 +356,7 @@ type RequireAtLeastOne<T, K extends keyof T = keyof T> =
 6. Create comprehensive validation error handling
 7. Write tests for type validation
 8. Optimize performance with caching and fast-path checks
+9. Use multi-phase validation for complex data
+10. Compose type guards for complex validations
 
 This comprehensive approach ensures type safety throughout the application while maintaining performance and developer productivity.
