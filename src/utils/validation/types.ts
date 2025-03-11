@@ -3,7 +3,8 @@
  * Core Validation Type System
  * 
  * This module provides the foundation for our validation system with
- * properly defined types, interfaces, and utilities.
+ * properly defined types, interfaces, and utilities for consistent validation
+ * across the application.
  */
 
 /**

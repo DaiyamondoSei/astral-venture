@@ -24,13 +24,16 @@ export type MetricType = 'render' | 'interaction' | 'load' | 'memory' | 'network
 export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
 export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability' | 'responsiveness';
 
+// Web vital rating types
+export type WebVitalRating = 'good' | 'needs-improvement' | 'poor';
+
 // Web vital metric structure
 export interface WebVitalMetric {
   name: string;
   value: number;
   category: WebVitalCategory;
   timestamp: number;
-  rating?: 'good' | 'needs-improvement' | 'poor';
+  rating?: WebVitalRating;
 }
 
 // Performance metric structure
@@ -45,7 +48,7 @@ export interface PerformanceMetric {
   session_id?: string;
   page_url?: string;
   metadata?: Record<string, any>;
-  rating?: 'good' | 'needs-improvement' | 'poor';
+  rating?: WebVitalRating;
 }
 
 // Component metrics structure
