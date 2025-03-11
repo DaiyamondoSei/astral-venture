@@ -1,133 +1,106 @@
 
 /**
- * Shared cache utilities for Edge Functions
+ * Shared caching utilities for Edge Functions
  */
 
-import { logEvent } from "./responseUtils.ts";
+// Cache key creation
+export function createCacheKey(
+  ...parts: Array<string | number | boolean | null | undefined>
+): string {
+  // Filter out null and undefined values
+  const validParts = parts.filter(part => part !== null && part !== undefined);
+  
+  // Join parts with a separator that won't appear in the parts
+  return validParts.join('::');
+}
+
+// Cache key prefix by function
+export const CACHE_PREFIXES = {
+  ASK_ASSISTANT: 'ask-assistant:',
+  PROCESS_AI_QUERY: 'process-ai-query:',
+  TRACK_PERFORMANCE: 'track-performance:',
+  GET_NAVIGATION_NODES: 'get-navigation-nodes:'
+};
 
 /**
- * Create a deterministic cache key from request parameters
+ * Parse and normalize a cache key
+ * 
+ * @param key The cache key to parse
+ * @param defaultPrefix The default prefix to use if none is present
+ * @returns Normalized cache key with proper prefix
  */
-export function createCacheKey(
-  primaryValue: string,
-  secondaryValue?: string,
-  prefix = "cache"
-): string {
-  // Use crypto to create a deterministic hash
-  let input = primaryValue;
+export function normalizeCacheKey(key: string, defaultPrefix: string): string {
+  // Check if key already has a known prefix
+  const hasPrefix = Object.values(CACHE_PREFIXES).some(prefix => 
+    key.startsWith(prefix)
+  );
   
-  if (secondaryValue) {
-    input += `:${secondaryValue}`;
+  // If no prefix, add the default one
+  if (!hasPrefix) {
+    return `${defaultPrefix}${key}`;
   }
   
-  // Create a simple hash using String.charCodeAt
+  return key;
+}
+
+/**
+ * Generate a cache key based on request parameters
+ * 
+ * @param params Request parameters
+ * @param prefix Cache key prefix
+ * @returns Cache key
+ */
+export function generateCacheKey(
+  params: Record<string, any>,
+  prefix: string
+): string {
+  // Get stable keys sorted alphabetically
+  const keys = Object.keys(params).sort();
+  
+  // Build parameter string
+  const paramString = keys
+    .filter(key => params[key] !== undefined && params[key] !== null)
+    .map(key => {
+      const value = params[key];
+      return `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}`;
+    })
+    .join('&');
+  
+  // Combine prefix and parameters
+  return `${prefix}${paramString}`;
+}
+
+/**
+ * Generate a consistent hash from a string
+ * 
+ * @param str String to hash
+ * @returns Hash string
+ */
+export function generateHash(str: string): string {
   let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
+  
+  if (str.length === 0) {
+    return hash.toString(16);
+  }
+  
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
     hash = hash & hash; // Convert to 32bit integer
   }
   
-  // Return a prefixed hash string
-  return `${prefix}:${Math.abs(hash).toString(16)}`;
+  return Math.abs(hash).toString(16);
 }
 
 /**
- * Cache an item with time-to-live
+ * Creates a partitioned cache key to distribute cache across buckets
+ * 
+ * @param key Original cache key
+ * @param buckets Number of buckets
+ * @returns Partitioned cache key
  */
-export async function cacheItem<T>(
-  key: string, 
-  value: T, 
-  ttlSeconds = 300, // 5 minutes default
-  kvNamespace?: Deno.Kv
-): Promise<boolean> {
-  try {
-    // Return early if no KV namespace and not in Deno environment
-    if (!kvNamespace && typeof Deno?.openKv !== "function") {
-      logEvent("warn", "Cache not available", { key });
-      return false;
-    }
-    
-    // Use provided KV namespace or open a new one
-    const kv = kvNamespace || await Deno.openKv();
-    
-    // Calculate expiry
-    const expireAt = new Date();
-    expireAt.setSeconds(expireAt.getSeconds() + ttlSeconds);
-    
-    // Store value with expiration
-    await kv.set([key], value, { expireAt });
-    
-    // Close KV if we opened it
-    if (!kvNamespace) {
-      kv.close();
-    }
-    
-    return true;
-  } catch (error) {
-    logEvent("error", "Cache write error", { key, error: error.message });
-    return false;
-  }
-}
-
-/**
- * Retrieve an item from cache
- */
-export async function getCachedItem<T>(
-  key: string,
-  kvNamespace?: Deno.Kv
-): Promise<T | null> {
-  try {
-    // Return null if no KV namespace and not in Deno environment
-    if (!kvNamespace && typeof Deno?.openKv !== "function") {
-      return null;
-    }
-    
-    // Use provided KV namespace or open a new one
-    const kv = kvNamespace || await Deno.openKv();
-    
-    // Get value from cache
-    const result = await kv.get<T>([key]);
-    
-    // Close KV if we opened it
-    if (!kvNamespace) {
-      kv.close();
-    }
-    
-    return result.value;
-  } catch (error) {
-    logEvent("error", "Cache read error", { key, error: error.message });
-    return null;
-  }
-}
-
-/**
- * Delete an item from cache
- */
-export async function deleteCachedItem(
-  key: string,
-  kvNamespace?: Deno.Kv
-): Promise<boolean> {
-  try {
-    // Return false if no KV namespace and not in Deno environment
-    if (!kvNamespace && typeof Deno?.openKv !== "function") {
-      return false;
-    }
-    
-    // Use provided KV namespace or open a new one
-    const kv = kvNamespace || await Deno.openKv();
-    
-    // Delete value from cache
-    await kv.delete([key]);
-    
-    // Close KV if we opened it
-    if (!kvNamespace) {
-      kv.close();
-    }
-    
-    return true;
-  } catch (error) {
-    logEvent("error", "Cache delete error", { key, error: error.message });
-    return false;
-  }
+export function createPartitionedCacheKey(key: string, buckets: number = 16): string {
+  const hash = generateHash(key);
+  const bucket = parseInt(hash.substring(0, 2), 16) % buckets;
+  return `bucket${bucket}:${key}`;
 }

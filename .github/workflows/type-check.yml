@@ -24,6 +24,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate configuration
+        run: |
+          # Create temporary validation script
+          echo "
+          import { validateAppConfig } from './src/utils/config/configValidator';
+          
+          // Run validation
+          const isValid = validateAppConfig();
+          
+          // Exit with appropriate code
+          process.exit(isValid ? 0 : 1);
+          " > validate-config.mjs
+          
+          # Set dummy environment variables for testing
+          export VITE_SUPABASE_URL="https://test.supabase.co"
+          export VITE_SUPABASE_ANON_KEY="test-key"
+          
+          # Run validation script
+          node validate-config.mjs || (echo "Configuration validation failed" && exit 1)
+
       - name: TypeScript type check
         run: npx tsc --noEmit
 
