@@ -1,168 +1,138 @@
 
-import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
-import { PerfConfig, defaultConfigs } from '@/hooks/usePerfConfig';
-import performanceMonitor from '@/utils/performance/performanceMonitor';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { PerfConfig, DEFAULT_PERF_CONFIG } from '../hooks/usePerfConfig';
+import { performanceMonitor } from '../utils/performance/performanceMonitor';
 
-export interface PerfConfigContextType {
-  config: PerfConfig;
-  updateConfig: (updates: Partial<PerfConfig>) => void;
-  applyPreset: (preset: 'low' | 'medium' | 'high' | 'auto') => void;
-  deviceCapability: 'low' | 'medium' | 'high';
-  setDeviceCapability: (capability: 'low' | 'medium' | 'high') => void;
-  manualPerformanceMode: boolean;
-  setManualPerformanceMode: (manual: boolean) => void;
-  features: {
-    virtualization: boolean;
-    lazyLoading: boolean;
-    imageOptimization: boolean;
-  };
-  webVitals: {
-    fcp: number | null;
-    lcp: number | null;
-    cls: number | null;
-    fid: number | null;
-    ttfb: number | null;
-  };
-}
-
-const defaultContext: PerfConfigContextType = {
-  config: defaultConfigs.medium,
-  updateConfig: () => {},
-  applyPreset: () => {},
-  deviceCapability: 'medium',
-  setDeviceCapability: () => {},
-  manualPerformanceMode: false,
-  setManualPerformanceMode: () => {},
-  features: {
-    virtualization: true,
-    lazyLoading: true,
-    imageOptimization: true
+// Preset configurations
+const PRESETS = {
+  comprehensive: {
+    ...DEFAULT_PERF_CONFIG,
+    samplingRate: 1.0,
+    enablePerformanceTracking: true,
+    enableRenderTracking: true,
+    enableValidation: true,
+    enablePropTracking: true,
+    enableDebugLogging: true,
+    intelligentProfiling: true
   },
-  webVitals: {
-    fcp: null,
-    lcp: null,
-    cls: null,
-    fid: null,
-    ttfb: null
+  balanced: {
+    ...DEFAULT_PERF_CONFIG,
+    samplingRate: 0.3,
+    enablePerformanceTracking: true,
+    enableRenderTracking: true,
+    enableValidation: true,
+    enablePropTracking: false,
+    enableDebugLogging: false
+  },
+  minimal: {
+    ...DEFAULT_PERF_CONFIG,
+    samplingRate: 0.1,
+    enablePerformanceTracking: true,
+    enableRenderTracking: false,
+    enableValidation: false,
+    enablePropTracking: false,
+    enableDebugLogging: false
+  },
+  disabled: {
+    ...DEFAULT_PERF_CONFIG,
+    enablePerformanceTracking: false,
+    enableRenderTracking: false,
+    enableValidation: false,
+    enablePropTracking: false,
+    enableDebugLogging: false
   }
 };
 
-const PerfConfigContext = createContext<PerfConfigContextType>(defaultContext);
+// Context shape
+export interface PerfConfigContextType {
+  config: PerfConfig;
+  updateConfig: (updates: Partial<PerfConfig>) => void;
+  deviceCapability: 'low' | 'medium' | 'high';
+  isLowPerformance: boolean;
+  isMediumPerformance: boolean;
+  isHighPerformance: boolean;
+  shouldUseSimplifiedUI: boolean;
+  applyPreset: (presetName: 'comprehensive' | 'balanced' | 'minimal' | 'disabled') => void;
+}
 
-export const PerfConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Detect device capability based on user agent, memory and hardware concurrency
-  const detectDeviceCapability = useCallback((): 'low' | 'medium' | 'high' => {
-    if (typeof window === 'undefined') return 'medium';
+// Create context
+const PerfConfigContext = createContext<PerfConfigContextType | null>(null);
 
-    // Check for mobile devices
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent
-    );
+// Hook to use the context
+export const usePerfConfig = (): PerfConfigContextType => {
+  const context = useContext(PerfConfigContext);
+  if (!context) {
+    throw new Error('usePerfConfig must be used within a PerfConfigProvider');
+  }
+  return context;
+};
 
-    // Check for available memory (if available in the browser)
-    const lowMemory = (navigator as any).deviceMemory && (navigator as any).deviceMemory < 4;
+// Provider component
+interface PerfConfigProviderProps {
+  children: ReactNode;
+  initialConfig?: Partial<PerfConfig>;
+}
 
-    // Check for CPU cores
-    const lowCPU = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2;
-
-    // Determine capability level
-    if (isMobile && (lowMemory || lowCPU)) {
-      return 'low';
-    } else if (
-      (navigator as any).deviceMemory &&
-      (navigator as any).deviceMemory >= 8 &&
-      navigator.hardwareConcurrency &&
-      navigator.hardwareConcurrency >= 8
-    ) {
-      return 'high';
-    }
-
-    return 'medium';
-  }, []);
-
-  const [deviceCapability, setDeviceCapability] = useState<'low' | 'medium' | 'high'>(
-    detectDeviceCapability()
-  );
-  const [manualPerformanceMode, setManualPerformanceMode] = useState(false);
-  const [config, setConfig] = useState<PerfConfig>(defaultConfigs[deviceCapability]);
-  const [webVitals, setWebVitals] = useState({
-    fcp: null as number | null,
-    lcp: null as number | null,
-    cls: null as number | null,
-    fid: null as number | null,
-    ttfb: null as number | null
+export const PerfConfigProvider: React.FC<PerfConfigProviderProps> = ({
+  children,
+  initialConfig = {}
+}) => {
+  // State for the configuration
+  const [config, setConfig] = useState<PerfConfig>({
+    ...DEFAULT_PERF_CONFIG,
+    ...initialConfig
   });
-
-  // Apply config based on device capability on mount
-  useEffect(() => {
-    if (!manualPerformanceMode) {
-      setConfig(defaultConfigs[deviceCapability]);
-    }
-  }, [deviceCapability, manualPerformanceMode]);
-
-  // Update config with partial changes
-  const updateConfig = useCallback((updates: Partial<PerfConfig>) => {
-    setConfig(prevConfig => ({
-      ...prevConfig,
+  
+  // Update performance monitor when config changes
+  React.useEffect(() => {
+    performanceMonitor.configure({
+      enabled: config.enablePerformanceTracking,
+      samplingRate: config.samplingRate,
+      debugMode: config.enableDebugLogging
+    });
+  }, [
+    config.enablePerformanceTracking,
+    config.samplingRate,
+    config.enableDebugLogging
+  ]);
+  
+  // Update configuration with partial updates
+  const updateConfig = (updates: Partial<PerfConfig>) => {
+    setConfig(prev => ({
+      ...prev,
       ...updates
     }));
-    
-    // Enable manual mode when the config is updated
-    setManualPerformanceMode(true);
-  }, []);
-
+  };
+  
   // Apply a preset configuration
-  const applyPreset = useCallback((preset: 'low' | 'medium' | 'high' | 'auto') => {
-    if (preset === 'auto') {
-      const detectedCapability = detectDeviceCapability();
-      setDeviceCapability(detectedCapability);
-      setConfig(defaultConfigs[detectedCapability]);
-      setManualPerformanceMode(false);
-    } else {
-      setConfig(defaultConfigs[preset]);
-      setDeviceCapability(preset);
-      setManualPerformanceMode(true);
+  const applyPreset = (presetName: 'comprehensive' | 'balanced' | 'minimal' | 'disabled') => {
+    const preset = PRESETS[presetName];
+    if (preset) {
+      setConfig(preset);
     }
-  }, [detectDeviceCapability]);
-
-  // Derive features from config
-  const features = useMemo(() => ({
-    virtualization: config.virtualizeLists,
-    lazyLoading: true,
-    imageOptimization: true
-  }), [config.virtualizeLists]);
-
-  // Enable/disable performance tracking based on config
-  useEffect(() => {
-    performanceMonitor.setMetricsEnabled(config.enableMetricsCollection || false);
-  }, [config.enableMetricsCollection]);
-
+  };
+  
+  // Derived state for UI-level flags
+  const isLowPerformance = config.deviceCapability === 'low';
+  const isMediumPerformance = config.deviceCapability === 'medium';
+  const isHighPerformance = config.deviceCapability === 'high';
+  
+  // Should we use simplified UI based on device capability?
+  const shouldUseSimplifiedUI = isLowPerformance || 
+    (config.disableEffects && !isHighPerformance);
+  
   // Context value
-  const contextValue = useMemo(
-    () => ({
-      config,
-      updateConfig,
-      applyPreset,
-      deviceCapability,
-      setDeviceCapability,
-      manualPerformanceMode,
-      setManualPerformanceMode,
-      features,
-      webVitals
-    }),
-    [
-      config,
-      updateConfig,
-      applyPreset,
-      deviceCapability,
-      setDeviceCapability,
-      manualPerformanceMode,
-      setManualPerformanceMode,
-      features,
-      webVitals
-    ]
-  );
-
+  const contextValue: PerfConfigContextType = {
+    config,
+    updateConfig,
+    deviceCapability: config.deviceCapability,
+    isLowPerformance,
+    isMediumPerformance,
+    isHighPerformance,
+    shouldUseSimplifiedUI,
+    applyPreset
+  };
+  
   return (
     <PerfConfigContext.Provider value={contextValue}>
       {children}

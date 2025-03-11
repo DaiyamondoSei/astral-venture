@@ -1,205 +1,101 @@
 
-import { supabase } from '@/integrations/supabase/client';
+/**
+ * Performance Metrics Service
+ * 
+ * Handles the collection and submission of performance metrics to the server.
+ */
+import { PerformanceMetric, PerformanceReportPayload } from './types';
+import { invokeEdgeFunction } from '../edgeFunctionHelper';
 import { Result, success, failure } from '../result/Result';
-import { PerformanceMetric, DeviceInfo, PerformanceReportPayload } from './types';
-import { asyncResultify } from '../result/AsyncResult';
-
-interface MetricsBatch {
-  metrics: PerformanceMetric[];
-  sessionId: string;
-  timestamp: string;
-  source: 'web';
-  deviceInfo?: DeviceInfo;
-}
+import { perfMetricsCollector } from './perfMetricsCollector';
 
 /**
- * Service for collecting and sending performance metrics to the backend
+ * Service for tracking and reporting performance metrics
  */
-export const perfMetricsService = {
+class PerfMetricsService {
+  private isEnabled: boolean = true;
+  private pendingMetrics: PerformanceMetric[] = [];
+  private isReporting: boolean = false;
+  
+  constructor() {
+    // Register callback for automatic metric reporting
+    perfMetricsCollector.onFlush(this.handleMetricsBatch.bind(this));
+    
+    // Register document visibility handler for flushing on page hide
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+    }
+  }
+  
   /**
-   * Send metrics to the backend with improved error handling and type safety
+   * Handle metrics batch from collector
    */
-  async sendMetrics(metrics: PerformanceMetric[]): Promise<Result<void, Error>> {
-    if (!metrics.length) {
+  private handleMetricsBatch(metrics: PerformanceMetric[]): void {
+    if (!this.isEnabled || metrics.length === 0) return;
+    
+    // Add to pending metrics
+    this.pendingMetrics.push(...metrics);
+    
+    // Submit if we're not already in the process of reporting
+    if (!this.isReporting) {
+      void this.submitPendingMetrics();
+    }
+  }
+  
+  /**
+   * Handle document visibility change
+   */
+  private handleVisibilityChange(): void {
+    if (document.visibilityState === 'hidden') {
+      // Flush perfMetricsCollector to ensure all metrics are added to pendingMetrics
+      void perfMetricsCollector.flush();
+      
+      // Force submission of pending metrics when page is hidden
+      if (this.pendingMetrics.length > 0) {
+        void this.submitPendingMetricsSync();
+      }
+    }
+  }
+  
+  /**
+   * Submit metrics to the server
+   */
+  public async sendMetrics(metrics: PerformanceMetric[]): Promise<Result<void, Error>> {
+    if (!this.isEnabled || metrics.length === 0) {
       return success(undefined);
     }
     
     try {
-      // Generate session ID if not already set
-      const sessionId = localStorage.getItem('metrics_session_id') || 
-        `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      // Add to pending metrics
+      this.pendingMetrics.push(...metrics);
       
-      // Store session ID for consistent reporting
-      localStorage.setItem('metrics_session_id', sessionId);
-      
-      // Collect device information for better context
-      const deviceInfo = this.collectDeviceInfo();
-      
-      const batch: MetricsBatch = {
-        metrics,
-        sessionId,
-        timestamp: new Date().toISOString(),
-        source: 'web',
-        deviceInfo
-      };
-      
-      // Send metrics to Supabase Edge Function
-      const { error } = await supabase.functions.invoke('track-performance', {
-        body: batch
-      });
-      
-      if (error) {
-        console.error('Error sending performance metrics:', error);
-        return failure(new Error(`Failed to send metrics: ${error.message}`));
+      // Submit if we're not already in the process of reporting
+      if (!this.isReporting) {
+        return await this.submitPendingMetrics();
       }
       
       return success(undefined);
     } catch (error) {
-      console.error('Unexpected error sending metrics:', error);
-      return failure(error instanceof Error ? error : new Error('Failed to send performance metrics'));
+      console.error('Error sending performance metrics:', error);
+      return failure(error instanceof Error ? error : new Error(String(error)));
     }
-  },
+  }
   
   /**
-   * Track a component render with improved type safety
+   * Get device information for metrics reporting
    */
-  async trackComponentRender(
-    componentName: string, 
-    renderTime: number,
-    metadata?: Record<string, any>
-  ): Promise<Result<void, Error>> {
-    const metric: PerformanceMetric = {
-      component_name: componentName,
-      metric_name: 'renderTime',
-      value: renderTime,
-      timestamp: Date.now(),
-      category: 'component',
-      type: 'render',
-      ...(metadata && { metadata })
+  private getDeviceInfo(): Record<string, any> {
+    const deviceInfo: Record<string, any> = {
+      userAgent: navigator.userAgent
     };
     
-    return this.sendMetrics([metric]);
-  },
-  
-  /**
-   * Track a user interaction with improved type safety
-   */
-  async trackInteraction(
-    name: string, 
-    duration: number,
-    metadata?: Record<string, any>
-  ): Promise<Result<void, Error>> {
-    const metric: PerformanceMetric = {
-      metric_name: name,
-      value: duration,
-      timestamp: Date.now(),
-      category: 'interaction',
-      type: 'interaction',
-      page_url: window.location.pathname,
-      ...(metadata && { metadata })
-    };
-    
-    return this.sendMetrics([metric]);
-  },
-  
-  /**
-   * Track a web vital metric with improved type safety
-   */
-  async trackWebVital(
-    name: string, 
-    value: number,
-    category: string,
-    rating?: 'good' | 'needs-improvement' | 'poor'
-  ): Promise<Result<void, Error>> {
-    const metric: PerformanceMetric = {
-      metric_name: name,
-      value,
-      timestamp: Date.now(),
-      category,
-      type: 'webVital',
-      ...(rating && { rating })
-    };
-    
-    return this.sendMetrics([metric]);
-  },
-
-  /**
-   * Collect and report all metrics at once
-   */
-  async reportAllMetrics(
-    componentMetrics: Record<string, number[]>,
-    webVitals: Record<string, number>,
-    interactionMetrics: Record<string, number[]>
-  ): Promise<Result<void, Error>> {
-    try {
-      // Format and combine all metrics
-      const allMetrics: PerformanceMetric[] = [];
-
-      // Add component metrics
-      Object.entries(componentMetrics).forEach(([componentName, times]) => {
-        if (times.length > 0) {
-          const avgTime = times.reduce((sum, time) => sum + time, 0) / times.length;
-          allMetrics.push({
-            component_name: componentName,
-            metric_name: 'averageRenderTime',
-            value: avgTime,
-            timestamp: Date.now(),
-            category: 'component',
-            type: 'render',
-            metadata: { sampleCount: times.length }
-          });
-        }
-      });
-
-      // Add web vitals
-      Object.entries(webVitals).forEach(([name, value]) => {
-        allMetrics.push({
-          metric_name: name,
-          value,
-          timestamp: Date.now(),
-          category: 'webVital',
-          type: 'webVital'
-        });
-      });
-
-      // Add interaction metrics
-      Object.entries(interactionMetrics).forEach(([name, times]) => {
-        if (times.length > 0) {
-          const avgTime = times.reduce((sum, time) => sum + time, 0) / times.length;
-          allMetrics.push({
-            metric_name: name,
-            value: avgTime,
-            timestamp: Date.now(),
-            category: 'interaction',
-            type: 'interaction',
-            metadata: { sampleCount: times.length }
-          });
-        }
-      });
-
-      return this.sendMetrics(allMetrics);
-    } catch (error) {
-      console.error('Error reporting all metrics:', error);
-      return failure(error instanceof Error ? error : new Error('Failed to report metrics'));
+    // Add screen info if available
+    if (window.screen) {
+      deviceInfo.screenWidth = window.screen.width;
+      deviceInfo.screenHeight = window.screen.height;
+      deviceInfo.devicePixelRatio = window.devicePixelRatio;
     }
-  },
-
-  /**
-   * Collect device information for better context
-   */
-  collectDeviceInfo(): DeviceInfo {
-    const deviceInfo: DeviceInfo = {
-      userAgent: navigator.userAgent,
-      deviceCategory: this.detectDeviceCategory(),
-      screenWidth: window.screen.width,
-      screenHeight: window.screen.height,
-      devicePixelRatio: window.devicePixelRatio,
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight
-      }
-    };
-
+    
     // Add connection info if available
     if ('connection' in navigator) {
       const connection = (navigator as any).connection;
@@ -212,47 +108,93 @@ export const perfMetricsService = {
         };
       }
     }
-
-    // Add memory info if available
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
-      if (memory) {
-        deviceInfo.memory = {
-          jsHeapSizeLimit: memory.jsHeapSizeLimit,
-          totalJSHeapSize: memory.totalJSHeapSize,
-          usedJSHeapSize: memory.usedJSHeapSize
-        };
-      }
-    }
-
+    
     return deviceInfo;
-  },
-
+  }
+  
   /**
-   * Detect device category based on user agent and screen size
+   * Submit pending metrics to the server
    */
-  detectDeviceCategory(): string {
-    const ua = navigator.userAgent;
-    
-    // Check for mobile devices
-    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
-      return window.screen.width < 768 ? 'mobile' : 'tablet';
+  private async submitPendingMetrics(): Promise<Result<void, Error>> {
+    if (this.pendingMetrics.length === 0) {
+      return success(undefined);
     }
     
-    // Check for desktop devices
-    return 'desktop';
+    this.isReporting = true;
+    
+    try {
+      const metrics = [...this.pendingMetrics];
+      this.pendingMetrics = [];
+      
+      const payload: PerformanceReportPayload = {
+        timestamp: new Date().toISOString(),
+        metrics,
+        device: this.getDeviceInfo()
+      };
+      
+      await invokeEdgeFunction('track-performance', payload);
+      
+      this.isReporting = false;
+      
+      // If more metrics accumulated while we were submitting, submit those too
+      if (this.pendingMetrics.length > 0) {
+        return this.submitPendingMetrics();
+      }
+      
+      return success(undefined);
+    } catch (error) {
+      this.isReporting = false;
+      console.error('Failed to send performance metrics:', error);
+      
+      // Put the metrics back in the queue for retry
+      this.pendingMetrics.push(...this.pendingMetrics);
+      
+      return failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
-};
+  
+  /**
+   * Submit pending metrics synchronously using sendBeacon
+   * This is used when the page is being unloaded
+   */
+  private submitPendingMetricsSync(): Result<void, Error> {
+    if (this.pendingMetrics.length === 0 || !navigator.sendBeacon) {
+      return success(undefined);
+    }
+    
+    try {
+      const metrics = [...this.pendingMetrics];
+      this.pendingMetrics = [];
+      
+      const payload: PerformanceReportPayload = {
+        timestamp: new Date().toISOString(),
+        metrics,
+        device: this.getDeviceInfo()
+      };
+      
+      const blob = new Blob([JSON.stringify(payload)], {
+        type: 'application/json'
+      });
+      
+      navigator.sendBeacon('/api/track-performance', blob);
+      
+      return success(undefined);
+    } catch (error) {
+      console.error('Failed to send performance metrics synchronously:', error);
+      return failure(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  
+  /**
+   * Enable or disable metrics reporting
+   */
+  public setEnabled(enabled: boolean): void {
+    this.isEnabled = enabled;
+  }
+}
 
-/**
- * Create AsyncResult versions of the service methods
- */
-export const perfMetricsServiceAsync = {
-  sendMetrics: asyncResultify(perfMetricsService.sendMetrics.bind(perfMetricsService)),
-  trackComponentRender: asyncResultify(perfMetricsService.trackComponentRender.bind(perfMetricsService)),
-  trackInteraction: asyncResultify(perfMetricsService.trackInteraction.bind(perfMetricsService)),
-  trackWebVital: asyncResultify(perfMetricsService.trackWebVital.bind(perfMetricsService)),
-  reportAllMetrics: asyncResultify(perfMetricsService.reportAllMetrics.bind(perfMetricsService))
-};
+// Create a singleton instance
+const perfMetricsService = new PerfMetricsService();
 
+// Export the instance
 export default perfMetricsService;

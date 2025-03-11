@@ -1,6 +1,6 @@
 
 /**
- * Core utilities for working with AsyncResult types
+ * AsyncResult Core - Core utilities for working with asynchronous operations that may fail
  */
 import { Result, success, failure } from './Result';
 import { AsyncResult } from './AsyncResultTypes';
@@ -13,64 +13,22 @@ import { AsyncResult } from './AsyncResultTypes';
  */
 export async function mapAsync<T, U, E>(
   asyncResult: AsyncResult<T, E>,
-  fn: (value: T) => U | Promise<U>
+  fn: (value: T) => Promise<U> | U
 ): AsyncResult<U, E> {
   const result = await asyncResult;
 
   if (result.type === 'success') {
     try {
-      const mapped = await fn(result.value);
-      return success(mapped);
+      const mappedValue = await fn(result.value);
+      return Promise.resolve(success(mappedValue));
     } catch (error) {
-      return failure(error as E);
+      // If the mapping function throws, we still want to return a failure
+      // but with the original error type
+      return Promise.resolve(failure(result.error as E));
     }
   }
 
-  return result;
-}
-
-/**
- * Flat maps the success value of an AsyncResult
- * @param asyncResult The AsyncResult to flat map
- * @param fn The function to apply to the success value that returns a new AsyncResult
- * @returns A new AsyncResult with the flat mapped success value
- */
-export async function flatMapAsync<T, U, E>(
-  asyncResult: AsyncResult<T, E>,
-  fn: (value: T) => AsyncResult<U, E> | Promise<AsyncResult<U, E>>
-): AsyncResult<U, E> {
-  const result = await asyncResult;
-
-  if (result.type === 'success') {
-    try {
-      return await fn(result.value);
-    } catch (error) {
-      return failure(error as E);
-    }
-  }
-
-  return result;
-}
-
-/**
- * Folds an AsyncResult into a single value
- * @param asyncResult The AsyncResult to fold
- * @param onSuccess The function to apply to the success value
- * @param onFailure The function to apply to the failure value
- * @returns A promise of the folded value
- */
-export async function foldAsync<T, E, U>(
-  asyncResult: AsyncResult<T, E>,
-  onSuccess: (value: T) => U | Promise<U>,
-  onFailure: (error: E) => U | Promise<U>
-): Promise<U> {
-  const result = await asyncResult;
-
-  if (result.type === 'success') {
-    return onSuccess(result.value);
-  } else {
-    return onFailure(result.error);
-  }
+  return Promise.resolve(result as Result<unknown, E>) as AsyncResult<U, E>;
 }
 
 /**
@@ -81,24 +39,70 @@ export async function foldAsync<T, E, U>(
  */
 export async function mapErrorAsync<T, E, F>(
   asyncResult: AsyncResult<T, E>,
-  fn: (error: E) => F | Promise<F>
+  fn: (error: E) => Promise<F> | F
 ): AsyncResult<T, F> {
   const result = await asyncResult;
 
   if (result.type === 'failure') {
     try {
-      const mapped = await fn(result.error);
-      return failure(mapped);
+      const mappedError = await fn(result.error);
+      return Promise.resolve(failure(mappedError));
     } catch (error) {
-      return failure(error as F);
+      // If mapping the error throws, we still want to return a failure
+      return Promise.resolve(failure(error as F));
     }
   }
 
-  return result as unknown as AsyncResult<T, F>;
+  return Promise.resolve(result as Result<T, unknown>) as AsyncResult<T, F>;
 }
 
 /**
- * Converts a function that may throw to one that returns an AsyncResult
+ * Flat maps the success value of an AsyncResult
+ * @param asyncResult The AsyncResult to flat map
+ * @param fn The function to apply to the success value that returns a new AsyncResult
+ * @returns A new AsyncResult with the flat mapped success value
+ */
+export async function flatMapAsync<T, U, E>(
+  asyncResult: AsyncResult<T, E>,
+  fn: (value: T) => AsyncResult<U, E> | Promise<Result<U, E>>
+): AsyncResult<U, E> {
+  const result = await asyncResult;
+
+  if (result.type === 'success') {
+    try {
+      return await fn(result.value);
+    } catch (error) {
+      // If the mapping function throws, we want to return a failure
+      return Promise.resolve(failure(error as E));
+    }
+  }
+
+  return Promise.resolve(result as Result<unknown, E>) as AsyncResult<U, E>;
+}
+
+/**
+ * Folds an AsyncResult into a single value
+ * @param asyncResult The AsyncResult to fold
+ * @param onSuccess The function to apply to the success value
+ * @param onFailure The function to apply to the failure value
+ * @returns The folded value
+ */
+export async function foldAsync<T, E, U>(
+  asyncResult: AsyncResult<T, E>,
+  onSuccess: (value: T) => Promise<U> | U,
+  onFailure: (error: E) => Promise<U> | U
+): Promise<U> {
+  const result = await asyncResult;
+
+  if (result.type === 'success') {
+    return await onSuccess(result.value);
+  } else {
+    return await onFailure(result.error);
+  }
+}
+
+/**
+ * Converts a function that returns a Promise to one that returns an AsyncResult
  * @param fn The function to convert
  * @returns A function that returns an AsyncResult
  */
