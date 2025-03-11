@@ -41,13 +41,14 @@ const CubeNode: React.FC<CubeNodeProps> = ({
       break;
   }
 
+  // Fixed animation variants to comply with framer-motion types
   const nodeVariants = {
     active: {
       scale: [1, 1.1, 1],
       transition: {
         duration: 2,
         repeat: Infinity,
-        repeatType: "loop"
+        repeatType: "loop" as const
       }
     },
     inactive: {

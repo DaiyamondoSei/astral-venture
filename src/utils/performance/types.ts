@@ -71,7 +71,7 @@ export interface PerformanceTrackingResult {
   startTiming: () => void;
   endTiming: () => void;
   startInteractionTiming: (interactionName: string) => () => void;
-  trackInteraction?: (interactionName: string, duration: number) => void;
+  trackInteraction?: (interactionName: string) => (() => void) | void;
   getMetrics: () => ComponentMetrics | null;
   recordSize: (domNode: HTMLElement | null) => void;
 }

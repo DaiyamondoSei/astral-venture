@@ -64,8 +64,10 @@ export async function initializeConfiguration(throwOnError: boolean = true): Pro
     configState.isValid = validationResult.isValid;
     configState.isInitialized = true;
     configState.initializationTime = performance.now() - startTime;
-    configState.errors = [...validationResult.missingKeys.map(key => `Missing required config: ${key}`), 
-                         ...validationResult.invalidKeys.map(key => `Invalid config value: ${key}`)];
+    configState.errors = [
+      ...validationResult.missingKeys.map(key => `Missing required config: ${key}`), 
+      ...validationResult.invalidKeys.map(key => `Invalid config value: ${key}`)
+    ];
     
     // 3. Log the configuration status
     if (validationResult.isValid) {
@@ -76,9 +78,14 @@ export async function initializeConfiguration(throwOnError: boolean = true): Pro
       
       // Throw error if requested - this will prevent application startup
       if (throwOnError) {
+        const details = configState.errors.map(error => ({ 
+          path: 'config', 
+          message: error 
+        }));
+        
         throw new ValidationError(
           'Application configuration is invalid. Check console for details.',
-          configState.errors.map(error => ({ path: 'config', message: error })),
+          details,
           'CONFIG_VALIDATION_ERROR',
           500
         );
@@ -158,9 +165,18 @@ export function resetConfigurationState(): void {
   configState.initializationTime = null;
 }
 
+/**
+ * Get a specific configuration value with validation
+ */
+export function getConfig<T>(key: string, defaultValue: T): T {
+  ensureValidConfiguration();
+  return getValidatedConfig(key) as unknown as T || defaultValue;
+}
+
 export default {
   initializeConfiguration,
   ensureValidConfiguration,
   getConfigurationState,
-  resetConfigurationState
+  resetConfigurationState,
+  getConfig
 };

@@ -15,7 +15,7 @@ import {
   callRpc,
   createRpcCaller,
   incrementEnergyPoints
-} from '@/lib/supabaseClient';
+} from '@/lib/supabase';
 
 // Re-export everything for consistent imports
 export {

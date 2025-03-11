@@ -20,9 +20,9 @@ export interface ValidationErrorDetail {
   details?: string;
   statusCode?: number;
   
-  // Legacy compatibility field - redirected to path
+  // Legacy compatibility field
   field?: string;
-  expectedType?: string; // Maps to type
+  expectedType?: string;
 }
 
 export class ValidationError extends Error {

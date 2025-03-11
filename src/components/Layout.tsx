@@ -32,10 +32,9 @@ const Layout: React.FC<LayoutProps> = ({
   showDevTools = process.env.NODE_ENV === 'development'
 }: LayoutProps) => {
   // Use enhanced performance tracking
-  const { trackInteraction, startInteractionTiming } = usePerformanceTracking({
+  const { trackInteraction } = usePerformanceTracking({
     componentName: 'Layout',
-    logSlowRenders: true,
-    categories: ['layout', 'core']
+    logSlowRenders: true
   });
   
   // Memoize content width class to prevent unnecessary re-renders
@@ -55,8 +54,8 @@ const Layout: React.FC<LayoutProps> = ({
   }, [contentWidth]);
   
   const handleLayoutClick = () => {
-    const trackMetadata = trackInteraction('layout-click');
-    return trackMetadata();
+    const trackingFn = trackInteraction('layout-click');
+    if (trackingFn) trackingFn();
   };
   
   return (

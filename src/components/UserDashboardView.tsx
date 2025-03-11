@@ -1,10 +1,13 @@
+
 import React from 'react';
 import Layout from '@/components/Layout';
 import UserProfilePanel from '@/components/panels/UserProfilePanel';
 import AchievementsPanel from '@/components/panels/AchievementsPanel';
-import ReflectionsPanel from '@/components/panels/ReflectionsPanel';
-import LogoutButton from '@/components/LogoutButton';
 import { useAuth } from '@/hooks/auth/useAuth';
+import LogoutButton from '@/components/LogoutButton';
+
+// Import the ReflectionsPanel component correctly
+import ReflectionsPanel from '@/components/panels/ReflectionsPanel';
 
 interface UserDashboardViewProps {
   onLogout: () => void;
@@ -13,10 +16,12 @@ interface UserDashboardViewProps {
 const UserDashboardView: React.FC<UserDashboardViewProps> = ({ onLogout }) => {
   const { logout } = useAuth();
 
-  // Fix for line 37 where handleLogout is called with an argument but expects none
   const handleUserLogout = async () => {
     await logout();
-  }
+    if (onLogout) {
+      onLogout();
+    }
+  };
 
   return (
     <Layout className="min-h-screen flex flex-col">

@@ -9,19 +9,25 @@ interface LogoutButtonProps {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
+  onClick?: () => Promise<void>; // Added onClick prop to support external handlers
 }
 
 const LogoutButton = ({ 
   variant = 'ghost',
   size = 'default',
-  className
+  className,
+  onClick
 }: LogoutButtonProps) => {
   const { signOut, isLoading } = useAuth();
   const navigate = useNavigate();
   
   const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
+    if (onClick) {
+      await onClick();
+    } else {
+      await signOut();
+      navigate('/login');
+    }
   };
   
   return (
