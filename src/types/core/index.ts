@@ -26,15 +26,26 @@ export {
   isUUID,
   isTimestamp,
   isEnergyPoints,
-  isDateString
+  isDateString,
+  asUUID,
+  asTimestamp,
+  asEnergyPoints,
+  asDateString,
+  safeCreateUUID
 } from './base/branded';
+
+export {
+  hasId,
+  ensureEntityId
+} from './base/primitives';
 
 export {
   isValidationErrorDetail,
   isValidationResult,
   createValidSuccess,
   createValidError,
-  createValidErrors
+  createValidErrors,
+  ValidationError
 } from './validation/results';
 
 export {
@@ -43,5 +54,6 @@ export {
   isValidWebVitalCategory,
   isPerformanceMetric,
   isWebVitalMetric,
-  isComponentMetrics
+  isComponentMetrics,
+  ensureMetricId
 } from './performance/metrics';

@@ -9,6 +9,7 @@ import EmptyAchievementList from './achievement/EmptyAchievementList';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import type { Achievement } from '@/types/achievement';
+import { normalizeEntities } from '@/utils/entityUtils';
 
 /**
  * Achievements panel that displays user achievements
@@ -33,7 +34,8 @@ const AchievementsPanel = () => {
         if (error) throw error;
         
         // Transform to Achievement type and add unlocked status
-        return data.map((item: any) => ({
+        // Using normalizeEntities ensures all items have an id property
+        return normalizeEntities(data.map((item: any) => ({
           id: item.id,
           title: item.title,
           description: item.description,
@@ -48,7 +50,7 @@ const AchievementsPanel = () => {
           unlockedAt: Math.random() > 0.7 ? new Date().toISOString() : undefined,
           requiredCount: Math.floor(Math.random() * 10) + 1,
           currentCount: Math.floor(Math.random() * 10)
-        }));
+        })));
       } catch (err) {
         console.error('Error fetching achievements:', err);
         return [];
@@ -65,7 +67,7 @@ const AchievementsPanel = () => {
 
   // Get unique categories for filter
   const categories = Array.from(
-    new Set(achievements.map(achievement => achievement.category))
+    new Set(achievements.map(achievement => achievement.category).filter(Boolean))
   );
 
   return (

@@ -2,18 +2,13 @@
 /**
  * Performance Metrics Types
  * 
- * This module defines standardized types for performance metrics
- * used throughout the application.
+ * This module defines type definitions for performance metrics.
  * 
  * @category Performance
  * @version 1.0.0
  */
 
-import { Timestamp } from '../base/primitives';
-
-/**
- * Basic Classification Types
- */
+import { SafeEntity } from '../base/primitives';
 
 /**
  * Device capability classification
@@ -21,31 +16,25 @@ import { Timestamp } from '../base/primitives';
 export enum DeviceCapability {
   LOW = 'low',
   MEDIUM = 'medium',
-  HIGH = 'high',
-  ULTRA = 'ultra'
+  HIGH = 'high'
 }
 
 /**
  * Performance mode settings
  */
 export enum PerformanceMode {
-  AUTO = 'auto',       // Automatically determine based on device capabilities
-  LOW = 'low',         // Low-end mode with minimal effects
-  MEDIUM = 'medium',   // Balanced performance and visual effects
-  HIGH = 'high'        // Full visual effects, assumes powerful device
+  QUALITY = 'quality',
+  BALANCED = 'balanced',
+  PERFORMANCE = 'performance'
 }
 
 /**
  * Render frequency classification
  */
 export enum RenderFrequency {
-  LOW = 'low',         // 30fps or lower
-  MEDIUM = 'medium',   // 30-45fps
-  HIGH = 'high',       // 45-60fps
-  VARIABLE = 'variable', // Adaptive based on device
-  NORMAL = 'normal',   // Expected render frequency
-  FREQUENT = 'frequent', // More frequent than expected
-  EXCESSIVE = 'excessive' // Too frequent, potential performance issue
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high'
 }
 
 /**
@@ -57,10 +46,6 @@ export enum QualityLevel {
   HIGH = 'high',
   ULTRA = 'ultra'
 }
-
-/**
- * Metric Types
- */
 
 /**
  * Types of metrics to track
@@ -86,7 +71,7 @@ export enum MetricType {
  */
 export enum WebVitalName {
   CLS = 'CLS',
-  FCP = 'FCP', 
+  FCP = 'FCP',
   LCP = 'LCP',
   TTFB = 'TTFB',
   FID = 'FID',
@@ -94,7 +79,7 @@ export enum WebVitalName {
 }
 
 /**
- * Web vital categories
+ * Web vital category
  */
 export enum WebVitalCategory {
   LOADING = 'loading',
@@ -113,44 +98,44 @@ export enum WebVitalRating {
 }
 
 /**
- * Core Metric Interfaces
+ * Base interface for all metrics
  */
+export interface BaseMetric {
+  id?: string;
+  timestamp: number;
+}
 
 /**
  * Web vital metric structure
  */
-export interface WebVitalMetric {
+export interface WebVitalMetric extends BaseMetric {
   name: WebVitalName | string;
   value: number;
   category: WebVitalCategory;
-  timestamp: Timestamp | number;
   rating?: WebVitalRating;
   delta?: number;
-  id?: string;
 }
 
 /**
  * Performance metric structure
  */
-export interface PerformanceMetric {
+export interface PerformanceMetric extends BaseMetric {
   component_name?: string;
   metric_name: string;
   value: number;
-  timestamp: Timestamp | number | string;
   category: string;
-  type: MetricType;
+  type: MetricType | string;
   user_id?: string;
   session_id?: string;
   page_url?: string;
   metadata?: Record<string, any>;
   rating?: WebVitalRating;
-  id?: string;
 }
 
 /**
  * Component metrics structure
  */
-export interface ComponentMetrics {
+export interface ComponentMetrics extends BaseMetric {
   componentName: string;
   renderCount: number;
   totalRenderTime: number;
@@ -164,109 +149,92 @@ export interface ComponentMetrics {
     height: number;
     elements?: number;
   };
+  // Additional properties
   slowRenderCount?: number;
   renderTimes?: number[];
   minRenderTime?: number;
   maxRenderTime?: number;
   lastUpdated?: number;
   metricType?: string;
-  id?: string;
 }
 
 /**
- * Device information structure
+ * Check if a string is a valid MetricType
  */
-export interface DeviceInfo {
-  userAgent?: string;
-  deviceCategory?: string;
-  screenWidth?: number;
-  screenHeight?: number;
-  devicePixelRatio?: number;
-  connection?: {
-    effectiveType?: string;
-    downlink?: number;
-    rtt?: number;
-    saveData?: boolean;
-  };
-  memory?: {
-    jsHeapSizeLimit?: number;
-    totalJSHeapSize?: number;
-    usedJSHeapSize?: number;
-  };
+export function isValidMetricType(type: string): type is MetricType {
+  return Object.values(MetricType).includes(type as MetricType);
 }
 
 /**
- * Performance report payload structure
+ * Check if a string is a valid WebVitalName
  */
-export interface PerformanceReportPayload {
-  metrics: PerformanceMetric[];
-  webVitals?: WebVitalMetric[];
-  sessionId?: string;
-  userId?: string;
-  timestamp: string;
-  source: 'web' | 'mobile' | 'desktop';
-  deviceInfo?: DeviceInfo;
+export function isValidWebVitalName(name: string): name is WebVitalName {
+  return Object.values(WebVitalName).includes(name as WebVitalName);
 }
 
 /**
- * Type Guards
+ * Check if a string is a valid WebVitalCategory
  */
-
-/**
- * Type guard for MetricType
- */
-export function isValidMetricType(type: unknown): type is MetricType {
-  return typeof type === 'string' && Object.values(MetricType).includes(type as MetricType);
+export function isValidWebVitalCategory(category: string): category is WebVitalCategory {
+  return Object.values(WebVitalCategory).includes(category as WebVitalCategory);
 }
 
 /**
- * Type guard for WebVitalName
- */
-export function isValidWebVitalName(name: unknown): name is WebVitalName {
-  return typeof name === 'string' && Object.values(WebVitalName).includes(name as WebVitalName);
-}
-
-/**
- * Type guard for WebVitalCategory
- */
-export function isValidWebVitalCategory(category: unknown): category is WebVitalCategory {
-  return typeof category === 'string' && Object.values(WebVitalCategory).includes(category as WebVitalCategory);
-}
-
-/**
- * Type guard for PerformanceMetric
+ * Check if an object is a valid PerformanceMetric
  */
 export function isPerformanceMetric(obj: unknown): obj is PerformanceMetric {
-  return typeof obj === 'object' && 
-    obj !== null && 
-    'metric_name' in obj && 
-    'value' in obj && 
-    'category' in obj && 
-    'type' in obj && 
-    'timestamp' in obj;
+  if (typeof obj !== 'object' || obj === null) return false;
+  
+  const metric = obj as Partial<PerformanceMetric>;
+  return (
+    typeof metric.metric_name === 'string' &&
+    typeof metric.value === 'number' &&
+    typeof metric.category === 'string' &&
+    typeof metric.type === 'string' &&
+    typeof metric.timestamp === 'number'
+  );
 }
 
 /**
- * Type guard for WebVitalMetric
+ * Check if an object is a valid WebVitalMetric
  */
 export function isWebVitalMetric(obj: unknown): obj is WebVitalMetric {
-  return typeof obj === 'object' && 
-    obj !== null && 
-    'name' in obj && 
-    'value' in obj && 
-    'category' in obj && 
-    'timestamp' in obj;
+  if (typeof obj !== 'object' || obj === null) return false;
+  
+  const metric = obj as Partial<WebVitalMetric>;
+  return (
+    typeof metric.name === 'string' &&
+    typeof metric.value === 'number' &&
+    typeof metric.category === 'string' &&
+    typeof metric.timestamp === 'number'
+  );
 }
 
 /**
- * Type guard for ComponentMetrics
+ * Check if an object is a valid ComponentMetrics
  */
 export function isComponentMetrics(obj: unknown): obj is ComponentMetrics {
-  return typeof obj === 'object' && 
-    obj !== null && 
-    'componentName' in obj && 
-    'renderCount' in obj && 
-    'totalRenderTime' in obj && 
-    'averageRenderTime' in obj && 
-    'lastRenderTime' in obj;
+  if (typeof obj !== 'object' || obj === null) return false;
+  
+  const metrics = obj as Partial<ComponentMetrics>;
+  return (
+    typeof metrics.componentName === 'string' &&
+    typeof metrics.renderCount === 'number' &&
+    typeof metrics.totalRenderTime === 'number' &&
+    typeof metrics.averageRenderTime === 'number' &&
+    typeof metrics.lastRenderTime === 'number'
+  );
+}
+
+/**
+ * Safe helper to ensure a performance metric has an ID
+ */
+export function ensureMetricId<T extends BaseMetric>(metric: T): SafeEntity<T> {
+  if (!metric.id) {
+    return {
+      ...metric,
+      id: `metric-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    };
+  }
+  return metric as SafeEntity<T>;
 }

@@ -3,10 +3,33 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { SafeEntity, ensureEntityId } from '@/types/core';
+
+// Define explicit interface for user profile
+interface UserProfile extends SafeEntity<{
+  id: string;
+  user_id?: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+  preferences?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}> {}
+
+// Define challenge interface
+interface Challenge extends SafeEntity<{
+  id: string;
+  title: string;
+  description: string;
+  points?: number;
+  difficulty?: string;
+  created_at?: string;
+}> {}
 
 export const useUserProfile = () => {
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [todayChallenge, setTodayChallenge] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [todayChallenge, setTodayChallenge] = useState<Challenge | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -23,7 +46,9 @@ export const useUserProfile = () => {
             .single();
             
           if (error) throw error;
-          setUserProfile(data);
+          
+          // Ensure the profile has an id
+          setUserProfile(ensureEntityId(data));
           
           const { data: challengeData, error: challengeError } = await supabase
             .from('challenges')
@@ -34,7 +59,8 @@ export const useUserProfile = () => {
           if (challengeError) throw challengeError;
           
           if (challengeData && challengeData.length > 0) {
-            setTodayChallenge(challengeData[0]);
+            // Ensure the challenge has an id
+            setTodayChallenge(ensureEntityId(challengeData[0]));
           }
           
           // Ensure user streak record exists
@@ -73,11 +99,13 @@ export const useUserProfile = () => {
     fetchUserProfile();
   }, [user, toast]);
 
-  const updateUserProfile = (newData: any) => {
-    setUserProfile(prev => ({
+  const updateUserProfile = (newData: Partial<UserProfile>) => {
+    setUserProfile(prev => prev ? {
       ...prev,
-      ...newData
-    }));
+      ...newData,
+      // Always ensure id is present
+      id: prev.id || newData.id || 'unknown-id'
+    } : null);
   };
 
   return { 

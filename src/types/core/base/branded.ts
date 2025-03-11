@@ -30,7 +30,7 @@ export function createBrandedType<K, T>(
   brandName: string
 ): Brand<K, T> {
   if (!validator(value)) {
-    throw new Error(`Invalid ${brandName}: ${value}`);
+    throw new Error(`Invalid ${brandName}: ${String(value)}`);
   }
   return value as Brand<K, T>;
 }
@@ -44,6 +44,20 @@ export function createUUID(id: string): UUID {
     (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
     'UUID'
   );
+}
+
+/**
+ * Safe version of createUUID that returns a default UUID if validation fails
+ */
+export function safeCreateUUID(id: string | null | undefined): UUID {
+  if (!id) return 'unknown-uuid' as UUID;
+  
+  try {
+    return createUUID(id);
+  } catch (e) {
+    console.warn(`Invalid UUID: ${id}, using fallback`);
+    return 'unknown-uuid' as UUID;
+  }
 }
 
 /**
@@ -107,4 +121,32 @@ export function isEnergyPoints(value: unknown): value is EnergyPoints {
 export function isDateString(value: unknown): value is DateString {
   if (typeof value !== 'string') return false;
   return /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/.test(value);
+}
+
+/**
+ * Safe type assertion that won't throw - for UUID
+ */
+export function asUUID(value: unknown): UUID {
+  return isUUID(value) ? value : 'unknown-uuid' as UUID;
+}
+
+/**
+ * Safe type assertion that won't throw - for Timestamp
+ */
+export function asTimestamp(value: unknown): Timestamp {
+  return isTimestamp(value) ? value : (Date.now() as Timestamp);
+}
+
+/**
+ * Safe type assertion that won't throw - for EnergyPoints
+ */
+export function asEnergyPoints(value: unknown): EnergyPoints {
+  return isEnergyPoints(value) ? value : (0 as EnergyPoints);
+}
+
+/**
+ * Safe type assertion that won't throw - for DateString
+ */
+export function asDateString(value: unknown): DateString {
+  return isDateString(value) ? value : (new Date().toISOString() as DateString);
 }

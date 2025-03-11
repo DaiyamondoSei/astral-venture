@@ -3,6 +3,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Award } from 'lucide-react';
 import type { Achievement } from '@/types/achievement';
+import { ensureEntityId } from '@/types/core';
 
 /**
  * Props for the AchievementItem component
@@ -16,9 +17,11 @@ interface IAchievementItemProps {
  * Component that displays a single achievement
  */
 const AchievementItem: React.FC<IAchievementItemProps> = ({ 
-  achievement, 
+  achievement: rawAchievement, 
   onClick 
 }) => {
+  // Ensure the achievement has all required properties, preventing "id does not exist on type never"
+  const achievement = ensureEntityId(rawAchievement);
   const { title, description, unlocked, icon } = achievement;
   
   // Get the style for the achievement based on whether it's unlocked
