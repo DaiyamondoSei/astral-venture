@@ -21,24 +21,37 @@ export interface ComponentMetrics {
   lastRenderTime: number;
   memoryUsage: number;
   renderSizes: number[];
+  // Additional properties for backward compatibility and extended tracking
+  slowRenderCount?: number;
+  renderTimes?: number[];
+  minRenderTime?: number;
+  maxRenderTime?: number;
+  lastUpdated?: number;
+  metricType?: string;
 }
 
 // Web vital metric structure
 export interface WebVitalMetric {
-  name: WebVitalName;
+  name: WebVitalName | string;
   value: number;
   category: WebVitalCategory;
   timestamp: number;
+  rating?: 'good' | 'needs-improvement' | 'poor';
 }
 
 // General performance metric
 export interface PerformanceMetric {
   componentName?: string;
+  component_name?: string; // For backward compatibility
   metricName: string;
+  metric_name?: string; // For backward compatibility
   value: number;
   timestamp: number;
   category: string;
   type: string;
+  user_id?: string;
+  session_id?: string;
+  page_url?: string;
 }
 
 // Performance tracking options for hooks
@@ -58,6 +71,7 @@ export interface PerformanceTrackingResult {
   startTiming: () => void;
   endTiming: () => void;
   startInteractionTiming: (interactionName: string) => () => void;
+  trackInteraction?: (interactionName: string, duration: number) => void;
   getMetrics: () => ComponentMetrics | null;
   recordSize: (domNode: HTMLElement | null) => void;
 }
@@ -70,13 +84,47 @@ export interface PerformanceMonitorConfig {
   samplingRate: number;
   reportingEndpoint?: string;
   debugMode: boolean;
+  
+  // Extended config properties for adaptive performance
+  optimizationLevel?: 'high' | 'medium' | 'low' | 'auto';
+  throttleInterval?: number;
+  maxTrackedComponents?: number;
+  
+  // Feature flags
+  enablePerformanceTracking?: boolean;
+  enableRenderTracking?: boolean;
+  enableValidation?: boolean;
+  enablePropTracking?: boolean;
+  enableDebugLogging?: boolean;
+  
+  // Advanced features
+  intelligentProfiling?: boolean;
+  inactiveTabThrottling?: boolean;
+  batchUpdates?: boolean;
 }
 
 // Device information for metrics reporting
 export interface DeviceInfo {
   userAgent: string;
   deviceCategory: string;
-  // Add other device info as needed
+  screenWidth?: number;
+  screenHeight?: number;
+  devicePixelRatio?: number;
+  viewport?: {
+    width: number;
+    height: number;
+  };
+  connection?: {
+    effectiveType?: string;
+    downlink?: number;
+    rtt?: number;
+    saveData?: boolean;
+  };
+  memory?: {
+    jsHeapSizeLimit?: number;
+    totalJSHeapSize?: number;
+    usedJSHeapSize?: number;
+  };
 }
 
 // Performance report payload
@@ -89,3 +137,26 @@ export interface PerformanceReportPayload {
 
 // Subscriber for metrics updates
 export type MetricsSubscriber = (metrics: Map<string, ComponentMetrics>) => void;
+
+// Web vitals for backward compatibility
+export interface WebVitals {
+  fcp: number;
+  lcp: number;
+  cls: number;
+  fid: number;
+  ttfb: number;
+  inp?: number;
+}
+
+// Adaptive optimization settings
+export interface AdaptiveSettings {
+  virtualization: boolean;
+  lazyLoading: boolean;
+  imageOptimization: boolean;
+  enableParticles?: boolean;
+  enableComplexAnimations?: boolean;
+  enableBlur?: boolean;
+  enableShadows?: boolean;
+  enableWebWorkers?: boolean;
+  enableHighResImages?: boolean;
+}

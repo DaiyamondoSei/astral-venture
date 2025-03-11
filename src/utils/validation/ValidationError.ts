@@ -6,16 +6,21 @@
  */
 
 export interface ValidationErrorDetail {
+  // Core fields
   path: string;
   message: string;
+  
+  // Optional fields for additional context
   value?: any;
   type?: string;
-  field?: string; // Added for backward compatibility
-  expectedType?: string;
   rule?: string;
-  code?: string; // Added for error categorization
-  details?: string; // Added for additional error context
-  statusCode?: number; // Added for HTTP status mapping
+  code?: string;
+  
+  // Legacy compatibility fields - redirected to core fields
+  field?: string; // Maps to path
+  expectedType?: string; // Maps to type
+  details?: string; // Additional details
+  statusCode?: number; // HTTP status mapping
 }
 
 export class ValidationError extends Error {
@@ -23,6 +28,8 @@ export class ValidationError extends Error {
   public readonly code: string;
   public readonly httpStatus: number;
   public readonly isOperational: boolean = true;
+  
+  // Legacy fields for backward compatibility
   public readonly field?: string;
   public readonly expectedType?: string;
   public readonly rule?: string;
@@ -37,16 +44,31 @@ export class ValidationError extends Error {
   ) {
     super(message);
     this.name = 'ValidationError';
-    this.details = details;
+    
+    // Normalize details to ensure all required fields exist
+    this.details = details.map(detail => {
+      const normalizedDetail: ValidationErrorDetail = {
+        // Ensure path exists (use field as fallback)
+        path: detail.path || detail.field || 'unknown',
+        // Ensure message exists
+        message: detail.message || 'Validation failed',
+        // Copy all other properties
+        ...detail,
+        // Ensure field exists for backward compatibility
+        field: detail.field || detail.path
+      };
+      return normalizedDetail;
+    });
+    
     this.code = code;
     this.httpStatus = httpStatus;
     this.statusCode = httpStatus;
 
     // Extract field, expectedType, and rule from first detail if available
-    if (details && details.length > 0) {
-      this.field = details[0].field || details[0].path;
-      this.expectedType = details[0].expectedType || details[0].type;
-      this.rule = details[0].rule;
+    if (this.details && this.details.length > 0) {
+      this.field = this.details[0].field || this.details[0].path;
+      this.expectedType = this.details[0].expectedType || this.details[0].type;
+      this.rule = this.details[0].rule;
     }
 
     // This is needed to make instanceof work correctly
@@ -84,14 +106,18 @@ export class ValidationError extends Error {
    * Check if there are validation errors for a specific field
    */
   public hasErrorForField(field: string): boolean {
-    return this.details.some(detail => detail.path === field || detail.field === field);
+    return this.details.some(detail => 
+      detail.path === field || detail.field === field
+    );
   }
 
   /**
    * Get error message for a specific field
    */
   public getFieldError(field: string): string | undefined {
-    const error = this.details.find(detail => detail.path === field || detail.field === field);
+    const error = this.details.find(detail => 
+      detail.path === field || detail.field === field
+    );
     return error?.message;
   }
 

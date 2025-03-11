@@ -102,6 +102,7 @@ export async function initializeApplication(): Promise<InitializationResult> {
     if (performanceMonitor) {
       try {
         performanceMonitor.setEnabled(true);
+        performanceMonitor.startMonitoring();
       } catch (err) {
         console.warn('Failed to initialize performance monitoring:', err);
         warnings.push('Performance monitoring initialization failed');
@@ -116,7 +117,7 @@ export async function initializeApplication(): Promise<InitializationResult> {
         toast({
           title: 'Connection Warning',
           description: 'Unable to connect to backend services. Some features may not work properly.',
-          variant: 'warning',
+          variant: 'destructive', // Changed from 'warning' to 'destructive'
         });
         
         warnings.push('Supabase connection failed');

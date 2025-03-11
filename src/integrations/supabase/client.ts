@@ -1,34 +1,32 @@
 
 /**
- * Legacy Supabase client
+ * Supabase Integration Client
  * 
- * @deprecated Use the singleton client from '@/lib/supabaseClient' instead
- * This file exists for backward compatibility with existing code.
+ * This file re-exports the supabase client from lib/supabaseClient.ts
+ * to maintain consistency across the application.
  */
 
-import { 
-  supabase, 
-  incrementEnergyPoints, 
-  callRpc, 
-  createRpcCaller,
-  checkSupabaseConnection
-} from '@/lib/supabaseClient';
-
-// Export the singleton instance and helper functions
-export { 
-  supabase, 
-  incrementEnergyPoints, 
+import {
+  supabase,
+  getSupabase,
+  resetSupabaseClient,
+  isUsingMockSupabaseClient,
+  checkSupabaseConnection,
   callRpc,
   createRpcCaller,
-  checkSupabaseConnection
-};
+  incrementEnergyPoints
+} from '@/lib/supabaseClient';
 
-// Add deprecation warning in development
-if (process.env.NODE_ENV === 'development') {
-  console.warn(
-    '[Deprecation Warning] Importing from "@/integrations/supabase/client" is deprecated. ' +
-    'Please import from "@/lib/supabaseClient" instead for better consistency.'
-  );
-}
+// Re-export everything for consistent imports
+export {
+  supabase,
+  getSupabase,
+  resetSupabaseClient,
+  isUsingMockSupabaseClient,
+  checkSupabaseConnection,
+  callRpc,
+  createRpcCaller,
+  incrementEnergyPoints
+};
 
 export default supabase;

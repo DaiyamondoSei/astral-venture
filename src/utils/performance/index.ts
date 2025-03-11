@@ -1,40 +1,21 @@
 
 /**
- * Performance Monitoring Exports
+ * Performance Monitoring System
  * 
- * This file centralizes exports from the performance monitoring system
- * to ensure consistent imports throughout the application.
+ * Centralized exports for performance monitoring
  */
 
-import performanceMonitor from './performanceMonitor';
-import { metricsCollector } from './metricsCollector';
-import { metricsReporter } from './metricsReporter';
-import type { 
-  MetricType, 
-  ComponentMetric, 
-  ComponentMetrics, 
-  WebVitalMetric,
-  PerformanceMonitorConfig,
-  MetricsSubscriber,
-  PerformanceReportPayload
-} from './types';
+// Export the main performance monitor
+export { performanceMonitor } from './performanceMonitor';
+export { default as performanceMonitor } from './performanceMonitor';
 
-// Re-export types
-export type {
-  MetricType,
-  ComponentMetric,
-  ComponentMetrics, 
-  WebVitalMetric,
-  PerformanceMonitorConfig,
-  MetricsSubscriber,
-  PerformanceReportPayload
-};
+// Export types
+export * from './types';
 
-// Re-export components
-export {
-  metricsCollector,
-  metricsReporter
-};
+// Export utility functions
+export { default as withPerformanceTracking } from './withPerformanceTracking';
+export { default as RenderAnalyzer } from './RenderAnalyzer';
+export { default as metricsReporter } from './metricsReporter';
 
-// Default export for the singleton
-export default performanceMonitor;
+// Re-export for backward compatibility
+export { performanceMonitor as PerformanceMonitor } from './performanceMonitor';

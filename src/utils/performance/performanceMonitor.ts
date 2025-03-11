@@ -25,7 +25,24 @@ export const defaultConfig: PerformanceMonitorConfig = {
   metricsEnabled: true,
   slowRenderThreshold: 16, // 60fps threshold
   samplingRate: 0.1, // Sample 10% of metrics by default
-  debugMode: false
+  debugMode: false,
+  
+  // Extended configuration with defaults
+  optimizationLevel: 'auto',
+  throttleInterval: 1000,
+  maxTrackedComponents: 100,
+  
+  // Feature flags
+  enablePerformanceTracking: true,
+  enableRenderTracking: true,
+  enableValidation: true,
+  enablePropTracking: false,
+  enableDebugLogging: false,
+  
+  // Advanced features
+  intelligentProfiling: false,
+  inactiveTabThrottling: true,
+  batchUpdates: true
 };
 
 /**
@@ -39,6 +56,7 @@ class PerformanceMonitor {
   private subscribers: Set<(metrics: Map<string, ComponentMetrics>) => void>;
   private isEnabled: boolean;
   private lastReportTime: number;
+  private isMonitoring: boolean = false;
 
   constructor(initialConfig: Partial<PerformanceMonitorConfig> = {}) {
     this.config = { ...defaultConfig, ...initialConfig };
@@ -51,6 +69,26 @@ class PerformanceMonitor {
   }
 
   /**
+   * Start performance monitoring
+   */
+  public startMonitoring(): void {
+    this.isMonitoring = true;
+    if (this.config.debugMode) {
+      console.log('Performance monitoring started');
+    }
+  }
+
+  /**
+   * Stop performance monitoring
+   */
+  public stopMonitoring(): void {
+    this.isMonitoring = false;
+    if (this.config.debugMode) {
+      console.log('Performance monitoring stopped');
+    }
+  }
+
+  /**
    * Enable or disable the performance monitoring
    */
   public setEnabled(enabled: boolean): void {
@@ -58,6 +96,17 @@ class PerformanceMonitor {
     
     if (this.config.debugMode) {
       console.log(`Performance monitoring ${enabled ? 'enabled' : 'disabled'}`);
+    }
+  }
+
+  /**
+   * Enable or disable metrics collection
+   */
+  public setMetricsEnabled(enabled: boolean): void {
+    this.config.metricsEnabled = enabled;
+    
+    if (this.config.debugMode) {
+      console.log(`Performance metrics collection ${enabled ? 'enabled' : 'disabled'}`);
     }
   }
 
@@ -87,7 +136,7 @@ class PerformanceMonitor {
     renderTime: number,
     type: MetricType = 'render'
   ): void {
-    if (!this.isEnabled || !this.config.metricsEnabled) return;
+    if (!this.isEnabled || !this.config.metricsEnabled || !this.config.enablePerformanceTracking) return;
 
     // Apply sampling if configured
     if (Math.random() > this.config.samplingRate) return;
@@ -100,23 +149,63 @@ class PerformanceMonitor {
       existingMetric.lastRenderTime = renderTime;
       existingMetric.averageRenderTime = existingMetric.totalRenderTime / existingMetric.renderCount;
       
-      // Track memory if available
-      if (window.performance && window.performance.memory) {
-        existingMetric.memoryUsage = window.performance.memory.usedJSHeapSize;
+      // Track slow renders
+      if (renderTime > this.config.slowRenderThreshold) {
+        existingMetric.slowRenderCount = (existingMetric.slowRenderCount || 0) + 1;
       }
+      
+      // Track min/max render times
+      if (!existingMetric.maxRenderTime || renderTime > existingMetric.maxRenderTime) {
+        existingMetric.maxRenderTime = renderTime;
+      }
+      
+      if (!existingMetric.minRenderTime || renderTime < existingMetric.minRenderTime) {
+        existingMetric.minRenderTime = renderTime;
+      }
+      
+      // Store render times history if available
+      if (!existingMetric.renderTimes) {
+        existingMetric.renderTimes = [];
+      }
+      
+      if (existingMetric.renderTimes.length < 10) {
+        existingMetric.renderTimes.push(renderTime);
+      } else {
+        existingMetric.renderTimes.shift();
+        existingMetric.renderTimes.push(renderTime);
+      }
+      
+      // Track memory if available
+      if (window.performance && 'memory' in window.performance) {
+        existingMetric.memoryUsage = (window.performance as any).memory.usedJSHeapSize;
+      }
+      
+      existingMetric.lastUpdated = Date.now();
+      existingMetric.metricType = type;
       
       this.componentMetrics.set(componentName, existingMetric);
     } else {
+      // Initialize render times array
+      const renderTimes = [renderTime];
+      
       const newMetric: ComponentMetrics = {
         componentName,
         renderCount: 1,
         totalRenderTime: renderTime,
         averageRenderTime: renderTime,
         lastRenderTime: renderTime,
-        memoryUsage: window.performance && window.performance.memory 
-          ? window.performance.memory.usedJSHeapSize 
+        memoryUsage: window.performance && 'memory' in window.performance
+          ? (window.performance as any).memory.usedJSHeapSize 
           : 0,
-        renderSizes: []
+        renderSizes: [],
+        
+        // Extended metrics
+        slowRenderCount: renderTime > this.config.slowRenderThreshold ? 1 : 0,
+        minRenderTime: renderTime,
+        maxRenderTime: renderTime,
+        renderTimes,
+        lastUpdated: Date.now(),
+        metricType: type
       };
       
       this.componentMetrics.set(componentName, newMetric);
@@ -124,6 +213,18 @@ class PerformanceMonitor {
 
     // Notify subscribers
     this.notifySubscribers();
+  }
+
+  /**
+   * Record a component render for performance tracking
+   */
+  public recordRender(
+    componentName: string,
+    renderTime: number,
+    type: MetricType = 'render'
+  ): void {
+    // Alias for addComponentMetric for backward compatibility
+    this.addComponentMetric(componentName, renderTime, type);
   }
 
   /**
@@ -168,16 +269,37 @@ class PerformanceMonitor {
   }
 
   /**
+   * Get all metrics in a flattened format
+   */
+  public getAllMetrics(): Record<string, ComponentMetrics> {
+    const metrics: Record<string, ComponentMetrics> = {};
+    this.componentMetrics.forEach((value, key) => {
+      metrics[key] = { ...value };
+    });
+    return metrics;
+  }
+
+  /**
+   * Get the slowest components by render time
+   */
+  public getSlowestComponents(limit: number = 5): ComponentMetrics[] {
+    const metrics = Array.from(this.componentMetrics.values());
+    return metrics
+      .sort((a, b) => b.averageRenderTime - a.averageRenderTime)
+      .slice(0, limit);
+  }
+
+  /**
    * Get web vital metrics
    */
-  public getWebVitals(): Record<WebVitalName, number> {
-    const result: Partial<Record<WebVitalName, number>> = {};
+  public getWebVitals(): Record<string, number> {
+    const result: Record<string, number> = {};
     
     this.webVitals.forEach((vital, name) => {
-      result[name as WebVitalName] = vital.value;
+      result[name] = vital.value;
     });
     
-    return result as Record<WebVitalName, number>;
+    return result;
   }
 
   /**
@@ -192,6 +314,13 @@ class PerformanceMonitor {
     if (this.config.debugMode) {
       console.log('Performance metrics reset');
     }
+  }
+
+  /**
+   * Clear metrics (alias for resetMetrics for backward compatibility)
+   */
+  public clearMetrics(): void {
+    this.resetMetrics();
   }
 
   /**
@@ -234,7 +363,9 @@ class PerformanceMonitor {
       this.componentMetrics.forEach((metric) => {
         metrics.push({
           componentName: metric.componentName,
+          component_name: metric.componentName, // For backward compatibility
           metricName: 'renderTime',
+          metric_name: 'renderTime', // For backward compatibility
           value: metric.averageRenderTime,
           timestamp: Date.now(),
           category: 'component',
@@ -243,18 +374,34 @@ class PerformanceMonitor {
         
         metrics.push({
           componentName: metric.componentName,
+          component_name: metric.componentName, // For backward compatibility
           metricName: 'renderCount',
+          metric_name: 'renderCount', // For backward compatibility
           value: metric.renderCount,
           timestamp: Date.now(),
           category: 'component',
           type: 'render'
         });
+        
+        if (metric.slowRenderCount) {
+          metrics.push({
+            componentName: metric.componentName,
+            component_name: metric.componentName,
+            metricName: 'slowRenderCount',
+            metric_name: 'slowRenderCount',
+            value: metric.slowRenderCount,
+            timestamp: Date.now(),
+            category: 'component', 
+            type: 'render'
+          });
+        }
       });
       
       // Add web vitals
       this.webVitals.forEach((vital) => {
         metrics.push({
           metricName: vital.name,
+          metric_name: vital.name, // For backward compatibility
           value: vital.value,
           timestamp: vital.timestamp,
           category: vital.category,
@@ -319,4 +466,4 @@ class PerformanceMonitor {
 export const performanceMonitor = new PerformanceMonitor();
 
 // Export class for testing or custom instances
-export default PerformanceMonitor;
+export default performanceMonitor;
