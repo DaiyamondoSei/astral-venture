@@ -6,26 +6,42 @@ import { toast } from '@/components/ui/use-toast';
 import LandingPage from './pages';
 import EntryAnimationPage from './pages/EntryAnimationPage';
 import DesignSystemDemo from './pages/DesignSystemDemo';
-import { initializeApplication } from './utils/bootstrap/appBootstrap';
+import { 
+  initializeApplication, 
+  InitializationState, 
+  InitializationResult 
+} from './utils/bootstrap/appBootstrap';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
-  const [initialized, setInitialized] = useState<boolean>(false);
+  const [initState, setInitState] = useState<InitializationState>(InitializationState.PENDING);
+  const [initResult, setInitResult] = useState<InitializationResult | null>(null);
   const [initError, setInitError] = useState<Error | null>(null);
 
   // Bootstrap the application at startup
   useEffect(() => {
     const bootstrapApp = async () => {
       try {
-        const success = await initializeApplication();
-        setInitialized(success);
+        const result = await initializeApplication();
+        setInitResult(result);
+        setInitState(result.state);
         
-        if (!success) {
-          setInitError(new Error('Application initialization failed'));
+        if (!result.success) {
+          setInitError(result.error || new Error('Application initialization failed'));
+          
+          // Show warning toast for each warning
+          result.warnings.forEach(warning => {
+            toast({
+              title: 'Initialization Warning',
+              description: warning,
+              variant: 'warning',
+            });
+          });
         }
       } catch (error) {
         console.error('Application bootstrap error:', error);
         setInitError(error instanceof Error ? error : new Error('Unknown initialization error'));
+        setInitState(InitializationState.FAILED);
         
         toast({
           title: 'Initialization Error',
@@ -39,7 +55,7 @@ function App() {
   }, []);
 
   // Show loading state while initializing
-  if (!initialized && !initError) {
+  if (initState === InitializationState.PENDING || initState === InitializationState.IN_PROGRESS) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="text-center space-y-4">
@@ -51,12 +67,25 @@ function App() {
   }
 
   // Show error state if initialization failed
-  if (initError) {
+  if (initState === InitializationState.FAILED || initError) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="text-center space-y-4 max-w-md p-6 bg-card rounded-lg shadow-lg">
           <h1 className="text-2xl font-semibold text-destructive">Initialization Error</h1>
-          <p className="text-muted-foreground">{initError.message}</p>
+          <p className="text-muted-foreground">{initError?.message || 'Unknown initialization error'}</p>
+          
+          {/* Show any warnings */}
+          {initResult?.warnings && initResult.warnings.length > 0 && (
+            <div className="mt-4 p-4 bg-yellow-50 rounded-md border border-yellow-200">
+              <h3 className="text-sm font-medium text-yellow-800">Warnings:</h3>
+              <ul className="mt-2 text-sm text-yellow-700 list-disc list-inside">
+                {initResult.warnings.map((warning, index) => (
+                  <li key={index}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
           <button 
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             onClick={() => window.location.reload()}

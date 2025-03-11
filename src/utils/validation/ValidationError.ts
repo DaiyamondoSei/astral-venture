@@ -10,12 +10,12 @@ export interface ValidationErrorDetail {
   message: string;
   value?: any;
   type?: string;
-  field?: string;
+  field?: string; // Added for backward compatibility
   expectedType?: string;
   rule?: string;
-  code?: string;
-  details?: string;
-  statusCode?: number;
+  code?: string; // Added for error categorization
+  details?: string; // Added for additional error context
+  statusCode?: number; // Added for HTTP status mapping
 }
 
 export class ValidationError extends Error {
@@ -130,6 +130,13 @@ export class ValidationError extends Error {
       apiError?.code || 'VALIDATION_ERROR',
       statusCode
     );
+  }
+
+  /**
+   * Type guard to check if an error is a ValidationError
+   */
+  public static isValidationError(error: unknown): error is ValidationError {
+    return error instanceof ValidationError;
   }
 
   /**

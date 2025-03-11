@@ -1,238 +1,202 @@
 
 /**
- * Configuration Validation Utility
+ * Configuration Validator
  * 
- * Provides robust validation for application configuration parameters
- * and environment variables to prevent runtime errors.
+ * Centralized system for validating, accessing, and managing application configuration.
+ * Implements validation, type safety, and fallback mechanisms.
  */
 
-import { toast } from '@/components/ui/use-toast';
+import { ValidationError } from '@/utils/validation/ValidationError';
 
-// Configuration validation result type
-export interface ConfigValidationResult {
-  isValid: boolean;
-  missingVars: string[];
-  invalidVars: Array<{name: string; issue: string}>;
-}
-
-// Configuration requirement definition
-export interface ConfigRequirement {
-  name: string;
+// Interface for configuration validation rules
+interface ConfigValidationRule {
+  key: string;
   required: boolean;
-  validator?: (value: string) => boolean | string;
+  validator?: (value: string) => boolean;
   fallback?: string;
-  description?: string;
+  description: string;
 }
 
-/**
- * Validates configuration variables against defined requirements
- * 
- * @param requirements List of configuration requirements
- * @param env Environment object (defaults to import.meta.env)
- * @returns Validation result with detailed information
- */
-export function validateConfig(
-  requirements: ConfigRequirement[],
-  env: Record<string, string> = import.meta.env
-): ConfigValidationResult {
-  const result: ConfigValidationResult = {
-    isValid: true,
-    missingVars: [],
-    invalidVars: []
-  };
-
-  for (const req of requirements) {
-    const value = env[req.name];
-    
-    // Check if required variable is missing
-    if (req.required && (!value || value.trim() === '')) {
-      result.isValid = false;
-      result.missingVars.push(req.name);
-      continue;
-    }
-    
-    // Skip validation if value is empty and not required
-    if (!value && !req.required) {
-      continue;
-    }
-    
-    // Validate using custom validator if provided
-    if (value && req.validator) {
-      const validationResult = req.validator(value);
-      
-      if (validationResult !== true) {
-        result.isValid = false;
-        result.invalidVars.push({
-          name: req.name,
-          issue: typeof validationResult === 'string' 
-            ? validationResult 
-            : 'Failed validation check'
-        });
-      }
-    }
-  }
-  
-  return result;
+// Configuration validation result
+interface ConfigValidationResult {
+  isValid: boolean;
+  missingKeys: string[];
+  invalidKeys: string[];
 }
 
-/**
- * Simplified validation for common configuration objects
- * Throws an error if any required configuration is missing
- * 
- * @param config Configuration object to validate
- * @returns true if valid, throws error otherwise
- */
-export function validateRequiredConfig(config: Record<string, unknown>): boolean {
-  const missingKeys = Object.entries(config)
-    .filter(([_, value]) => value === undefined || value === null || value === '')
-    .map(([key]) => key);
-    
-  if (missingKeys.length > 0) {
-    throw new Error(`Missing required configuration: ${missingKeys.join(', ')}`);
-  }
-  
-  return true;
+// Application configuration
+interface AppConfig {
+  [key: string]: string | undefined;
 }
 
-/**
- * Get a configuration value with fallback
- * 
- * @param name Configuration variable name
- * @param fallback Optional fallback value
- * @param env Environment object (defaults to import.meta.env)
- * @returns The configuration value or fallback
- */
-export function getConfigValue(
-  name: string,
-  fallback: string = '',
-  env: Record<string, string> = import.meta.env
-): string {
-  return env[name] || fallback;
-}
-
-/**
- * Get a validated configuration value, throwing error if missing and required
- * 
- * @param name Configuration variable name
- * @param fallback Optional fallback value (makes the config optional)
- * @param env Environment object (defaults to import.meta.env)
- * @returns The configuration value
- * @throws Error if value is missing and no fallback provided
- */
-export function getValidatedConfig(
-  name: string, 
-  fallback?: string,
-  env: Record<string, string> = import.meta.env
-): string {
-  const value = env[name] || fallback;
-  
-  if (value === undefined && fallback === undefined) {
-    throw new Error(`Missing required configuration: ${name}`);
-  }
-  
-  return value || '';
-}
-
-/**
- * Common validators for configuration values
- */
-export const ConfigValidators = {
-  /**
-   * Validates a URL string
-   */
-  isValidUrl: (value: string): boolean | string => {
-    try {
-      new URL(value);
-      return true;
-    } catch (e) {
-      return 'Invalid URL format';
-    }
-  },
-  
-  /**
-   * Validates a port number
-   */
-  isValidPort: (value: string): boolean | string => {
-    const port = parseInt(value, 10);
-    if (isNaN(port) || port < 1 || port > 65535) {
-      return 'Invalid port number (must be between 1-65535)';
-    }
-    return true;
-  },
-  
-  /**
-   * Validates an API key format (simple format check)
-   */
-  isApiKeyFormat: (value: string): boolean | string => {
-    // This is a simple check - adjust based on your API key format
-    if (value.length < 10) {
-      return 'API key too short (less than 10 characters)';
-    }
-    return true;
-  },
-  
-  /**
-   * Validates that a string is not empty
-   */
-  isNotEmpty: (value: string): boolean | string => {
-    return value.trim() !== '' ? true : 'Value cannot be empty';
-  }
-};
-
-/**
- * Application configuration requirements
- * Define all required and optional configuration parameters here
- */
-export const appConfigRequirements: ConfigRequirement[] = [
+// Define validation rules for all required configuration
+const configValidationRules: ConfigValidationRule[] = [
   {
-    name: 'VITE_SUPABASE_URL',
+    key: 'VITE_SUPABASE_URL',
     required: true,
-    validator: ConfigValidators.isValidUrl,
+    validator: (value) => value.startsWith('https://') && value.includes('.supabase.co'),
     description: 'Supabase project URL'
   },
   {
-    name: 'VITE_SUPABASE_ANON_KEY',
+    key: 'VITE_SUPABASE_ANON_KEY',
     required: true,
-    validator: ConfigValidators.isNotEmpty,
-    description: 'Supabase anonymous key for client-side operations'
+    validator: (value) => value.length > 20,
+    description: 'Supabase anonymous API key'
+  },
+  {
+    key: 'VITE_API_ENDPOINT',
+    required: false,
+    fallback: '/api',
+    description: 'API endpoint for backend services'
+  },
+  {
+    key: 'VITE_APP_VERSION',
+    required: false,
+    fallback: '0.1.0',
+    description: 'Application version'
+  },
+  {
+    key: 'VITE_ENABLE_ANALYTICS',
+    required: false,
+    fallback: 'false',
+    validator: (value) => value === 'true' || value === 'false',
+    description: 'Enable or disable analytics tracking'
+  },
+  {
+    key: 'VITE_LOG_LEVEL',
+    required: false,
+    fallback: 'warn',
+    validator: (value) => ['debug', 'info', 'warn', 'error'].includes(value),
+    description: 'Application logging level'
   }
 ];
 
+// In-memory cache of validated configuration
+const configCache: AppConfig = {};
+
 /**
- * Validates the application configuration at startup
- * and shows appropriate warnings for missing or invalid configuration
+ * Get the environment variables based on the current environment
+ */
+function getEnvironmentVariables(): AppConfig {
+  return import.meta.env;
+}
+
+/**
+ * Validate all required configuration
  * 
- * @returns Whether the validation was successful
+ * @returns Validation result with overall validity and details
  */
 export function validateAppConfig(): boolean {
-  const result = validateConfig(appConfigRequirements);
-  
-  if (!result.isValid) {
-    // Log detailed information for developers
-    console.error('Application configuration validation failed:', result);
-    
-    // Show a toast notification with important missing vars
-    if (result.missingVars.length > 0) {
-      toast({
-        title: 'Configuration Error',
-        description: `Missing required configuration: ${result.missingVars.join(', ')}`,
-        variant: 'destructive',
-      });
+  const env = getEnvironmentVariables();
+  const result: ConfigValidationResult = {
+    isValid: true,
+    missingKeys: [],
+    invalidKeys: []
+  };
+
+  // Validate all configuration rules
+  for (const rule of configValidationRules) {
+    const value = env[rule.key];
+
+    // Check if required configuration is missing
+    if (rule.required && (value === undefined || value === '')) {
+      result.isValid = false;
+      result.missingKeys.push(rule.key);
+      console.error(`Missing required configuration: ${rule.key} (${rule.description})`);
+      continue;
     }
     
-    // Show issues with invalid variables
-    if (result.invalidVars.length > 0) {
-      result.invalidVars.forEach(invalid => {
-        console.error(`Invalid configuration for ${invalid.name}: ${invalid.issue}`);
-      });
-      
-      toast({
-        title: 'Configuration Error',
-        description: 'Some configuration values are invalid. Check the console for details.',
-        variant: 'destructive',
-      });
+    // If value exists and has a validator, check validity
+    if (value !== undefined && rule.validator && !rule.validator(value as string)) {
+      result.isValid = false;
+      result.invalidKeys.push(rule.key);
+      console.error(`Invalid configuration value for ${rule.key}: "${value}" (${rule.description})`);
+      continue;
     }
+    
+    // Store valid configuration in cache
+    configCache[rule.key] = value !== undefined ? value : rule.fallback;
   }
-  
+
   return result.isValid;
 }
+
+/**
+ * Get a validated configuration value
+ * 
+ * @param key Configuration key
+ * @returns The configuration value, or undefined if not set
+ */
+export function getValidatedConfig(key: string): string | undefined {
+  // If not in cache, try to get from environment
+  if (configCache[key] === undefined) {
+    const env = getEnvironmentVariables();
+    let value = env[key];
+    
+    // Find the rule for this key
+    const rule = configValidationRules.find(r => r.key === key);
+    
+    // If rule exists and value is undefined/empty, use fallback if available
+    if (rule && (value === undefined || value === '')) {
+      value = rule.fallback;
+    }
+    
+    // Store in cache
+    configCache[key] = value;
+  }
+  
+  return configCache[key];
+}
+
+/**
+ * Get a validated configuration value with type casting
+ * 
+ * @param key Configuration key
+ * @param defaultValue Default value if configuration is not set
+ * @returns The configuration value cast to the specified type
+ */
+export function getConfig<T>(key: string, defaultValue: T): T {
+  const value = getValidatedConfig(key);
+  
+  if (value === undefined) {
+    return defaultValue;
+  }
+  
+  // Type casting based on default value type
+  const valueType = typeof defaultValue;
+  
+  try {
+    if (valueType === 'boolean') {
+      return (value.toLowerCase() === 'true') as unknown as T;
+    }
+    
+    if (valueType === 'number') {
+      return Number(value) as unknown as T;
+    }
+    
+    if (valueType === 'object' && defaultValue !== null) {
+      return JSON.parse(value) as T;
+    }
+    
+    return value as unknown as T;
+  } catch (error) {
+    console.warn(`Error casting configuration value for ${key}:`, error);
+    return defaultValue;
+  }
+}
+
+/**
+ * Clear the configuration cache (primarily for testing)
+ */
+export function clearConfigCache(): void {
+  Object.keys(configCache).forEach(key => {
+    delete configCache[key];
+  });
+}
+
+export default {
+  validateAppConfig,
+  getValidatedConfig,
+  getConfig,
+  clearConfigCache
+};
