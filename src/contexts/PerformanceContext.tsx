@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode, useMemo } from 'react';
 import { PerfConfig } from '../hooks/usePerfConfig';
 import { usePerformanceTracking, PerformanceData } from '../hooks/usePerformanceTracking';
 import perfMetricsService from '../utils/performance/perfMetricsService';
