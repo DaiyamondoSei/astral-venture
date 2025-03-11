@@ -70,7 +70,6 @@ export const perfMetricsService = {
   ): Promise<Result<void, Error>> {
     const metric: PerformanceMetric = {
       component_name: componentName,
-      metricName: 'renderTime',
       metric_name: 'renderTime',
       value: renderTime,
       timestamp: Date.now(),
@@ -91,7 +90,6 @@ export const perfMetricsService = {
     metadata?: Record<string, any>
   ): Promise<Result<void, Error>> {
     const metric: PerformanceMetric = {
-      metricName: name,
       metric_name: name,
       value: duration,
       timestamp: Date.now(),
@@ -114,7 +112,6 @@ export const perfMetricsService = {
     rating?: 'good' | 'needs-improvement' | 'poor'
   ): Promise<Result<void, Error>> {
     const metric: PerformanceMetric = {
-      metricName: name,
       metric_name: name,
       value,
       timestamp: Date.now(),
@@ -144,7 +141,6 @@ export const perfMetricsService = {
           const avgTime = times.reduce((sum, time) => sum + time, 0) / times.length;
           allMetrics.push({
             component_name: componentName,
-            metricName: 'averageRenderTime',
             metric_name: 'averageRenderTime',
             value: avgTime,
             timestamp: Date.now(),
@@ -158,7 +154,6 @@ export const perfMetricsService = {
       // Add web vitals
       Object.entries(webVitals).forEach(([name, value]) => {
         allMetrics.push({
-          metricName: name,
           metric_name: name,
           value,
           timestamp: Date.now(),
@@ -172,7 +167,6 @@ export const perfMetricsService = {
         if (times.length > 0) {
           const avgTime = times.reduce((sum, time) => sum + time, 0) / times.length;
           allMetrics.push({
-            metricName: name,
             metric_name: name,
             value: avgTime,
             timestamp: Date.now(),

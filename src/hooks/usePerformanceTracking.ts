@@ -1,204 +1,158 @@
 
 /**
- * Performance Tracking Hook
- * 
- * Provides consistent, type-safe performance tracking capabilities
- * for measuring and reporting component performance.
- */
-
-import { useRef, useEffect, useCallback } from 'react';
-
-export interface PerformanceTrackingOptions {
-  /** Component name for tracking */
-  componentName: string;
-  /** Whether to log slow renders to console */
-  logSlowRenders?: boolean;
-  /** Threshold in ms for slow render warnings */
-  slowRenderThreshold?: number;
-  /** Whether to track render count */
-  trackRenderCount?: boolean;
-  /** Whether to track mount time */
-  trackMountTime?: boolean;
-  /** Whether to track update times */
-  trackUpdateTime?: boolean;
-}
-
-export interface PerformanceData {
-  /** Component name */
-  componentName: string;
-  /** Render count since mount */
-  renderCount: number;
-  /** Time taken for initial mount in ms */
-  mountTime?: number;
-  /** Time taken for last update in ms */
-  lastUpdateTime?: number;
-  /** Average update time in ms */
-  averageUpdateTime?: number;
-  /** Interactions tracked for this component */
-  interactions: Record<string, { count: number, averageTime: number }>;
-}
-
-export interface InteractionMetrics {
-  /** Time when the interaction started */
-  startTime: number;
-  /** Type of interaction */
-  type: string;
-  /** Additional metadata */
-  metadata?: Record<string, any>;
-}
-
-/**
  * Hook for tracking component performance
  */
+import { useRef, useEffect, useState } from 'react';
+import { usePerformance } from '../contexts/PerformanceContext';
+
+export interface PerformanceData {
+  renderCount: number;
+  totalRenderTime: number;
+  averageRenderTime: number;
+  lastRenderTime: number;
+  mountTime?: number;
+  updateTimes: number[];
+  interactionTimes: Record<string, number[]>;
+}
+
+export interface PerformanceTrackingOptions {
+  componentName: string;
+  trackMountTime?: boolean;
+  trackUpdateTime?: boolean;
+  trackInteractions?: boolean;
+  enableLogging?: boolean;
+}
+
 export function usePerformanceTracking(options: PerformanceTrackingOptions) {
-  const {
-    componentName,
-    logSlowRenders = false,
-    slowRenderThreshold = 16, // 16ms = 60fps threshold
-    trackRenderCount = true,
-    trackMountTime = true,
-    trackUpdateTime = true
+  const { 
+    componentName, 
+    trackMountTime = false, 
+    trackUpdateTime = false, 
+    trackInteractions = false,
+    enableLogging = false
   } = options;
-
-  // Performance tracking state refs
-  const renderCount = useRef(0);
-  const mountTime = useRef<number | null>(null);
-  const renderStartTime = useRef(performance.now());
-  const updateTimes = useRef<number[]>([]);
-  const isMounted = useRef(false);
-  const interactions = useRef<Record<string, { times: number[], count: number }>>({}); 
-
-  // Track render start time
-  renderStartTime.current = performance.now();
   
-  // Increment render count
-  if (trackRenderCount) {
-    renderCount.current += 1;
-  }
-
-  /**
-   * Create a function to track user interactions
-   * Returns a function that, when called, will end the interaction tracking
-   */
-  const trackInteraction = useCallback((
-    interactionType: string,
-    metadata?: Record<string, any>
-  ) => {
-    const startTime = performance.now();
+  const { trackMetric, config } = usePerformance();
+  const enabled = config.enablePerformanceTracking;
+  
+  // Performance data refs
+  const mountTimeRef = useRef<number | null>(null);
+  const renderStartTimeRef = useRef<number | null>(null);
+  const updateTimesRef = useRef<number[]>([]);
+  const interactionTimesRef = useRef<Record<string, number[]>>({});
+  const renderCountRef = useRef<number>(0);
+  const totalRenderTimeRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(false);
+  
+  // Start timing a render cycle
+  const startTiming = () => {
+    if (!enabled) return;
+    renderStartTimeRef.current = performance.now();
+  };
+  
+  // End timing a render cycle and record metrics
+  const endTiming = () => {
+    if (!enabled || renderStartTimeRef.current === null) return;
     
-    // Initialize interaction tracking if needed
-    if (!interactions.current[interactionType]) {
-      interactions.current[interactionType] = { times: [], count: 0 };
+    const endTime = performance.now();
+    const renderTime = endTime - renderStartTimeRef.current;
+    
+    // Track mount time
+    if (trackMountTime && !isMountedRef.current) {
+      mountTimeRef.current = renderTime;
+      trackMetric(componentName, 'mountTime', renderTime);
+      if (enableLogging) {
+        console.log(`[Performance] ${componentName} mount time: ${renderTime.toFixed(2)}ms`);
+      }
     }
     
-    // Return a function that will end the tracking when called
+    // Track update time
+    if (trackUpdateTime && isMountedRef.current) {
+      updateTimesRef.current.push(renderTime);
+      trackMetric(componentName, 'updateTime', renderTime);
+      if (enableLogging) {
+        console.log(`[Performance] ${componentName} update time: ${renderTime.toFixed(2)}ms`);
+      }
+    }
+    
+    // Update general render stats
+    renderCountRef.current += 1;
+    totalRenderTimeRef.current += renderTime;
+    
+    // Track render time metric
+    trackMetric(componentName, 'renderTime', renderTime);
+    
+    // Reset timing
+    renderStartTimeRef.current = null;
+    
+    // Set mounted flag
+    isMountedRef.current = true;
+  };
+  
+  // Track an interaction timing
+  const startInteractionTiming = (interactionName: string) => {
+    if (!enabled || !trackInteractions) return () => {};
+    
+    const startTime = performance.now();
+    
     return () => {
       const endTime = performance.now();
       const duration = endTime - startTime;
       
-      interactions.current[interactionType].times.push(duration);
-      interactions.current[interactionType].count += 1;
+      // Initialize interaction array if needed
+      if (!interactionTimesRef.current[interactionName]) {
+        interactionTimesRef.current[interactionName] = [];
+      }
       
-      // Log slow interactions
-      if (logSlowRenders && duration > slowRenderThreshold) {
-        console.warn(
-          `Slow interaction [${interactionType}] in ${componentName}: ${duration.toFixed(2)}ms`,
-          metadata
-        );
+      // Record interaction time
+      interactionTimesRef.current[interactionName].push(duration);
+      
+      // Track metric
+      trackMetric(componentName, `interaction.${interactionName}`, duration);
+      
+      if (enableLogging) {
+        console.log(`[Performance] ${componentName} interaction '${interactionName}': ${duration.toFixed(2)}ms`);
       }
     };
-  }, [componentName, logSlowRenders, slowRenderThreshold]);
-
-  // Measure mount and update times
-  useEffect(() => {
-    const renderEndTime = performance.now();
-    const renderDuration = renderEndTime - renderStartTime.current;
-    
-    // Check if this is the first render (mount)
-    if (!isMounted.current) {
-      isMounted.current = true;
-      
-      if (trackMountTime) {
-        mountTime.current = renderDuration;
-        
-        // Log slow mounts
-        if (logSlowRenders && renderDuration > slowRenderThreshold) {
-          console.warn(`Slow mount in ${componentName}: ${renderDuration.toFixed(2)}ms`);
-        }
-      }
-    } else if (trackUpdateTime) {
-      // Track update time
-      updateTimes.current.push(renderDuration);
-      
-      // Log slow updates
-      if (logSlowRenders && renderDuration > slowRenderThreshold) {
-        console.warn(`Slow update in ${componentName}: ${renderDuration.toFixed(2)}ms (render #${renderCount.current})`);
-      }
-    }
-    
-    // Cleanup function to report final stats
-    return () => {
-      if (process.env.NODE_ENV === 'development') {
-        // Only log in development
-        const totalUpdates = updateTimes.current.length;
-        const totalUpdateTime = updateTimes.current.reduce((sum, time) => sum + time, 0);
-        const avgUpdateTime = totalUpdates > 0 ? totalUpdateTime / totalUpdates : 0;
-        
-        // Calculate interaction averages
-        const interactionStats = Object.fromEntries(
-          Object.entries(interactions.current).map(([type, data]) => {
-            const totalTime = data.times.reduce((sum, time) => sum + time, 0);
-            const avgTime = data.times.length > 0 ? totalTime / data.times.length : 0;
-            return [type, { count: data.count, averageTime: avgTime }];
-          })
-        );
-        
-        console.log(`Component Performance (${componentName}):`, {
-          renderCount: renderCount.current,
-          mountTime: mountTime.current,
-          averageUpdateTime: avgUpdateTime,
-          interactions: interactionStats
-        });
-      }
-    };
-  }, [componentName, logSlowRenders, slowRenderThreshold, trackMountTime, trackUpdateTime]);
-
-  /**
-   * Get current performance data
-   */
-  const getPerformanceData = useCallback((): PerformanceData => {
-    // Calculate average update time
-    const totalUpdates = updateTimes.current.length;
-    const totalUpdateTime = updateTimes.current.reduce((sum, time) => sum + time, 0);
-    const avgUpdateTime = totalUpdates > 0 ? totalUpdateTime / totalUpdates : 0;
-    
-    // Calculate last update time
-    const lastUpdateTime = totalUpdates > 0 ? updateTimes.current[totalUpdates - 1] : undefined;
-    
-    // Calculate interaction averages
-    const interactionStats = Object.fromEntries(
-      Object.entries(interactions.current).map(([type, data]) => {
-        const totalTime = data.times.reduce((sum, time) => sum + time, 0);
-        const avgTime = data.times.length > 0 ? totalTime / data.times.length : 0;
-        return [type, { count: data.count, averageTime: avgTime }];
-      })
-    );
+  };
+  
+  // Get the current performance data
+  const getPerformanceData = (): PerformanceData => {
+    const averageRenderTime = renderCountRef.current > 0
+      ? totalRenderTimeRef.current / renderCountRef.current
+      : 0;
     
     return {
-      componentName,
-      renderCount: renderCount.current,
-      mountTime: mountTime.current || undefined,
-      lastUpdateTime,
-      averageUpdateTime: avgUpdateTime || undefined,
-      interactions: interactionStats
+      renderCount: renderCountRef.current,
+      totalRenderTime: totalRenderTimeRef.current,
+      averageRenderTime,
+      lastRenderTime: updateTimesRef.current[updateTimesRef.current.length - 1] || 0,
+      mountTime: mountTimeRef.current || undefined,
+      updateTimes: [...updateTimesRef.current],
+      interactionTimes: { ...interactionTimesRef.current }
     };
-  }, [componentName]);
-
+  };
+  
+  // Start timing for the initial render
+  useEffect(() => {
+    startTiming();
+    
+    // End timing when the component mounts
+    return () => {
+      if (isMountedRef.current && enabled) {
+        // Final reporting of metrics
+        const data = getPerformanceData();
+        if (enableLogging) {
+          console.log(`[Performance] ${componentName} final stats:`, data);
+        }
+      }
+    };
+  }, []);
+  
   return {
-    trackInteraction,
-    getPerformanceData,
-    renderCount: renderCount.current
+    startTiming,
+    endTiming,
+    startInteractionTiming,
+    getPerformanceData
   };
 }
-
-export default usePerformanceTracking;

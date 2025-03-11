@@ -1,77 +1,148 @@
 
 /**
- * Hook for adaptive rendering based on device performance capabilities
+ * Hook for adaptive rendering based on device capability
  */
+import { useMemo } from 'react';
+import { usePerfConfig } from './usePerfConfig';
 
-import { useState, useEffect, useCallback } from 'react';
-import { usePerformance } from '../contexts/PerformanceContext';
-import performanceOptimizer, { AdaptiveSettings, OptimizationDecision } from '../utils/performance/PerformanceOptimizer';
-
-interface AdaptiveRenderingOptions {
-  featureKey: keyof AdaptiveSettings;
-  featureId?: string;
-  defaultEnabled?: boolean;
-  allowOverride?: boolean;
+export interface AdaptiveRenderingOptions {
+  // Visual features
+  enableParticles?: boolean;
+  enableAnimations?: boolean;
+  enableBlur?: boolean;
+  enableShadows?: boolean;
+  
+  // Content loading
+  enableLazyLoading?: boolean;
+  enableImageOptimization?: boolean;
+  
+  // Rendering optimizations
+  enableVirtualization?: boolean;
+  enableThrottling?: boolean;
+  
+  // Custom thresholds
+  lowPerformanceAdjustment?: number; // 0-1, how much to reduce complexity
+  mediumPerformanceAdjustment?: number; // 0-1, how much to reduce complexity
 }
 
-/**
- * Hook for determining whether a feature should be enabled based on performance
- */
-export function useAdaptiveRendering(options: AdaptiveRenderingOptions): {
-  isEnabled: boolean;
-  reason: string;
-  settings: AdaptiveSettings;
-  override: (enabled: boolean) => void;
-} {
+export interface AdaptiveRenderingResult {
+  // Feature flags
+  shouldEnableParticles: boolean;
+  shouldEnableAnimations: boolean;
+  shouldEnableBlur: boolean;
+  shouldEnableShadows: boolean;
+  shouldEnableLazyLoading: boolean;
+  shouldEnableImageOptimization: boolean;
+  shouldEnableVirtualization: boolean;
+  shouldEnableThrottling: boolean;
+  
+  // Adjustments
+  complexityMultiplier: number; // 0-1, affects visual complexity
+  qualityMultiplier: number; // 0-1, affects visual quality
+  
+  // Convenience properties
+  isSimplifiedUI: boolean;
+  deviceCapability: 'low' | 'medium' | 'high';
+}
+
+export function useAdaptiveRendering(options: AdaptiveRenderingOptions = {}): AdaptiveRenderingResult {
+  const { 
+    config,
+    deviceCapability, 
+    isLowPerformance,
+    isMediumPerformance,
+    isHighPerformance
+  } = usePerfConfig();
+  
+  // Destructure options with defaults
   const {
-    featureKey,
-    featureId,
-    defaultEnabled = true,
-    allowOverride = true
+    enableParticles = true,
+    enableAnimations = true,
+    enableBlur = true,
+    enableShadows = true,
+    enableLazyLoading = true,
+    enableImageOptimization = true,
+    enableVirtualization = true,
+    enableThrottling = true,
+    lowPerformanceAdjustment = 0.3, // Reduce complexity by 70%
+    mediumPerformanceAdjustment = 0.7 // Reduce complexity by 30%
   } = options;
   
-  const { shouldUseSimplifiedUI, deviceCapability } = usePerformance();
-  const [decision, setDecision] = useState<OptimizationDecision>({ 
-    useFeature: defaultEnabled, 
-    reason: 'Initial state'
-  });
-  const [overrideEnabled, setOverrideEnabled] = useState<boolean | null>(null);
+  // Whether adaptive rendering is enabled in the config
+  const adaptiveRenderingEnabled = config.enableAdaptiveRendering;
   
-  // Get the settings directly from the optimizer
-  const settings = performanceOptimizer.getAdaptiveSettings();
-  
-  // Effect to determine if the feature should be enabled
-  useEffect(() => {
-    if (!shouldUseSimplifiedUI && defaultEnabled) {
-      setDecision({ 
-        useFeature: true, 
-        reason: 'Adaptive rendering is disabled'
-      });
-      return;
+  // Calculate adaptive rendering settings based on device capability
+  return useMemo(() => {
+    // Base values assuming high performance device
+    let shouldEnableParticles = enableParticles;
+    let shouldEnableAnimations = enableAnimations;
+    let shouldEnableBlur = enableBlur;
+    let shouldEnableShadows = enableShadows;
+    let shouldEnableLazyLoading = enableLazyLoading;
+    let shouldEnableImageOptimization = enableImageOptimization;
+    let shouldEnableVirtualization = enableVirtualization;
+    let shouldEnableThrottling = enableThrottling;
+    let complexityMultiplier = 1.0;
+    let qualityMultiplier = 1.0;
+    
+    // Apply adjustments if adaptive rendering is enabled
+    if (adaptiveRenderingEnabled) {
+      if (isLowPerformance) {
+        // Low performance devices get significant reductions
+        shouldEnableParticles = false;
+        shouldEnableAnimations = false;
+        shouldEnableBlur = false;
+        shouldEnableShadows = false;
+        shouldEnableLazyLoading = true;
+        shouldEnableImageOptimization = true;
+        shouldEnableVirtualization = true;
+        shouldEnableThrottling = true;
+        complexityMultiplier = lowPerformanceAdjustment;
+        qualityMultiplier = lowPerformanceAdjustment;
+      } else if (isMediumPerformance) {
+        // Medium performance devices get moderate reductions
+        shouldEnableParticles = enableParticles && false; // Disable particles by default
+        shouldEnableAnimations = enableAnimations && true; // Keep basic animations
+        shouldEnableBlur = enableBlur && false; // Disable blur effects
+        shouldEnableShadows = enableShadows && true; // Keep simple shadows
+        shouldEnableLazyLoading = true;
+        shouldEnableImageOptimization = true;
+        shouldEnableVirtualization = true;
+        shouldEnableThrottling = true;
+        complexityMultiplier = mediumPerformanceAdjustment;
+        qualityMultiplier = mediumPerformanceAdjustment;
+      }
     }
     
-    const optimizerDecision = performanceOptimizer.shouldEnableFeature(featureKey, featureId);
-    setDecision(optimizerDecision);
-  }, [shouldUseSimplifiedUI, featureKey, featureId, defaultEnabled, deviceCapability]);
-  
-  // Function to override the decision
-  const override = useCallback((enabled: boolean) => {
-    if (allowOverride) {
-      setOverrideEnabled(enabled);
-    }
-  }, [allowOverride]);
-  
-  // The actual enabled state, considering the override
-  const isEnabled = overrideEnabled !== null ? overrideEnabled : decision.useFeature;
-  
-  return {
-    isEnabled,
-    reason: overrideEnabled !== null 
-      ? `Manual override: feature ${overrideEnabled ? 'enabled' : 'disabled'}`
-      : decision.reason,
-    settings,
-    override
-  };
+    return {
+      shouldEnableParticles,
+      shouldEnableAnimations,
+      shouldEnableBlur,
+      shouldEnableShadows,
+      shouldEnableLazyLoading,
+      shouldEnableImageOptimization,
+      shouldEnableVirtualization,
+      shouldEnableThrottling,
+      complexityMultiplier,
+      qualityMultiplier,
+      isSimplifiedUI: isLowPerformance || (isMediumPerformance && adaptiveRenderingEnabled),
+      deviceCapability
+    };
+  }, [
+    adaptiveRenderingEnabled,
+    deviceCapability,
+    isLowPerformance,
+    isMediumPerformance,
+    isHighPerformance,
+    enableParticles,
+    enableAnimations,
+    enableBlur,
+    enableShadows,
+    enableLazyLoading,
+    enableImageOptimization,
+    enableVirtualization,
+    enableThrottling,
+    lowPerformanceAdjustment,
+    mediumPerformanceAdjustment
+  ]);
 }
-
-export default useAdaptiveRendering;

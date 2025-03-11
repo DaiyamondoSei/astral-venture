@@ -1,9 +1,10 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode, useMemo } from 'react';
-import { PerfConfig } from '../hooks/usePerfConfig';
+import { PerfConfig, DEFAULT_PERF_CONFIG } from '../hooks/usePerfConfig';
 import { usePerformanceTracking, PerformanceData } from '../hooks/usePerformanceTracking';
 import perfMetricsService from '../utils/performance/perfMetricsService';
 import { Result } from '../utils/result/Result';
+import { asyncResultify } from '../utils/result/AsyncResult';
 
 interface PerformanceMetric {
   componentName: string;
@@ -47,16 +48,24 @@ export const usePerformance = () => {
 
 interface PerformanceProviderProps {
   children: ReactNode;
-  initialConfig: PerfConfig;
+  initialConfig?: Partial<PerfConfig>;
 }
 
 export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ 
   children, 
-  initialConfig 
+  initialConfig = {}
 }) => {
-  const [config, setConfig] = useState<PerfConfig>(initialConfig);
+  // Initialize config with defaults and provided values
+  const [config, setConfig] = useState<PerfConfig>({
+    ...DEFAULT_PERF_CONFIG,
+    ...initialConfig
+  });
+  
+  // State for metrics and component stats
   const [metrics, setMetrics] = useState<PerformanceMetric[]>([]);
   const [componentStats, setComponentStats] = useState<Record<string, PerformanceData>>({});
+  
+  // Device capability detection
   const [deviceCapability, setDeviceCapability] = useState<'low' | 'medium' | 'high'>(
     initialConfig.deviceCapability || 'medium'
   );
@@ -129,7 +138,7 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
     
     // Optionally send metrics to backend
     if (config.enableMetricsCollection) {
-      submitMetricsToBackend([newMetric]);
+      void submitMetricsToBackend([newMetric]);
     }
   };
   
@@ -168,7 +177,7 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
     }));
   };
   
-  // Submit metrics to backend
+  // Submit metrics to backend using AsyncResult pattern
   const submitMetricsToBackend = async (metricsToSubmit: PerformanceMetric[]): Promise<Result<void, Error>> => {
     if (!config.enableMetricsCollection || metricsToSubmit.length === 0) {
       return { type: 'success', value: undefined };
@@ -178,7 +187,6 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
       // Convert to format expected by perfMetricsService
       const formattedMetrics = metricsToSubmit.map(metric => ({
         component_name: metric.componentName,
-        metricName: metric.metricName,
         metric_name: metric.metricName,
         value: metric.value,
         timestamp: metric.timestamp,
@@ -212,7 +220,7 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
       
       // Flush metrics on unmount
       if (config.enableMetricsCollection && metrics.length > 0) {
-        submitMetricsToBackend(metrics);
+        void submitMetricsToBackend(metrics);
       }
     };
   }, [metrics, config.enableMetricsCollection]);
