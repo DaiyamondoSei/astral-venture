@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DeviceCapability, detectDeviceCapability } from '@/utils/performanceUtils';
-import { usePerformanceContext } from '@/contexts/PerformanceContext';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal';
 
@@ -28,7 +28,7 @@ export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
   intensityLevel = 1,
   responsive = true,
 }) => {
-  const { deviceCapability } = usePerformanceContext();
+  const { deviceCapability } = usePerformance();
   const [capability, setCapability] = useState<DeviceCapability>(deviceCapability);
   
   // Initialize based on device capability

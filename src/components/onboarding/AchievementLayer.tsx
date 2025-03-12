@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { IAchievementData } from './hooks/achievement/types';
 import { AchievementState } from './hooks/achievement';
 import { DeviceCapability, detectDeviceCapability } from '@/utils/performanceUtils';
-import { usePerformanceContext } from '@/contexts/PerformanceContext';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 interface AchievementLayerProps {
   achievementState: AchievementState;
@@ -18,7 +18,7 @@ export const AchievementLayer: React.FC<AchievementLayerProps> = ({
 }) => {
   const { currentAchievement, dismissAchievement } = achievementState;
   const [isVisible, setIsVisible] = useState(false);
-  const { deviceCapability } = usePerformanceContext();
+  const { deviceCapability } = usePerformance();
   
   // Auto-dismiss after a delay
   useEffect(() => {

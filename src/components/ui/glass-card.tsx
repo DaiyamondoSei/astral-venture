@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 import { DeviceCapability, detectDeviceCapability } from '@/utils/performanceUtils';
-import { usePerformanceContext } from '@/contexts/PerformanceContext';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 const glassCardVariants = cva(
   "relative rounded-lg overflow-hidden transition-all duration-300",
@@ -59,7 +59,7 @@ export const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
     motionProps = {},
     ...props 
   }, ref) => {
-    const { deviceCapability } = usePerformanceContext();
+    const { deviceCapability } = usePerformance();
 
     // Adapt glow intensity based on device capability
     const adaptedGlowIntensity = React.useMemo(() => {

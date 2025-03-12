@@ -1,15 +1,12 @@
-
 /**
  * Supabase Client Singleton
- * 
+ *
  * Centralized, type-safe Supabase client instance with proper initialization
  * and configuration validation.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { toast } from '@/components/ui/use-toast';
 import { getValidatedConfig } from '@/utils/config/configValidator';
-import { ensureValidConfiguration } from '@/utils/bootstrap/configBootstrap';
 import { ValidationError } from '@/utils/validation/ValidationError';
 import { ValidationSeverity } from '@/types/core';
 
@@ -19,366 +16,28 @@ interface SupabaseConfig {
   supabaseAnonKey: string;
 }
 
-// Mock client for environments without Supabase configuration
-class MockSupabaseClient {
-  constructor() {
-    console.warn(
-      'Using mock Supabase client because configuration is missing or invalid. ' +
-      'Database operations will not work. Check your environment variables: ' +
-      'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
-    );
-  }
-
-  from(table: string) {
-    const mockQueryBuilder = this._createMockQueryBuilder();
-    return {
-      select: () => mockQueryBuilder,
-      insert: () => this._createMockResponse(null, new Error('Mock Supabase client')),
-      update: () => this._createMockResponse(null, new Error('Mock Supabase client')),
-      delete: () => this._createMockResponse(null, new Error('Mock Supabase client')),
-      upsert: () => this._createMockResponse(null, new Error('Mock Supabase client')),
-    };
-  }
-
-  _createMockQueryBuilder() {
-    const mockResponse = this._createMockResponse(null, new Error('Mock Supabase client'));
-    const mockBuilder: any = {
-      eq: () => mockBuilder,
-      neq: () => mockBuilder,
-      gt: () => mockBuilder,
-      gte: () => mockBuilder,
-      lt: () => mockBuilder,
-      lte: () => mockBuilder,
-      like: () => mockBuilder,
-      ilike: () => mockBuilder,
-      is: () => mockBuilder,
-      in: () => mockBuilder,
-      contains: () => mockBuilder,
-      containedBy: () => mockBuilder,
-      rangeGt: () => mockBuilder,
-      rangeGte: () => mockBuilder,
-      rangeLt: () => mockBuilder,
-      rangeLte: () => mockBuilder,
-      rangeAdjacent: () => mockBuilder,
-      overlaps: () => mockBuilder,
-      textSearch: () => mockBuilder,
-      match: () => mockBuilder,
-      not: () => mockBuilder,
-      or: () => mockBuilder,
-      filter: () => mockBuilder,
-      
-      order: () => mockBuilder,
-      limit: () => mockBuilder,
-      range: () => mockBuilder,
-      
-      single: () => mockResponse,
-      maybeSingle: () => mockResponse,
-      then: (onFulfilled: any) => Promise.resolve(onFulfilled(mockResponse)),
-    };
-    return mockBuilder;
-  }
-
-  _createMockResponse(data: any, error: Error | null) {
-    return { data, error };
-  }
-
-  rpc(functionName: string, params?: Record<string, any>) {
-    return this._createMockResponse(null, new Error('Mock Supabase client'));
-  }
-
-  auth = {
-    signIn: () => Promise.resolve({ user: null, session: null, error: new Error('Mock Supabase client') }),
-    signOut: () => Promise.resolve({ error: null }),
-    onAuthStateChange: () => ({ data: null, unsubscribe: () => {} }),
-    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-    signInWithPassword: () => Promise.resolve({ data: { user: null, session: null }, error: new Error('Mock Supabase client') }),
-    signUp: () => Promise.resolve({ data: { user: null, session: null }, error: new Error('Mock Supabase client') }),
-    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-  };
-
-  storage = {
-    from: () => ({
-      upload: () => Promise.resolve({ data: null, error: new Error('Mock Supabase client') }),
-      download: () => Promise.resolve({ data: null, error: new Error('Mock Supabase client') }),
-      remove: () => Promise.resolve({ data: null, error: new Error('Mock Supabase client') }),
-      list: () => Promise.resolve({ data: null, error: new Error('Mock Supabase client') }),
-    })
-  };
-
-  functions = {
-    invoke: () => Promise.resolve({ data: null, error: new Error('Mock Supabase client') }),
-  };
-}
-
 // Singleton instance
-let supabaseInstance: SupabaseClient | MockSupabaseClient | null = null;
-let isUsingMockClient = false;
-let initializationAttempted = false;
-let initializationPromise: Promise<SupabaseClient | MockSupabaseClient> | null = null;
+let supabase: SupabaseClient | null = null;
 
 /**
- * Initialize Supabase client with proper validation and retry logic
- * Requires that application configuration has been validated
+ * Initialize Supabase client with proper validation
  */
-function initializeSupabaseClient(retryCount = 0): Promise<SupabaseClient | MockSupabaseClient> {
-  // If already initializing, return the existing promise
-  if (initializationPromise) {
-    return initializationPromise;
+function initializeSupabaseClient(): SupabaseClient {
+  if (supabase) return supabase;
+
+  const supabaseUrl = getValidatedConfig('VITE_SUPABASE_URL');
+  const supabaseAnonKey = getValidatedConfig('VITE_SUPABASE_ANON_KEY');
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase credentials are missing. Check environment variables.');
   }
-  
-  // Maximum number of retries and delay
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 100; // ms
-  
-  // Create initialization promise
-  initializationPromise = new Promise(async (resolve) => {
-    try {
-      // Mark initialization as attempted
-      initializationAttempted = true;
-      
-      // Check for environment variables availability
-      const supabaseUrl = getValidatedConfig('VITE_SUPABASE_URL');
-      const supabaseAnonKey = getValidatedConfig('VITE_SUPABASE_ANON_KEY');
-      
-      // If environment variables haven't loaded yet and we haven't reached max retries,
-      // retry after a short delay
-      if (((!supabaseUrl || !supabaseAnonKey)) && retryCount < MAX_RETRIES) {
-        setTimeout(() => {
-          // Clear the initialization promise so we can retry
-          initializationPromise = null;
-          
-          // Retry initialization
-          const retryPromise = initializeSupabaseClient(retryCount + 1);
-          retryPromise.then(resolve);
-        }, RETRY_DELAY * (retryCount + 1));
-        return;
-      }
-      
-      // If after retries we still don't have required config, use mock client
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.error(
-          '[SUPABASE] Environment variables are not available or missing required values. ' +
-          'Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are defined in your environment.'
-        );
-        
-        // Show different messages in development vs production
-        if (import.meta.env.DEV) {
-          console.info('[SUPABASE] In development mode. Using mock Supabase client until configuration is available.');
-        } else {
-          console.error('[SUPABASE] Missing required configuration in production environment.');
-        }
-        
-        // Use mock client until configuration is available
-        isUsingMockClient = true;
-        supabaseInstance = new MockSupabaseClient();
-        resolve(supabaseInstance);
-        return;
-      }
-      
-      // Validate configuration values
-      if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
-        throw new ValidationError(
-          'Invalid Supabase URL format',
-          [{ 
-            path: 'VITE_SUPABASE_URL', 
-            message: 'Supabase URL must be in the format https://your-project-id.supabase.co', 
-            rule: 'format', 
-            code: 'CONFIG_ERROR',
-            severity: ValidationSeverity.ERROR
-          }],
-          'CONFIG_VALIDATION_ERROR',
-          500
-        );
-      }
-      
-      if (supabaseAnonKey.length < 20) {
-        throw new ValidationError(
-          'Invalid Supabase anonymous key format',
-          [{ 
-            path: 'VITE_SUPABASE_ANON_KEY', 
-            message: 'Supabase anonymous key appears to be invalid', 
-            rule: 'format', 
-            code: 'CONFIG_ERROR',
-            severity: ValidationSeverity.ERROR
-          }],
-          'CONFIG_VALIDATION_ERROR',
-          500
-        );
-      }
-      
-      // Create and return client
-      const client = createClient(supabaseUrl, supabaseAnonKey);
-      isUsingMockClient = false;
-      supabaseInstance = client;
-      resolve(client);
-    } catch (error) {
-      // Log detailed error for developers
-      console.error('[CRITICAL] Failed to initialize Supabase client:', error);
-      
-      // Show user-friendly error message
-      if (import.meta.env.PROD) {
-        toast({
-          title: 'Configuration Error',
-          description: 'The application is not properly configured. Please contact support.',
-          variant: 'destructive',
-        });
-      } else {
-        // In development, show more details
-        toast({
-          title: 'Supabase Configuration Error',
-          description: 'Using mock client. Check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
-          variant: 'destructive',
-        });
-      }
-      
-      // Use mock client to prevent application crashes
-      isUsingMockClient = true;
-      supabaseInstance = new MockSupabaseClient();
-      resolve(supabaseInstance);
-    }
-  });
-  
-  return initializationPromise;
+
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  return supabase;
 }
 
-/**
- * Check connection to Supabase is working
- * @returns Promise resolving to true if connection is successful
- */
-export async function checkSupabaseConnection(): Promise<boolean> {
-  if (isUsingMockClient) {
-    return false;
-  }
-  
-  try {
-    // Simple health check query
-    const client = await getSupabase();
-    const { error } = await client.from('user_profiles').select('id').limit(1);
-    return !error;
-  } catch (err) {
-    console.error('Supabase connection check failed:', err);
-    return false;
-  }
-}
+// Initialize Supabase on import
+initializeSupabaseClient();
 
-/**
- * Get the Supabase client instance, initializing it if necessary
- * Using this getter pattern ensures proper error handling and validation
- */
-export async function getSupabase(): Promise<SupabaseClient | MockSupabaseClient> {
-  if (!supabaseInstance || !initializationAttempted) {
-    return initializeSupabaseClient();
-  }
-  return supabaseInstance;
-}
-
-/**
- * Get the Supabase client instance synchronously
- * Warning: This may return a mock client or undefined if initialization is not complete
- */
-export function getSupabaseSync(): SupabaseClient | MockSupabaseClient | null {
-  if (!supabaseInstance && !initializationAttempted) {
-    // Start initialization but don't wait for it
-    initializeSupabaseClient();
-    return new MockSupabaseClient(); // Return mock client while initializing
-  }
-  return supabaseInstance;
-}
-
-/**
- * Reset the Supabase client (primarily for testing)
- */
-export function resetSupabaseClient(): void {
-  supabaseInstance = null;
-  isUsingMockClient = false;
-  initializationAttempted = false;
-  initializationPromise = null;
-}
-
-/**
- * Check if we're using the mock client
- */
-export function isUsingMockSupabaseClient(): boolean {
-  return isUsingMockClient;
-}
-
-/**
- * Increments energy points for a user
- * 
- * @param userId User ID
- * @param points Number of points to add
- * @returns Promise that resolves to the updated energy points or null on error
- */
-export async function incrementEnergyPoints(
-  userId: string,
-  points: number
-): Promise<number | null> {
-  try {
-    const supabase = await getSupabase();
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('energy_points')
-      .eq('user_id', userId)
-      .single();
-    
-    if (error) throw error;
-    
-    const currentPoints = data?.energy_points || 0;
-    const newPoints = currentPoints + points;
-    
-    const { data: updateData, error: updateError } = await supabase
-      .from('user_profiles')
-      .update({ energy_points: newPoints })
-      .eq('user_id', userId)
-      .select('energy_points')
-      .single();
-    
-    if (updateError) throw updateError;
-    
-    return updateData.energy_points;
-  } catch (error) {
-    console.error('Failed to increment energy points:', error);
-    return null;
-  }
-}
-
-/**
- * Type-safe helper for calling RPC functions
- * 
- * @param functionName Name of the RPC function
- * @param params Parameters to pass to the function
- * @returns Result from the RPC function
- */
-export async function callRpc<T = any>(
-  functionName: string,
-  params: Record<string, any> = {}
-): Promise<T> {
-  try {
-    const supabase = await getSupabase();
-    const { data, error } = await supabase.rpc(functionName, params);
-    
-    if (error) throw error;
-    return data as T;
-  } catch (error) {
-    console.error(`Error calling RPC function ${functionName}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Creates a strongly-typed RPC caller function
- * 
- * @example
- * // Define a type-safe RPC caller for a specific function
- * const getUserAchievements = createRpcCaller<Achievement[]>('get_user_achievements');
- * 
- * // Use the caller with proper parameter typing
- * const achievements = await getUserAchievements({ user_id_param: userId });
- */
-export function createRpcCaller<TResult = any, TParams extends Record<string, any> = Record<string, any>>(
-  functionName: string
-) {
-  return async (params: TParams): Promise<TResult> => {
-    return callRpc<TResult>(functionName, params);
-  };
-}
+// Export initialized Supabase client
+export { supabase };
