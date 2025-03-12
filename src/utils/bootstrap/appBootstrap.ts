@@ -8,7 +8,7 @@
 
 import { toast } from '@/components/ui/use-toast';
 import { initializeConfiguration, getConfigurationStatus } from './configBootstrap';
-import { checkSupabaseConnection, isUsingMockSupabaseClient, getSupabase } from '@/lib/supabaseClient';
+import { getSupabase, isUsingMockClient, testConnection } from '@/lib/supabase/client';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
 
 /**
@@ -82,7 +82,7 @@ async function initializeApplicationInternal(): Promise<InitializationResult> {
   try {
     // Step 1: Initialize and validate configuration
     // First run configuration validation with a grace period
-    const configResult = initializeConfiguration(false);
+    const configResult = await initializeConfiguration(false);
     const configStatus = getConfigurationStatus();
     
     if (!configResult.isValid) {
@@ -106,27 +106,25 @@ async function initializeApplicationInternal(): Promise<InitializationResult> {
     }
     
     // Step 3: Initialize Supabase client
+    let supabaseClient;
     try {
-      // Start Supabase client initialization without waiting for it to complete
-      getSupabase().catch(err => {
-        console.warn('Error initializing Supabase client:', err);
-        warnings.push('Supabase client initialization error');
-      });
+      supabaseClient = await getSupabase();
+      console.log('Supabase client initialized');
     } catch (err) {
       console.warn('Error initializing Supabase client:', err);
       warnings.push('Supabase client initialization error');
     }
     
-    // Step 4: Validate Supabase connection (if used) - non-blocking
+    // Step 4: Validate Supabase connection
     let supabaseConnected = false;
     
     try {
-      supabaseConnected = await checkSupabaseConnection();
+      supabaseConnected = await testConnection();
       if (!supabaseConnected) {
         console.warn('Unable to connect to Supabase. Some features may not work.');
         warnings.push('Supabase connection failed');
         
-        if (isUsingMockSupabaseClient()) {
+        if (isUsingMockClient()) {
           warnings.push('Using mock Supabase client, database operations will not work');
         }
       } else {
@@ -149,7 +147,7 @@ async function initializeApplicationInternal(): Promise<InitializationResult> {
         toast({
           title: 'Application Started with Warnings',
           description: 'Some features may not work properly. Check console for details.',
-          variant: 'warning',
+          variant: 'destructive',
         });
       }
     }

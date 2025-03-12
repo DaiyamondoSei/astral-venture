@@ -22,25 +22,23 @@ function App() {
   useEffect(() => {
     const bootstrapApp = async () => {
       try {
-        // Initialize with a short delay to ensure environment variables are loaded
-        setTimeout(async () => {
-          const result = await initializeApplication();
-          setInitResult(result);
-          setInitState(result.state);
+        // Initialize app with proper handling
+        const result = await initializeApplication();
+        setInitResult(result);
+        setInitState(result.state);
+        
+        if (!result.success) {
+          setInitError(result.error || new Error('Application initialization failed'));
           
-          if (!result.success) {
-            setInitError(result.error || new Error('Application initialization failed'));
-            
-            // Show warning toast for each warning
-            result.warnings.forEach(warning => {
-              toast({
-                title: 'Initialization Warning',
-                description: warning,
-                variant: 'warning',
-              });
+          // Show warning toast for each warning
+          result.warnings.forEach(warning => {
+            toast({
+              title: 'Initialization Warning',
+              description: warning,
+              variant: 'destructive',
             });
-          }
-        }, 100); // Short delay to ensure environment variables are loaded
+          });
+        }
       } catch (error) {
         console.error('Application bootstrap error:', error);
         setInitError(error instanceof Error ? error : new Error('Unknown initialization error'));
@@ -105,7 +103,7 @@ function App() {
     toast({
       title: "Limited Functionality",
       description: "Some features may not be available due to configuration issues.",
-      variant: "warning",
+      variant: "destructive",
       duration: 5000,
     });
   }

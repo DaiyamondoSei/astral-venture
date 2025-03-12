@@ -6,7 +6,6 @@
  * with invalid configuration, implementing a fail-fast approach.
  */
 
-import { getValidatedConfig, validateAppConfig, getSetupInstructions } from '@/utils/config/configValidator';
 import { ValidationError } from '@/utils/validation/ValidationError';
 import { ValidationSeverity } from '@/types/core';
 
@@ -22,60 +21,128 @@ const REQUIRED_CONFIGS = [
   'VITE_SUPABASE_ANON_KEY'
 ];
 
+// Configuration setup instructions
+const SETUP_INSTRUCTIONS: Record<string, string> = {
+  'VITE_SUPABASE_URL': 'Create a .env file in your project root and add VITE_SUPABASE_URL=https://your-project-id.supabase.co',
+  'VITE_SUPABASE_ANON_KEY': 'Add VITE_SUPABASE_ANON_KEY=your-anon-key to your .env file'
+};
+
+/**
+ * Gets a validated config value with retry mechanism
+ * @param key Config key to retrieve
+ * @param defaultValue Optional default value
+ * @returns The config value or default value
+ */
+export function getValidatedConfig(key: string, defaultValue?: string): string | undefined {
+  const value = import.meta.env[key];
+  
+  if (value === undefined || value === '') {
+    if (REQUIRED_CONFIGS.includes(key)) {
+      if (import.meta.env.DEV) {
+        const instructions = getSetupInstructions(key);
+        console.warn(`Missing required config: ${key}`);
+        if (instructions) {
+          console.info(`[SETUP] ${instructions}`);
+        }
+      }
+    }
+    return defaultValue;
+  }
+  
+  return value;
+}
+
+/**
+ * Gets typed configuration with fallback
+ */
+export function getConfig<T>(key: string, defaultValue: T): T {
+  const value = getValidatedConfig(key);
+  
+  if (value === undefined) {
+    return defaultValue;
+  }
+  
+  // Type casting based on default value type
+  const valueType = typeof defaultValue;
+  
+  try {
+    if (valueType === 'boolean') {
+      return (value.toLowerCase() === 'true') as unknown as T;
+    }
+    
+    if (valueType === 'number') {
+      return Number(value) as unknown as T;
+    }
+    
+    if (valueType === 'object' && defaultValue !== null) {
+      return JSON.parse(value) as T;
+    }
+    
+    return value as unknown as T;
+  } catch (error) {
+    console.warn(`Error casting configuration value for ${key}:`, error);
+    return defaultValue;
+  }
+}
+
 /**
  * Initialize and validate application configuration
  * This should be called early in the application bootstrap process
  * 
  * @param throwOnError Whether to throw errors (true) or just return status (false)
- * @returns Configuration validation status
+ * @returns Promise resolving to configuration validation status
  */
-export function initializeConfiguration(throwOnError = false): { 
+export async function initializeConfiguration(throwOnError = false): Promise<{ 
   isValid: boolean; 
   errors: ValidationError | null | string[]
-} {
+}> {
   // If we have an initialization in progress, return that promise
   if (initializationPromise) {
-    return initializationPromise as any;
+    return initializationPromise;
   }
   
   // Create initialization promise
   initializationPromise = new Promise((resolve) => {
     try {
-      // Run initial validation
-      const validationResults = validateAppConfig();
+      // Validate required environment variables
+      const missingVars: string[] = [];
+      const validVars: string[] = [];
       
-      if (!validationResults.isValid) {
+      // Check if all required configs are present
+      for (const key of REQUIRED_CONFIGS) {
+        const value = getValidatedConfig(key);
+        if (value === undefined) {
+          missingVars.push(key);
+        } else {
+          validVars.push(key);
+        }
+      }
+      
+      const isValid = missingVars.length === 0;
+      
+      if (!isValid) {
         // Create detailed validation error
-        const errorDetails = [];
+        const errorDetails = missingVars.map(key => ({
+          path: key,
+          message: `Missing required configuration: ${key}`,
+          rule: 'required',
+          code: 'CONFIG_ERROR',
+          severity: ValidationSeverity.ERROR
+        }));
         
-        // Add missing keys to error details
-        for (const key of validationResults.missingKeys) {
-          errorDetails.push({
-            path: key,
-            message: `Missing required configuration: ${key}`,
-            rule: 'required',
-            code: 'CONFIG_ERROR',
-            severity: ValidationSeverity.ERROR
-          });
-          
-          // Log setup instructions in development
-          if (import.meta.env.DEV) {
+        // Log detailed messages in development
+        if (import.meta.env.DEV) {
+          console.error('[BOOTSTRAP] Configuration validation failed. Missing configuration:');
+          missingVars.forEach(key => {
+            console.error(`- ${key}`);
             const instructions = getSetupInstructions(key);
             if (instructions) {
-              console.info(`[SETUP] ${instructions}`);
+              console.info(`  ${instructions}`);
             }
-          }
-        }
-        
-        // Add invalid keys to error details
-        for (const key of validationResults.invalidKeys) {
-          errorDetails.push({
-            path: key,
-            message: `Invalid configuration value for: ${key}`,
-            rule: 'format',
-            code: 'CONFIG_ERROR',
-            severity: ValidationSeverity.ERROR
           });
+        } else {
+          // In production, log a less detailed error
+          console.error('[BOOTSTRAP] Application configuration validation failed');
         }
         
         validationErrors = new ValidationError(
@@ -85,17 +152,6 @@ export function initializeConfiguration(throwOnError = false): {
           500
         );
         
-        // Log detailed error for developers
-        if (import.meta.env.DEV) {
-          console.error('[BOOTSTRAP] Configuration validation failed:', validationErrors);
-          console.error('Missing or invalid configurations:', 
-            [...validationResults.missingKeys, ...validationResults.invalidKeys].join(', '));
-          console.error('Please check your environment variables and .env files');
-        } else {
-          // In production, log a less detailed error
-          console.error('[BOOTSTRAP] Application configuration validation failed');
-        }
-        
         isConfigurationValid = false;
         
         if (throwOnError) {
@@ -104,9 +160,10 @@ export function initializeConfiguration(throwOnError = false): {
         
         resolve({ 
           isValid: false, 
-          errors: errorDetails.map(detail => detail.message)
+          errors: missingVars
         });
       } else {
+        // All required configs are present
         isConfigurationValid = true;
         validationErrors = null;
         isBootstrapComplete = true;
@@ -114,6 +171,7 @@ export function initializeConfiguration(throwOnError = false): {
         // Log success in development
         if (import.meta.env.DEV) {
           console.info('[BOOTSTRAP] Configuration validation successful');
+          console.info(`Validated configurations: ${validVars.join(', ')}`);
         }
         
         resolve({ 
@@ -154,60 +212,7 @@ export function initializeConfiguration(throwOnError = false): {
     }
   });
   
-  return initializationPromise as any;
-}
-
-/**
- * Ensure valid configuration or throw a detailed error
- * This implements a fail-fast approach to configuration validation
- * 
- * @param retryIfNotComplete Whether to retry initialization if not yet complete
- */
-export function ensureValidConfiguration(retryIfNotComplete = true): void {
-  // If we haven't fully validated configuration yet, do so now
-  if (retryIfNotComplete && !isBootstrapComplete) {
-    const { isValid, errors } = initializeConfiguration(true);
-    
-    if (!isValid && errors) {
-      throw new ValidationError(
-        'Configuration validation failed',
-        Array.isArray(errors) 
-          ? errors.map(msg => ({ 
-              path: 'config', 
-              message: msg, 
-              rule: 'required', 
-              code: 'CONFIG_ERROR',
-              severity: ValidationSeverity.ERROR
-            }))
-          : [{ 
-              path: 'config', 
-              message: 'Unknown configuration error', 
-              rule: 'required', 
-              code: 'CONFIG_ERROR',
-              severity: ValidationSeverity.ERROR
-            }],
-        'CONFIG_VALIDATION_ERROR',
-        500
-      );
-    }
-  } else if (!isConfigurationValid && validationErrors) {
-    // We already know configuration is invalid
-    throw validationErrors;
-  }
-  
-  // If we get here, configuration is valid
-}
-
-/**
- * Check if a specific configuration key is valid
- */
-export function isConfigValid(key: string): boolean {
-  try {
-    const value = getValidatedConfig(key);
-    return !!value;
-  } catch (error) {
-    return false;
-  }
+  return initializationPromise;
 }
 
 /**
@@ -226,6 +231,21 @@ export function getConfigurationStatus(): {
 }
 
 /**
+ * Check if a specific configuration key is valid
+ */
+export function isConfigValid(key: string): boolean {
+  const value = getValidatedConfig(key);
+  return value !== undefined;
+}
+
+/**
+ * Gets setup instructions for missing configuration
+ */
+export function getSetupInstructions(key: string): string | undefined {
+  return SETUP_INSTRUCTIONS[key];
+}
+
+/**
  * Reset configuration state (primarily for testing)
  */
 export function resetConfigurationState(): void {
@@ -234,6 +254,3 @@ export function resetConfigurationState(): void {
   isBootstrapComplete = false;
   initializationPromise = null;
 }
-
-// DO NOT auto-initialize configuration on module import
-// This has been intentionally removed to prevent initialization before environment variables are loaded

@@ -6,152 +6,23 @@
  * and handles configuration errors gracefully.
  */
 
-import { createClient, PostgrestError, SupabaseClient } from '@supabase/supabase-js';
+import { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from './types';
-import { getSupabase as getMainSupabase, isUsingMockSupabaseClient } from '@/lib/supabaseClient';
+import { 
+  getSupabase, 
+  getSupabaseSync, 
+  isUsingMockClient 
+} from '@/lib/supabase/client';
 
-// Configuration validation
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Warn if configuration is missing
-if (!SUPABASE_URL) {
-  console.warn('Missing VITE_SUPABASE_URL environment variable');
-}
-
-if (!SUPABASE_ANON_KEY) {
-  console.warn('Missing VITE_SUPABASE_ANON_KEY environment variable');
-}
-
-// Singleton instance
-let supabaseInstance: SupabaseClient<Database> | null = null;
-let isMockClient = false;
+// Export the public client functions
+export {
+  getSupabase,
+  getSupabaseSync,
+  isUsingMockClient
+};
 
 /**
- * Creates and returns the Supabase client instance
- * This is a wrapper around the main Supabase client singleton
- */
-export async function getSupabase(): Promise<SupabaseClient<Database>> {
-  if (!supabaseInstance) {
-    // Use the main supabase client helper to get a properly initialized client
-    const mainClient = await getMainSupabase();
-    
-    // Check if we're using a mock client
-    isMockClient = isUsingMockSupabaseClient();
-    
-    // Cast the client to the correct type
-    supabaseInstance = mainClient as SupabaseClient<Database>;
-  }
-  
-  return supabaseInstance;
-}
-
-/**
- * Get the Supabase client synchronously
- * Warning: This may return a mock client if initialization is not complete
- */
-export function getSupabaseSync(): SupabaseClient<Database> {
-  if (!supabaseInstance) {
-    // If not initialized, create a new instance
-    // This is a fallback and might be a mock client
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.warn('Supabase credentials missing in synchronous call, using mock client');
-      supabaseInstance = createMockClient();
-      isMockClient = true;
-    } else {
-      supabaseInstance = createClient<Database>(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true
-          }
-        }
-      );
-    }
-    
-    // Start the async initialization in the background
-    getSupabase().catch(err => {
-      console.error('Error initializing Supabase client:', err);
-    });
-  }
-  
-  return supabaseInstance;
-}
-
-/**
- * Reset the Supabase client (useful for testing)
- */
-export function resetSupabaseClient(): void {
-  supabaseInstance = null;
-  isMockClient = false;
-}
-
-/**
- * Checks if we're using a mock client
- */
-export function isUsingMockClient(): boolean {
-  return isMockClient;
-}
-
-/**
- * Creates a mock Supabase client for testing/development
- */
-function createMockClient(): SupabaseClient<Database> {
-  // Return a mock client that logs warnings but doesn't throw errors
-  return {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          data: [],
-          error: null
-        }),
-        single: () => ({
-          data: null,
-          error: null
-        })
-      }),
-      insert: () => ({
-        select: () => ({
-          data: [],
-          error: null
-        })
-      }),
-      update: () => ({
-        eq: () => ({
-          data: [],
-          error: null
-        }),
-        select: () => ({
-          data: [],
-          error: null
-        })
-      }),
-      delete: () => ({
-        eq: () => ({
-          data: [],
-          error: null
-        })
-      })
-    }),
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-      signUp: () => Promise.resolve({ data: { user: null }, error: null }),
-      signInWithPassword: () => Promise.resolve({ data: { user: null }, error: null }),
-      signOut: () => Promise.resolve({ error: null })
-    },
-    rpc: (name: string) => ({
-      data: null,
-      error: null
-    })
-  } as unknown as SupabaseClient<Database>;
-}
-
-/**
- * Checks if the Supabase connection is working
+ * Check Supabase connection
  */
 export async function checkSupabaseConnection(): Promise<boolean> {
   try {

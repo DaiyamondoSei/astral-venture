@@ -5,36 +5,46 @@ import App from './App.tsx';
 import './index.css';
 import { initWebVitals } from './utils/webVitalsMonitor';
 import { Toaster } from '@/components/ui/toaster';
-import { getSupabase } from '@/lib/supabaseClient';
 import { initializeConfiguration } from '@/utils/bootstrap/configBootstrap';
+import { getSupabase } from '@/lib/supabase/client';
 
-// Initialize configuration and Supabase early
-const initializeAppDependencies = async () => {
+/**
+ * Initialize application dependencies
+ * This happens before React renders to ensure configuration is validated early
+ */
+async function initializeDependencies() {
+  console.info('Initializing application dependencies...');
+  const startTime = performance.now();
+  
   try {
-    // Start configuration validation
+    // Initialize configuration first to validate environment variables
     const configResult = await initializeConfiguration();
     
     if (!configResult.isValid) {
-      console.warn('Configuration validation has issues:', configResult.errors);
+      console.warn('⚠️ Configuration validation failed:', configResult.errors);
+    } else {
+      console.info('✅ Configuration validation successful');
     }
     
-    // Initialize Supabase client early
-    // This starts the connection process but doesn't wait for it
+    // Pre-initialize Supabase client to start connection process
     getSupabase().catch(error => {
-      console.warn('Supabase initialization issue:', error);
+      console.warn('⚠️ Supabase initialization issue:', error);
     });
+    
+    // Initialize web vitals monitoring
+    initWebVitals();
+    
+    const initTime = performance.now() - startTime;
+    console.info(`Initialization completed in ${initTime.toFixed(2)}ms`);
   } catch (error) {
-    console.error('Error initializing app dependencies:', error);
+    console.error('❌ Critical initialization error:', error);
   }
-};
+}
 
-// Initialize dependencies early without blocking rendering
-initializeAppDependencies();
+// Start initialization but don't block rendering
+initializeDependencies();
 
-// Initialize web vitals monitoring
-initWebVitals();
-
-// Render the app
+// Render the application
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

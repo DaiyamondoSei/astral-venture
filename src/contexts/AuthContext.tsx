@@ -1,7 +1,10 @@
 
 import { createContext, useState, useCallback, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabase, getSupabaseSync } from '@/lib/supabase/client';
+
+// Get the supabase client
+const supabase = getSupabaseSync();
 
 export interface IUserProfile {
   id: string;
@@ -71,7 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const { data: { user }, error } = await supabase.auth.signInWithPassword({
+      const client = await getSupabase();
+      const { data: { user }, error } = await client.auth.signInWithPassword({
         email: email,
         password: password,
       });
@@ -98,7 +102,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const { data: { user }, error } = await supabase.auth.signUp({
+      const client = await getSupabase();
+      const { data: { user }, error } = await client.auth.signUp({
         email: email,
         password: password,
       });
@@ -124,7 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async (): Promise<void> => {
     setIsLoggingOut(true);
     try {
-      const { error } = await supabase.auth.signOut();
+      const client = await getSupabase();
+      const { error } = await client.auth.signOut();
       if (error) {
         console.error('Logout error:', error);
         setErrorMessage(error.message);
@@ -150,7 +156,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchUserProfile = async (userId: string) => {
       setProfileLoading(true);
       try {
-        const { data, error } = await supabase
+        const client = await getSupabase();
+        const { data, error } = await client
           .from('profiles')
           .select('*')
           .eq('id', userId)
@@ -177,7 +184,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchUserStreak = async (userId: string) => {
       try {
-        const { data, error } = await supabase
+        const client = await getSupabase();
+        const { data, error } = await client
           .from('user_streaks')
           .select('*')
           .eq('user_id', userId)
@@ -203,7 +211,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchActivatedChakras = async (userId: string) => {
       try {
-        const { data, error } = await supabase
+        const client = await getSupabase();
+        const { data, error } = await client
           .from('activated_chakras')
           .select('chakra_id')
           .eq('user_id', userId);
@@ -221,8 +230,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchTodayChallenge = async (userId: string) => {
       try {
+        const client = await getSupabase();
         const today = new Date().toISOString().slice(0, 10);
-        const { data, error } = await supabase
+        const { data, error } = await client
           .from('daily_challenges')
           .select('*')
           .eq('user_id', userId)
@@ -255,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
 
       if (session?.user) {
@@ -270,6 +280,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTodayChallenge(null);
       }
     });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const updateStreak = useCallback((streak: IUserStreak) => {
