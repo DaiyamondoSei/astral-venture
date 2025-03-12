@@ -8,9 +8,8 @@
 
 import { toast } from '@/components/ui/use-toast';
 import { initializeConfiguration, getConfigurationStatus } from './configBootstrap';
-import { checkSupabaseConnection, isUsingMockSupabaseClient } from '@/lib/supabaseClient';
+import { checkSupabaseConnection, isUsingMockSupabaseClient, getSupabase } from '@/lib/supabaseClient';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-import { ValidationError } from '@/utils/validation/ValidationError';
 
 /**
  * Application initialization states
@@ -82,6 +81,7 @@ async function initializeApplicationInternal(): Promise<InitializationResult> {
   
   try {
     // Step 1: Initialize and validate configuration
+    // First run configuration validation with a grace period
     const configResult = initializeConfiguration(false);
     const configStatus = getConfigurationStatus();
     
@@ -105,7 +105,19 @@ async function initializeApplicationInternal(): Promise<InitializationResult> {
       }
     }
     
-    // Step 3: Validate Supabase connection (if used) - non-blocking
+    // Step 3: Initialize Supabase client
+    try {
+      // Start Supabase client initialization without waiting for it to complete
+      getSupabase().catch(err => {
+        console.warn('Error initializing Supabase client:', err);
+        warnings.push('Supabase client initialization error');
+      });
+    } catch (err) {
+      console.warn('Error initializing Supabase client:', err);
+      warnings.push('Supabase client initialization error');
+    }
+    
+    // Step 4: Validate Supabase connection (if used) - non-blocking
     let supabaseConnected = false;
     
     try {
@@ -137,7 +149,7 @@ async function initializeApplicationInternal(): Promise<InitializationResult> {
         toast({
           title: 'Application Started with Warnings',
           description: 'Some features may not work properly. Check console for details.',
-          variant: 'destructive',
+          variant: 'warning',
         });
       }
     }
@@ -213,12 +225,3 @@ export function resetInitializationState(): void {
   initializationResult = null;
   initializationPromise = null;
 }
-
-/**
- * Bootstrap function to be called at application startup
- */
-export function bootstrapApplication(): Promise<InitializationResult> {
-  return initializeApplication();
-}
-
-export default bootstrapApplication;

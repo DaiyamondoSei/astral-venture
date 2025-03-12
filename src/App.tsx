@@ -22,7 +22,7 @@ function App() {
   useEffect(() => {
     const bootstrapApp = async () => {
       try {
-        // Provide time for environment variables to load
+        // Initialize with a short delay to ensure environment variables are loaded
         setTimeout(async () => {
           const result = await initializeApplication();
           setInitResult(result);

@@ -1,3 +1,4 @@
+
 /**
  * Supabase Client Singleton
  * 
@@ -10,6 +11,7 @@ import { toast } from '@/components/ui/use-toast';
 import { getValidatedConfig } from '@/utils/config/configValidator';
 import { ensureValidConfiguration } from '@/utils/bootstrap/configBootstrap';
 import { ValidationError } from '@/utils/validation/ValidationError';
+import { ValidationSeverity } from '@/types/core';
 
 // Configuration interface for type safety
 interface SupabaseConfig {
@@ -112,89 +114,131 @@ class MockSupabaseClient {
 let supabaseInstance: SupabaseClient | MockSupabaseClient | null = null;
 let isUsingMockClient = false;
 let initializationAttempted = false;
+let initializationPromise: Promise<SupabaseClient | MockSupabaseClient> | null = null;
 
 /**
- * Initialize Supabase client with proper validation
+ * Initialize Supabase client with proper validation and retry logic
  * Requires that application configuration has been validated
  */
-function initializeSupabaseClient(): SupabaseClient | MockSupabaseClient {
-  // Only attempt initialization once
-  if (initializationAttempted) {
-    return supabaseInstance || new MockSupabaseClient();
+function initializeSupabaseClient(retryCount = 0): Promise<SupabaseClient | MockSupabaseClient> {
+  // If already initializing, return the existing promise
+  if (initializationPromise) {
+    return initializationPromise;
   }
   
-  initializationAttempted = true;
+  // Maximum number of retries and delay
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 100; // ms
   
-  try {
-    // Check for environment variables availability
-    if (typeof import.meta.env === 'undefined' || 
-        !import.meta.env.VITE_SUPABASE_URL || 
-        !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  // Create initialization promise
+  initializationPromise = new Promise(async (resolve) => {
+    try {
+      // Mark initialization as attempted
+      initializationAttempted = true;
       
-      console.error(
-        '[SUPABASE] Environment variables are not available or missing required values. ' +
-        'Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are defined in your environment.'
-      );
+      // Check for environment variables availability
+      const supabaseUrl = getValidatedConfig('VITE_SUPABASE_URL');
+      const supabaseAnonKey = getValidatedConfig('VITE_SUPABASE_ANON_KEY');
       
-      // Use mock client until configuration is available
-      isUsingMockClient = true;
-      return new MockSupabaseClient();
-    }
-    
-    // Get configuration values with validation
-    const supabaseUrl = getValidatedConfig('VITE_SUPABASE_URL');
-    const supabaseAnonKey = getValidatedConfig('VITE_SUPABASE_ANON_KEY');
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new ValidationError(
-        'Supabase configuration is missing',
-        [
-          { 
+      // If environment variables haven't loaded yet and we haven't reached max retries,
+      // retry after a short delay
+      if (((!supabaseUrl || !supabaseAnonKey)) && retryCount < MAX_RETRIES) {
+        setTimeout(() => {
+          // Clear the initialization promise so we can retry
+          initializationPromise = null;
+          
+          // Retry initialization
+          const retryPromise = initializeSupabaseClient(retryCount + 1);
+          retryPromise.then(resolve);
+        }, RETRY_DELAY * (retryCount + 1));
+        return;
+      }
+      
+      // If after retries we still don't have required config, use mock client
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error(
+          '[SUPABASE] Environment variables are not available or missing required values. ' +
+          'Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are defined in your environment.'
+        );
+        
+        // Show different messages in development vs production
+        if (import.meta.env.DEV) {
+          console.info('[SUPABASE] In development mode. Using mock Supabase client until configuration is available.');
+        } else {
+          console.error('[SUPABASE] Missing required configuration in production environment.');
+        }
+        
+        // Use mock client until configuration is available
+        isUsingMockClient = true;
+        supabaseInstance = new MockSupabaseClient();
+        resolve(supabaseInstance);
+        return;
+      }
+      
+      // Validate configuration values
+      if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
+        throw new ValidationError(
+          'Invalid Supabase URL format',
+          [{ 
             path: 'VITE_SUPABASE_URL', 
-            message: !supabaseUrl ? 'Supabase URL is required' : '', 
-            rule: 'required',
-            code: 'CONFIG_ERROR' 
-          },
-          { 
+            message: 'Supabase URL must be in the format https://your-project-id.supabase.co', 
+            rule: 'format', 
+            code: 'CONFIG_ERROR',
+            severity: ValidationSeverity.ERROR
+          }],
+          'CONFIG_VALIDATION_ERROR',
+          500
+        );
+      }
+      
+      if (supabaseAnonKey.length < 20) {
+        throw new ValidationError(
+          'Invalid Supabase anonymous key format',
+          [{ 
             path: 'VITE_SUPABASE_ANON_KEY', 
-            message: !supabaseAnonKey ? 'Supabase anonymous key is required' : '', 
-            rule: 'required',
-            code: 'CONFIG_ERROR' 
-          }
-        ],
-        'CONFIG_VALIDATION_ERROR',
-        500
-      );
+            message: 'Supabase anonymous key appears to be invalid', 
+            rule: 'format', 
+            code: 'CONFIG_ERROR',
+            severity: ValidationSeverity.ERROR
+          }],
+          'CONFIG_VALIDATION_ERROR',
+          500
+        );
+      }
+      
+      // Create and return client
+      const client = createClient(supabaseUrl, supabaseAnonKey);
+      isUsingMockClient = false;
+      supabaseInstance = client;
+      resolve(client);
+    } catch (error) {
+      // Log detailed error for developers
+      console.error('[CRITICAL] Failed to initialize Supabase client:', error);
+      
+      // Show user-friendly error message
+      if (import.meta.env.PROD) {
+        toast({
+          title: 'Configuration Error',
+          description: 'The application is not properly configured. Please contact support.',
+          variant: 'destructive',
+        });
+      } else {
+        // In development, show more details
+        toast({
+          title: 'Supabase Configuration Error',
+          description: 'Using mock client. Check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+          variant: 'destructive',
+        });
+      }
+      
+      // Use mock client to prevent application crashes
+      isUsingMockClient = true;
+      supabaseInstance = new MockSupabaseClient();
+      resolve(supabaseInstance);
     }
-    
-    // Create and return client
-    const client = createClient(supabaseUrl, supabaseAnonKey);
-    isUsingMockClient = false;
-    return client;
-  } catch (error) {
-    // Log detailed error for developers
-    console.error('[CRITICAL] Failed to initialize Supabase client:', error);
-    
-    // Show user-friendly error message
-    if (import.meta.env.PROD) {
-      toast({
-        title: 'Configuration Error',
-        description: 'The application is not properly configured. Please contact support.',
-        variant: 'destructive',
-      });
-    } else {
-      // In development, show more details
-      toast({
-        title: 'Supabase Configuration Error',
-        description: 'Using mock client. Check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
-        variant: 'destructive',
-      });
-    }
-    
-    // Use mock client to prevent application crashes
-    isUsingMockClient = true;
-    return new MockSupabaseClient();
-  }
+  });
+  
+  return initializationPromise;
 }
 
 /**
@@ -208,7 +252,8 @@ export async function checkSupabaseConnection(): Promise<boolean> {
   
   try {
     // Simple health check query
-    const { error } = await getSupabase().from('user_profiles').select('id').limit(1);
+    const client = await getSupabase();
+    const { error } = await client.from('user_profiles').select('id').limit(1);
     return !error;
   } catch (err) {
     console.error('Supabase connection check failed:', err);
@@ -220,9 +265,22 @@ export async function checkSupabaseConnection(): Promise<boolean> {
  * Get the Supabase client instance, initializing it if necessary
  * Using this getter pattern ensures proper error handling and validation
  */
-export function getSupabase(): SupabaseClient | MockSupabaseClient {
-  if (!supabaseInstance) {
-    supabaseInstance = initializeSupabaseClient();
+export async function getSupabase(): Promise<SupabaseClient | MockSupabaseClient> {
+  if (!supabaseInstance || !initializationAttempted) {
+    return initializeSupabaseClient();
+  }
+  return supabaseInstance;
+}
+
+/**
+ * Get the Supabase client instance synchronously
+ * Warning: This may return a mock client or undefined if initialization is not complete
+ */
+export function getSupabaseSync(): SupabaseClient | MockSupabaseClient | null {
+  if (!supabaseInstance && !initializationAttempted) {
+    // Start initialization but don't wait for it
+    initializeSupabaseClient();
+    return new MockSupabaseClient(); // Return mock client while initializing
   }
   return supabaseInstance;
 }
@@ -234,6 +292,7 @@ export function resetSupabaseClient(): void {
   supabaseInstance = null;
   isUsingMockClient = false;
   initializationAttempted = false;
+  initializationPromise = null;
 }
 
 /**
@@ -255,7 +314,7 @@ export async function incrementEnergyPoints(
   points: number
 ): Promise<number | null> {
   try {
-    const supabase = getSupabase();
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('user_profiles')
       .select('energy_points')
@@ -283,10 +342,6 @@ export async function incrementEnergyPoints(
   }
 }
 
-// Create and export the singleton instance
-// This maintains backward compatibility while ensuring delayed initialization
-export const supabase = getSupabase();
-
 /**
  * Type-safe helper for calling RPC functions
  * 
@@ -299,7 +354,8 @@ export async function callRpc<T = any>(
   params: Record<string, any> = {}
 ): Promise<T> {
   try {
-    const { data, error } = await getSupabase().rpc(functionName, params);
+    const supabase = await getSupabase();
+    const { data, error } = await supabase.rpc(functionName, params);
     
     if (error) throw error;
     return data as T;
@@ -326,6 +382,3 @@ export function createRpcCaller<TResult = any, TParams extends Record<string, an
     return callRpc<TResult>(functionName, params);
   };
 }
-
-// Export singleton instance and helpers
-export default supabase;

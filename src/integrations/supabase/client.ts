@@ -1,17 +1,26 @@
 
+/**
+ * Supabase Client Integration
+ * 
+ * This file provides a centralized Supabase client that is properly initialized
+ * and handles configuration errors gracefully.
+ */
+
 import { createClient, PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from './types';
+import { getSupabase as getMainSupabase, isUsingMockSupabaseClient } from '@/lib/supabaseClient';
 
 // Configuration validation
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Warn if configuration is missing
 if (!SUPABASE_URL) {
-  console.error('Missing VITE_SUPABASE_URL environment variable');
+  console.warn('Missing VITE_SUPABASE_URL environment variable');
 }
 
 if (!SUPABASE_ANON_KEY) {
-  console.error('Missing VITE_SUPABASE_ANON_KEY environment variable');
+  console.warn('Missing VITE_SUPABASE_ANON_KEY environment variable');
 }
 
 // Singleton instance
@@ -20,11 +29,33 @@ let isMockClient = false;
 
 /**
  * Creates and returns the Supabase client instance
+ * This is a wrapper around the main Supabase client singleton
  */
-export function getSupabase(): SupabaseClient<Database> {
+export async function getSupabase(): Promise<SupabaseClient<Database>> {
   if (!supabaseInstance) {
+    // Use the main supabase client helper to get a properly initialized client
+    const mainClient = await getMainSupabase();
+    
+    // Check if we're using a mock client
+    isMockClient = isUsingMockSupabaseClient();
+    
+    // Cast the client to the correct type
+    supabaseInstance = mainClient as SupabaseClient<Database>;
+  }
+  
+  return supabaseInstance;
+}
+
+/**
+ * Get the Supabase client synchronously
+ * Warning: This may return a mock client if initialization is not complete
+ */
+export function getSupabaseSync(): SupabaseClient<Database> {
+  if (!supabaseInstance) {
+    // If not initialized, create a new instance
+    // This is a fallback and might be a mock client
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.warn('Supabase credentials missing, using mock client');
+      console.warn('Supabase credentials missing in synchronous call, using mock client');
       supabaseInstance = createMockClient();
       isMockClient = true;
     } else {
@@ -40,6 +71,11 @@ export function getSupabase(): SupabaseClient<Database> {
         }
       );
     }
+    
+    // Start the async initialization in the background
+    getSupabase().catch(err => {
+      console.error('Error initializing Supabase client:', err);
+    });
   }
   
   return supabaseInstance;
@@ -56,7 +92,7 @@ export function resetSupabaseClient(): void {
 /**
  * Checks if we're using a mock client
  */
-export function isUsingMockSupabaseClient(): boolean {
+export function isUsingMockClient(): boolean {
   return isMockClient;
 }
 
@@ -64,7 +100,7 @@ export function isUsingMockSupabaseClient(): boolean {
  * Creates a mock Supabase client for testing/development
  */
 function createMockClient(): SupabaseClient<Database> {
-  // This is a simplified mock for development purposes
+  // Return a mock client that logs warnings but doesn't throw errors
   return {
     from: () => ({
       select: () => ({
@@ -119,7 +155,7 @@ function createMockClient(): SupabaseClient<Database> {
  */
 export async function checkSupabaseConnection(): Promise<boolean> {
   try {
-    const supabase = getSupabase();
+    const supabase = await getSupabase();
     const { error } = await supabase.from('user_profiles').select('id').limit(1);
     return !error;
   } catch (err) {
@@ -135,7 +171,7 @@ export async function executeQuery<T>(
   queryFn: (supabase: SupabaseClient<Database>) => Promise<{ data: T | null; error: PostgrestError | null }>
 ): Promise<{ data: T | null; error: Error | null }> {
   try {
-    const supabase = getSupabase();
+    const supabase = await getSupabase();
     const { data, error } = await queryFn(supabase);
     
     if (error) {
@@ -165,7 +201,7 @@ export async function incrementEnergyPoints(
   }
   
   try {
-    const supabase = getSupabase();
+    const supabase = await getSupabase();
     const { data, error } = await supabase.rpc('increment_points', {
       row_id: userId,
       points_to_add: points
@@ -190,11 +226,11 @@ export async function incrementEnergyPoints(
  * Call a database function (RPC)
  */
 export async function callRpc<T = any>(
-  functionName: string,
+  functionName: "get_total_points" | "get_user_achievements" | "increment_points",
   params: Record<string, any> = {}
 ): Promise<{ data: T | null; error: Error | null }> {
   try {
-    const supabase = getSupabase();
+    const supabase = await getSupabase();
     const { data, error } = await supabase.rpc(functionName, params);
     
     if (error) {
@@ -215,9 +251,11 @@ export async function callRpc<T = any>(
 /**
  * Creates a typed RPC caller for a specific function
  */
-export function createRpcCaller<TParams, TResult>(functionName: string) {
+export function createRpcCaller<TParams, TResult>(
+  functionName: "get_total_points" | "get_user_achievements" | "increment_points"
+) {
   return (params: TParams) => callRpc<TResult>(functionName, params as Record<string, any>);
 }
 
 // Export Supabase client singleton
-export const supabase = getSupabase();
+export const supabase = getSupabaseSync();
