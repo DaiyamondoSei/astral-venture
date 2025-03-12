@@ -2,31 +2,18 @@
 /**
  * Supabase Client Integration
  * 
- * This file provides a centralized Supabase client that is properly initialized
- * and handles configuration errors gracefully.
+ * This file provides a centralized Supabase client with proper error handling
+ * and helper functions for common operations.
  */
 
-import { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
-import { Database } from './types';
-import { 
-  getSupabase, 
-  getSupabaseSync, 
-  isUsingMockClient 
-} from '@/lib/supabase/client';
-
-// Export the public client functions
-export {
-  getSupabase,
-  getSupabaseSync,
-  isUsingMockClient
-};
+import { PostgrestError } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
 
 /**
  * Check Supabase connection
  */
 export async function checkSupabaseConnection(): Promise<boolean> {
   try {
-    const supabase = await getSupabase();
     const { error } = await supabase.from('user_profiles').select('id').limit(1);
     return !error;
   } catch (err) {
@@ -39,11 +26,10 @@ export async function checkSupabaseConnection(): Promise<boolean> {
  * Execute a database query with standard error handling
  */
 export async function executeQuery<T>(
-  queryFn: (supabase: SupabaseClient<Database>) => Promise<{ data: T | null; error: PostgrestError | null }>
+  queryFn: () => Promise<{ data: T | null; error: PostgrestError | null }>
 ): Promise<{ data: T | null; error: Error | null }> {
   try {
-    const supabase = await getSupabase();
-    const { data, error } = await queryFn(supabase);
+    const { data, error } = await queryFn();
     
     if (error) {
       console.error('Database query error:', error);
@@ -72,7 +58,6 @@ export async function incrementEnergyPoints(
   }
   
   try {
-    const supabase = await getSupabase();
     const { data, error } = await supabase.rpc('increment_points', {
       row_id: userId,
       points_to_add: points
@@ -101,7 +86,6 @@ export async function callRpc<T = any>(
   params: Record<string, any> = {}
 ): Promise<{ data: T | null; error: Error | null }> {
   try {
-    const supabase = await getSupabase();
     const { data, error } = await supabase.rpc(functionName, params);
     
     if (error) {
@@ -119,14 +103,5 @@ export async function callRpc<T = any>(
   }
 }
 
-/**
- * Creates a typed RPC caller for a specific function
- */
-export function createRpcCaller<TParams, TResult>(
-  functionName: "get_total_points" | "get_user_achievements" | "increment_points"
-) {
-  return (params: TParams) => callRpc<TResult>(functionName, params as Record<string, any>);
-}
-
-// Export Supabase client singleton
-export const supabase = getSupabaseSync();
+// Export Supabase client for direct use
+export { supabase };

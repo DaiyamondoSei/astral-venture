@@ -1,43 +1,22 @@
-/**
- * Supabase Client Singleton
- *
- * Centralized, type-safe Supabase client instance with proper initialization
- * and configuration validation.
- */
-
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { getValidatedConfig } from '@/utils/config/configValidator';
-import { ValidationError } from '@/utils/validation/ValidationError';
-import { ValidationSeverity } from '@/types/core';
-
-// Configuration interface for type safety
-interface SupabaseConfig {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-}
-
-// Singleton instance
-let supabase: SupabaseClient | null = null;
 
 /**
- * Initialize Supabase client with proper validation
+ * Supabase Client - Simple and reliable client initialization
  */
-function initializeSupabaseClient(): SupabaseClient {
-  if (supabase) return supabase;
+import { createClient } from '@supabase/supabase-js';
 
-  const supabaseUrl = getValidatedConfig('VITE_SUPABASE_URL');
-  const supabaseAnonKey = getValidatedConfig('VITE_SUPABASE_ANON_KEY');
+// Get environment variables from Vite
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase credentials are missing. Check environment variables.');
-  }
-
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-  return supabase;
+// Validate configuration
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase credentials. Please check your environment variables:');
+  console.error('- VITE_SUPABASE_URL');
+  console.error('- VITE_SUPABASE_ANON_KEY');
 }
 
-// Initialize Supabase on import
-initializeSupabaseClient();
-
-// Export initialized Supabase client
-export { supabase };
+// Create and export the Supabase client
+export const supabase = createClient(
+  supabaseUrl || '',
+  supabaseAnonKey || ''
+);
