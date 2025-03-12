@@ -94,25 +94,6 @@ END;
 $$;
 ```
 
-## Authentication Security
-
-### Password Policies
-
-Enable leaked password protection in Supabase Auth settings to prevent users from using compromised passwords.
-
-Configure password policies:
-- Minimum password length
-- Required character types
-- Password expiration
-- Failed login attempt limits
-
-### JWT Settings
-
-Configure JWT settings appropriately:
-- Set reasonable expiration times
-- Configure refresh token rotation
-- Use secure cookies for token storage
-
 ## Database Design
 
 ### Foreign Keys
@@ -124,19 +105,6 @@ CREATE TABLE public.user_data (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   data TEXT
-);
-```
-
-### Secure Data Types
-
-Use appropriate data types for security-sensitive data:
-
-```sql
-CREATE TABLE public.sensitive_data (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id),
-  password_hash TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 ```
 
@@ -193,65 +161,6 @@ try {
   
   // Don't expose internal error details to users
   throw new Error('Failed to save data. Please try again later.');
-}
-```
-
-## Storage Security
-
-### Bucket Policies
-
-Configure appropriate bucket policies:
-
-```sql
--- Public bucket with RLS
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('public', 'Public Bucket', true);
-
--- Create RLS policy for public bucket
-CREATE POLICY "Public Access" 
-  ON storage.objects 
-  FOR SELECT
-  USING (bucket_id = 'public');
-
--- Create RLS policy for uploads
-CREATE POLICY "Users can upload their own files" 
-  ON storage.objects 
-  FOR INSERT 
-  WITH CHECK (bucket_id = 'private' AND auth.uid() = owner);
-```
-
-### File Validation
-
-Validate files before uploading:
-
-```typescript
-function validateFile(file: File): boolean {
-  // Check file type
-  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-  if (!allowedTypes.includes(file.type)) {
-    return false;
-  }
-  
-  // Check file size
-  const maxSize = 5 * 1024 * 1024; // 5MB
-  if (file.size > maxSize) {
-    return false;
-  }
-  
-  return true;
-}
-
-async function uploadFile(file: File) {
-  if (!validateFile(file)) {
-    throw new Error('Invalid file');
-  }
-  
-  // Generate a secure file name
-  const fileName = `${uuidv4()}-${file.name}`;
-  
-  return await supabase.storage
-    .from('private')
-    .upload(`user/${supabase.auth.user()?.id}/${fileName}`, file);
 }
 ```
 

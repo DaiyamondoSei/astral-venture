@@ -2,12 +2,13 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import { useAuth } from '@/contexts/AuthContext';
 import AuthStateManager from '@/components/AuthStateManager';
 import OnboardingManager from '@/components/onboarding/OnboardingManager';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { usePerformance } from '@/contexts/PerformanceContext';
 import { initializeApp } from '@/utils/appInitializer';
+// Import the useAuth hook from the correct location
+import { useAuth } from '@/hooks/auth';
 
 // Import lazy-loaded components using our optimized lazy loader
 import {
@@ -100,7 +101,6 @@ const Index = () => {
             <Suspense fallback={<SuspenseFallback />}>
               {showEntryAnimation ? (
                 <EntryAnimationView 
-                  user={authState.user}
                   onComplete={handleEntryAnimationComplete}
                   showTestButton={false}
                 />
@@ -118,8 +118,6 @@ const Index = () => {
                       >
                         {(handleChallengeComplete) => (
                           <UserDashboardView
-                            user={authState.user}
-                            userProfile={authState.userProfile}
                             todayChallenge={authState.todayChallenge}
                             userStreak={authState.userStreak || { current: 0, longest: 0 }}
                             activatedChakras={authState.activatedChakras || []}

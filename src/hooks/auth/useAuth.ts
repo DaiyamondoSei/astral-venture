@@ -7,16 +7,15 @@
 
 import { useContext } from 'react';
 import { AuthContext } from '@/contexts/AuthContext';
-import type { IAuthContext, UseAuthProps } from './types';
+import type { IAuthContext } from './types';
 
 /**
  * Custom hook for accessing authentication context
  * 
- * @param options - Configuration options for authentication behavior
  * @returns The authentication context with user state and authentication methods
  * @throws Error if used outside an AuthProvider
  */
-export function useAuth(options: UseAuthProps = {}): IAuthContext {
+export function useAuth(): IAuthContext {
   const context = useContext(AuthContext);
   
   if (!context) {

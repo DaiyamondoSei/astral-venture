@@ -1,87 +1,93 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import LoadingScreen from '@/components/LoadingScreen';
 
-interface EntryAnimationViewProps {
-  progress: number;
-  message?: string;
-  onComplete?: () => void;
-  showAnimation?: boolean;
+import React, { useState, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { SeedOfLife } from '@/components/SeedOfLife';
+import { ChevronRight } from 'lucide-react';
+import { EntryAnimation } from '@/components/entry-animation/EntryAnimation';
+
+export interface EntryAnimationViewProps {
+  onComplete: () => void;
+  showTestButton: boolean;
 }
 
+/**
+ * A container for the entry animation that manages animation state
+ * and provides a way to skip the animation.
+ */
 const EntryAnimationView: React.FC<EntryAnimationViewProps> = ({
-  progress,
-  message = "Loading...",
   onComplete,
-  showAnimation = true
+  showTestButton = false
 }) => {
-  const [loading, setLoading] = useState(true);
+  const [animationStep, setAnimationStep] = useState<number>(0);
+  const [skipped, setSkipped] = useState<boolean>(false);
 
   useEffect(() => {
-    if (progress >= 100) {
-      const timer = setTimeout(() => {
-        setLoading(false);
-        onComplete && onComplete();
-      }, 500);
-
-      return () => clearTimeout(timer);
+    // Auto-complete the animation if skipped
+    if (skipped) {
+      onComplete();
     }
-  }, [progress, onComplete]);
+  }, [skipped, onComplete]);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-        delayChildren: 0.3,
-        staggerChildren: 0.2,
-      },
-    },
+  const handleSkip = () => {
+    setSkipped(true);
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-      },
-    },
+  const handleComplete = () => {
+    onComplete();
   };
 
-  const finishLoading = () => {
-    setLoading(false);
-    onComplete && onComplete();
-  };
-
-  const renderLoadingScreen = () => {
-    if (loading) {
-      return <LoadingScreen onComplete={finishLoading} />;
+  const handleTestNext = () => {
+    if (animationStep < 3) {
+      setAnimationStep(animationStep + 1);
+    } else {
+      handleComplete();
     }
-    return null;
   };
 
   return (
-    <motion.div
-      className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {renderLoadingScreen()}
-      {!loading && (
-        <motion.div className="text-center" variants={itemVariants}>
-          <h1 className="text-4xl font-bold text-white mb-4">
-            {message}
-          </h1>
-          <p className="text-lg text-gray-300">
-            Completed!
-          </p>
-        </motion.div>
-      )}
-    </motion.div>
+    <AnimatePresence>
+      <motion.div
+        className="relative w-full h-full min-h-screen flex flex-col items-center justify-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <EntryAnimation
+          step={animationStep}
+          onStepComplete={() => setAnimationStep(animationStep + 1)}
+          onComplete={handleComplete}
+        />
+
+        {/* Skip button */}
+        <div className="absolute bottom-6 right-6 z-20">
+          <Button
+            variant="ghost"
+            className="text-white/70 hover:text-white hover:bg-white/10"
+            onClick={handleSkip}
+          >
+            Skip <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Test controls - only visible in development */}
+        {showTestButton && (
+          <div className="absolute bottom-6 left-6 z-20 flex gap-2">
+            <Button
+              variant="outline"
+              className="bg-white/10 text-white hover:bg-white/20"
+              onClick={handleTestNext}
+            >
+              Next Step
+            </Button>
+            <div className="px-3 py-2 bg-black/50 rounded text-white/70">
+              Step: {animationStep}
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </AnimatePresence>
   );
 };
 

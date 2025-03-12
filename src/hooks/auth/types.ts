@@ -1,15 +1,12 @@
 
 /**
- * Authentication Types
+ * Authentication types
  * 
- * These types define the structure and behavior of the authentication system.
+ * Type definitions for authentication-related functionality
  */
 
 import type { User } from '@supabase/supabase-js';
 
-/**
- * User profile information
- */
 export interface IUserProfile {
   id: string;
   email: string;
@@ -18,131 +15,46 @@ export interface IUserProfile {
   preferences?: Record<string, unknown>;
 }
 
-/**
- * User streak information
- */
 export interface IUserStreak {
   current: number;
   longest: number;
   lastActivity?: string;
 }
 
-/**
- * Authentication hook options
- */
+export interface IAuthContext {
+  user: User | null;
+  userProfile: IUserProfile | null;
+  userStreak: IUserStreak | null;
+  activatedChakras: number[];
+  todayChallenge: any; // Will be typed properly in next iteration
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  hasCompletedLoading: boolean;
+  profileLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  register: (email: string, password: string) => Promise<boolean>;
+  handleLogout: () => Promise<void>;
+  isLoggingOut: boolean;
+  updateStreak: (streak: IUserStreak) => void;
+  updateActivatedChakras: (chakras: number[]) => void;
+  updateUserProfile: (profile: Partial<IUserProfile>) => void;
+  errorMessage: string;
+}
+
 export interface UseAuthProps {
   /**
-   * Whether to redirect on authentication state changes
+   * Whether to redirect on login/logout
    */
-  redirect?: boolean;
+  redirectOnAuthChange?: boolean;
   
   /**
-   * Path to redirect to after successful login
+   * Where to redirect after login
    */
   redirectTo?: string;
   
   /**
-   * Whether to store session in localStorage
+   * Where to redirect after logout
    */
-  persistSession?: boolean;
-  
-  /**
-   * Whether to automatically refresh the session
-   */
-  autoRefresh?: boolean;
-}
-
-/**
- * Authentication context interface
- */
-export interface IAuthContext {
-  /**
-   * Current authenticated user or null if not authenticated
-   */
-  user: User | null;
-  
-  /**
-   * User profile information
-   */
-  userProfile: IUserProfile | null;
-  
-  /**
-   * User streak information
-   */
-  userStreak: IUserStreak | null;
-  
-  /**
-   * Activated chakras for the current user
-   */
-  activatedChakras: number[];
-  
-  /**
-   * Today's challenge for the user
-   */
-  todayChallenge: any; // Will be typed properly in next iteration
-  
-  /**
-   * Whether the user is authenticated
-   */
-  isAuthenticated: boolean;
-  
-  /**
-   * Whether authentication is currently loading
-   */
-  isLoading: boolean;
-  
-  /**
-   * Whether the initial authentication check has completed
-   */
-  hasCompletedLoading: boolean;
-  
-  /**
-   * Whether the profile is currently loading
-   */
-  profileLoading: boolean;
-  
-  /**
-   * Login with email and password
-   */
-  login: (email: string, password: string) => Promise<boolean>;
-  
-  /**
-   * Logout the current user
-   */
-  logout: () => Promise<void>;
-  
-  /**
-   * Register a new user with email and password
-   */
-  register: (email: string, password: string) => Promise<boolean>;
-  
-  /**
-   * Alias for logout with consistent naming
-   */
-  handleLogout: () => Promise<void>;
-  
-  /**
-   * Whether logout is in progress
-   */
-  isLoggingOut: boolean;
-  
-  /**
-   * Update the user's streak information
-   */
-  updateStreak: (streak: IUserStreak) => void;
-  
-  /**
-   * Update the user's activated chakras
-   */
-  updateActivatedChakras: (chakras: number[]) => void;
-  
-  /**
-   * Update the user's profile information
-   */
-  updateUserProfile: (profile: Partial<IUserProfile>) => void;
-  
-  /**
-   * Error message from last authentication operation
-   */
-  errorMessage: string;
+  redirectAfterLogout?: string;
 }

@@ -7,7 +7,7 @@ import LandingPage from './pages';
 import EntryAnimationPage from './pages/EntryAnimationPage';
 import DesignSystemDemo from './pages/DesignSystemDemo';
 import ErrorBoundary from './components/ErrorBoundary';
-import { supabase } from './lib/supabaseClient';
+import { supabase, isSupabaseConfigValid } from './lib/supabaseClient';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -17,6 +17,18 @@ function App() {
     // Simple initialization check
     const checkConnection = async () => {
       try {
+        // Check if configuration is valid before attempting connection
+        if (!isSupabaseConfigValid()) {
+          console.warn('Supabase configuration is incomplete or invalid');
+          toast({
+            title: 'Configuration Warning',
+            description: 'Please set up your Supabase credentials in the environment variables.',
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          return;
+        }
+        
         // Try a simple query to check connection
         const { error } = await supabase.from('user_profiles').select('id').limit(1);
         

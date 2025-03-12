@@ -1,10 +1,9 @@
-
 import { createContext, useState, useCallback, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { getSupabase, getSupabaseSync } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 
 // Get the supabase client
-const supabase = getSupabaseSync();
+// Used synchronously to set up auth state listener
 
 export interface IUserProfile {
   id: string;
@@ -49,14 +48,8 @@ export interface IAuthContext {
  */
 export const AuthContext = createContext<IAuthContext | null>(null);
 
-// Export for backward compatibility, but mark as deprecated
-// In the future, importing from '@/hooks/auth' should be preferred
-/**
- * @deprecated Import from '@/hooks/auth' instead
- */
-export const useAuth = () => {
-  throw new Error('Direct import of useAuth from AuthContext is deprecated. Import from "@/hooks/auth" instead.');
-};
+// IMPORTANT: This hook export is deprecated. Import from @/hooks/auth instead.
+// This export only remains for backward compatibility.
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -74,8 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const client = await getSupabase();
-      const { data: { user }, error } = await client.auth.signInWithPassword({
+      const { data: { user }, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
       });
@@ -102,8 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const client = await getSupabase();
-      const { data: { user }, error } = await client.auth.signUp({
+      const { data: { user }, error } = await supabase.auth.signUp({
         email: email,
         password: password,
       });
@@ -129,8 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async (): Promise<void> => {
     setIsLoggingOut(true);
     try {
-      const client = await getSupabase();
-      const { error } = await client.auth.signOut();
+      const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Logout error:', error);
         setErrorMessage(error.message);
@@ -156,8 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchUserProfile = async (userId: string) => {
       setProfileLoading(true);
       try {
-        const client = await getSupabase();
-        const { data, error } = await client
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
@@ -184,8 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchUserStreak = async (userId: string) => {
       try {
-        const client = await getSupabase();
-        const { data, error } = await client
+        const { data, error } = await supabase
           .from('user_streaks')
           .select('*')
           .eq('user_id', userId)
@@ -211,8 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchActivatedChakras = async (userId: string) => {
       try {
-        const client = await getSupabase();
-        const { data, error } = await client
+        const { data, error } = await supabase
           .from('activated_chakras')
           .select('chakra_id')
           .eq('user_id', userId);
@@ -230,9 +217,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchTodayChallenge = async (userId: string) => {
       try {
-        const client = await getSupabase();
         const today = new Date().toISOString().slice(0, 10);
-        const { data, error } = await client
+        const { data, error } = await supabase
           .from('daily_challenges')
           .select('*')
           .eq('user_id', userId)
