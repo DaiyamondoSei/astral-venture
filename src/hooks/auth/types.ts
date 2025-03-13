@@ -1,60 +1,30 @@
 
-/**
- * Authentication types
- * 
- * Type definitions for authentication-related functionality
- */
+import { User } from '@supabase/supabase-js';
 
-import type { User } from '@supabase/supabase-js';
-
-export interface IUserProfile {
+export interface UserProfile {
   id: string;
-  email: string;
-  displayName?: string;
-  avatar?: string;
-  preferences?: Record<string, unknown>;
-}
-
-export interface IUserStreak {
-  current: number;
-  longest: number;
-  lastActivity?: string;
+  username: string | null;
+  astral_level: number;
+  energy_points: number;
+  joined_at: string;
+  last_active_at: string | null;
 }
 
 export interface IAuthContext {
   user: User | null;
-  userProfile: IUserProfile | null;
-  userStreak: IUserStreak | null;
-  activatedChakras: number[];
-  todayChallenge: any; // Will be typed properly in next iteration
-  isAuthenticated: boolean;
+  profile: UserProfile | null;
   isLoading: boolean;
-  hasCompletedLoading: boolean;
-  profileLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  isAuthenticated: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  register: (email: string, password: string) => Promise<boolean>;
-  handleLogout: () => Promise<void>;
-  isLoggingOut: boolean;
-  updateStreak: (streak: IUserStreak) => void;
-  updateActivatedChakras: (chakras: number[]) => void;
-  updateUserProfile: (profile: Partial<IUserProfile>) => void;
-  errorMessage: string;
+  resetPassword: (email: string) => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 export interface UseAuthProps {
-  /**
-   * Whether to redirect on login/logout
-   */
-  redirectOnAuthChange?: boolean;
-  
-  /**
-   * Where to redirect after login
-   */
-  redirectTo?: string;
-  
-  /**
-   * Where to redirect after logout
-   */
-  redirectAfterLogout?: string;
+  redirectOnAuth?: boolean;
+  redirectUrl?: string;
 }

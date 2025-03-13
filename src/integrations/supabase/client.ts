@@ -8,6 +8,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { toast } from '@/components/ui/use-toast';
+import type { Database } from '@/types/database';
 
 // Get environment variables from Vite
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -28,8 +29,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
-// Create a Supabase client instance
-export const supabase = createClient(
+// Create a Supabase client instance with the Database type
+export const supabase = createClient<Database>(
   supabaseUrl || '',
   supabaseAnonKey || ''
 );
@@ -48,7 +49,11 @@ export async function checkSupabaseConnection(): Promise<boolean> {
 }
 
 /**
- * Get user's energy points
+ * Increment user's energy points
+ * 
+ * @param userId User ID to increment points for
+ * @param points Number of points to add (can be negative to decrease)
+ * @returns The new total points count
  */
 export async function incrementEnergyPoints(userId: string, points: number): Promise<number> {
   try {
@@ -58,6 +63,15 @@ export async function incrementEnergyPoints(userId: string, points: number): Pro
     });
     
     if (error) throw error;
+    
+    // Also record this in the points history table
+    await supabase.from('energy_points_history').insert({
+      user_id: userId,
+      points_added: points,
+      new_total: data || 0,
+      source: 'api_action'
+    });
+    
     return data || 0;
   } catch (err) {
     console.error('Failed to increment energy points:', err);
@@ -67,6 +81,28 @@ export async function incrementEnergyPoints(userId: string, points: number): Pro
       variant: 'destructive',
     });
     return 0;
+  }
+}
+
+/**
+ * Get user profile data
+ * 
+ * @param userId User ID to get profile for
+ * @returns The user profile or null if not found
+ */
+export async function getUserProfile(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch user profile:', err);
+    return null;
   }
 }
 
