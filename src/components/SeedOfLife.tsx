@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from "@/lib/utils";
@@ -157,9 +156,7 @@ const SeedOfLife = ({ className, onCategorySelect }: SeedOfLifeProps) => {
     }
   };
 
-  // Function to determine if two categories should have a connection line
   const shouldConnectCategories = (cat1Id: string, cat2Id: string) => {
-    // Define connections between categories
     const connections: Record<string, string[]> = {
       'meditation': ['chakras', 'guidance', 'energy', 'intention'],
       'energy': ['chakras', 'healing', 'connection', 'guidance'],
@@ -180,7 +177,6 @@ const SeedOfLife = ({ className, onCategorySelect }: SeedOfLifeProps) => {
   };
 
   const getConnectionClasses = (cat1Id: string, cat2Id: string) => {
-    // Check if one or both categories are hovered or active
     const isActive = activeCategory === cat1Id || activeCategory === cat2Id;
     const isHovered = hoverCategory === cat1Id || hoverCategory === cat2Id;
     
@@ -200,7 +196,6 @@ const SeedOfLife = ({ className, onCategorySelect }: SeedOfLifeProps) => {
         transition={{ duration: 1.5, ease: "easeOut" }}
       />
       
-      {/* Center flower of life pattern - subtle background */}
       <div className="absolute w-full h-full opacity-10">
         <div className="w-full h-full rounded-full border border-white/30"></div>
         <div className="absolute w-2/3 h-2/3 top-1/6 left-1/6 rounded-full border border-white/30"></div>
@@ -211,14 +206,10 @@ const SeedOfLife = ({ className, onCategorySelect }: SeedOfLifeProps) => {
         <div className="absolute w-2/3 h-2/3 bottom-1/6 left-1/2 -translate-x-1/2 rounded-full border border-white/30"></div>
       </div>
       
-      {/* Connection lines between categories */}
       <div className="absolute inset-0">
         {categories.map((cat1) => (
           categories.map((cat2) => {
-            // Only render connection if they should be connected and avoid duplicates
             if (shouldConnectCategories(cat1.id, cat2.id) && cat1.id < cat2.id) {
-              // Calculate positions for the line based on category positions
-              // This is simplified and would need adjustment based on actual layout
               const startPos = cat1.position.includes('left') ? 'left' : cat1.position.includes('right') ? 'right' : 'center';
               const startVertical = cat1.position.includes('top') ? 'top' : cat1.position.includes('bottom') ? 'bottom' : 'middle';
               

@@ -25,5 +25,5 @@ export function useAuth(): IAuthContext {
   return context;
 }
 
-// Default export for backwards compatibility
+// Export as default for components using default import
 export default useAuth;

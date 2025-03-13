@@ -3,11 +3,9 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import UserProfilePanel from '@/components/panels/UserProfilePanel';
 import AchievementsPanel from '@/components/panels/AchievementsPanel';
+import ReflectionsPanel from '@/components/panels/ReflectionsPanel';
 import { useAuth } from '@/hooks/auth/useAuth';
 import LogoutButton from '@/components/LogoutButton';
-
-// Import the ReflectionsPanel component correctly
-import ReflectionsPanel from '@/components/panels/ReflectionsPanel';
 
 interface UserDashboardViewProps {
   onLogout: () => void;

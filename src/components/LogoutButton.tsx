@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,7 @@ interface LogoutButtonProps {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
-  onClick?: () => Promise<void> | void; // Updated to support both async and sync handlers
+  onClick?: () => Promise<void> | void;
 }
 
 const LogoutButton = ({ 
@@ -18,7 +18,7 @@ const LogoutButton = ({
   className,
   onClick
 }: LogoutButtonProps) => {
-  const { signOut, isLoading } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   
   const handleLogout = async () => {
@@ -30,13 +30,13 @@ const LogoutButton = ({
           await result;
         }
       } else {
-        await signOut();
+        await logout();
         navigate('/login');
       }
     } catch (error) {
       console.error('Error during logout:', error);
       // Use default logout as fallback if custom handler fails
-      await signOut();
+      await logout();
       navigate('/login');
     }
   };
@@ -46,7 +46,7 @@ const LogoutButton = ({
       variant={variant}
       size={size}
       onClick={handleLogout}
-      disabled={isLoading}
+      disabled={false}
       className={className}
     >
       <LogOut className="mr-2 h-4 w-4" />
