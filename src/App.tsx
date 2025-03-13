@@ -33,10 +33,10 @@ function App() {
         const { error } = await supabase.from('user_profiles').select('id').limit(1);
         
         if (error) {
-          console.warn('Supabase connection issue:', error.message);
+          console.warn('Supabase connection check:', error.message);
           toast({
             title: 'Connection Warning',
-            description: 'Some features may not work properly due to connection issues.',
+            description: 'Some features may not work properly due to database connection issues.',
             variant: 'destructive',
           });
         }

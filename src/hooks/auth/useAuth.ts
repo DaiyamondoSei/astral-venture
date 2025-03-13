@@ -25,4 +25,5 @@ export function useAuth(): IAuthContext {
   return context;
 }
 
+// Default export for backwards compatibility
 export default useAuth;

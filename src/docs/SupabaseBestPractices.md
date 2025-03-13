@@ -1,204 +1,216 @@
+
 # Supabase Best Practices
 
-## Client Initialization
+## Row Level Security (RLS)
 
-### Simple and Reliable Initialization
+### Enabling RLS
 
-```typescript
-// Simple initialization pattern
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Create a single client instance
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-```
-
-### Configuration Validation
-
-Always validate that environment variables are present:
-
-```typescript
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase credentials. Please check your environment variables.');
-}
-```
-
-### Error Handling
-
-Use try/catch blocks to gracefully handle errors:
-
-```typescript
-try {
-  const { data, error } = await supabase.from('table').select('*');
-  if (error) throw error;
-  // Process data
-} catch (error) {
-  console.error('Database operation failed:', error);
-  // Handle error gracefully
-}
-```
-
-## Database Operations
-
-### Standard Query Pattern
-
-```typescript
-// Helper function for standard query pattern
-async function executeQuery<T>(queryFn) {
-  try {
-    const { data, error } = await queryFn();
-    
-    if (error) {
-      console.error('Database query error:', error);
-      return { data: null, error };
-    }
-    
-    return { data, error: null };
-  } catch (err) {
-    return { data: null, error: err };
-  }
-}
-
-// Usage
-const { data, error } = await executeQuery(() => 
-  supabase.from('table').select('*')
-);
-```
-
-### Row Level Security (RLS)
-
-Always enable RLS on tables with user data:
+Always enable Row Level Security on all tables that contain user data or sensitive information:
 
 ```sql
-ALTER TABLE my_table ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.your_table ENABLE ROW LEVEL SECURITY;
+```
 
--- Create policies for different operations
-CREATE POLICY "Users can view own data" 
-  ON my_table FOR SELECT 
+### Creating Policies
+
+Create specific policies for each operation type:
+
+```sql
+-- Example: User can only see their own data
+CREATE POLICY "Users can view their own data" 
+  ON public.user_data
+  FOR SELECT 
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert own data" 
-  ON my_table FOR INSERT 
+-- Example: User can only insert their own data
+CREATE POLICY "Users can insert their own data" 
+  ON public.user_data
+  FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
+
+-- Example: User can only update their own data
+CREATE POLICY "Users can update their own data" 
+  ON public.user_data
+  FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+-- Example: User can only delete their own data
+CREATE POLICY "Users can delete their own data" 
+  ON public.user_data
+  FOR DELETE 
+  USING (auth.uid() = user_id);
 ```
 
-### Function Search Path
+### Testing Policies
 
-Always set a fixed search path in functions:
+Always test RLS policies thoroughly:
+
+1. Test as authenticated and unauthenticated users
+2. Test with different user IDs
+3. Test all operations (SELECT, INSERT, UPDATE, DELETE)
+4. Test edge cases (e.g., null values, special characters)
+
+## Function Security
+
+### SECURITY DEFINER vs INVOKER
+
+Use `SECURITY DEFINER` only when necessary:
 
 ```sql
-CREATE FUNCTION my_function()
-RETURNS void
+CREATE OR REPLACE FUNCTION public.get_user_data(user_id_param UUID)
+RETURNS TABLE (
+  id UUID,
+  data TEXT
+) 
+LANGUAGE plpgsql
+SECURITY DEFINER -- Function runs with the privileges of the creator
+SET search_path = '' -- Empty search path for security
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT id, data 
+  FROM public.user_data
+  WHERE user_id = user_id_param;
+END;
+$$;
+```
+
+### Fixed Search Path
+
+Always set a fixed search path in functions to prevent SQL injection:
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = '' -- Empty search path for security
 AS $$
 BEGIN
-  -- Function body
+  INSERT INTO public.profiles (id, username)
+  VALUES (new.id, new.email);
+  RETURN new;
 END;
 $$;
 ```
 
-## Authentication
+## Database Design
 
-### User Sessions
+### Foreign Keys
 
-Handle user sessions properly:
+Use foreign keys to maintain data integrity:
 
-```typescript
-// Check for existing session
-const { data: { session } } = await supabase.auth.getSession();
-
-// Set up auth state change listener
-supabase.auth.onAuthStateChange((event, session) => {
-  // Update app state based on auth changes
-});
+```sql
+CREATE TABLE public.user_data (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  data TEXT
+);
 ```
 
-### Authentication Error Handling
+## API Design
 
-Provide clear feedback for authentication errors:
+### Input Validation
+
+Always validate user input before inserting into the database:
 
 ```typescript
-const { data, error } = await supabase.auth.signInWithPassword({
-  email,
-  password
-});
-
-if (error) {
-  // Show appropriate error message
-  if (error.message.includes('Invalid login')) {
-    // Handle invalid credentials
-  } else if (error.message.includes('Email not confirmed')) {
-    // Handle unconfirmed email
-  } else {
-    // Handle other errors
+// Client-side validation
+function validateUserData(data: UserData): ValidationResult {
+  const errors: ValidationError[] = [];
+  
+  if (!data.name) {
+    errors.push({
+      field: 'name',
+      message: 'Name is required'
+    });
   }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+// Secure database insertion
+async function insertUserData(data: UserData) {
+  const validation = validateUserData(data);
+  
+  if (!validation.isValid) {
+    throw new ValidationError('Invalid user data', validation.errors);
+  }
+  
+  return await supabase
+    .from('user_data')
+    .insert({
+      ...data,
+      user_id: supabase.auth.user()?.id // Always set user_id server-side
+    });
 }
 ```
 
-## Security Best Practices
+### Error Handling
 
-### Never Store Sensitive Data Unencrypted
-
-```typescript
-// Store hashed/encrypted data only
-const hashedData = await hashFunction(sensitiveData);
-await supabase.from('secure_table').insert({ user_id, secure_data: hashedData });
-```
-
-### Use RLS for All Tables
-
-Every table should have RLS enabled and appropriate policies.
-
-### Use Transactions for Related Operations
+Handle errors securely without exposing sensitive information:
 
 ```typescript
-// Using PostgreSQL functions for transactions
-const { data, error } = await supabase.rpc('create_user_with_profile', {
-  user_email: email,
-  user_name: name,
-  // other parameters
-});
+try {
+  await supabase.from('user_data').insert(data);
+} catch (error) {
+  console.error('Database error:', error);
+  
+  // Don't expose internal error details to users
+  throw new Error('Failed to save data. Please try again later.');
+}
 ```
 
-## Performance
+## Edge Functions
 
-### Optimize Queries
+### Environment Variables
+
+Use environment variables for sensitive information:
 
 ```typescript
-// Select only needed columns
-const { data } = await supabase
-  .from('large_table')
-  .select('id, name, specific_column')
-  .eq('condition', value)
-  .limit(20);
+// Edge function
+export async function handler(req: Request) {
+  // Get API key from environment
+  const apiKey = Deno.env.get('API_KEY');
+  
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({ error: 'API key not configured' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Use API key securely
+}
 ```
 
-### Use Indexes for Frequently Queried Columns
+### Authentication in Edge Functions
 
-```sql
-CREATE INDEX idx_table_column ON table(column);
-```
-
-### Leverage RPC for Complex Operations
-
-Move complex operations to the database using RPC functions:
+Verify authentication in edge functions:
 
 ```typescript
-// Client-side
-const { data, error } = await supabase.rpc('complex_operation', { param1, param2 });
-
-// Database function
-CREATE FUNCTION complex_operation(param1 text, param2 int)
-RETURNS json
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  -- Complex logic here
-  RETURN json_build_object('result', true);
-END;
-$$;
+// Edge function
+export async function handler(req: Request) {
+  // Get Supabase client
+  const supabaseClient = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+  );
+  
+  // Verify authentication
+  const { data: { session }, error } = await supabaseClient.auth.getSession();
+  
+  if (error || !session) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Process authenticated request
+}
 ```
