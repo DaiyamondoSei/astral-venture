@@ -47,6 +47,29 @@ export async function checkSupabaseConnection(): Promise<boolean> {
   }
 }
 
+/**
+ * Get user's energy points
+ */
+export async function incrementEnergyPoints(userId: string, points: number): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc('increment_points', {
+      row_id: userId,
+      points_to_add: points
+    });
+    
+    if (error) throw error;
+    return data || 0;
+  } catch (err) {
+    console.error('Failed to increment energy points:', err);
+    toast({
+      title: 'Operation Failed',
+      description: 'Could not update energy points. Please try again.',
+      variant: 'destructive',
+    });
+    return 0;
+  }
+}
+
 // Export a function to check if configuration is valid
 export function isSupabaseConfigValid(): boolean {
   return !!supabaseUrl && !!supabaseAnonKey;

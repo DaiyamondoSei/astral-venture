@@ -83,4 +83,5 @@ const SeedOfLife: React.FC<SeedOfLifeProps> = ({
   );
 };
 
+export { SeedOfLife };
 export default SeedOfLife;
