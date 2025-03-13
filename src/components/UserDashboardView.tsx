@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import UserProfilePanel from '@/components/panels/UserProfilePanel';
 import AchievementsPanel from '@/components/panels/AchievementsPanel';
 import ReflectionsPanel from '@/components/panels/ReflectionsPanel';
-import { useAuth } from '@/hooks/auth/useAuth';
+import useAuth from '@/hooks/auth/useAuth';
 import LogoutButton from '@/components/LogoutButton';
 
 interface UserDashboardViewProps {

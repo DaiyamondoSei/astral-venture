@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useAuth } from '@/hooks/auth/useAuth';
+import useAuth from '@/hooks/auth/useAuth';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

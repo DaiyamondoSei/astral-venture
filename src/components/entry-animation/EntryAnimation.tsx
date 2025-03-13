@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { StarsBackground } from './StarsBackground';
-import { InitialOrb } from './InitialOrb';
-import { AstralBody } from './AstralBody';
-import { CosmicAstralBody } from './CosmicAstralBody';
+import StarsBackground from './StarsBackground';
+import InitialOrb from './InitialOrb';
+import AstralBody from './AstralBody';
+import CosmicAstralBody from './CosmicAstralBody';
 import { 
   WelcomeStep, 
   FocusStep, 
