@@ -1,6 +1,6 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { supabase } from '@/utils/supabase/client';
+import { supabase } from '@/lib/supabaseUnified';
 import { AIResponse, AIQuestion, AIQuestionOptions } from '@/services/ai/types';
 import { toast } from 'sonner';
 

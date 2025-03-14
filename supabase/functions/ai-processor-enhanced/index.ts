@@ -1,246 +1,242 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
-// Response utility for consistent formatting
+// Define CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Utility for creating success responses
-function createSuccessResponse(data: any) {
-  return new Response(
-    JSON.stringify({
-      success: true,
-      data,
-      timestamp: new Date().toISOString(),
-    }),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
-  );
-}
+// Initialize OpenAI API with configuration
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
-// Utility for creating error responses
-function createErrorResponse(message: string, details?: any, status = 500) {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      error: {
-        message,
-        details,
-      },
-      timestamp: new Date().toISOString(),
-    }),
-    {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
-  );
-}
-
-// Cache utilities
-const CACHE_DURATION = 3600; // 1 hour in seconds
-const memoryCache = new Map<string, { data: any; expires: number }>();
-
-async function getCachedResponse(key: string): Promise<any | null> {
-  // Check memory cache first
-  const cached = memoryCache.get(key);
-  const now = Date.now();
+// Initialize Supabase client for server-side operations
+function getSupabaseClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
   
-  if (cached && cached.expires > now) {
-    console.log(`Cache hit for key: ${key}`);
-    return cached.data;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Supabase credentials are not configured");
   }
   
-  // Remove expired cache entries
-  if (cached && cached.expires <= now) {
-    memoryCache.delete(key);
+  return createClient(supabaseUrl, supabaseKey);
+}
+
+// Process AI requests with various models and caching
+async function processAIRequest(prompt: string, options: any = {}) {
+  const { 
+    model = "gpt-4o-mini", 
+    temperature = 0.7,
+    maxTokens = 1000,
+    useCache = true,
+    cacheKey = ""
+  } = options;
+
+  // Cache key generation
+  const effectiveCacheKey = cacheKey || `${model}:${prompt.substring(0, 100).replace(/\s+/g, '-').toLowerCase()}`;
+  
+  // Check cache first if enabled
+  if (useCache) {
+    const supabase = getSupabaseClient();
+    
+    // Create unique cache key based on prompt+model
+    try {
+      const { data: cachedResponses, error } = await supabase
+        .from('ai_response_cache')
+        .select('*')
+        .eq('cache_key', effectiveCacheKey)
+        .maybeSingle();
+      
+      if (!error && cachedResponses) {
+        console.log("Cache hit for:", effectiveCacheKey);
+        return {
+          ...cachedResponses.response_data,
+          cached: true,
+          processingTime: 0
+        };
+      }
+    } catch (error) {
+      // If there's a cache error, we'll continue with API call
+      console.error("Cache retrieval error:", error);
+    }
   }
-  
-  return null;
-}
 
-function cacheResponse(key: string, data: any): void {
-  const expires = Date.now() + CACHE_DURATION * 1000;
-  memoryCache.set(key, { data, expires });
-  console.log(`Cached response for key: ${key}`);
-}
-
-// Process query with OpenAI
-async function processWithOpenAI(
-  query: string,
-  model: string = "gpt-4o-mini",
-  temperature: number = 0.7,
-  maxTokens: number = 1000
-) {
-  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  // No cached result, so we make API call
+  const startTime = performance.now();
   
+  // Validate OpenAI API key
   if (!OPENAI_API_KEY) {
     throw new Error("OpenAI API key is not configured");
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: "You are an AI assistant specialized in consciousness, energy work, and personal growth."
-        },
-        {
-          role: "user",
-          content: query
-        }
-      ],
-      temperature,
-      max_tokens: maxTokens,
-    }),
-  });
+  try {
+    // Prepare request for OpenAI API
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful, spiritual assistant specializing in chakra energy, meditation, and holistic wellness."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature,
+        max_tokens: maxTokens,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
-
-// Process emotional analysis for reflection content
-async function processEmotionalAnalysis(
-  reflectionContent: string,
-  userId?: string
-) {
-  const prompt = `
-    Analyze the following reflection entry for emotional themes, chakra connections, and growth insights:
-    
-    Reflection: "${reflectionContent}"
-    
-    Provide the following structured analysis:
-    1. Primary emotions identified
-    2. Chakra centers most active based on the content
-    3. Growth opportunities and insights
-    4. Personalized practice recommendations
-  `;
-
-  const result = await processWithOpenAI(
-    prompt,
-    "gpt-4o",
-    0.7,
-    1500
-  );
-
-  // If user is authenticated, store the analysis
-  if (userId) {
-    try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      
-      // Store analysis result
-      const { error } = await supabase
-        .from("reflection_insights")
-        .insert({
-          user_id: userId,
-          reflection_content: reflectionContent,
-          analysis_result: result,
-          created_at: new Date().toISOString(),
-        });
-        
-      if (error) {
-        console.error("Error storing reflection analysis:", error);
-      }
-    } catch (error) {
-      console.error("Failed to connect to database:", error);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
     }
-  }
 
-  return { analysisResult: result };
+    const data = await response.json();
+    const endTime = performance.now();
+    const processingTime = endTime - startTime;
+    
+    const result = {
+      response: data.choices[0].message.content,
+      metrics: {
+        tokenUsage: (data.usage?.total_tokens || 0),
+        promptTokens: (data.usage?.prompt_tokens || 0),
+        completionTokens: (data.usage?.completion_tokens || 0),
+        processingTime
+      },
+      model: data.model,
+      processingTime
+    };
+
+    // Store in cache if caching is enabled
+    if (useCache) {
+      try {
+        const supabase = getSupabaseClient();
+        await supabase
+          .from('ai_response_cache')
+          .upsert({
+            cache_key: effectiveCacheKey,
+            prompt,
+            model,
+            response_data: result,
+            created_at: new Date().toISOString()
+          });
+      } catch (error) {
+        // If caching fails, we still want to return the result
+        console.error("Cache storage error:", error);
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error("AI processing error:", error);
+    throw error;
+  }
 }
 
+// Process AI reflection analysis
+async function processReflectionAnalysis(reflectionId: string, userId: string, query: string) {
+  try {
+    const supabase = getSupabaseClient();
+    
+    // Get the reflection content
+    const { data: reflection, error } = await supabase
+      .from('energy_reflections')
+      .select('*')
+      .eq('id', reflectionId)
+      .eq('user_id', userId)
+      .single();
+    
+    if (error || !reflection) {
+      throw new Error(`Reflection not found or unauthorized access`);
+    }
+    
+    // Enhanced system prompt with context
+    const systemPrompt = `
+      You are an AI spiritual guide providing insights based on user reflections.
+      
+      Reflection content: "${reflection.content}"
+      
+      Analyze this reflection and respond to the following query with deep spiritual insights.
+      Focus on chakra energy, emotional patterns, and personalized guidance.
+    `;
+    
+    // Process the analysis with OpenAI
+    const result = await processAIRequest(
+      `${systemPrompt}\n\nUser query: ${query}`, 
+      { 
+        model: "gpt-4o-mini",
+        temperature: 0.7,
+        useCache: true,
+        cacheKey: `reflection-analysis:${reflectionId}:${query.substring(0, 50).replace(/\s+/g, '-').toLowerCase()}`
+      }
+    );
+    
+    return {
+      ...result,
+      reflectionContext: {
+        id: reflection.id,
+        content: reflection.content.substring(0, 100) + '...'
+      }
+    };
+  } catch (error) {
+    console.error("Reflection analysis error:", error);
+    throw error;
+  }
+}
+
+// Handle HTTP requests
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-
+  
   try {
-    const { action, query, model, temperature, maxTokens, userId, reflectionContent, useCache } = await req.json();
+    // Parse request body
+    const { query, context, reflectionId, userId, options } = await req.json();
     
-    // Process start time for performance tracking
-    const startTime = performance.now();
-    
-    // Generate cache key if caching is enabled
-    const cacheKey = useCache ? 
-      `${action}:${JSON.stringify({ query, model, reflectionContent })}` : 
-      null;
-    
-    // Check cache if enabled
-    if (cacheKey) {
-      const cachedResult = await getCachedResponse(cacheKey);
-      if (cachedResult) {
-        return createSuccessResponse({
-          result: cachedResult,
-          cached: true,
-          processingTime: 0
-        });
-      }
+    if (!query) {
+      return new Response(
+        JSON.stringify({ error: "Query is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     
-    // Process based on action type
     let result;
     
-    switch (action) {
-      case "query":
-        if (!query) {
-          return createErrorResponse("Query is required", null, 400);
-        }
-        result = await processWithOpenAI(
-          query,
-          model || "gpt-4o-mini",
-          temperature || 0.7,
-          maxTokens || 1000
-        );
-        break;
-        
-      case "analyze_reflection":
-        if (!reflectionContent) {
-          return createErrorResponse("Reflection content is required", null, 400);
-        }
-        result = await processEmotionalAnalysis(reflectionContent, userId);
-        break;
-        
-      default:
-        return createErrorResponse("Invalid action specified", null, 400);
+    // Process request based on context
+    if (context === 'reflection' && reflectionId && userId) {
+      result = await processReflectionAnalysis(reflectionId, userId, query);
+    } else {
+      // Standard AI processing
+      result = await processAIRequest(query, options);
     }
     
-    // Calculate processing time
-    const processingTime = performance.now() - startTime;
-    
-    // Cache the result if caching is enabled
-    if (cacheKey) {
-      cacheResponse(cacheKey, result);
-    }
-    
-    return createSuccessResponse({
-      result,
-      cached: false,
-      processingTime
-    });
+    return new Response(
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
-    console.error("Error in ai-processor-enhanced:", error);
+    console.error("Request processing error:", error);
     
-    return createErrorResponse(
-      error instanceof Error ? error.message : "Unknown error occurred",
-      { stack: error instanceof Error ? error.stack : undefined }
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : "An unknown error occurred",
+        details: error instanceof Error ? error.stack : undefined
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
     );
   }
 });
