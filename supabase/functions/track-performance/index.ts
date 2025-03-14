@@ -1,138 +1,130 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
 
-// Define response headers for CORS
+// Define CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Performance metric types
-interface PerformanceMetric {
-  component_name: string;
-  metric_name: string;
-  value: number;
-  device_capability: string;
-  user_agent?: string;
-  user_id?: string;
+// Define metric type enum
+enum MetricType {
+  RENDER = 'render',
+  INTERACTION = 'interaction',
+  LOAD = 'load',
+  NAVIGATION = 'navigation',
+  RESOURCE = 'resource',
+  CUSTOM = 'custom'
 }
 
-// Create response utilities
-function createResponse(body: any, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+// Define web vital category enum
+enum WebVitalCategory {
+  LOADING = 'loading',
+  INTERACTION = 'interaction',
+  VISUAL_STABILITY = 'visual_stability'
 }
 
-// Initialize Supabase client
-function getSupabaseClient() {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase credentials are not configured");
+// Define a function to handle the request
+const handleRequest = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders,
+    });
   }
-  
-  return createClient(supabaseUrl, supabaseKey);
-}
 
-// Track performance metrics in the database
-async function trackMetrics(supabase: any, metrics: PerformanceMetric[]) {
-  const { data, error } = await supabase
-    .from("performance_metrics")
-    .insert(metrics.map(metric => ({
-      ...metric,
-      recorded_at: new Date().toISOString()
-    })));
-    
-  if (error) {
-    console.error("Error storing metrics:", error);
-    throw error;
-  }
-  
-  return data;
-}
-
-// Get performance summary
-async function getPerformanceSummary(supabase: any, userId: string, timePeriod: string) {
-  const { data, error } = await supabase.rpc('get_performance_summary', {
-    user_id_param: userId,
-    time_period: timePeriod
-  });
-  
-  if (error) {
-    console.error("Error getting performance summary:", error);
-    throw error;
-  }
-  
-  return data;
-}
-
-// Serve the HTTP requests
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-  
   try {
-    // Initialize Supabase client
-    const supabase = getSupabaseClient();
+    // Parse the request body
+    const { metrics, deviceInfo, userId } = await req.json();
     
-    const url = new URL(req.url);
-    const action = url.pathname.split("/").pop();
+    if (!metrics || !Array.isArray(metrics)) {
+      return new Response(
+        JSON.stringify({ error: 'Metrics array is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Validate metrics
+    const validatedMetrics = metrics.filter(validateMetric);
     
-    // Handle different actions
-    if (req.method === "POST" && action === "track") {
-      const { metrics, userId } = await req.json();
-      
-      if (!metrics || !Array.isArray(metrics)) {
-        return createResponse({ error: "Invalid metrics data" }, 400);
-      }
-      
-      // Add user_id to each metric if provided
-      const metricsWithUserId = metrics.map(metric => ({
-        ...metric,
-        user_id: userId || null
-      }));
-      
-      // Store the metrics
-      await trackMetrics(supabase, metricsWithUserId);
-      
-      return createResponse({
-        success: true,
-        message: "Metrics stored successfully",
-        count: metrics.length
-      });
-    } 
-    else if (req.method === "GET" && action === "summary") {
-      const params = new URLSearchParams(url.search);
-      const userId = params.get("userId");
-      const timePeriod = params.get("timePeriod") || "day";
-      
-      if (!userId) {
-        return createResponse({ error: "userId is required" }, 400);
-      }
-      
-      // Get the performance summary
-      const summary = await getPerformanceSummary(supabase, userId, timePeriod);
-      
-      return createResponse({
-        success: true,
-        summary
-      });
+    if (validatedMetrics.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No valid metrics provided' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
     
-    // Handle unknown action
-    return createResponse({ error: "Unknown action" }, 400);
-  } catch (error) {
-    console.error("Error in performance tracking:", error);
+    // Create a Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    return createResponse({
-      success: false,
-      error: error.message || "An error occurred processing the request"
-    }, 500);
+    if (!supabaseUrl || !supabaseKey) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Supabase configuration' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Store metrics in database
+    const { data, error } = await supabase
+      .from('performance_metrics')
+      .insert(
+        validatedMetrics.map(metric => ({
+          user_id: userId || null,
+          metric_name: metric.name,
+          metric_type: metric.type,
+          value: metric.value,
+          timestamp: new Date(metric.timestamp || Date.now()).toISOString(),
+          device_info: deviceInfo || null,
+          metadata: metric.metadata || null
+        }))
+      );
+    
+    if (error) {
+      console.error('Error storing metrics:', error);
+      return new Response(
+        JSON.stringify({ error: 'Failed to store metrics' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: `Successfully stored ${validatedMetrics.length} metrics` 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+    
+  } catch (error) {
+    console.error('Error processing performance tracking:', error);
+    
+    return new Response(
+      JSON.stringify({ error: error.message || 'An unknown error occurred' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
   }
-});
+};
+
+// Validate a metric
+function validateMetric(metric: any): boolean {
+  if (!metric || typeof metric !== 'object') return false;
+  
+  // Check required fields
+  if (!metric.name || typeof metric.name !== 'string') return false;
+  if (!metric.type || !Object.values(MetricType).includes(metric.type)) return false;
+  if (!metric.value || !isFinite(metric.value)) return false;
+  
+  // If it's a web vital, validate the category
+  if (metric.type === MetricType.CUSTOM && metric.category) {
+    if (!Object.values(WebVitalCategory).includes(metric.category)) return false;
+  }
+  
+  return true;
+}
+
+// Start serving the function
+serve(handleRequest);

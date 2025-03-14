@@ -1,24 +1,23 @@
-
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseUnified';
-import { AIResponse, AIQuestion, AIQuestionOptions } from '@/services/ai/types';
-import { toast } from 'sonner';
+import { AIQuestion, AIResponse, AIQuestionOptions, AIModelInfo } from '@/services/ai/types';
+import { getAIResponse } from '@/services/ai/aiProcessingService';
 
-// Optimized AI assistant hook that leverages Edge Functions
 export function useOptimizedAIAssistant() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [question, setQuestion] = useState('');
   const [response, setResponse] = useState<AIResponse | null>(null);
-  const [streamingResponse, setStreamingResponse] = useState<string | null>(null);
-  const [modelInfo, setModelInfo] = useState<{
-    model: string;
-    tokenCount: number;
-    processingTime: number;
-  } | null>(null);
-  
+  const [streamingResponse, setStreamingResponse] = useState('');
+  const [isLoading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [modelInfo, setModelInfo] = useState<AIModelInfo>({
+    model: '',
+    tokenCount: 0,
+    processingTime: 0,
+  });
+
+  // Track request cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
-  
-  // Cleanup function for any pending requests
+
+  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -26,138 +25,105 @@ export function useOptimizedAIAssistant() {
       }
     };
   }, []);
-  
-  /**
-   * Submit a question to the AI assistant using the optimized Edge Function
-   */
+
   const submitQuestion = useCallback(async (
     questionInput: string | AIQuestion,
     options?: AIQuestionOptions
   ) => {
-    // Cancel any pending requests
+    // Cancel any ongoing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
+
     // Create a new abort controller for this request
     abortControllerRef.current = new AbortController();
     
-    // Format the question properly
-    const question: AIQuestion = typeof questionInput === 'string' 
-      ? { 
-          text: questionInput,
-          question: questionInput,
-          userId: options?.userId || '',
-          context: options?.context,
-          reflectionIds: options?.reflectionIds
-        } 
-      : questionInput;
+    // Handle either string or AIQuestion object
+    let finalQuestion: AIQuestion;
     
-    if (!question.text.trim()) {
-      return null;
+    if (typeof questionInput === 'string') {
+      finalQuestion = { 
+        text: questionInput, 
+        question: questionInput, 
+        userId: options?.userId || 'default-user',
+        context: options?.context,
+        reflectionIds: options?.reflectionIds,
+      };
+    } else {
+      finalQuestion = questionInput;
     }
     
-    setIsLoading(true);
-    setError(null);
-    setStreamingResponse(null);
+    if (!finalQuestion.text.trim()) {
+      return;
+    }
     
     try {
-      // Choose the appropriate Edge Function based on the options
-      const functionName = options?.detailedAnalysis 
-        ? 'process-ai-query' 
-        : 'ai-processor-enhanced';
+      // Update loading state
+      setLoading(true);
+      setError('');
+      setStreamingResponse('');
       
-      // Call the Edge Function
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: {
-          query: question.text,
-          context: question.context || '',
-          reflectionId: question.reflectionIds?.[0] || '',
-          userId: question.userId,
-          options: {
-            model: options?.model || 'gpt-4o-mini',
-            temperature: 0.7,
-            maxTokens: 1000,
-            stream: options?.streaming || false,
-            useCache: options?.useCache !== false,
-            cacheKey: options?.cacheKey
-          }
-        }
+      // Keep a copy of question for reference
+      const currentQuestionText = finalQuestion.text;
+      
+      // Reset question input
+      setQuestion('');
+      
+      // Call AI service with signal for cancellation
+      const response = await getAIResponse(finalQuestion.text, {
+        useCache: options?.useCache ?? true,
+        showLoadingToast: false,
+        showErrorToast: false,
+        model: options?.model || 'gpt-4o-mini',
+        streaming: options?.streaming,
+        signal: abortControllerRef.current.signal,
       });
       
-      if (error) {
-        throw new Error(`AI service error: ${error.message}`);
-      }
-      
-      if (!data) {
-        throw new Error('No data received from AI service');
-      }
-      
-      // Format the response
-      const aiResponse: AIResponse = {
-        answer: data.result || data.response || '',
-        type: 'markdown',
-        suggestedPractices: data.suggestedPractices || [],
-        meta: {
-          model: options?.model || 'gpt-4o-mini',
-          tokenUsage: data.metrics?.tokenUsage || data.metrics?.totalTokens || 0,
-          processingTime: data.processingTime || data.metrics?.processingTime || 0,
-          cached: data.cached || false
-        }
-      };
-      
-      setResponse(aiResponse);
+      // Set the response
+      setResponse(response);
       setModelInfo({
-        model: aiResponse.meta.model,
-        tokenCount: aiResponse.meta.tokenUsage,
-        processingTime: aiResponse.meta.processingTime
+        model: response.meta.model,
+        tokenCount: response.meta.tokenUsage,
+        processingTime: response.meta.processingTime,
       });
       
-      return aiResponse;
-    } catch (error) {
-      console.error('Error in AI assistant:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred while processing your request';
-      setError(errorMessage);
-      
-      // Only show toast if it's not a cancellation
-      if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        toast.error('AI Assistant Error', {
-          description: errorMessage,
-        });
+      return response;
+    } catch (error: any) {
+      // Don't set error state if the request was deliberately canceled
+      if (error.name === 'AbortError') {
+        return;
       }
       
-      return null;
+      console.error('Error submitting question:', error);
+      
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to get a response. Please try again.'
+      );
     } finally {
-      setIsLoading(false);
+      setLoading(false);
       abortControllerRef.current = null;
     }
   }, []);
   
-  /**
-   * Reset the state of the AI assistant
-   */
-  const reset = useCallback(() => {
-    setIsLoading(false);
-    setError(null);
-    setResponse(null);
-    setStreamingResponse(null);
-    setModelInfo(null);
-    
+  const cancelRequest = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
+      setLoading(false);
     }
   }, []);
   
   return {
-    submitQuestion,
-    isLoading,
-    error,
+    question,
+    setQuestion,
     response,
     streamingResponse,
+    isLoading,
+    error,
     modelInfo,
-    reset
+    submitQuestion,
+    cancelRequest,
   };
 }
-
-export default useOptimizedAIAssistant;

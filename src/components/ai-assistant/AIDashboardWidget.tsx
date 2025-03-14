@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useOptimizedAIAssistant } from '@/hooks/useOptimizedAIAssistant';
-import { useReflections } from '@/hooks/useReflections';
 import { AIResponseDisplay } from './AIResponseDisplay';
 import { AIDashboardWidgetProps } from './types';
 
@@ -17,7 +16,6 @@ export function AIDashboardWidget({
 }: AIDashboardWidgetProps) {
   const [question, setQuestion] = useState('');
   const { isLoading, error, response, submitQuestion } = useOptimizedAIAssistant();
-  const { reflections } = useReflections();
   const [selectedReflectionId, setSelectedReflectionId] = useState<string | null>(null);
   const isMounted = useRef(true);
 
@@ -31,7 +29,7 @@ export function AIDashboardWidget({
     e.preventDefault();
     if (!question.trim()) return;
 
-    // Create the final submission parameters
+    // Create the final submission parameters with proper type structure
     const aiQuestion = {
       text: question,
       question: question,
