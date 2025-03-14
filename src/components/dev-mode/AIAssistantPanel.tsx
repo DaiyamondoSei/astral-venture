@@ -15,27 +15,21 @@ interface AIAssistantPanelProps {
 const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) => {
   const [activeTab, setActiveTab] = useState('chat');
   const [inputValue, setInputValue] = useState('');
-  const [questionText, setQuestionText] = useState('');
-  const [responseHtml, setResponseHtml] = useState('');
   
   const {
     isLoading,
+    submitQuestion,
     data: response, // Use alias for backward compatibility
     loading,
     analyzeComponent,
-    submitQuestion: handleSubmitQuestion
   } = useAssistant({ componentName });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
     
-    setQuestionText(inputValue);
     // Call the submitQuestion function from useAssistant
-    const result = await handleSubmitQuestion(inputValue);
-    if (result) {
-      setResponseHtml(result); // Store the HTML response
-    }
+    await submitQuestion(inputValue);
     setInputValue('');
   };
 
@@ -58,9 +52,9 @@ const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) =>
         <TabsContent value="chat" className="p-0">
           <div className="flex flex-col h-[400px]">
             <div className="flex-1 overflow-auto p-4">
-              {responseHtml || response ? (
+              {response ? (
                 <div className="prose dark:prose-invert max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: responseHtml || response }} />
+                  <div dangerouslySetInnerHTML={{ __html: response }} />
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground h-full flex items-center justify-center">

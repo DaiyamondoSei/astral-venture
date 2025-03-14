@@ -1,104 +1,81 @@
 
-import { CubeSize, CubeTheme, GlowIntensity } from '@/types/core/performance/constants';
+import type { CubeSize, CubeTheme } from '@/utils/performance/core/constants';
 
+/**
+ * MetatronsNode represents a point in the Metatron's Cube geometry
+ */
 export interface MetatronsNode {
   id: string;
   x: number;
   y: number;
-  activated?: boolean;
-  importance?: number;
-  label?: string;
   radius?: number;
-  size?: number;
-  tooltip?: string;
-  pulsing?: boolean;
+  energy?: number;
   active?: boolean;
+  label?: string;
+  type?: 'primary' | 'secondary' | 'intersection';
 }
 
+/**
+ * MetatronsConnection represents a line connecting two nodes
+ */
 export interface MetatronsConnection {
   id: string;
-  source: string; // Source node ID
-  target: string; // Target node ID
-  strength?: number;
-  activated?: boolean;
-  
-  // Additional properties needed
-  from?: string;
-  to?: string;
+  source: string;
+  target: string;
   active?: boolean;
-  animated?: boolean;
-  width?: number;
-  intensity?: number;
+  energy?: number;
+  from?: string; // Backward compatibility
+  to?: string;   // Backward compatibility
+  type?: 'primary' | 'secondary' | 'energy';
 }
 
+/**
+ * GlowIntensity defines how strongly nodes and connections glow
+ */
+export type GlowIntensity = 'off' | 'low' | 'medium' | 'high';
+
+/**
+ * MetatronsCubeData represents the full geometric data structure
+ */
 export interface MetatronsCubeData {
-  nodes: MetatronsNode[];
+  nodes: Record<string, MetatronsNode>;
   connections: MetatronsConnection[];
-  centerNodeId?: string;
+  centerNode?: string;
+  primaryNodes?: string[];
+  secondaryNodes?: string[];
 }
 
+/**
+ * MetatronsCubeProps defines the props for the MetatronsCube component
+ */
 export interface MetatronsCubeProps {
   size?: CubeSize;
   theme?: CubeTheme;
   data?: MetatronsCubeData;
+  nodes: Record<string, MetatronsNode>;
   activatedNodes?: string[];
   glowIntensity?: GlowIntensity;
   interactive?: boolean;
-  onNodeSelect?: (nodeId: string) => void;
-  className?: string;
-  animationLevel?: 'minimal' | 'standard' | 'enhanced';
-  pulseEffect?: boolean;
-  withAnimation?: boolean;
-  nodes?: MetatronsNode[];
+  simplified?: boolean;
+  onNodeClick?: (nodeId: string) => void;
+  energyFlowing?: boolean;
+  rotationSpeed?: number;
   connections?: MetatronsConnection[];
 }
 
+/**
+ * CubeNodeProps defines the props for a node in the Metatron's Cube
+ */
 export interface CubeNodeProps {
   node: MetatronsNode;
+  primaryColor: string;
+  secondaryColor: string;
+  isActive: boolean;
   activated: boolean;
   onClick: () => void;
-  glowIntensity?: GlowIntensity;
-  theme?: CubeTheme;
-  pulseEffect?: boolean;
-  primaryColor?: string;
-  secondaryColor?: string;
-  isActive?: boolean;
-  isSimplified?: boolean;
+  glowIntensity: GlowIntensity | 'low' | 'medium' | 'high';
+  isSimplified: boolean;
 }
 
-export interface CubeLinesProps {
-  connections: MetatronsConnection[];
-  nodes: Record<string, MetatronsNode>;
-  activatedNodes: string[];
-  theme?: CubeTheme;
-  glowIntensity?: GlowIntensity;
-  primaryColor?: string;
-  secondaryColor?: string;
-  activeNodeId?: string;
-  isSimplified?: boolean;
-}
-
-export interface CubeRendererProps {
-  data: MetatronsCubeData;
-  activatedNodes: string[];
-  theme?: CubeTheme;
-  glowIntensity?: GlowIntensity;
-  onNodeSelect?: (nodeId: string) => void;
-  interactive?: boolean;
-  pulseEffect?: boolean;
-  
-  // Additional properties needed
-  nodes?: MetatronsNode[];
-  connections?: MetatronsConnection[];
-  activeNodeId?: string;
-  onNodeClick?: (nodeId: string) => void;
-  variant?: string;
-  withAnimation?: boolean;
-  intensity?: GlowIntensity;
-}
-
-// Export these enum types to make them accessible
-export { CubeSize, CubeTheme, GlowIntensity };
-
-// Define a CubeConnection type (for backward compatibility)
-export type CubeConnection = MetatronsConnection;
+// Re-export types for consistency - using export type to avoid TS1205 error
+export type { CubeSize, CubeTheme };

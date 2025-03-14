@@ -1,97 +1,159 @@
 
 /**
- * Performance Monitoring Constants
+ * Core Performance Runtime Constants
  * 
- * Default values and configuration settings for the performance monitoring system.
+ * This module provides both TypeScript types and their corresponding JavaScript 
+ * runtime constants for performance monitoring and configuration.
  */
+
 import { QualityLevel, PerformanceBoundaries, PerformanceMonitorConfig } from './types';
 
-// Default quality levels
-export const DEFAULT_QUALITY_LEVELS: QualityLevel[] = [
-  {
-    level: 1,
-    name: 'Low',
-    description: 'Minimal visual effects, optimized for low-end devices',
-    particleCount: 50,
-    effectsEnabled: false,
-    animationComplexity: 1,
-    geometryDetail: 1,
-    textureResolution: 1
-  },
-  {
-    level: 2,
-    name: 'Medium',
-    description: 'Balanced visual effects, suitable for most devices',
-    particleCount: 200,
-    effectsEnabled: true,
-    animationComplexity: 2,
-    geometryDetail: 2,
-    textureResolution: 2
-  },
-  {
-    level: 3,
-    name: 'High',
-    description: 'Enhanced visual effects with moderate complexity',
-    particleCount: 500,
-    effectsEnabled: true,
-    animationComplexity: 3,
-    geometryDetail: 3,
-    textureResolution: 3
-  },
-  {
-    level: 4,
-    name: 'Ultra',
-    description: 'Maximum visual quality with full effects',
-    particleCount: 1000,
-    effectsEnabled: true,
-    animationComplexity: 4,
-    geometryDetail: 4,
-    textureResolution: 4
-  },
-  {
-    level: 5,
-    name: 'Extreme',
-    description: 'Exceptional visual quality for high-end devices',
-    particleCount: 2000,
-    effectsEnabled: true,
-    animationComplexity: 5,
-    geometryDetail: 5,
-    textureResolution: 5
-  }
-];
+// Device capability type and runtime constants
+export type DeviceCapability = 'low' | 'medium' | 'high';
 
-// Default performance boundaries
+export const DeviceCapabilities = {
+  LOW: 'low' as DeviceCapability,
+  MEDIUM: 'medium' as DeviceCapability,
+  HIGH: 'high' as DeviceCapability
+} as const;
+
+// Performance mode type and runtime constants
+export type PerformanceMode = 'quality' | 'balanced' | 'performance';
+
+export const PerformanceModes = {
+  QUALITY: 'quality' as PerformanceMode,
+  BALANCED: 'balanced' as PerformanceMode,
+  PERFORMANCE: 'performance' as PerformanceMode
+} as const;
+
+// Render frequency type and runtime constants
+export type RenderFrequency = 'low' | 'medium' | 'high';
+
+export const RenderFrequencies = {
+  LOW: 'low' as RenderFrequency,
+  MEDIUM: 'medium' as RenderFrequency,
+  HIGH: 'high' as RenderFrequency
+} as const;
+
+// Quality level type and runtime constants
+export type CubeSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+export const CubeSizes = {
+  XS: 'xs' as CubeSize,
+  SM: 'sm' as CubeSize,
+  MD: 'md' as CubeSize,
+  LG: 'lg' as CubeSize,
+  XL: 'xl' as CubeSize
+} as const;
+
+// Cube theme type and runtime constants
+export type CubeTheme = 'default' | 'energy' | 'spiritual' | 'ethereal' | 'quantum';
+
+export const CubeThemes = {
+  DEFAULT: 'default' as CubeTheme,
+  ENERGY: 'energy' as CubeTheme,
+  SPIRITUAL: 'spiritual' as CubeTheme,
+  ETHEREAL: 'ethereal' as CubeTheme,
+  QUANTUM: 'quantum' as CubeTheme
+} as const;
+
+// Type guards for runtime validation
+export function isValidDeviceCapability(value: unknown): value is DeviceCapability {
+  return typeof value === 'string' && 
+    Object.values(DeviceCapabilities).includes(value as DeviceCapability);
+}
+
+export function isValidPerformanceMode(value: unknown): value is PerformanceMode {
+  return typeof value === 'string' && 
+    Object.values(PerformanceModes).includes(value as PerformanceMode);
+}
+
+export function isValidRenderFrequency(value: unknown): value is RenderFrequency {
+  return typeof value === 'string' && 
+    Object.values(RenderFrequencies).includes(value as RenderFrequency);
+}
+
+export function isValidCubeSize(value: unknown): value is CubeSize {
+  return typeof value === 'string' && 
+    Object.values(CubeSizes).includes(value as CubeSize);
+}
+
+export function isValidCubeTheme(value: unknown): value is CubeTheme {
+  return typeof value === 'string' && 
+    Object.values(CubeThemes).includes(value as CubeTheme);
+}
+
+// Performance boundaries
 export const DEFAULT_PERFORMANCE_BOUNDARIES: PerformanceBoundaries = {
-  lowFPS: 30,
-  mediumFPS: 45,
-  highFPS: 60,
-  criticalMemory: 500 * 1024 * 1024, // 500MB
-  highMemory: 350 * 1024 * 1024, // 350MB
-  mediumMemory: 200 * 1024 * 1024 // 200MB
+  lowFpsThreshold: 30,
+  mediumFpsThreshold: 50,
+  highFpsThreshold: 58,
+  excessiveRenderTimeMs: 16,
+  highMemoryUsageMb: 200
 };
 
 // Default monitor configuration
 export const DEFAULT_MONITOR_CONFIG: PerformanceMonitorConfig = {
-  enabled: true,
-  metricsEnabled: true,
-  slowRenderThreshold: 16, // 60fps threshold
-  samplingRate: 0.1, // Sample 10% of metrics by default
-  debugMode: false,
-  
-  // Extended configuration with defaults
-  optimizationLevel: 'auto',
-  throttleInterval: 1000,
-  maxTrackedComponents: 100,
-  
-  // Feature flags
-  enablePerformanceTracking: true,
-  enableRenderTracking: true,
-  enableValidation: true,
-  enablePropTracking: false,
-  enableDebugLogging: false,
-  
-  // Advanced features
-  intelligentProfiling: false,
-  inactiveTabThrottling: true,
-  batchUpdates: true
+  samplingInterval: 1000,
+  metricsBufferSize: 100,
+  autoStart: true,
+  trackComponents: true,
+  trackInteractions: true,
+  trackWebVitals: true,
+  logWarnings: true,
+  captureElementMetrics: false,
+  adaptiveMode: true,
+  throttleUpdates: true
 };
+
+/**
+ * Maps device capability to quality level
+ */
+export function getQualityLevelForCapability(capability: DeviceCapability): QualityLevel {
+  switch (capability) {
+    case DeviceCapabilities.HIGH:
+      return 'high';
+    case DeviceCapabilities.MEDIUM:
+      return 'medium';
+    case DeviceCapabilities.LOW:
+      return 'low';
+    default:
+      return 'medium';
+  }
+}
+
+/**
+ * Maps performance mode to settings configuration
+ */
+export function getSettingsForPerformanceMode(mode: PerformanceMode) {
+  switch (mode) {
+    case PerformanceModes.QUALITY:
+      return {
+        disableBlur: false,
+        disableShadows: false,
+        particleCount: 1.0,
+        maxAnimationsPerFrame: 10
+      };
+    case PerformanceModes.BALANCED:
+      return {
+        disableBlur: false,
+        disableShadows: true,
+        particleCount: 0.7,
+        maxAnimationsPerFrame: 6
+      };
+    case PerformanceModes.PERFORMANCE:
+      return {
+        disableBlur: true,
+        disableShadows: true,
+        particleCount: 0.4,
+        maxAnimationsPerFrame: 3
+      };
+    default:
+      return {
+        disableBlur: false,
+        disableShadows: false,
+        particleCount: 0.7,
+        maxAnimationsPerFrame: 6
+      };
+  }
+}

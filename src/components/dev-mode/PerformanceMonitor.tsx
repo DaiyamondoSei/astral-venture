@@ -1,223 +1,315 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Settings } from 'lucide-react';
-import { usePerformance } from '@/contexts/PerformanceContext';
-import { DeviceCapability } from '@/utils/performanceUtils';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { usePerfConfig } from '@/hooks/usePerfConfig';
 import { performanceMonitor } from '@/utils/performance/performanceMonitor';
+import { DeviceCapabilities } from '@/utils/performance/core/constants';
+import { 
+  Activity, 
+  Cpu, 
+  BarChart, 
+  Gauge, 
+  AlertTriangle,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Smartphone
+} from 'lucide-react';
 
-/**
- * PerformanceMonitor
- * 
- * A floating component that shows performance metrics and allows
- * adjusting performance settings on the fly.
- */
-const PerformanceMonitor = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [fps, setFps] = useState(0);
-  const [memoryUsage, setMemoryUsage] = useState<number | null>(null);
-  const [slowestComponents, setSlowestComponents] = useState<any[]>([]);
-  const frameCountRef = useRef(0);
-  const lastTimeRef = useRef(0);
+const PerformanceMonitor: React.FC = () => {
+  const [fps, setFps] = useState<number>(0);
+  const [memoryUsage, setMemoryUsage] = useState<number>(0);
+  const [activePage, setActivePage] = useState<string>('dashboard');
+  const [componentMetrics, setComponentMetrics] = useState<any[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   
+  const perfConfig = usePerfConfig();
+  
+  // Destructuring values from perfConfig
   const { 
     deviceCapability, 
-    enableParticles, 
-    enableComplexAnimations, 
-    enableBlur, 
-    enableShadows,
-    setManualPerformanceMode 
-  } = usePerformance();
+    isLowPerformance,
+    setManualPerformanceMode
+  } = perfConfig;
   
-  const { config, updateConfig, applyPreset } = usePerfConfig();
-
-  // Performance monitoring
+  // Update metrics on interval
   useEffect(() => {
-    if (!isOpen) return;
-    
-    let rafId: number;
-    
-    const countFrame = (time: number) => {
-      // Increment frame count
-      frameCountRef.current++;
-      
-      // Calculate FPS once per second
-      if (time - lastTimeRef.current >= 1000) {
-        setFps(Math.round(frameCountRef.current * 1000 / (time - lastTimeRef.current)));
-        frameCountRef.current = 0;
-        lastTimeRef.current = time;
-        
-        // Try to get memory usage if available
-        if ((performance as any).memory) {
-          setMemoryUsage((performance as any).memory.usedJSHeapSize / (1024 * 1024));
-        }
-        
-        // Get slowest components
-        setSlowestComponents(performanceMonitor.getSlowestComponents(5));
-      }
-      
-      rafId = requestAnimationFrame(countFrame);
+    const updateMetrics = () => {
+      const data = performanceMonitor.getPerformanceData();
+      setFps(Math.round(data.fps));
+      setMemoryUsage(Math.round(data.memory));
+      setComponentMetrics(performanceMonitor.getAllMetrics());
+      setLastUpdated(new Date());
     };
     
-    rafId = requestAnimationFrame(countFrame);
+    // Initial update
+    updateMetrics();
     
-    return () => {
-      cancelAnimationFrame(rafId);
-    };
-  }, [isOpen]);
-
-  if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
-    return null; // Don't show in production
-  }
-
+    // Set up interval
+    const intervalId = setInterval(updateMetrics, 1000);
+    
+    // Clean up interval
+    return () => clearInterval(intervalId);
+  }, []);
+  
+  // Optimize for performance
+  const handleOptimizeClick = () => {
+    perfConfig.updateConfig({ 
+      disableAnimations: true,
+      disableEffects: true
+    });
+  };
+  
+  // Metrics quality rendering
+  const renderMetricQuality = (value: number, type: 'fps' | 'memory') => {
+    if (type === 'fps') {
+      if (value < 30) return <Badge variant="destructive">Poor</Badge>;
+      if (value < 45) return <Badge variant="warning">Low</Badge>;
+      if (value < 55) return <Badge variant="secondary">Good</Badge>;
+      return <Badge variant="success">Excellent</Badge>;
+    } else {
+      if (value > 200) return <Badge variant="destructive">High</Badge>;
+      if (value > 150) return <Badge variant="warning">Elevated</Badge>;
+      if (value > 100) return <Badge variant="secondary">Moderate</Badge>;
+      return <Badge variant="success">Low</Badge>;
+    }
+  };
+  
+  // Format component name for display
+  const formatComponentName = (name: string) => {
+    return name.replace(/[<>]/g, '').split(' ')[0];
+  };
+  
   return (
-    <div className="fixed bottom-2 right-2 z-50">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="bg-black/80 p-2 rounded-full hover:bg-black/90 transition-colors"
-      >
-        <Settings size={16} className="text-white/80" />
-      </button>
+    <Card className="shadow-md">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg font-medium">Performance Monitor</CardTitle>
+          <Badge variant={isLowPerformance ? "destructive" : "success"}>
+            {isLowPerformance ? "Low Performance" : "Good Performance"}
+          </Badge>
+        </div>
+        <CardDescription>
+          Device Capability: {deviceCapability} | Last Updated: {lastUpdated.toLocaleTimeString()}
+        </CardDescription>
+      </CardHeader>
       
-      {isOpen && (
-        <div className="bg-black/80 text-white/90 p-4 mb-2 rounded-lg text-xs w-80">
-          <h3 className="font-medium mb-2">Performance Monitor</h3>
+      <Tabs defaultValue={activePage} onValueChange={setActivePage}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="components">Components</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="dashboard" className="px-2 py-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-muted/50 p-4 rounded-lg flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  FPS
+                </h3>
+                <p className="text-2xl font-bold">{fps}</p>
+              </div>
+              {renderMetricQuality(fps, 'fps')}
+            </div>
+            
+            <div className="bg-muted/50 p-4 rounded-lg flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <Cpu className="h-4 w-4" />
+                  Memory
+                </h3>
+                <p className="text-2xl font-bold">{memoryUsage} MB</p>
+              </div>
+              {renderMetricQuality(memoryUsage, 'memory')}
+            </div>
+          </div>
           
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>FPS:</span>
-              <span className={fps < 30 ? 'text-red-400' : fps < 50 ? 'text-yellow-400' : 'text-green-400'}>
-                {fps}
-              </span>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="text-xs"
+              onClick={() => setManualPerformanceMode(DeviceCapabilities.HIGH)}
+            >
+              <ArrowUpCircle className="h-3 w-3 mr-1" />
+              High
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="text-xs"
+              onClick={() => setManualPerformanceMode(DeviceCapabilities.MEDIUM)}
+            >
+              <Smartphone className="h-3 w-3 mr-1" />
+              Medium
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="text-xs"
+              onClick={() => setManualPerformanceMode(DeviceCapabilities.LOW)}
+            >
+              <ArrowDownCircle className="h-3 w-3 mr-1" />
+              Low
+            </Button>
+          </div>
+          
+          {isLowPerformance && (
+            <div className="bg-destructive/10 p-3 rounded-md flex items-start mt-2">
+              <AlertTriangle className="h-5 w-5 text-destructive mr-2 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-sm">Performance Issues Detected</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Your device is struggling with the current configuration.
+                </p>
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  className="mt-2 text-xs h-7"
+                  onClick={handleOptimizeClick}
+                >
+                  Optimize Now
+                </Button>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="components">
+          <div className="space-y-2 px-1 py-2">
+            <div className="flex justify-between text-xs text-muted-foreground mb-1 px-3">
+              <span>Component</span>
+              <div className="flex gap-6">
+                <span>Renders</span>
+                <span>Avg Time</span>
+              </div>
             </div>
             
-            {memoryUsage !== null && (
-              <div className="flex justify-between">
-                <span>Memory:</span>
-                <span>{Math.round(memoryUsage)} MB</span>
+            {componentMetrics.slice(0, 8).map((metric, index) => (
+              <div 
+                key={index} 
+                className="flex justify-between items-center p-2 bg-muted/30 rounded-md text-sm hover:bg-muted transition-colors"
+              >
+                <span className="font-mono text-xs truncate max-w-[180px]">
+                  {formatComponentName(metric.componentName)}
+                </span>
+                <div className="flex gap-4">
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {metric.renderCount}
+                  </Badge>
+                  <span className="font-mono text-xs w-16 text-right">
+                    {metric.averageRenderTime.toFixed(2)}ms
+                  </span>
+                </div>
+              </div>
+            ))}
+            
+            {componentMetrics.length === 0 && (
+              <div className="text-center py-4 text-muted-foreground">
+                No component metrics available
               </div>
             )}
-            
-            <div className="flex justify-between">
-              <span>Device Category:</span>
-              <span>{deviceCapability}</span>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="settings">
+          <div className="p-2 space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-medium text-sm">Device Capability</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Current: {deviceCapability}
+                </p>
+              </div>
+              <div className="flex gap-1">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => perfConfig.detectDeviceCapability()}
+                >
+                  Auto Detect
+                </Button>
+              </div>
             </div>
             
-            {slowestComponents.length > 0 && (
-              <div className="mt-2">
-                <h4 className="font-medium text-xs">Slowest Components:</h4>
-                <div className="max-h-32 overflow-y-auto text-[10px] mt-1">
-                  {slowestComponents.map((comp, i) => (
-                    <div key={i} className="flex justify-between mb-1">
-                      <span>{comp.componentName}</span>
-                      <span className={comp.averageRenderTime > 16 ? 'text-red-400' : 'text-yellow-400'}>
-                        {comp.averageRenderTime.toFixed(1)}ms
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-medium text-sm">Disable Animations</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Improves performance on low-end devices
+                </p>
               </div>
-            )}
+              <div className="flex gap-1">
+                <Button 
+                  variant={perfConfig.config.disableAnimations ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => perfConfig.updateConfig({ disableAnimations: true })}
+                >
+                  On
+                </Button>
+                <Button 
+                  variant={!perfConfig.config.disableAnimations ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => perfConfig.updateConfig({ disableAnimations: false })}
+                >
+                  Off
+                </Button>
+              </div>
+            </div>
             
-            <div className="pt-2 space-y-2">
-              <h4 className="font-medium">Performance Settings</h4>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === DeviceCapability.LOW ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode(DeviceCapability.LOW)}
-                >
-                  Low
-                </button>
-                <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === DeviceCapability.MEDIUM ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode(DeviceCapability.MEDIUM)}
-                >
-                  Medium
-                </button>
-                <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === DeviceCapability.HIGH ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode(DeviceCapability.HIGH)}
-                >
-                  High
-                </button>
-                <button
-                  className="px-2 py-1 rounded text-xs bg-black/40"
-                  onClick={() => setManualPerformanceMode('auto')}
-                >
-                  Auto-detect
-                </button>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-medium text-sm">Disable Effects</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Disables blur, shadows and other effects
+                </p>
               </div>
-              
-              <div className="mt-2">
-                <h4 className="font-medium text-xs">Performance Presets:</h4>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  <button
-                    className="px-2 py-1 rounded text-xs bg-black/40"
-                    onClick={() => applyPreset('comprehensive')}
-                  >
-                    Comprehensive
-                  </button>
-                  <button
-                    className="px-2 py-1 rounded text-xs bg-quantum-600"
-                    onClick={() => applyPreset('balanced')}
-                  >
-                    Balanced
-                  </button>
-                  <button
-                    className="px-2 py-1 rounded text-xs bg-black/40"
-                    onClick={() => applyPreset('minimal')}
-                  >
-                    Minimal
-                  </button>
-                  <button
-                    className="px-2 py-1 rounded text-xs bg-black/40"
-                    onClick={() => applyPreset('disabled')}
-                  >
-                    Disabled
-                  </button>
-                </div>
-              </div>
-              
-              <div className="pt-2 space-y-1">
-                <div className="flex justify-between items-center">
-                  <span>Features Enabled:</span>
-                </div>
-                <ul className="text-[10px] pl-2">
-                  <li className={enableParticles ? 'text-green-400' : 'text-red-400'}>
-                    Particles: {enableParticles ? 'On' : 'Off'}
-                  </li>
-                  <li className={enableComplexAnimations ? 'text-green-400' : 'text-red-400'}>
-                    Complex Animations: {enableComplexAnimations ? 'On' : 'Off'}
-                  </li>
-                  <li className={enableBlur ? 'text-green-400' : 'text-red-400'}>
-                    Blur Effects: {enableBlur ? 'On' : 'Off'}
-                  </li>
-                  <li className={enableShadows ? 'text-green-400' : 'text-red-400'}>
-                    Shadows: {enableShadows ? 'On' : 'Off'}
-                  </li>
-                  <li className={config.enableRenderTracking ? 'text-green-400' : 'text-red-400'}>
-                    Render Tracking: {config.enableRenderTracking ? 'On' : 'Off'}
-                  </li>
-                </ul>
-              </div>
-              
-              <div className="text-[10px] mt-2 pt-2 border-t border-white/10">
-                <button 
-                  className="text-quantum-400 underline"
-                  onClick={() => {
-                    performanceMonitor.resetMetrics();
-                    setSlowestComponents([]);
-                  }}
+              <div className="flex gap-1">
+                <Button 
+                  variant={perfConfig.config.disableEffects ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => perfConfig.updateConfig({ disableEffects: true })}
                 >
-                  Reset Metrics
-                </button>
+                  On
+                </Button>
+                <Button 
+                  variant={!perfConfig.config.disableEffects ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => perfConfig.updateConfig({ disableEffects: false })}
+                >
+                  Off
+                </Button>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </TabsContent>
+      </Tabs>
+      
+      <CardFooter className="border-t pt-3 flex justify-between">
+        <span className="text-xs text-muted-foreground">
+          {perfConfig.isInSimulationMode ? 'Simulation Mode' : 'Live Monitoring'}
+        </span>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="text-xs h-7"
+          onClick={() => performanceMonitor.clearMetrics()}
+        >
+          Clear Metrics
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 

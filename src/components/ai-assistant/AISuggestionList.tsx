@@ -13,6 +13,16 @@ export interface AISuggestionListProps {
   limit?: number;
 }
 
+// Helper function to get color based on priority
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'high': return 'bg-red-500';
+    case 'medium': return 'bg-yellow-500';
+    case 'low': return 'bg-blue-500';
+    default: return 'bg-gray-500';
+  }
+};
+
 export const AISuggestionList: React.FC<AISuggestionListProps> = ({
   componentId,
   limit = 5
@@ -20,6 +30,7 @@ export const AISuggestionList: React.FC<AISuggestionListProps> = ({
   const { 
     suggestions, 
     isFixing, 
+    isAnalyzing,
     analyzeComponent, 
     dismissSuggestion, 
     implementSuggestion, 
@@ -29,9 +40,6 @@ export const AISuggestionList: React.FC<AISuggestionListProps> = ({
     lastUpdated,
     currentComponent
   } = useAssistant();
-
-  // Check if the assistant is analyzing (loading)
-  const isAnalyzing = loading;
 
   // Filter suggestions by component if provided
   const filteredSuggestions = componentId 
@@ -44,16 +52,6 @@ export const AISuggestionList: React.FC<AISuggestionListProps> = ({
   const handleAnalyze = () => {
     if (componentId) {
       analyzeComponent(componentId);
-    }
-  };
-
-  // Helper function to get color based on priority
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-blue-500';
-      default: return 'bg-gray-500';
     }
   };
 
