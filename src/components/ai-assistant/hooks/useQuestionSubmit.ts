@@ -8,7 +8,7 @@ import { AIQuestion, AIQuestionOptions, AIResponse } from '../types';
 export const useQuestionSubmit = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setResponse, setTokens, setStreamingResponse } = useAssistantState();
+  const { setResponse, setStreamingResponse, setModelInfo } = useAssistantState();
   const [tokenMetrics, setTokenMetrics] = useState<{ model: string; tokens: number }>({
     model: '',
     tokens: 0
@@ -52,16 +52,22 @@ export const useQuestionSubmit = () => {
       setResponse(response);
       setIsLoading(false);
       
-      // Update token metrics
+      // Update token metrics, handling both tokenUsage and tokens properties
       if (response.meta?.tokenUsage) {
-        setTokens(response.meta.tokenUsage);
         setTokenMetrics({
           model: response.meta.model,
           tokens: response.meta.tokenUsage
         });
+        setModelInfo({
+          model: response.meta.model,
+          tokens: response.meta.tokenUsage
+        });
       } else if (response.meta?.tokens) {
-        setTokens(response.meta.tokens);
         setTokenMetrics({
+          model: response.meta.model,
+          tokens: response.meta.tokens
+        });
+        setModelInfo({
           model: response.meta.model,
           tokens: response.meta.tokens
         });

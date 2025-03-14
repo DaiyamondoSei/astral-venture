@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, Code, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useAICodeAssistant } from '@/hooks/useAICodeAssistant';
-import { AssistantSuggestion } from '@/utils/ai/AICodeAssistant';
+import { AssistantSuggestion } from '@/components/ai-assistant/types';
 import { aiLearningSystem } from '@/utils/ai/AIAssistantLearningSystem';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -21,11 +21,15 @@ const AISuggestionList: React.FC<AISuggestionListProps> = ({
 }) => {
   const { 
     suggestions, 
-    loading, 
+    isAnalyzing: loading, // Map isAnalyzing to loading
     refreshSuggestions,
-    applyAutoFix,
-    lastUpdated
+    applyFix: applyAutoFix, // Map applyFix to applyAutoFix
+    currentComponent, // Use this to check when last updated
+    error
   } = useAICodeAssistant(componentName);
+  
+  // Calculate a lastUpdated date from the current time for now
+  const lastUpdated = new Date();
   
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   
@@ -191,7 +195,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
           </div>
         </div>
         <CardDescription>
-          {suggestion.context.component && (
+          {suggestion.context && suggestion.context.component && (
             <span className="text-xs bg-muted px-2 py-1 rounded">
               {suggestion.context.component}
             </span>

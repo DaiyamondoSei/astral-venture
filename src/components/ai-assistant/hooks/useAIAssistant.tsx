@@ -3,7 +3,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantState } from './useAssistantState';
 import { useQuestionSubmit } from './useQuestionSubmit';
-import { AIQuestion } from '@/services/ai/types';
+import { AIQuestion } from '@/components/ai-assistant/types';
 
 interface UseAIAssistantProps {
   reflectionContext?: string;
@@ -30,13 +30,7 @@ export const useAIAssistant = ({
     };
   }, []);
   
-  const { submitQuestion } = useQuestionSubmit({
-    state,
-    reflectionContext,
-    selectedReflectionId,
-    userId: user?.id || '',
-    isMounted
-  });
+  const { submitQuestion } = useQuestionSubmit();
   
   // Reset the state when the dialog opens/closes
   useEffect(() => {
@@ -70,7 +64,7 @@ export const useAIAssistant = ({
     question: state.question,
     setQuestion: state.setQuestion,
     response: state.response,
-    loading: state.loading,
+    loading: state.isLoading,
     error: state.error,
     handleSubmitQuestion,
     reset: state.reset,

@@ -1,8 +1,53 @@
+import { AIQuestion, AIResponse } from '@/components/ai-assistant/types';
+import { supabase } from '@/lib/supabaseUnified';
 
-import { AIQuestion, AIResponse, AIQuestionOptions } from './types';
+/**
+ * Get personalized AI recommendations based on user history
+ * @param userId User ID to get recommendations for
+ * @returns Array of recommendation strings
+ */
+export async function getPersonalizedRecommendations(userId: string): Promise<string[]> {
+  try {
+    // First, try to get recommendations from the cache
+    const { data: cachedData, error: cacheError } = await supabase
+      .from('ai_recommendations_cache')
+      .select('recommendations')
+      .eq('user_id', userId)
+      .single();
 
-// Simulated backend response delay
-const simulateBackendDelay = (ms: number = 1000) => new Promise(resolve => setTimeout(resolve, ms));
+    if (!cacheError && cachedData && cachedData.recommendations) {
+      return cachedData.recommendations;
+    }
+
+    // Fallback recommendations if no personalization data available
+    const defaultRecommendations = [
+      "Practice mindful breathing for 5 minutes daily",
+      "Try a chakra balancing meditation",
+      "Journal about your energy experiences",
+      "Explore the energy visualization in the Practice section",
+      "Complete today's suggested practice"
+    ];
+
+    // Store default recommendations in cache for future use
+    await supabase
+      .from('ai_recommendations_cache')
+      .upsert({
+        user_id: userId,
+        recommendations: defaultRecommendations,
+        updated_at: new Date().toISOString()
+      });
+
+    return defaultRecommendations;
+  } catch (error) {
+    console.error('Error fetching personalized recommendations:', error);
+    // Return fallback recommendations if there's an error
+    return [
+      "Practice mindful breathing for 5 minutes daily",
+      "Try a chakra balancing meditation",
+      "Journal about your energy experiences"
+    ];
+  }
+}
 
 /**
  * Ask a question to the AI assistant
@@ -93,6 +138,25 @@ function generateDemoResponse(question: AIQuestion): AIResponse {
       model: 'gpt-3.5-turbo',
       tokenUsage: 125,
       processingTime: 278
+    }
+  };
+}
+
+/**
+ * Process question with AI service
+ * @param question AIQuestion object to process
+ * @returns Promise with AI response
+ */
+export async function processAIQuestion(question: AIQuestion): Promise<AIResponse> {
+  // Implementation would go here
+  // For now, return a mock response
+  return {
+    answer: `This is a response to your question: "${question.text}"`,
+    type: 'text',
+    meta: {
+      model: 'gpt-4o-mini',
+      tokenUsage: 150,
+      processingTime: 2.3
     }
   };
 }
