@@ -16,7 +16,38 @@ export interface AIGuidedPracticeProps {
 }
 
 export interface AIResponseDisplayProps {
-  response: any;
+  response: AIResponse;
+}
+
+export interface AIResponse {
+  answer: string;
+  type: 'text' | 'code' | 'markdown' | 'error';
+  suggestedPractices?: string[];
+  meta: {
+    model: string;
+    tokenUsage?: number; 
+    tokens?: number;
+    processingTime: number;
+    cached?: boolean;
+  };
+}
+
+export interface AIQuestion {
+  text: string;
+  question: string;
+  userId: string;
+  context?: string;
+  reflectionIds?: string[];
+}
+
+export interface AIQuestionOptions {
+  useCache?: boolean;
+  showLoadingToast?: boolean;
+  showErrorToast?: boolean;
+  model?: string;
+  userId?: string;
+  context?: string;
+  reflectionIds?: string[];
 }
 
 export interface AssistantSuggestion {

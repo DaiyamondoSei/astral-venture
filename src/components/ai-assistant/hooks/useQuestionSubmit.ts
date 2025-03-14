@@ -1,92 +1,86 @@
 
-import { useCallback, MutableRefObject } from 'react';
-import { useAssistantState } from './useAssistantState';
-import { AIQuestion, AIQuestionOptions } from '@/services/ai/types';
+import { useState } from 'react';
 import { getAIResponse } from '@/services/ai/aiProcessingService';
+import { useAssistantState } from './useAssistantState';
+import { AIQuestion, AIQuestionOptions, AIResponse } from '../types';
 
-interface UseQuestionSubmitProps {
-  state: ReturnType<typeof useAssistantState>;
-  reflectionContext?: string;
-  selectedReflectionId?: string;
-  userId: string;
-  isMounted: MutableRefObject<boolean>;
-}
+// Hook for submitting questions to the AI assistant
+export const useQuestionSubmit = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { setResponse, setTokens, setStreamingResponse } = useAssistantState();
+  const [tokenMetrics, setTokenMetrics] = useState<{ model: string; tokens: number }>({
+    model: '',
+    tokens: 0
+  });
 
-export const useQuestionSubmit = ({
-  state,
-  reflectionContext,
-  selectedReflectionId,
-  userId,
-  isMounted
-}: UseQuestionSubmitProps) => {
-  
-  const submitQuestion = useCallback(async (
+  // Submit a question to the AI assistant
+  const submitQuestion = async (
     questionInput: string | AIQuestion,
     options?: AIQuestionOptions
   ) => {
-    // Handle either string or AIQuestion object
-    let question: AIQuestion;
+    // Form the question object
+    let finalQuestion: AIQuestion;
     
     if (typeof questionInput === 'string') {
-      question = { 
+      finalQuestion = { 
         text: questionInput, 
         question: questionInput, 
-        userId 
+        userId: options?.userId || 'default-user',
+        context: options?.context,
+        reflectionIds: options?.reflectionIds,
       };
     } else {
-      question = questionInput;
+      // If it's already an AIQuestion object, use it directly
+      finalQuestion = questionInput;
     }
     
-    if (!question.text.trim()) {
-      return;
-    }
+    setIsLoading(true);
+    setError('');
+    setStreamingResponse('');
     
     try {
-      // Update loading state
-      state.setLoading(true);
-      state.setError('');
-      
-      // Keep a copy of question for history
-      const currentQuestion = question.text;
-      
-      // Reset after submit
-      state.setQuestion('');
-      
-      // Call AI service
-      const response = await getAIResponse(question.text, {
+      // Call the AI service
+      const response = await getAIResponse(finalQuestion.text, {
         useCache: options?.useCache ?? true,
-        showLoadingToast: false, // We'll handle loading UI ourselves
-        showErrorToast: false,   // We'll handle errors ourselves
-        model: options?.model || 'gpt-4o-mini',
+        showLoadingToast: options?.showLoadingToast ?? false,
+        showErrorToast: options?.showErrorToast ?? false,
+        model: options?.model || 'gpt-4o-mini'
       });
       
-      // Update state if component is still mounted
-      if (isMounted.current) {
-        state.setResponse(response);
-        state.setStreamingResponse('');
-        state.setModelInfo({
+      // Update state with response
+      setResponse(response);
+      setIsLoading(false);
+      
+      // Update token metrics
+      if (response.meta?.tokenUsage) {
+        setTokens(response.meta.tokenUsage);
+        setTokenMetrics({
           model: response.meta.model,
-          tokenCount: response.meta.tokenUsage,
-          processingTime: response.meta.processingTime,
+          tokens: response.meta.tokenUsage
         });
-        state.setLoading(false);
+      } else if (response.meta?.tokens) {
+        setTokens(response.meta.tokens);
+        setTokenMetrics({
+          model: response.meta.model,
+          tokens: response.meta.tokens
+        });
       }
       
       return response;
-    } catch (error) {
-      console.error('Error submitting question:', error);
-      
-      // Update error state if component is still mounted
-      if (isMounted.current) {
-        state.setError(
-          error instanceof Error 
-            ? error.message 
-            : 'Failed to get a response. Please try again.'
-        );
-        state.setLoading(false);
-      }
+    } catch (error: any) {
+      setIsLoading(false);
+      const errorMessage = error.message || 'Failed to communicate with AI assistant';
+      setError(errorMessage);
+      console.error('Error in AI request:', error);
+      return null;
     }
-  }, [state, isMounted, userId]);
+  };
   
-  return { submitQuestion };
+  return {
+    submitQuestion,
+    isLoading,
+    error,
+    tokenMetrics
+  };
 };

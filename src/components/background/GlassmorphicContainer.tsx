@@ -1,99 +1,89 @@
 
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
 import { cn } from '@/lib/utils';
-import { DeviceCapability, detectDeviceCapability } from '@/utils/performanceUtils';
-import { usePerformance } from '@/contexts/PerformanceContext';
+import { DeviceCapabilities, GlassmorphicVariants } from '@/types/runtime-values';
 
-export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal';
-
-interface GlassmorphicContainerProps {
+export interface GlassmorphicContainerProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'cosmic' | 'medium' | 'purple';
+  intensity?: 'low' | 'medium' | 'high';
   children: React.ReactNode;
-  className?: string;
-  variant?: GlassmorphicVariant;
-  withGlow?: boolean;
-  intensityLevel?: number;
   responsive?: boolean;
+  noFallback?: boolean;
 }
 
-/**
- * A container with a glassmorphic effect
- * Adapts to device capability for performance optimization
- */
-export const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
+const GlassmorphicContainer = ({
+  variant = 'default',
+  intensity = 'medium',
   children,
   className,
-  variant = 'default',
-  withGlow = true,
-  intensityLevel = 1,
   responsive = true,
-}) => {
-  const { deviceCapability } = usePerformance();
-  const [capability, setCapability] = useState<DeviceCapability>(deviceCapability);
-  
-  // Initialize based on device capability
-  useEffect(() => {
-    setCapability(detectDeviceCapability());
-  }, []);
-  
-  // Get styles based on variant
-  const getVariantStyles = () => {
-    switch (variant) {
-      case 'quantum':
-        return 'bg-black/30 backdrop-blur-md border border-indigo-500/30';
-      case 'ethereal':
-        return 'bg-white/10 backdrop-blur-md border border-white/20';
-      case 'default':
+  noFallback = false,
+  ...props
+}: GlassmorphicContainerProps) => {
+  // Get intensity modifier
+  const getIntensityClass = () => {
+    switch (intensity) {
+      case 'low':
+        return 'bg-opacity-20 backdrop-blur-sm';
+      case 'medium':
+        return 'bg-opacity-30 backdrop-blur-md';
+      case 'high':
+        return 'bg-opacity-40 backdrop-blur-lg';
       default:
-        return 'bg-black/20 backdrop-blur-sm border border-white/10';
+        return 'bg-opacity-30 backdrop-blur-md';
     }
   };
-  
-  // Adjust blur amount based on device capability
-  const getBlurAmount = () => {
-    if (capability === DeviceCapability.LOW) {
-      return 'backdrop-blur-sm';
-    } else if (capability === DeviceCapability.MEDIUM) {
-      return 'backdrop-blur-md';
-    } else {
-      return 'backdrop-blur-lg';
+
+  // Get variant class
+  const getVariantClass = () => {
+    // Use the runtime value constants to check
+    // Instead of using the type directly
+    if (variant === GlassmorphicVariants.DEFAULT) {
+      return 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800';
+    } else if (variant === GlassmorphicVariants.QUANTUM) {
+      return 'bg-indigo-900 border-indigo-600 text-white';
+    } else if (variant === GlassmorphicVariants.ETHEREAL) {
+      return 'bg-purple-900 border-purple-700 text-white';
+    } else if (variant === GlassmorphicVariants.ELEVATED) {
+      return 'bg-white dark:bg-gray-800 shadow-lg border-gray-100 dark:border-gray-700';
+    } else if (variant === GlassmorphicVariants.SUBTLE) {
+      return 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 shadow-sm';
+    } else if (variant === GlassmorphicVariants.COSMIC) {
+      return 'bg-indigo-950 border-indigo-800 text-white';
+    } else if (variant === GlassmorphicVariants.MEDIUM) {
+      return 'bg-indigo-800 border-indigo-700 text-white';
+    } else if (variant === GlassmorphicVariants.PURPLE) {
+      return 'bg-purple-800 border-purple-700 text-white';
     }
+    return 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800';
   };
-  
-  // Apply glow based on device capability
-  const getGlowEffect = () => {
-    if (!withGlow) return '';
-    
-    // Simplify effect on low-end devices
-    if (capability === DeviceCapability.LOW) {
-      return 'shadow-sm';
-    }
-    
-    // Adjust intensity based on level
-    const intensityMap = {
-      1: 'shadow-md',
-      2: 'shadow-lg',
-      3: 'shadow-xl'
-    };
-    
-    return intensityMap[intensityLevel as 1 | 2 | 3] || 'shadow-md';
+
+  // Get fallback class when backdrop-filter is not supported
+  const getFallbackClass = () => {
+    if (noFallback) return '';
+    return 'glassmorphic-fallback';
   };
-  
+
+  // Get responsive class
+  const getResponsiveClass = () => {
+    if (!responsive) return '';
+    return 'transition-all duration-500';
+  };
+
+  // Combine all classes
+  const containerClass = cn(
+    'glassmorphic rounded-xl border',
+    getVariantClass(),
+    getIntensityClass(),
+    getFallbackClass(),
+    getResponsiveClass(),
+    className
+  );
+
   return (
-    <motion.div
-      className={cn(
-        'relative rounded-xl transition-all duration-300',
-        getVariantStyles(),
-        getBlurAmount(),
-        getGlowEffect(),
-        className
-      )}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
+    <div className={containerClass} {...props}>
       {children}
-    </motion.div>
+    </div>
   );
 };
 

@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { SeedOfLife } from '@/components/SeedOfLife';
+import SeedOfLife from '@/components/SeedOfLife';
 import { ChevronRight } from 'lucide-react';
-import { EntryAnimation } from '@/components/entry-animation/EntryAnimation';
+import EntryAnimation from '@/components/entry-animation/EntryAnimation';
 
 export interface EntryAnimationViewProps {
   onComplete: () => void;
