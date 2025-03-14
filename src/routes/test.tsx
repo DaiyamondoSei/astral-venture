@@ -1,9 +1,9 @@
 
 import React from 'react';
-import ApplicationTestDashboard from '@/components/test/ApplicationTestDashboard';
+import TestDashboardWrapper from '@/components/test/TestDashboardWrapper';
 
 const TestPage: React.FC = () => {
-  return <ApplicationTestDashboard />;
+  return <TestDashboardWrapper />;
 };
 
 export default TestPage;
