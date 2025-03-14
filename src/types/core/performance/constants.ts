@@ -1,5 +1,5 @@
 
-import { DeviceCapability, PerformanceMode, RenderFrequency, QualityLevel } from '@/utils/performance/core/types';
+import { DeviceCapability, PerformanceMode, RenderFrequency } from '@/utils/performance/core/types';
 
 /**
  * Runtime constants for device capability
@@ -61,3 +61,42 @@ export const PerformanceBoundaries = {
     HIGH: 16
   }
 };
+
+/**
+ * GlassmorphicVariant type for UI components
+ */
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'medium' | 'cosmic' | 'purple';
+
+/**
+ * Runtime constants for GlassmorphicVariant
+ */
+export const GlassmorphicVariants = {
+  DEFAULT: 'default' as GlassmorphicVariant,
+  QUANTUM: 'quantum' as GlassmorphicVariant,
+  ETHEREAL: 'ethereal' as GlassmorphicVariant,
+  ELEVATED: 'elevated' as GlassmorphicVariant,
+  SUBTLE: 'subtle' as GlassmorphicVariant,
+  MEDIUM: 'medium' as GlassmorphicVariant,
+  COSMIC: 'cosmic' as GlassmorphicVariant,
+  PURPLE: 'purple' as GlassmorphicVariant
+};
+
+/**
+ * Cube size type for Metatron's Cube
+ */
+export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+/**
+ * Cube theme type for Metatron's Cube
+ */
+export type CubeTheme = 'default' | 'light' | 'dark' | 'cosmic' | 'chakra' | 'etheric';
+
+/**
+ * Glow intensity type for visual components
+ */
+export type GlowIntensity = 'high' | 'medium' | 'low' | 'none';
+
+/**
+ * Quality level type for performance settings
+ */
+export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';

@@ -31,102 +31,37 @@ export interface User { id: string; name: string; email: string; }
 import { User } from '@/types/user';
 ```
 
-## 2. Singleton Services
+## 2. Separate Types from Runtime Values
 
 ### Issue
-Multiple instances of service clients (e.g., Supabase) created throughout the application, causing warnings and potential race conditions.
+Using type names directly as values in runtime code causes TypeScript errors because types are erased during compilation.
 
 ### Best Practices
-- Implement the singleton pattern for all service clients
-- Create a single initialization file for each external service
-- Export the instance, not the creation function
-- Add runtime checks to prevent multiple initializations
+- Define types for compile-time checking
+- Create corresponding constant objects with the same values for runtime use
+- Use "as const" assertions to preserve literal types
+- Use descriptive naming to distinguish between types and values
 
 Example:
 ```typescript
-// BAD: Multiple instances
-// file1.ts
-export const supabase1 = createClient(url, key);
+// Define the type (for compile-time type checking)
+export type DeviceCapability = 'low' | 'medium' | 'high';
 
-// file2.ts
-export const supabase2 = createClient(url, key); // Duplicate!
+// Define constants (for runtime use)
+export const DeviceCapabilities = {
+  LOW: 'low' as DeviceCapability,
+  MEDIUM: 'medium' as DeviceCapability,
+  HIGH: 'high' as DeviceCapability
+} as const;
 
-// GOOD: Singleton pattern
-// lib/supabaseClient.ts
-let instance = null;
+// INCORRECT usage
+if (deviceCapability === DeviceCapability.HIGH) // Error!
 
-function getClient() {
-  if (instance) return instance;
-  instance = createClient(url, key);
-  return instance;
-}
-
-export const supabase = getClient();
-export default supabase;
+// CORRECT usage
+if (deviceCapability === DeviceCapabilities.HIGH) // Works!
 ```
 
-## 3. Database Type Sync
-
-### Issue
-Database tables and their TypeScript type definitions were out of sync, causing errors when accessing tables or columns that weren't in the type definitions.
-
-### Best Practices
-- Use a tool to generate TypeScript types from the database schema (e.g., Supabase CLI)
-- Run type generation as part of the CI/CD pipeline
-- Never manually edit generated types
-- Include type generation in the migration process
-
-Example:
-```bash
-# Add this to your build process
-supabase gen types typescript --project-id your-project-id > src/types/database.ts
-```
-
-## 4. Consistent Error Handling
-
-### Issue
-Inconsistent error typing and handling led to unexpected behavior and type errors.
-
-### Best Practices
-- Define a single AppError class with proper typing
-- Use error factories for domain-specific errors
-- Always include proper type information in catch blocks
-- Use discriminated unions for error states
-
-Example:
-```typescript
-// Define a base error type
-export class AppError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>
-  ) {
-    super(message);
-    this.name = 'AppError';
-  }
-}
-
-// Use factories for specific errors
-export function createValidationError(message: string, field: string) {
-  return new AppError(message, 'VALIDATION_ERROR', { field });
-}
-
-// Type-safe error handling
-try {
-  // ...
-} catch (error) {
-  if (error instanceof AppError) {
-    // Type-safe error handling
-    console.error(`${error.code}: ${error.message}`);
-  } else {
-    // Unknown error handling
-    console.error('Unknown error:', error);
-  }
-}
-```
-
-## 5. Consistent Component Props
+## 3. Consistent Component Props
 
 ### Issue
 Component props were inconsistently defined, leading to type errors and mismatched props between components.
@@ -163,7 +98,43 @@ export function Button({
 }
 ```
 
-## 6. Use Type Guards
+## 4. Backward Compatibility for Evolving Types
+
+### Issue
+Type changes broke existing code when property names or types were modified.
+
+### Best Practices
+- Add new properties as optional
+- Maintain older property names alongside new ones for a transition period
+- Use union types to accept multiple formats
+- Document deprecated properties and planned removal dates
+
+Example:
+```typescript
+// Before
+interface Config {
+  timeout: number;
+}
+
+// After - with backward compatibility
+interface Config {
+  // New property name
+  timeoutMs: number;
+  
+  // Old property name (marked for deprecation)
+  /** @deprecated Use timeoutMs instead */
+  timeout?: number;
+}
+
+// Implementation with backward compatibility
+function processConfig(config: Config) {
+  // Support both old and new property names
+  const timeout = config.timeoutMs ?? config.timeout ?? 1000;
+  // ...
+}
+```
+
+## 5. Use Type Guards
 
 ### Issue
 Many type errors occurred because of improper narrowing of types, especially with optional or union types.
@@ -193,47 +164,31 @@ if (isSuccessResponse(response)) {
 }
 ```
 
-## 7. AI Service Type Safety
+## 6. Import Best Practices
 
 ### Issue
-AI components had inconsistent type definitions, making it difficult to ensure type-safe transitions between components.
+Mismatched file paths and case sensitivity issues caused import errors.
 
 ### Best Practices
-- Define a clear type hierarchy for AI-related entities
-- Use discriminated unions for different response types
-- Keep metadata separate from core data
-- Define clear boundaries between presentation and data layers
+- Use consistent file naming (e.g., kebab-case or camelCase)
+- Create barrel files (index.ts) to simplify imports
+- Use path aliases for cleaner imports
+- Use consistent relative vs. absolute imports
 
 Example:
 ```typescript
-// Clear type definitions for AI
-export interface AIQuestion {
-  text: string;
-  userId: string;
-  context?: string;
-}
+// BAD: Inconsistent file naming
+// MyComponent.ts vs myOtherComponent.ts
 
-export type AIResponseType = 'text' | 'code' | 'error';
+// GOOD: Consistent file naming (e.g., kebab-case)
+// my-component.ts and my-other-component.ts
 
-export interface AIResponse {
-  type: AIResponseType;
-  content: string;
-  meta: {
-    model: string;
-    tokenUsage: number;
-    processingTime: number;
-  };
-}
-
-// Function with clear type signatures
-export async function askAI(
-  question: AIQuestion
-): Promise<AIResponse> {
-  // Implementation
-}
+// GOOD: Using barrel files and path aliases
+import { Button, Card, TextField } from '@/components/ui';
+import { useAuth } from '@/hooks';
 ```
 
-## 8. State Management Type Safety
+## 7. State Management Type Safety
 
 ### Issue
 State updates were often not properly typed, leading to inconsistent state structures.
@@ -276,71 +231,46 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 }
 ```
 
-## 9. Database Queries Type Safety
+## 8. Never Use Type Names as Values
 
-### Issue
-Database queries often failed due to incorrect table or column names in the TypeScript code that weren't caught at compile time.
+One of the most common TypeScript errors occurs when using type names as values:
 
-### Best Practices
-- Use typed query builders (e.g., Prisma, TypeORM, or Supabase with type generation)
-- Never use string literals for table or column names
-- Use constants for table names if typed query builders aren't available
-- Add runtime validation for query results
-
-Example:
 ```typescript
-// BAD: Untyped queries
-const { data } = await supabase
-  .from('user_profiles') // Typo wouldn't be caught!
-  .select('*');
+// Type definition
+type Status = 'pending' | 'success' | 'error';
 
-// GOOD: Using typed client
-const { data } = await supabase
-  .from('user_profiles')
-  .select<{ id: string; name: string }>('id, name');
+// INCORRECT: Using type as namespace for values
+if (status === Status.pending) { // Error: 'Status' only refers to a type, but is being used as a value here
+  // ...
+}
 
-// Best: Using generated types
-import { Database } from '@/types/database';
-const supabase = createClient<Database>(url, key);
+// CORRECT: Define a separate constants object
+const StatusValues = {
+  PENDING: 'pending' as Status,
+  SUCCESS: 'success' as Status,
+  ERROR: 'error' as Status
+};
 
-const { data } = await supabase
-  .from('user_profiles') // Type-checked!
-  .select('*');
+if (status === StatusValues.PENDING) { // Works correctly
+  // ...
+}
 ```
+
+## 9. Update Type Definitions When Changing Code
+
+When modifying functionality, always update the corresponding type definitions:
+
+- When adding new properties to components, update the Props interface
+- When changing function parameters, update the function signature
+- When adding new state variables, update state type definitions
+- When creating new events or callbacks, define their types
 
 ## 10. Implement Continuous Type Checking
 
-### Issue
-Type errors were often discovered late in the development process.
-
-### Best Practices
 - Include type checking in the CI/CD pipeline
 - Use strict TypeScript configuration
 - Add pre-commit hooks for type checking
 - Regularly audit and update dependencies for type compatibility
-
-Example GitHub Action:
-```yaml
-name: Type Check
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Use Node.js
-      uses: actions/setup-node@v1
-      with:
-        node-version: '16.x'
-    - run: npm ci
-    - run: npm run type-check
-```
 
 ## Conclusion
 

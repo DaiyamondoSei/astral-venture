@@ -3,14 +3,17 @@ import { useState, useCallback } from 'react';
 import { AssistantSuggestion } from '@/components/ai-assistant/types';
 
 /**
- * Hook for managing AI assistant suggestions and interactions
+ * Hook for AI assistant functionality
+ * @returns Assistant state and methods
  */
-export function useAssistant() {
+export const useAssistant = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [tokens, setTokens] = useState(0);
+  const [data, setData] = useState<any>(null);
   const [suggestions, setSuggestions] = useState<AssistantSuggestion[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [currentComponent, setCurrentComponent] = useState('');
   const [error, setError] = useState('');
   const [isFixing, setIsFixing] = useState(false);
+  const [currentComponent, setCurrentComponent] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | undefined>(undefined);
 
@@ -18,13 +21,12 @@ export function useAssistant() {
    * Analyze a component to generate improvement suggestions
    */
   const analyzeComponent = useCallback(async (componentId: string): Promise<AssistantSuggestion[]> => {
-    setIsAnalyzing(true);
+    setIsLoading(true);
     setCurrentComponent(componentId);
     setLoading(true);
     
     try {
-      // This would normally make an API call to analyze the component
-      // For now, we'll just create a mock response after a delay
+      // Mock implementation - would connect to AI service in production
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const mockSuggestions: AssistantSuggestion[] = [
@@ -42,32 +44,19 @@ export function useAssistant() {
             file: `src/components/${componentId}.tsx`,
             severity: 'medium'
           }
-        },
-        {
-          id: `${componentId}-2`,
-          title: 'Add proper error handling',
-          description: 'This component lacks proper error boundaries which may lead to cascading failures.',
-          priority: 'high',
-          type: 'enhancement',
-          status: 'pending',
-          component: componentId,
-          codeExample: 'try {\n  // risky code\n} catch (error) {\n  // handle error\n}',
-          context: {
-            component: componentId,
-            file: `src/components/${componentId}.tsx`,
-            severity: 'high'
-          }
         }
       ];
       
       setSuggestions(prev => [...prev, ...mockSuggestions]);
+      setTokens(prev => prev + 250); // Simulating token usage
+      setData(mockSuggestions);
       setLastUpdated(new Date());
       return mockSuggestions;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       return [];
     } finally {
-      setIsAnalyzing(false);
+      setIsLoading(false);
       setLoading(false);
     }
   }, []);
@@ -77,7 +66,7 @@ export function useAssistant() {
    */
   const analyzeComponents = useCallback(async (componentIds: string[]): Promise<AssistantSuggestion[]> => {
     const allSuggestions: AssistantSuggestion[] = [];
-    setIsAnalyzing(true);
+    setIsLoading(true);
     setLoading(true);
     
     try {
@@ -87,7 +76,7 @@ export function useAssistant() {
       }
       return allSuggestions;
     } finally {
-      setIsAnalyzing(false);
+      setIsLoading(false);
       setLoading(false);
     }
   }, [analyzeComponent]);
@@ -111,7 +100,6 @@ export function useAssistant() {
   const implementSuggestion = useCallback(async (suggestion: AssistantSuggestion): Promise<void> => {
     setIsFixing(true);
     try {
-      // Mock implementation
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       setSuggestions(prev => 
@@ -134,7 +122,6 @@ export function useAssistant() {
   const applyFix = useCallback(async (suggestion: AssistantSuggestion): Promise<boolean> => {
     setIsFixing(true);
     try {
-      // Mock implementation
       await new Promise(resolve => setTimeout(resolve, 1200));
       return true;
     } catch (err) {
@@ -145,48 +132,22 @@ export function useAssistant() {
     }
   }, []);
 
-  /**
-   * Apply an automatic fix to a suggestion
-   */
-  const applyAutoFix = useCallback(async (suggestion: AssistantSuggestion): Promise<boolean> => {
-    if (!suggestion.autoFixAvailable) return false;
-    
-    setIsFixing(true);
-    try {
-      // Mock implementation
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      setSuggestions(prev => 
-        prev.map(s => 
-          s.id === suggestion.id 
-            ? { ...s, status: 'implemented' } 
-            : s
-        )
-      );
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      return false;
-    } finally {
-      setIsFixing(false);
-    }
-  }, []);
-
   return {
+    isLoading,
+    tokens,
+    data,
     suggestions,
-    isAnalyzing,
-    currentComponent,
     error,
     isFixing,
+    currentComponent,
     loading,
     lastUpdated,
     analyzeComponent,
     analyzeComponents,
     dismissSuggestion,
     implementSuggestion,
-    applyFix,
-    applyAutoFix
+    applyFix
   };
-}
+};
 
 export default useAssistant;
