@@ -103,3 +103,96 @@ export interface AchievementRecommendation {
   /** Expected growth areas */
   growthAreas: string[];
 }
+
+/**
+ * AI Assistant suggestion for code improvements
+ */
+export interface AssistantSuggestion {
+  /** Unique identifier for the suggestion */
+  id: string;
+  /** Type of suggestion (performance, quality, security, etc.) */
+  type: 'performance' | 'quality' | 'security' | 'pattern';
+  /** Component the suggestion applies to */
+  component: string;
+  /** Short title for the suggestion */
+  title: string;
+  /** Detailed description of the issue and recommendation */
+  description: string;
+  /** Priority level of the suggestion */
+  priority: 'low' | 'medium' | 'high';
+  /** Whether an automatic fix is available */
+  autoFixAvailable: boolean;
+}
+
+/**
+ * Status of an AI assistant intent
+ */
+export type AssistantIntentStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+/**
+ * An intent registered with the AI assistant
+ */
+export interface AssistantIntent {
+  /** Unique identifier for the intent */
+  id: string;
+  /** Type of intent (refactor, optimize, etc.) */
+  type: 'refactor' | 'optimize' | 'document' | 'fix';
+  /** Target component or file */
+  target: string;
+  /** Description of the intent */
+  description: string;
+  /** Status of the intent */
+  status: AssistantIntentStatus;
+  /** When the intent was created */
+  created: Date;
+  /** When the intent was last updated */
+  updated?: Date;
+}
+
+/**
+ * AI question for assistant
+ */
+export interface AIQuestion {
+  /** The question text */
+  text: string;
+  /** The main question */
+  question: string;
+  /** Optional context for the question */
+  context?: string;
+  /** Related reflection IDs */
+  reflectionIds?: string[];
+  /** User ID asking the question */
+  userId: string;
+}
+
+/**
+ * Options for AI question processing
+ */
+export interface AIQuestionOptions {
+  /** Whether to use streaming response */
+  streaming?: boolean;
+  /** Whether to use caching */
+  useCache?: boolean;
+  /** Detailed analysis requested */
+  detailedAnalysis?: boolean;
+  /** Related categories */
+  categories?: string[];
+  /** Custom model to use */
+  model?: string;
+}
+
+/**
+ * AI insight from analysis
+ */
+export interface AIInsight {
+  /** Insight type */
+  type: string;
+  /** Insight content */
+  content: string;
+  /** Confidence score (0-1) */
+  confidence: number;
+  /** Related themes */
+  themes: string[];
+  /** Source of the insight */
+  source: 'reflection' | 'practice' | 'meditation' | 'system';
+}
