@@ -1,3 +1,4 @@
+
 import { useCallback, MutableRefObject } from 'react';
 import { AssistantState } from './useAssistantState';
 import { AIQuestion, AIQuestionOptions } from '@/services/ai/types';
@@ -20,9 +21,14 @@ export const useQuestionSubmit = ({
 }: UseQuestionSubmitProps) => {
   
   const submitQuestion = useCallback(async (
-    question: AIQuestion,
+    questionInput: string | AIQuestion,
     options?: AIQuestionOptions
   ) => {
+    // Handle either string or AIQuestion object
+    const question: AIQuestion = typeof questionInput === 'string' 
+      ? { text: questionInput, question: questionInput, userId } 
+      : questionInput;
+    
     if (!question.text.trim()) {
       return;
     }
@@ -72,7 +78,7 @@ export const useQuestionSubmit = ({
         state.setLoading(false);
       }
     }
-  }, [state, isMounted]);
+  }, [state, isMounted, userId]);
   
   return { submitQuestion };
 };
