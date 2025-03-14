@@ -7,6 +7,7 @@ export interface ChakraSystemProps {
   energyPoints?: number;
   activatedChakras?: number[];
   onActivationChange?: (activatedChakras: number[]) => void;
+  activePairs?: Array<[number, number] | { primaryChakra: number; secondaryChakra: number; entanglementStrength: number; }>;
 }
 
 // Additional types needed for the ChakraSystem
@@ -104,4 +105,26 @@ export interface MetatronsConnection {
   active?: boolean;
   intensity?: number;
   animated?: boolean;
+}
+
+// Add the GlassmorphicVariant type to support the missing variants in errors
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'medium' | 'cosmic' | 'purple';
+
+// Metatron's Cube types for type errors
+export type CubeTheme = 'default' | 'light' | 'dark' | 'cosmic' | 'chakra' | 'etheric';
+export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type GlowIntensity = 'high' | 'medium' | 'low' | 'none';
+
+export interface MetatronsCubeData {
+  nodes: MetatronsNode[];
+  connections: MetatronsConnection[];
+}
+
+export interface VisualizationProps {
+  system?: ChakraSystem;
+  energyPoints?: number;
+  activatedChakras?: number[];
+  onActivationChange?: (activatedChakras: number[]) => void;
+  onVisualizationRendered?: () => void;
+  deviceCapability?: string;
 }

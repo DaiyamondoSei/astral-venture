@@ -78,7 +78,7 @@ export interface AIResponseMeta {
   cached?: boolean;
 }
 
-// AI Response types
+// AI Response types - adding 'stream' to match component usage
 export type AIResponseType = 'text' | 'markdown' | 'code' | 'error' | 'stream';
 
 // AI Response structure

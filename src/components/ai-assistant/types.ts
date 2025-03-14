@@ -19,9 +19,12 @@ export interface AIResponseDisplayProps {
   response: AIResponse;
 }
 
+// Update AIResponseType to include 'stream'
+export type AIResponseType = 'text' | 'code' | 'markdown' | 'error' | 'stream';
+
 export interface AIResponse {
   answer: string;
-  type: 'text' | 'code' | 'markdown' | 'error';
+  type: AIResponseType;
   suggestedPractices?: string[];
   meta: AIResponseMeta;
 }
@@ -126,4 +129,9 @@ export interface ContentRecommendation {
   estimatedDuration: number;
   thumbnailUrl?: string;
   tags: string[];
+}
+
+export interface AISuggestionListProps {
+  maxItems?: number;
+  componentName?: string;
 }

@@ -1,202 +1,193 @@
 
-# Module Imports Best Practices
+# Module Import Best Practices
 
 ## Problem
 
-Incorrect or inconsistent imports lead to TypeScript errors like:
+Inconsistent or incorrect module imports cause TypeScript errors that are difficult to debug:
 
-```
-Module '"@/utils/performance/PerformanceMonitor"' has no exported member 'ComponentMetrics'.
-Did you mean to use 'import ComponentMetrics from "@/utils/performance/PerformanceMonitor"' instead?
-```
+```typescript
+// ERROR: Module '"@/utils/performance/PerformanceMonitor"' has no exported member 'ComponentMetrics'
+import { ComponentMetrics } from '@/utils/performance/PerformanceMonitor';
 
-or
-
-```
-File name '/dev-server/src/utils/performance/PerformanceMonitor.ts' differs from already included file name 
-'/dev-server/src/utils/performance/performanceMonitor.ts' only in casing.
+// ERROR: File name '/path/to/PerformanceMonitor.ts' differs from already included file name '/path/to/performanceMonitor.ts'
 ```
 
-## Root Cause
+## Root Cause Analysis (5 Whys)
 
-Import issues arise from several sources:
-1. **File Casing Inconsistency**: Different import paths with the same name but different casing
-2. **Missing or Incorrect Exports**: Trying to import members that aren't properly exported
-3. **Type vs Value Imports**: Importing types incorrectly or using them as values
-4. **Barrel File Misuse**: Inconsistent or incomplete re-exports in barrel files
-5. **Path Aliasing Confusion**: Mixing absolute and relative imports
+1. **Why do import errors happen?**  
+   Importing modules or types that don't exist or have different capitalization.
+
+2. **Why do we import non-existent exports?**  
+   Module interfaces change over time, or path casing differs across operating systems.
+
+3. **Why do module interfaces change without updating imports?**  
+   No consistent process for tracking cross-module dependencies.
+
+4. **Why are there inconsistencies in file naming?**  
+   Developers using different operating systems (case-sensitive vs. case-insensitive file systems).
+
+5. **Why do file system differences matter?**  
+   TypeScript treats differently-cased imports as different files, but some file systems don't.
 
 ## Solution Patterns
 
-### 1. File Naming and Casing Conventions
+### 1. Export/Import Consistency
 
-Adopt and strictly enforce a consistent file naming convention:
+Always match exports with imports exactly:
 
 ```typescript
-// CORRECT: All lowercase with hyphens for multi-word filenames
-// performance-monitor.ts, user-profile.tsx
+// Module file
+export interface ComponentMetrics { /* ... */ }
 
-// AVOID: Mixed case or inconsistent styles
-// PerformanceMonitor.ts vs performanceMonitor.ts
+// Importing file
+import { ComponentMetrics } from './path/to/module';
 ```
 
-### 2. Proper Type Exports and Imports
+### 2. Barrel Files for Complex Modules
 
-Use explicit type exports and imports:
-
-```typescript
-// For exporting types
-export type ComponentMetrics = {
-  // ...
-};
-
-// For importing types
-import type { ComponentMetrics } from './types';
-
-// OR use the new 'type' modifier
-import { type ComponentMetrics } from './types';
-```
-
-### 3. Re-Export Pattern for Types
-
-Create dedicated type files with proper re-exports:
+Create index.ts files to unify and simplify imports:
 
 ```typescript
-// types.ts
-export type { ComponentMetrics } from './metrics';
-export type { PerformanceConfig } from './config';
-
-// Import all types from a single source
-import type { ComponentMetrics, PerformanceConfig } from './types';
-```
-
-### 4. Export/Import Strategy
-
-Always be explicit about what you're exporting and importing:
-
-```typescript
-// AVOID: Default exports for complex objects
-export default {
-  ComponentMetrics,
-  PerformanceConfig
-};
-
-// BETTER: Named exports for better discoverability
-export { ComponentMetrics };
-export { PerformanceConfig };
-
-// BEST: Type annotations for values, type exports for types
-export const ComponentMetrics: MetricsType = { /* ... */ };
-export type PerformanceConfig = { /* ... */ };
-```
-
-### 5. Barrel Files (index.ts)
-
-Use barrel files for clean imports, but be careful with circular dependencies:
-
-```typescript
-// types/index.ts
+// src/utils/performance/index.ts
 export * from './metrics';
-export * from './config';
+export * from './tracking';
+export * from './analysis';
 
-// Import from the barrel file
-import { ComponentMetrics } from '@/types';
+// Importing file
+import { ComponentMetrics, trackPerformance } from '@/utils/performance';
 ```
 
-### 6. Path Alias Consistency
+### 3. Consistent File Naming Convention
 
-Use consistent path aliases throughout the project:
+Use consistent kebab-case for file names to avoid case-sensitivity issues:
+
+```
+performance-monitor.ts   ✅
+performanceMonitor.ts    ❌
+PerformanceMonitor.ts    ❌
+```
+
+### 4. Type-Only Imports
+
+Use type-only imports for better tree-shaking:
 
 ```typescript
-// tsconfig.json
+// Only import types, not values
+import type { ComponentMetrics } from './module';
+
+// Import both types and values
+import { doSomething } from './module';
+import type { SomeType } from './module';
+```
+
+### 5. Absolute vs Relative Imports
+
+- Use absolute imports (with `@/` prefix) for imports across different directories
+- Use relative imports (`./` or `../`) for imports within the same directory
+
+```typescript
+// Different directory (absolute)
+import { Button } from '@/components/ui/button';
+
+// Same directory (relative)
+import { ButtonProps } from './button-types';
+```
+
+### 6. Path Alias Configuration
+
+Configure path aliases in tsconfig.json:
+
+```json
 {
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@utils/*": ["src/utils/*"]
     }
   }
 }
-
-// CONSISTENT: Always use the same pattern for similar imports
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-
-// AVOID: Mixing relative and aliased paths
-import { Button } from '@/components/ui/button';
-import { Input } from '../../components/ui/input';
 ```
 
-### 7. Type vs Value Imports
+### 7. Import Validation Tools
 
-Separate type and value imports clearly:
+Use tools like ESLint with the `import` plugin to catch common import errors:
 
-```typescript
-// CLEAR: Separate type and value imports
-import type { UserProfile } from '@/types';
-import { fetchUserProfile } from '@/api';
-
-// ALSO GOOD: Use the `type` modifier
-import { type UserProfile } from '@/types';
-import { fetchUserProfile } from '@/api';
-```
-
-### 8. Module Interface Pattern
-
-Create clear module interfaces:
-
-```typescript
-// performanceMonitor.ts
-export interface PerformanceMonitor {
-  trackComponent(name: string, renderTime: number): void;
-  getMetrics(): ComponentMetrics[];
+```json
+{
+  "rules": {
+    "import/no-unresolved": "error",
+    "import/named": "error",
+    "import/namespace": "error",
+    "import/default": "error",
+    "import/export": "error"
+  }
 }
-
-// Create and export the singleton instance
-export const performanceMonitor: PerformanceMonitor = {
-  // Implementation...
-};
-
-// Import and use the singleton
-import { performanceMonitor } from './performanceMonitor';
-performanceMonitor.trackComponent('MyComponent', 1.5);
 ```
 
-### 9. Default Export Caution
+## Common Pitfalls to Avoid
 
-Be careful with default exports:
+### 1. Circular Dependencies
+
+Avoid importing modules that import each other:
 
 ```typescript
-// PROBLEMATIC: Default export with separate types
-export type ComponentMetrics = { /* ... */ };
-export default class PerformanceMonitor { /* ... */ }
+// file1.ts ❌
+import { something } from './file2';
 
-// BETTER: Named exports for everything
-export type ComponentMetrics = { /* ... */ };
-export class PerformanceMonitor { /* ... */ }
-export const performanceMonitor = new PerformanceMonitor();
+// file2.ts ❌
+import { somethingElse } from './file1';
 ```
 
-### 10. Troubleshooting Guide
+### 2. Import * Antipattern
 
-When facing import errors:
+Avoid namespace imports that mask specific dependencies:
 
-1. **Check file existence**: Ensure the file exists at the imported path
-2. **Check exports**: Verify the member is actually exported
-3. **Check casing**: Verify that the file name casing matches exactly
-4. **Check circular dependencies**: Look for circular import chains
-5. **Check barrel files**: Ensure barrel files correctly re-export needed members
+```typescript
+// Avoid this ❌
+import * as Utils from '@/utils';
+Utils.formatDate();
+
+// Prefer this ✅
+import { formatDate } from '@/utils/date';
+formatDate();
+```
+
+### 3. Case-Sensitivity Issues
+
+Remember that import paths are case-sensitive, even on Windows:
+
+```typescript
+// These are different imports! ❌
+import { Button } from '@/components/Button';
+import { Button } from '@/components/button';
+```
+
+### 4. Missing Re-exports
+
+When creating barrel files, ensure all needed exports are included:
+
+```typescript
+// Missing re-exports ❌
+export { A, B } from './module';  // C is missing!
+
+// Complete re-exports ✅
+export * from './module';
+// OR
+export { A, B, C } from './module';
+```
 
 ## Best Practices Checklist
 
-When creating new modules or modifying imports:
+- [ ] Use consistent naming conventions for files
+- [ ] Create barrel files for complex modules
+- [ ] Use path aliases for cleaner imports
+- [ ] Use type-only imports where appropriate
+- [ ] Avoid circular dependencies
+- [ ] Export all relevant types and values
+- [ ] Validate imports with linting tools
+- [ ] Be mindful of case-sensitivity
+- [ ] Update all imports when refactoring exports
 
-- [ ] Use consistent file naming conventions
-- [ ] Be explicit about exporting types vs values
-- [ ] Use path aliases consistently
-- [ ] Avoid default exports for complex objects
-- [ ] Properly document exported members
-- [ ] Use barrel files for cleaner imports
-- [ ] Check for circular dependencies
-
-Following these practices will greatly reduce import-related errors and improve code maintainability.
+Following these best practices will significantly reduce import-related errors in your TypeScript project.
