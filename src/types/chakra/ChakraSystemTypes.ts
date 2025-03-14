@@ -1,156 +1,107 @@
 
-/**
- * Chakra System Types
- * 
- * Type definitions for the chakra system architecture
- */
+import { ChakraType, ChakraStatus, EntanglementState } from '@/types/consciousness';
 
-export type ChakraType = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
-export type EnergyLevel = 'dormant' | 'awakening' | 'active' | 'balanced' | 'heightened' | 'transcendent';
-export type ActivationMethod = 'meditation' | 'breathwork' | 'movement' | 'sound' | 'visualization' | 'intention';
-
-/**
- * Status of a specific chakra including energy levels and blockages
- */
-export interface ChakraStatus {
-  type: ChakraType;
-  energyLevel: EnergyLevel;
-  activationPercentage: number;
-  blockagePercentage: number;
-  dominantElement?: string;
-  associatedEmotions?: string[];
-  lastActivated?: string; // ISO date string
+// Define ChakraSystemProps for consistency across components
+export interface ChakraSystemProps {
+  system?: any;
+  energyPoints?: number;
+  activatedChakras?: number[];
+  onActivationChange?: (activatedChakras: number[]) => void;
 }
 
-/**
- * Balance metrics across the chakra system
- */
+// Additional types needed for the ChakraSystem
+export interface ChakraActivationState {
+  chakraId: number;
+  active: boolean;
+  activationLevel: number;
+  lastActivated?: string;
+  activationHistory?: { timestamp: string; level: number }[];
+}
+
+export interface EnergyLevel {
+  currentLevel: number;
+  maxLevel: number;
+  flowRate: number;
+  blockagePoints: any[];
+}
+
 export interface BalanceMetrics {
-  overallBalance: number; // 0-100
+  overallBalance: number;
   energyDistribution: Record<ChakraType, number>;
   dominantChakra?: ChakraType;
   weakestChakra?: ChakraType;
   recommendedFocus?: ChakraType[];
+  chakraBalanceRatios?: Record<number, number>;
 }
 
-/**
- * Energy resonance patterns between chakras
- */
 export interface ResonancePattern {
-  sourceChakra: ChakraType;
-  targetChakra: ChakraType;
-  resonanceStrength: number; // 0-100
-  resonanceType: 'harmonic' | 'dissonant' | 'neutral';
-  visualEffect?: string;
+  sourceChakra: number;
+  targetChakra: number;
+  resonanceStrength: number;
+  harmonicQuality: number;
 }
 
-/**
- * Quantum entanglement between chakras
- */
-export interface EntanglementState {
-  entangledChakras: [ChakraType, ChakraType][];
-  entanglementStrength: number; // 0-100
-  synchronicity: number; // 0-100
-  coherenceField?: boolean;
+export interface CoherenceMetrics {
+  overallCoherence: number;
+  chakraPairCoherence: Record<string, number>;
+  coherenceHistory: { timestamp: string; value: number }[];
+  phaseSynchronization?: Record<string, number>;
 }
 
-/**
- * Superposition states in the chakra system
- */
 export interface SuperpositionState {
-  activeChakras: ChakraType[];
-  potentialStates: Record<string, number>; // State name to probability
-  waveFunction: number; // 0-100
+  potentialStates: Record<string, number> | number;
+  stateAmplitudes: Record<string, number>;
+  waveFunction: any[];
   collapseThreshold: number;
 }
 
-/**
- * Metrics for system coherence
- */
-export interface CoherenceMetrics {
-  overallCoherence: number; // 0-100
-  stabilityIndex: number; // 0-100
-  harmonicResonance: number; // 0-100
-  entropyLevel: number; // 0-100
-}
-
-/**
- * Historical record of chakra activations
- */
-export interface ActivationRecord {
-  timestamp: string; // ISO date string
-  chakra: ChakraType;
-  method: ActivationMethod;
-  duration: number; // seconds
-  intensity: number; // 0-100
-  peakEnergy: number; // 0-100
-  insights?: string[];
-}
-
-/**
- * Metrics for tracking progression over time
- */
 export interface ProgressionMetrics {
-  historicalBalance: Record<string, number>; // date to balance
-  awakening: Record<ChakraType, number>; // 0-100
-  totalActivationTime: Record<ChakraType, number>; // seconds
-  milestones: string[];
+  currentStage: string;
+  progressToNextStage: number;
+  stageHistory: { stage: string; achievedAt: string }[];
+  overallProgress?: number;
 }
 
-/**
- * System performance statistics
- */
 export interface PerformanceStats {
-  energyEfficiency: number; // 0-100
-  recoveryRate: number; // 0-100
-  adaptabilityIndex: number; // 0-100
-  resistanceFactors: string[];
+  renderTime: number;
+  optimizationLevel: number;
+  memoryUsage: number;
+  activationLatency?: Record<number, number>;
 }
 
-/**
- * Complete chakra system configuration
- */
 export interface ChakraSystem {
-  // Core chakra management
   chakras: {
     activationStates: Record<ChakraType, ChakraStatus>;
     energyLevels: Record<ChakraType, EnergyLevel>;
     balanceMetrics: BalanceMetrics;
     resonancePatterns: ResonancePattern[];
   };
-
-  // Advanced quantum features
-  quantumStates?: {
+  quantumStates: {
     entanglement: EntanglementState;
     superposition: SuperpositionState;
     coherence: CoherenceMetrics;
   };
-
-  // Performance & Tracking
   metrics?: {
-    activationHistory: ActivationRecord[];
-    progressionPath: ProgressionMetrics;
-    performanceStats: PerformanceStats;
+    progression: ProgressionMetrics;
+    performance: PerformanceStats;
   };
 }
 
-/**
- * Component props for the ChakraSystem component
- */
-export interface ChakraSystemProps {
-  // Core configuration
-  config?: Partial<ChakraSystem>;
-  
-  // Activation control
-  activeChakras?: ChakraType[];
-  
-  // Visualization options
-  showResonance?: boolean;
-  showQuantumEffects?: boolean;
-  detailLevel?: 'basic' | 'detailed' | 'advanced';
-  
-  // Events
-  onChakraActivation?: (chakra: ChakraType, level: EnergyLevel) => void;
-  onBalanceChange?: (metrics: BalanceMetrics) => void;
-  onQuantumEvent?: (event: string, data: any) => void;
+// Define MetatronsNode and MetatronsConnection types
+export interface MetatronsNode {
+  id: string;
+  x: number;
+  y: number;
+  chakraIndex?: number;
+  active?: boolean;
+  state?: string;
+}
+
+export interface MetatronsConnection {
+  id: string;
+  source: string;
+  target: string;
+  active?: boolean;
+  intensity?: number;
+  animated?: boolean;
 }

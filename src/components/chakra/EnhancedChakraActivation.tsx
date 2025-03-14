@@ -14,7 +14,7 @@ import { ChakraSystemProps } from '@/types/chakra/ChakraSystemTypes';
 import { CHAKRA_NAMES, CHAKRA_COLORS } from '../entry-animation/cosmic/types';
 
 // Chakra activation component props
-interface ChakraActivationProps extends ChakraSystemProps {
+export interface ChakraActivationProps extends ChakraSystemProps {
   className?: string;
   showLabels?: boolean;
   interactive?: boolean;
@@ -126,7 +126,10 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
   
   // Check for entangled chakras
   const getEntanglementProps = (chakraId: number) => {
-    const entangledPairs = system.quantumStates.entanglement.activePairs;
+    // Get entanglement pairs from the system
+    const entangledPairs = system.quantumStates.entanglement.activePairs || [];
+    
+    // Check if this chakra is part of any entangled pair
     const isEntangled = entangledPairs.some(
       pair => pair.primaryChakra === chakraId || pair.secondaryChakra === chakraId
     );
@@ -140,11 +143,16 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
     
     const entanglementIntensity = strongestPair ? strongestPair.entanglementStrength : 0;
     
+    // Return the CSS properties for the glow effect
+    // Using boxShadow directly as a style prop, not ringColor
     return {
       boxShadow: `0 0 ${10 * entanglementIntensity}px ${2 * entanglementIntensity}px rgba(147, 51, 234, ${entanglementIntensity})`,
       transform: `scale(${1 + 0.1 * entanglementIntensity})`
     };
   };
+  
+  // Convert chakra object to array for mapping
+  const chakraArray = Object.values(system.chakras.activationStates || {});
   
   return (
     <div 
@@ -162,11 +170,18 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
       </div>
       
       <div className="flex flex-col gap-6 items-center">
-        {system.chakras.activationStates.map((chakra, index) => {
+        {chakraArray.map((chakra, index) => {
           const isActive = chakra.active;
           const activationLevel = chakra.activationLevel;
           const chakraName = CHAKRA_NAMES[index];
           const chakraColor = CHAKRA_COLORS[index];
+          
+          // Prepare the style object for the motion div
+          // Without the invalid ringColor property
+          const motionStyle = {
+            backgroundColor: chakraColor,
+            ...(getEntanglementProps(index))
+          };
           
           return (
             <div key={`chakra-${index}`} className="flex items-center gap-4">
@@ -176,11 +191,7 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
                   interactive ? "cursor-pointer hover:brightness-110" : "",
                   isActive ? "ring-2 ring-offset-2" : "opacity-60"
                 )}
-                style={{ 
-                  backgroundColor: chakraColor,
-                  ringColor: chakraColor,
-                  ...getEntanglementProps(index)
-                }}
+                style={motionStyle}
                 onClick={interactive ? () => handleChakraClick(index) : undefined}
                 {...getAnimationProps(index)}
               >
@@ -218,7 +229,7 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
             <div className="font-medium">Entanglement</div>
-            <div>{system.quantumStates.entanglement.activePairs.length} pairs active</div>
+            <div>{(system.quantumStates.entanglement.activePairs || []).length} pairs active</div>
           </div>
           <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
             <div className="font-medium">Coherence</div>
@@ -226,7 +237,11 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
           </div>
           <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
             <div className="font-medium">Superposition</div>
-            <div>{system.quantumStates.superposition.potentialStates} states</div>
+            <div>
+              {typeof system.quantumStates.superposition.potentialStates === 'number' 
+                ? system.quantumStates.superposition.potentialStates 
+                : Object.keys(system.quantumStates.superposition.potentialStates).length} states
+            </div>
           </div>
           <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
             <div className="font-medium">Balance</div>
