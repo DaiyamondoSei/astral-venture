@@ -1,4 +1,3 @@
-
 /**
  * Enhanced Chakra Activation Component
  * 
@@ -154,6 +153,67 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
   // Convert chakra object to array for mapping
   const chakraArray = Object.values(system.chakras.activationStates || {});
   
+  // Type guard function to check for object type in union
+  const isChakraPair = (pair: [number, number] | { primaryChakra: number; secondaryChakra: number; entanglementStrength: number }): 
+    pair is { primaryChakra: number; secondaryChakra: number; entanglementStrength: number } => {
+    return typeof pair === 'object' && 'primaryChakra' in pair;
+  };
+
+  // Using the type guard function in the rendering code
+  const renderChakraConnections = () => {
+    return entangledChakras.map((pair, index) => {
+      if (isChakraPair(pair)) {
+        // Safe to access properties now that we've verified the type
+        const { primaryChakra, secondaryChakra, entanglementStrength } = pair;
+        const entanglementOpacity = Math.min(0.8, Math.max(0.2, entanglementStrength / 100));
+        
+        return (
+          <ChakraConnection
+            key={`connection-${index}`}
+            sourceChakra={primaryChakra}
+            targetChakra={secondaryChakra}
+            strength={entanglementStrength}
+            opacity={entanglementOpacity}
+          />
+        );
+      } else {
+        // Handle the tuple variant
+        const [source, target] = pair;
+        const defaultStrength = 50; // Default strength for tuple format
+        const entanglementOpacity = 0.5; // Default opacity
+        
+        return (
+          <ChakraConnection
+            key={`connection-${index}`}
+            sourceChakra={source}
+            targetChakra={target}
+            strength={defaultStrength}
+            opacity={entanglementOpacity}
+          />
+        );
+      }
+    });
+  };
+
+  // Update the chakra item render function to handle active property correctly
+  const renderChakraItem = (chakra: number, status: ChakraStatus) => {
+    // Use activation instead of active (which doesn't exist on ChakraStatus)
+    const isActive = status.activation > 0;
+    // Use activation directly instead of activationLevel
+    const activationLevel = status.activation;
+    
+    return (
+      <ChakraNode
+        key={`chakra-${chakra}`}
+        chakraId={chakra}
+        activated={isActive}
+        activationLevel={activationLevel}
+        onClick={() => handleChakraClick(chakra)}
+        glowIntensity={getGlowIntensity(activationLevel)}
+      />
+    );
+  };
+
   return (
     <div 
       ref={setNodeRef}

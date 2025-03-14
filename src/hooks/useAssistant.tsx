@@ -19,6 +19,8 @@ export function useAssistant(props: UseAssistantProps = {}) {
   const [suggestions, setSuggestions] = useState<AssistantSuggestion[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState<AssistantSuggestion | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   
   // Use the core assistant state
   const assistantState = useAssistantState();
@@ -80,6 +82,7 @@ export function useAssistant(props: UseAssistantProps = {}) {
       ];
       
       setSuggestions(mockSuggestions);
+      setLastUpdated(new Date());
       return mockSuggestions;
     } catch (error) {
       console.error('Error analyzing component:', error);
@@ -95,6 +98,7 @@ export function useAssistant(props: UseAssistantProps = {}) {
     if (selectedSuggestion?.id === suggestionId) {
       setSelectedSuggestion(null);
     }
+    setLastUpdated(new Date());
   }, [selectedSuggestion]);
   
   // Implement a suggestion
@@ -103,14 +107,57 @@ export function useAssistant(props: UseAssistantProps = {}) {
     setSuggestions(prev => 
       prev.map(s => s.id === suggestion.id ? { ...s, status: 'implemented' } : s)
     );
+    setLastUpdated(new Date());
+    return Promise.resolve();
+  }, []);
+
+  // Apply a fix for a suggestion
+  const applyFix = useCallback(async (suggestion: AssistantSuggestion) => {
+    setIsFixing(true);
+    try {
+      // Simulate applying a fix
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSuggestions(prev => 
+        prev.map(s => s.id === suggestion.id ? { ...s, status: 'fixed' } : s)
+      );
+      setLastUpdated(new Date());
+      return true;
+    } catch (error) {
+      console.error('Error applying fix:', error);
+      return false;
+    } finally {
+      setIsFixing(false);
+    }
+  }, []);
+
+  // Apply an auto fix for a suggestion
+  const applyAutoFix = useCallback(async (suggestion: AssistantSuggestion) => {
+    setIsFixing(true);
+    try {
+      // Simulate auto-fixing
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      setSuggestions(prev => 
+        prev.map(s => s.id === suggestion.id ? { ...s, status: 'fixed' } : s)
+      );
+      setLastUpdated(new Date());
+      return true;
+    } catch (error) {
+      console.error('Error applying auto fix:', error);
+      return false;
+    } finally {
+      setIsFixing(false);
+    }
   }, []);
   
   return {
     ...assistantState,
     submitQuestion: handleSubmitQuestion,
     isLoading,
+    loading: isLoading, // Alias for backward compatibility
     error,
     tokenMetrics,
+    tokens: tokenMetrics?.total || 0, // For backward compatibility
+    data: assistantState.response, // For backward compatibility
     suggestions,
     selectedSuggestion,
     setSelectedSuggestion,
@@ -118,7 +165,11 @@ export function useAssistant(props: UseAssistantProps = {}) {
     analyzeComponent,
     dismissSuggestion,
     implementSuggestion,
-    currentComponent: componentName
+    currentComponent: componentName,
+    isFixing,
+    lastUpdated,
+    applyFix,
+    applyAutoFix
   };
 }
 

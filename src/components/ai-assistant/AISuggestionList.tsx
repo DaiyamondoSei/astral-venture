@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, AlertCircle, RefreshCw, Code, Wrench } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-interface AISuggestionListProps {
+export interface AISuggestionListProps {
   componentId?: string;
   limit?: number;
 }
@@ -277,14 +277,5 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
     </Card>
   );
 };
-
-function getPriorityColor(priority: string): string {
-  switch (priority) {
-    case 'high': return 'bg-red-500';
-    case 'medium': return 'bg-yellow-500';
-    case 'low': return 'bg-blue-500';
-    default: return 'bg-gray-500';
-  }
-}
 
 export default AISuggestionList;

@@ -32,6 +32,11 @@ export const RenderFrequencies = {
 };
 
 /**
+ * Quality level type for performance settings
+ */
+export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
+
+/**
  * Runtime constants for quality level
  */
 export const QualityLevels = {
@@ -128,8 +133,3 @@ export const GlowIntensities = {
   LOW: 'low' as GlowIntensity,
   NONE: 'none' as GlowIntensity
 };
-
-/**
- * Quality level type for performance settings
- */
-export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
