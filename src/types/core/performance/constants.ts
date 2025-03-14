@@ -87,14 +87,47 @@ export const GlassmorphicVariants = {
 export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
 /**
+ * Runtime constants for CubeSize
+ */
+export const CubeSizes = {
+  SMALL: 'sm' as CubeSize,
+  MEDIUM: 'md' as CubeSize,
+  LARGE: 'lg' as CubeSize,
+  EXTRA_LARGE: 'xl' as CubeSize,
+  FULL: 'full' as CubeSize
+};
+
+/**
  * Cube theme type for Metatron's Cube
  */
 export type CubeTheme = 'default' | 'light' | 'dark' | 'cosmic' | 'chakra' | 'etheric';
 
 /**
+ * Runtime constants for CubeTheme
+ */
+export const CubeThemes = {
+  DEFAULT: 'default' as CubeTheme,
+  LIGHT: 'light' as CubeTheme,
+  DARK: 'dark' as CubeTheme,
+  COSMIC: 'cosmic' as CubeTheme,
+  CHAKRA: 'chakra' as CubeTheme,
+  ETHERIC: 'etheric' as CubeTheme
+};
+
+/**
  * Glow intensity type for visual components
  */
 export type GlowIntensity = 'high' | 'medium' | 'low' | 'none';
+
+/**
+ * Runtime constants for GlowIntensity
+ */
+export const GlowIntensities = {
+  HIGH: 'high' as GlowIntensity,
+  MEDIUM: 'medium' as GlowIntensity,
+  LOW: 'low' as GlowIntensity,
+  NONE: 'none' as GlowIntensity
+};
 
 /**
  * Quality level type for performance settings

@@ -100,3 +100,26 @@ export function createGlassmorphicVariant(value: string): GlassmorphicVariant {
     GlassmorphicVariants.PURPLE
   ]);
 }
+
+// CubeSize type alias for Metatron's Cube (moved here for centralization)
+export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+// Runtime constants for CubeSize
+export const CubeSizes = {
+  SMALL: 'sm' as CubeSize,
+  MEDIUM: 'md' as CubeSize,
+  LARGE: 'lg' as CubeSize,
+  EXTRA_LARGE: 'xl' as CubeSize,
+  FULL: 'full' as CubeSize
+};
+
+// Helper function for creating type-safe CubeSize values
+export function createCubeSize(value: string): CubeSize {
+  return validateValueAgainstType(value, [
+    CubeSizes.SMALL,
+    CubeSizes.MEDIUM,
+    CubeSizes.LARGE,
+    CubeSizes.EXTRA_LARGE,
+    CubeSizes.FULL
+  ]);
+}

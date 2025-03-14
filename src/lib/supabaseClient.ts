@@ -1,18 +1,20 @@
 
 /**
- * Supabase Client - Robust and reliable client initialization with better error handling
+ * Supabase Client - Singleton implementation with proper error handling
  */
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { toast } from '@/components/ui/use-toast';
 import { metricsCollector } from '@/utils/performance/collectors/MetricsCollector';
 
-// Get environment variables with fallbacks to ensure the client always initializes
+// Environment variables with fallbacks
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://wkmyvthtyjcdzhzvfyji.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbXl2dGh0eWpjZHpoenZmeWppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExMDM5OTMsImV4cCI6MjA1NjY3OTk5M30.iOgl9X2mcl-eQi5CzhluFYqVal1Qevk4kTav4zVfeMU';
 
+// SINGLETON PATTERN: Private instance variable
+let instance: SupabaseClient | null = null;
+
 // Track initialization status
 let hasWarnedAboutConfig = false;
-let hasInitializedClient = false;
 
 // Validate configuration and provide useful feedback
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -78,6 +80,12 @@ const instrumentedFetch = (...args: Parameters<typeof fetch>): Promise<Response>
         resolve(response);
       })
       .catch(error => {
+        // Skip aborting twice
+        if (error.name === 'AbortError') {
+          reject(error);
+          return;
+        }
+        
         const endTime = performance.now();
         const duration = endTime - startTime;
         
@@ -100,31 +108,47 @@ const instrumentedFetch = (...args: Parameters<typeof fetch>): Promise<Response>
   });
 };
 
-// Create Supabase client with enhanced options
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-    global: {
-      fetch: instrumentedFetch
-    },
-    db: {
-      schema: 'public',
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10,
-      },
-    },
+/**
+ * Get the Supabase client instance - implements Singleton pattern
+ * Using this function ensures only one client instance exists
+ */
+export function getSupabaseClient(): SupabaseClient {
+  // If instance already exists, return it (singleton pattern)
+  if (instance) {
+    return instance;
   }
-);
+  
+  // Create Supabase client with enhanced options
+  instance = createClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'supabase.auth.token', // Consistent storage key
+      },
+      global: {
+        fetch: instrumentedFetch
+      },
+      db: {
+        schema: 'public',
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    }
+  );
+  
+  console.log('Supabase client initialized (singleton)');
+  return instance;
+}
 
-hasInitializedClient = true;
+// Export the singleton client instance
+export const supabase = getSupabaseClient();
 
 // Test connection and cache result
 let connectionValid: boolean | null = null;
@@ -174,7 +198,7 @@ export function getConfigurationStatus(): {
     errors: errors.length > 0 ? errors : null,
     isComplete: isValid,
     hasWarned: hasWarnedAboutConfig,
-    isInitialized: hasInitializedClient
+    isInitialized: !!instance
   };
 }
 
@@ -190,4 +214,5 @@ export function getSetupInstructions(key: string): string | undefined {
   return instructions[key];
 }
 
+// For compatibility with existing imports
 export default supabase;

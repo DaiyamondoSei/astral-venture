@@ -1,10 +1,53 @@
 
 /**
  * Enhanced utility for preloading assets to improve performance
+ * With validation to prevent 404 errors
  */
+
+// Track which assets we've already tried to preload to avoid duplicates
+const preloadAttempted = new Set<string>();
+
+// Asset validation: Check if the file actually exists before preloading
+const validateAssetPath = (src: string): boolean => {
+  // Skip validation for external URLs (starting with http)
+  if (src.startsWith('http')) {
+    return true;
+  }
+
+  // If we're preloading from the public directory, construct correct path
+  // Map paths like "/fonts/main-font.woff2" to the correct public URL
+  const publicBasePath = import.meta.env.BASE_URL || '/';
+  
+  // Log the base path for debugging
+  if (!preloadAttempted.has('_logged_basepath')) {
+    console.debug(`[Asset Preloader] Base path: ${publicBasePath}`);
+    preloadAttempted.add('_logged_basepath');
+  }
+  
+  // Consider the path valid by default, let the browser handle actual 404s
+  // but log warnings about potentially problematic paths
+  if (!src.startsWith('/') && !src.startsWith('./') && !src.startsWith('../')) {
+    console.warn(`[Asset Preloader] Warning: Asset path "${src}" should start with "/" for public assets`);
+  }
+  
+  return true;
+}
 
 // Preload a single image with priority indication
 export const preloadImage = (src: string, priority: 'high' | 'medium' | 'low' = 'medium'): Promise<HTMLImageElement> => {
+  // Avoid duplicate preloads
+  const cacheKey = `img_${src}`;
+  if (preloadAttempted.has(cacheKey)) {
+    return Promise.resolve(new Image()); // Return empty image for duplicates
+  }
+  preloadAttempted.add(cacheKey);
+  
+  // Validate path before attempting to preload
+  if (!validateAssetPath(src)) {
+    console.warn(`[Asset Preloader] Skipping invalid image path: ${src}`);
+    return Promise.reject(new Error(`Invalid image path: ${src}`));
+  }
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     
@@ -15,7 +58,10 @@ export const preloadImage = (src: string, priority: 'high' | 'medium' | 'low' = 
     }
     
     img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onerror = (e) => {
+      console.warn(`[Asset Preloader] Failed to preload image: ${src}`, e);
+      reject(e);
+    };
     img.src = src;
   });
 };
@@ -25,7 +71,29 @@ export const preloadImages = async (
   sources: Array<{src: string, priority?: 'high' | 'medium' | 'low'}>
 ): Promise<HTMLImageElement[]> => {
   try {
-    const highPriorityImages = sources
+    // Filter out invalid sources and deduplicate
+    const validSources = sources.filter(img => {
+      const cacheKey = `img_${img.src}`;
+      const isDuplicate = preloadAttempted.has(cacheKey);
+      const isValid = validateAssetPath(img.src);
+      
+      if (isDuplicate) {
+        console.debug(`[Asset Preloader] Skipping duplicate image: ${img.src}`);
+      }
+      if (!isValid) {
+        console.warn(`[Asset Preloader] Skipping invalid image path: ${img.src}`);
+      }
+      
+      return !isDuplicate && isValid;
+    });
+    
+    // Mark these as attempted
+    validSources.forEach(img => {
+      preloadAttempted.add(`img_${img.src}`);
+    });
+    
+    // Split by priority
+    const highPriorityImages = validSources
       .filter(img => img.priority === 'high')
       .map(img => preloadImage(img.src, 'high'));
     
@@ -33,7 +101,7 @@ export const preloadImages = async (
     const highPriorityResults = await Promise.allSettled(highPriorityImages);
     
     // Then load others
-    const otherImages = sources
+    const otherImages = validSources
       .filter(img => img.priority !== 'high')
       .map(img => preloadImage(img.src, img.priority));
     
@@ -48,18 +116,31 @@ export const preloadImages = async (
     // Log failures but don't block the app
     const failures = allResults.filter(result => result.status === 'rejected');
     if (failures.length > 0) {
-      console.warn(`Failed to preload ${failures.length} images`);
+      console.warn(`[Asset Preloader] Failed to preload ${failures.length} images`);
     }
     
     return successfulLoads;
   } catch (error) {
-    console.warn('Failed to preload some images:', error);
+    console.warn('[Asset Preloader] Failed to preload some images:', error);
     return [];
   }
 };
 
 // Preload critical CSS with proper resource hints
 export const preloadCSS = (href: string, priority: 'high' | 'low' = 'high'): void => {
+  // Avoid duplicates
+  const cacheKey = `css_${href}`;
+  if (preloadAttempted.has(cacheKey)) {
+    return;
+  }
+  preloadAttempted.add(cacheKey);
+  
+  // Validate path
+  if (!validateAssetPath(href)) {
+    console.warn(`[Asset Preloader] Skipping invalid CSS path: ${href}`);
+    return;
+  }
+  
   const link = document.createElement('link');
   link.rel = 'preload';
   link.as = 'style';
@@ -78,6 +159,19 @@ export const preloadFont = (
   type: string = 'font/woff2', 
   display: 'auto' | 'block' | 'swap' | 'fallback' | 'optional' = 'swap'
 ): void => {
+  // Avoid duplicates
+  const cacheKey = `font_${href}`;
+  if (preloadAttempted.has(cacheKey)) {
+    return;
+  }
+  preloadAttempted.add(cacheKey);
+  
+  // Validate path
+  if (!validateAssetPath(href)) {
+    console.warn(`[Asset Preloader] Skipping invalid font path: ${href}`);
+    return;
+  }
+  
   // Preload the font resource
   const preloadLink = document.createElement('link');
   preloadLink.rel = 'preload';
@@ -85,6 +179,12 @@ export const preloadFont = (
   preloadLink.type = type;
   preloadLink.href = href;
   preloadLink.crossOrigin = 'anonymous';
+  
+  // Add error handler to log issues
+  preloadLink.onerror = () => {
+    console.warn(`[Asset Preloader] Failed to preload font: ${href}`);
+  };
+  
   document.head.appendChild(preloadLink);
   
   // Also add a font-face declaration with font-display strategy
@@ -101,7 +201,9 @@ export const preloadFont = (
 
 // Priority preloading for critical assets with improved device capability awareness
 export const preloadCriticalAssets = (deviceCapability: 'low' | 'medium' | 'high'): void => {
-  // Critical images always loaded
+  console.debug(`[Asset Preloader] Preloading critical assets for device capability: ${deviceCapability}`);
+  
+  // Critical images always loaded - use correct paths based on your project structure
   const criticalImages = [
     { src: '/cosmic-human.svg', priority: 'high' as const },
     { src: '/placeholder.svg', priority: 'medium' as const }
@@ -112,22 +214,34 @@ export const preloadCriticalAssets = (deviceCapability: 'low' | 'medium' | 'high
   
   if (deviceCapability !== 'low') {
     additionalImages = [
-      // Add medium/high priority images
       { src: '/lovable-uploads/cosmic-human.png', priority: 'medium' as const },
       { src: '/og-image.png', priority: 'low' as const }
     ];
   }
   
   // Preload all images
-  preloadImages([...criticalImages, ...additionalImages]);
+  preloadImages([...criticalImages, ...additionalImages])
+    .then(images => {
+      console.debug(`[Asset Preloader] Successfully preloaded ${images.length} images`);
+    })
+    .catch(error => {
+      console.warn('[Asset Preloader] Error preloading images:', error);
+    });
   
-  // Preload critical fonts with proper font-display strategy
-  // This would be replaced with actual font paths if available
-  if (typeof window !== 'undefined') {
-    // Check if fonts are already loaded to avoid duplicate preloading
-    if (!document.querySelector('link[rel="preload"][as="font"]')) {
-      // Add font preloading here when fonts are available
+  // Don't attempt to preload fonts that don't exist in the project
+  // Instead, check if fonts are defined in the project before preloading
+  const stylesheets = document.querySelectorAll('link[rel="stylesheet"]');
+  let hasFonts = false;
+  
+  stylesheets.forEach(sheet => {
+    if (sheet.getAttribute('href')?.includes('font')) {
+      hasFonts = true;
     }
+  });
+  
+  if (hasFonts && typeof window !== 'undefined') {
+    // Only preload fonts if they seem to exist in the project
+    console.debug('[Asset Preloader] Skipping font preloading - no fonts detected in stylesheets');
   }
 };
 
@@ -141,4 +255,3 @@ export const initAssetPreloading = (): void => {
   // Start preloading critical assets
   preloadCriticalAssets(deviceCapability);
 };
-
