@@ -1,29 +1,24 @@
 
-/**
- * Custom hook for accessing authentication context
- * 
- * Provides access to user authentication state and methods for login, logout, etc.
- */
+import { createContext, useContext } from 'react';
+import { IAuthContext } from './types';
 
-import { useContext } from 'react';
-import { AuthContext } from '@/contexts/AuthContext';
-import type { IAuthContext, UseAuthProps } from './types';
+// Create default empty context
+const defaultContext: IAuthContext = {
+  user: null,
+  profile: null,
+  isLoading: true,
+  isAuthenticated: false,
+  error: null,
+  login: async () => {},
+  register: async () => {},
+  logout: async () => {},
+  resetPassword: async () => {},
+  updateProfile: async () => {},
+  refreshProfile: async () => {},
+};
 
-/**
- * Custom hook for accessing authentication context
- * 
- * @returns The authentication context with user state and authentication methods
- * @throws Error if used outside an AuthProvider
- */
-export function useAuth(options: UseAuthProps = {}): IAuthContext {
-  const context = useContext(AuthContext);
-  
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  
-  return context;
-}
+export const AuthContext = createContext<IAuthContext>(defaultContext);
 
-// Export as default for components using default import
+// Export both a hook and the context
+export const useAuth = () => useContext(AuthContext);
 export default useAuth;

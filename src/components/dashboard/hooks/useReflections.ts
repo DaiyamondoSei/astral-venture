@@ -1,8 +1,18 @@
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/auth/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { EnergyReflection } from '@/services/reflection/types';
+
+export interface EnergyReflection {
+  id: string;
+  created_at: string;
+  user_id: string;
+  content: string;
+  points_earned: number;
+  dominant_emotion?: string;
+  emotional_depth?: number;
+  chakras_activated?: any[];
+}
 
 interface UseReflectionsReturn {
   latestReflection: EnergyReflection | null;
@@ -30,9 +40,10 @@ export function useReflections(): UseReflectionsReturn {
     setError(null);
     
     try {
+      // We need to manually craft this query to match EnergyReflection type
       const { data, error: fetchError } = await supabase
         .from('energy_reflections')
-        .select('*')
+        .select('id, created_at, user_id, content, points_earned, dominant_emotion, emotional_depth, chakras_activated')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)

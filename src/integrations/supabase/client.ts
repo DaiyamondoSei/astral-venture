@@ -56,7 +56,13 @@ export async function checkSupabaseConnection(): Promise<boolean> {
  * @returns The new total points count
  */
 export async function incrementEnergyPoints(userId: string, points: number): Promise<number> {
+  if (!userId) {
+    console.error('Cannot increment points: userId is required');
+    return 0;
+  }
+
   try {
+    // Call the RPC function we've implemented in our database
     const { data, error } = await supabase.rpc('increment_points', {
       row_id: userId,
       points_to_add: points
@@ -64,7 +70,7 @@ export async function incrementEnergyPoints(userId: string, points: number): Pro
     
     if (error) throw error;
     
-    // Also record this in the points history table
+    // Record this in the points history table
     await supabase.from('energy_points_history').insert({
       user_id: userId,
       points_added: points,
@@ -91,6 +97,11 @@ export async function incrementEnergyPoints(userId: string, points: number): Pro
  * @returns The user profile or null if not found
  */
 export async function getUserProfile(userId: string) {
+  if (!userId) {
+    console.error('Cannot fetch profile: userId is required');
+    return null;
+  }
+
   try {
     const { data, error } = await supabase
       .from('user_profiles')

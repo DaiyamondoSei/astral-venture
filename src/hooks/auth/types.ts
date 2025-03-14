@@ -22,6 +22,7 @@ export interface IAuthContext {
   resetPassword: (email: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  errorMessage?: string; // Add this to fix component errors
 }
 
 export interface UseAuthProps {
