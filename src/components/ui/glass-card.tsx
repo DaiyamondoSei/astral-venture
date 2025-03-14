@@ -1,119 +1,119 @@
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { cva, type VariantProps } from 'class-variance-authority';
+import React, { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { DeviceCapability, detectDeviceCapability } from '@/utils/performanceUtils';
-import { usePerformance } from '@/contexts/PerformanceContext';
+import { motion } from 'framer-motion';
+import { usePerformance } from '@/hooks/usePerformance';
+import { DeviceCapabilities } from '@/types/core/performance/constants';
 
-const glassCardVariants = cva(
-  "relative rounded-lg overflow-hidden transition-all duration-300",
-  {
-    variants: {
-      variant: {
-        default: "bg-black/30 backdrop-blur-md border border-white/10",
-        subtle: "bg-black/20 backdrop-blur-sm border border-white/5",
-        elevated: "bg-black/40 backdrop-blur-lg border border-white/20",
-        quantum: "bg-black/30 backdrop-blur-md border border-indigo-500/30",
-        ethereal: "bg-white/10 backdrop-blur-md border border-white/20",
-      },
-      glowIntensity: {
-        none: "",
-        low: "shadow-sm",
-        medium: "shadow-md",
-        high: "shadow-lg",
-      },
-      hover: {
-        true: "hover:bg-black/40 hover:border-white/30 transition-all duration-300",
-        false: "",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      glowIntensity: "medium",
-      hover: false,
-    },
-  }
-);
+export type GlassmorphicVariant = 
+  | 'default' 
+  | 'quantum' 
+  | 'ethereal' 
+  | 'elevated' 
+  | 'subtle';
 
-export interface GlassCardProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof glassCardVariants> {
-  children: React.ReactNode;
-  animate?: boolean;
-  motionProps?: Record<string, any>;
+export interface GlassCardProps {
+  children: ReactNode;
+  className?: string;
+  variant?: GlassmorphicVariant;
+  blur?: number;
+  borderOpacity?: number;
+  backgroundOpacity?: number;
+  interactive?: boolean;
+  fullWidth?: boolean;
+  depth?: number;
+  disabled?: boolean;
+  onClick?: () => void;
 }
 
 /**
- * GlassCard component with glassmorphism effect
- * Adapts to device capability for performance optimization
+ * GlassCard - A glassmorphic card component with multiple visual variants
+ * 
+ * Automatically adapts visual complexity based on device performance capabilities
  */
-export const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
-  ({ 
-    className, 
-    variant, 
-    glowIntensity, 
-    hover, 
-    children, 
-    animate = false,
-    motionProps = {},
-    ...props 
-  }, ref) => {
-    const { deviceCapability } = usePerformance();
-
-    // Adapt glow intensity based on device capability
-    const adaptedGlowIntensity = React.useMemo(() => {
-      if (deviceCapability === DeviceCapability.LOW) {
-        return "none";
-      }
-      
-      if (deviceCapability === DeviceCapability.MEDIUM && glowIntensity === "high") {
-        return "medium";
-      }
-      
-      return glowIntensity;
-    }, [deviceCapability, glowIntensity]);
-    
-    // Render with or without animation
-    if (animate) {
-      return (
-        <motion.div
-          ref={ref}
-          className={cn(glassCardVariants({ 
-            variant, 
-            glowIntensity: adaptedGlowIntensity, 
-            hover, 
-            className 
-          }))}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-          {...motionProps}
-          {...props}
-        >
-          {children}
-        </motion.div>
-      );
+export const GlassCard: React.FC<GlassCardProps> = ({
+  children,
+  className,
+  variant = 'default',
+  blur,
+  borderOpacity,
+  backgroundOpacity,
+  interactive = false,
+  fullWidth = false,
+  depth = 1,
+  disabled = false,
+  onClick
+}) => {
+  const { deviceCapability } = usePerformance();
+  
+  // Default blur based on variant and device capability
+  const getDefaultBlur = () => {
+    if (deviceCapability === DeviceCapabilities.LOW_END) {
+      return 3; // Reduced blur for low-end devices
     }
     
-    return (
-      <div
-        ref={ref}
-        className={cn(glassCardVariants({ 
-          variant, 
-          glowIntensity: adaptedGlowIntensity, 
-          hover,
-          className 
-        }))}
-        {...props}
-      >
-        {children}
-      </div>
-    );
-  }
-);
+    if (deviceCapability === DeviceCapabilities.MID_RANGE) {
+      return 5; // Medium blur for mid-range devices
+    }
+    
+    // Variant-specific blur values for high-end devices
+    switch (variant) {
+      case 'quantum': return 10;
+      case 'ethereal': return 15;
+      case 'elevated': return 8;
+      case 'subtle': return 4;
+      default: return 6;
+    }
+  };
 
-GlassCard.displayName = "GlassCard";
+  // Default background opacity based on variant
+  const getBackgroundOpacity = () => {
+    switch (variant) {
+      case 'quantum': return 0.2;
+      case 'ethereal': return 0.15;
+      case 'elevated': return 0.3;
+      case 'subtle': return 0.1;
+      default: return 0.2;
+    }
+  };
+
+  // Card style variations
+  const blurValue = blur ?? getDefaultBlur();
+  const bgOpacity = backgroundOpacity ?? getBackgroundOpacity();
+  const borderOpacityValue = borderOpacity ?? 0.2;
+  
+  // Interactivity animations
+  const transition = {
+    type: 'spring',
+    stiffness: 500,
+    damping: 30,
+    duration: 0.2
+  };
+
+  return (
+    <motion.div
+      className={cn(
+        'relative rounded-lg overflow-hidden border',
+        fullWidth ? 'w-full' : '',
+        interactive ? 'cursor-pointer' : '',
+        disabled ? 'opacity-50 pointer-events-none' : '',
+        className
+      )}
+      style={{
+        background: `rgba(255, 255, 255, ${bgOpacity})`,
+        backdropFilter: `blur(${blurValue}px)`,
+        borderColor: `rgba(255, 255, 255, ${borderOpacityValue})`,
+        boxShadow: `0 ${depth * 4}px ${depth * 8}px rgba(0, 0, 0, 0.1)`,
+        WebkitBackdropFilter: `blur(${blurValue}px)`,
+      }}
+      whileHover={interactive ? { scale: 1.02, opacity: 1 } : undefined}
+      whileTap={interactive ? { scale: 0.98 } : undefined}
+      transition={transition}
+      onClick={!disabled && onClick ? onClick : undefined}
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 export default GlassCard;
