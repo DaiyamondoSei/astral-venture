@@ -25,7 +25,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     const observer = new PerformanceObserver((list) => {
       list.getEntries().forEach((entry) => {
         if (componentName) {
-          trackMetric(componentName, entry.duration);
+          trackMetric(componentName, entry.name, entry.duration);
         }
       });
     });

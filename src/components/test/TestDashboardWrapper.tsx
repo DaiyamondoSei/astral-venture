@@ -4,11 +4,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import UserFlowTestRunner from './UserFlowTestRunner';
 import EnhancedDataFlowVisualization from './EnhancedDataFlowVisualization';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 /**
  * A wrapper component for the test dashboard that doesn't modify protected files
  */
 const TestDashboardWrapper: React.FC = () => {
+  // Use the performance context to track metrics
+  const { trackMetric } = usePerformance();
+
+  // Track component render
+  React.useEffect(() => {
+    trackMetric('TestDashboardWrapper', 'render', performance.now());
+    return () => {
+      trackMetric('TestDashboardWrapper', 'unmount', performance.now());
+    };
+  }, [trackMetric]);
+
   return (
     <div className="container mx-auto py-8">
       <Card className="mb-6">

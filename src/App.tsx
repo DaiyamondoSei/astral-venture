@@ -7,7 +7,9 @@ import LandingPage from './pages';
 import EntryAnimationPage from './pages/EntryAnimationPage';
 import DesignSystemDemo from './pages/DesignSystemDemo';
 import ErrorBoundary from './components/ErrorBoundary';
+import { PerformanceProvider } from './contexts/PerformanceContext';
 import { supabase, isSupabaseConfigValid } from './lib/supabaseClient';
+import TestPage from './routes/test';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -83,13 +85,16 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/entry" element={<EntryAnimationPage />} />
-          <Route path="/design" element={<DesignSystemDemo />} />
-        </Routes>
-      </BrowserRouter>
+      <PerformanceProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/entry" element={<EntryAnimationPage />} />
+            <Route path="/design" element={<DesignSystemDemo />} />
+            <Route path="/test" element={<TestPage />} />
+          </Routes>
+        </BrowserRouter>
+      </PerformanceProvider>
     </ErrorBoundary>
   );
 }
