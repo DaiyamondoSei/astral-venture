@@ -4,7 +4,37 @@
  * 
  * Service for collecting and buffering performance metrics.
  */
-import { PerformanceMetric, MetricType } from '../core/types';
+import { DeviceCapability } from '@/utils/performanceUtils';
+
+// Define metric types
+export type MetricType = 
+  | 'render' 
+  | 'interaction' 
+  | 'load' 
+  | 'memory' 
+  | 'network' 
+  | 'resource' 
+  | 'javascript' 
+  | 'css' 
+  | 'animation' 
+  | 'metric' 
+  | 'summary' 
+  | 'performance' 
+  | 'webVital';
+
+export interface PerformanceMetric {
+  component_name?: string;
+  metric_name: string;
+  value: number;
+  timestamp: string | number;
+  category: string;
+  type: MetricType;
+  user_id?: string;
+  session_id?: string;
+  page_url?: string;
+  metadata?: Record<string, any>;
+  rating?: 'good' | 'needs-improvement' | 'poor';
+}
 
 // Event types for the metrics collector
 type CollectorEvent = 'flush' | 'collect' | 'error';
@@ -13,7 +43,7 @@ type CollectCallback = (metric: PerformanceMetric) => void;
 type ErrorCallback = (error: Error) => void;
 
 /**
- * Service for collecting performance metrics
+ * Service for collecting application performance metrics
  */
 class MetricsCollector {
   private metrics: PerformanceMetric[] = [];
@@ -66,6 +96,29 @@ class MetricsCollector {
   }
   
   /**
+   * Track a component-specific metric
+   */
+  public trackComponentMetric(
+    componentName: string,
+    metricName: string,
+    value: number,
+    type: MetricType = 'render'
+  ): void {
+    this.collect(metricName, value, type, undefined, componentName);
+  }
+  
+  /**
+   * Track an interaction metric
+   */
+  public trackInteraction(
+    name: string,
+    duration: number,
+    metadata?: Record<string, any>
+  ): void {
+    this.collect(name, duration, 'interaction', metadata);
+  }
+  
+  /**
    * Flush metrics to handlers
    */
   public async flush(): Promise<void> {
@@ -104,6 +157,14 @@ class MetricsCollector {
   }
   
   /**
+   * Set the sampling rate (0-1) for metrics collection
+   */
+  public setSamplingRate(rate: number): void {
+    // Implementation will determine whether to collect metrics
+    // based on this rate (e.g., if rate is 0.1, only 10% of metrics are collected)
+  }
+  
+  /**
    * Register a callback for the flush event
    */
   public onFlush(callback: FlushCallback): () => void {
@@ -136,6 +197,37 @@ class MetricsCollector {
    */
   public getCount(): number {
     return this.metrics.length;
+  }
+  
+  /**
+   * Add a web vital metric
+   */
+  public addWebVital(
+    name: string,
+    value: number, 
+    category: 'loading' | 'interaction' | 'visual_stability',
+  ): void {
+    this.collect(name, value, 'webVital', { webVitalCategory: category });
+  }
+  
+  /**
+   * Add a general metric
+   */
+  public addMetric(metric: Partial<PerformanceMetric>): void {
+    if (!metric.metric_name || typeof metric.value !== 'number') {
+      console.error('Invalid metric:', metric);
+      return;
+    }
+    
+    this.metrics.push({
+      metric_name: metric.metric_name,
+      value: metric.value,
+      timestamp: metric.timestamp || Date.now(),
+      category: metric.category || 'application',
+      type: metric.type || 'metric',
+      component_name: metric.component_name,
+      metadata: metric.metadata
+    });
   }
   
   /**

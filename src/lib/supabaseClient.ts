@@ -4,6 +4,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { toast } from '@/components/ui/use-toast';
+import { metricsCollector } from '@/utils/performance/collectors/MetricsCollector';
 
 // Get environment variables with fallbacks to ensure the client always initializes
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://wkmyvthtyjcdzhzvfyji.supabase.co';
@@ -11,6 +12,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 
 // Track initialization status
 let hasWarnedAboutConfig = false;
+let hasInitializedClient = false;
 
 // Validate configuration and provide useful feedback
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -23,12 +25,80 @@ if (!supabaseUrl || !supabaseAnonKey) {
   // Show toast only in browser environment
   if (typeof document !== 'undefined') {
     toast({
-      title: 'Configuration Warning',
-      description: 'Using fallback Supabase configuration. Some features may be limited.',
-      variant: 'warning',
+      title: "Configuration Warning",
+      description: "Using fallback Supabase configuration. Some features may be limited.",
+      variant: "destructive"
     });
   }
 }
+
+// Create fetch wrapper with instrumentation and timeouts
+const instrumentedFetch = (...args: Parameters<typeof fetch>): Promise<Response> => {
+  const [url, options] = args;
+  const startTime = performance.now();
+  
+  // Track the request start
+  if (typeof url === 'string') {
+    const urlObj = new URL(url, window.location.origin);
+    const path = urlObj.pathname;
+    metricsCollector.collect('apiRequest', 0, 'network', { path, method: options?.method || 'GET', status: 'started' });
+  }
+  
+  return new Promise((resolve, reject) => {
+    // Set up abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      const error = new Error('Request timeout');
+      metricsCollector.collect('apiRequestTimeout', performance.now() - startTime, 'network');
+      reject(error);
+    }, 10000); // 10 second timeout
+    
+    // Make the actual fetch request
+    fetch(url, {
+      ...options,
+      signal: controller.signal
+    })
+      .then(response => {
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        // Track the completed request
+        if (typeof url === 'string') {
+          const urlObj = new URL(url, window.location.origin);
+          const path = urlObj.pathname;
+          metricsCollector.collect('apiRequestComplete', duration, 'network', {
+            path, 
+            method: options?.method || 'GET', 
+            status: response.status,
+            ok: response.ok
+          });
+        }
+        
+        resolve(response);
+      })
+      .catch(error => {
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        // Track the failed request
+        if (typeof url === 'string') {
+          const urlObj = new URL(url, window.location.origin);
+          const path = urlObj.pathname;
+          metricsCollector.collect('apiRequestError', duration, 'network', {
+            path, 
+            method: options?.method || 'GET', 
+            error: error.message
+          });
+        }
+        
+        reject(error);
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+      });
+  });
+};
 
 // Create Supabase client with enhanced options
 export const supabase = createClient(
@@ -41,26 +111,7 @@ export const supabase = createClient(
       detectSessionInUrl: true,
     },
     global: {
-      fetch: (...args) => {
-        // Enhanced fetch with timeout and retry logic
-        const [url, options] = args;
-        
-        return new Promise((resolve, reject) => {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => {
-            controller.abort();
-            reject(new Error('Request timeout'));
-          }, 10000); // 10 second timeout
-          
-          fetch(url, {
-            ...options,
-            signal: controller.signal
-          })
-            .then(resolve)
-            .catch(reject)
-            .finally(() => clearTimeout(timeoutId));
-        });
-      }
+      fetch: instrumentedFetch
     },
     db: {
       schema: 'public',
@@ -72,6 +123,8 @@ export const supabase = createClient(
     },
   }
 );
+
+hasInitializedClient = true;
 
 // Test connection and cache result
 let connectionValid: boolean | null = null;
@@ -108,6 +161,7 @@ export function getConfigurationStatus(): {
   errors: string[] | null; 
   isComplete: boolean;
   hasWarned: boolean;
+  isInitialized: boolean;
 } {
   const isValid = isSupabaseConfigValid();
   
@@ -119,7 +173,8 @@ export function getConfigurationStatus(): {
     isValid,
     errors: errors.length > 0 ? errors : null,
     isComplete: isValid,
-    hasWarned: hasWarnedAboutConfig
+    hasWarned: hasWarnedAboutConfig,
+    isInitialized: hasInitializedClient
   };
 }
 

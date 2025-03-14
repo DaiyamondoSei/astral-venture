@@ -2,11 +2,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import { 
+  DeviceCapability, 
+  detectDeviceCapability, 
+  logPerformanceMetric 
+} from '@/utils/performanceUtils';
+import { metricsCollector } from '@/utils/performance/collectors/MetricsCollector';
 
-// Define performance capability levels
-export type DeviceCapability = 'low' | 'medium' | 'high';
-
-// Define context interface
+// Define performance context interface
 export interface PerformanceContextType {
   deviceCapability: DeviceCapability;
   isMonitoring: boolean;
@@ -15,6 +18,17 @@ export interface PerformanceContextType {
   startMonitoring: () => void;
   stopMonitoring: () => void;
   clearMetrics: () => void;
+  config?: Record<string, any>;
+  // App performance features
+  isLowPerformance: boolean;
+  isMediumPerformance: boolean;
+  isHighPerformance: boolean;
+  enableBlur: boolean;
+  enableShadows: boolean;
+  enableParticles: boolean;
+  enableComplexAnimations: boolean;
+  // Feature toggles manager
+  shouldEnableFeature: (featureName: string) => boolean;
 }
 
 // Create the context with default values
@@ -43,9 +57,28 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
   const [metrics, setMetrics] = useState<Record<string, any>>({});
   const { toast } = useToast();
   
+  // Features based on device capability
+  const isLowPerformance = deviceCapability === 'low';
+  const isMediumPerformance = deviceCapability === 'medium';
+  const isHighPerformance = deviceCapability === 'high';
+  
+  // Feature flags
+  const enableBlur = !isLowPerformance;
+  const enableShadows = !isLowPerformance;
+  const enableParticles = !isLowPerformance;
+  const enableComplexAnimations = isHighPerformance;
+  
+  // Config with default values
+  const config = {
+    enablePerformanceTracking: true,
+    samplingRate: isLowPerformance ? 0.3 : isMediumPerformance ? 0.7 : 1,
+    throttleInterval: isLowPerformance ? 150 : isMediumPerformance ? 80 : 30
+  };
+  
   // Detect device capability on mount
   useEffect(() => {
-    detectDeviceCapability();
+    const detectedCapability = detectDeviceCapability();
+    setDeviceCapability(detectedCapability);
     
     // Start background monitoring of core web vitals
     monitorWebVitals();
@@ -56,34 +89,17 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
     };
   }, []);
   
-  // Detect device capability
-  const detectDeviceCapability = useCallback(() => {
-    // Simple detection based on user agent and hardware concurrency
-    const navigator = window.navigator;
-    const userAgent = navigator.userAgent.toLowerCase();
-    
-    // Check if device is low end
-    const isLowEnd = userAgent.includes('android 4') || 
-                     userAgent.includes('android 5') ||
-                     (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
-    
-    // Check if device is high end
-    const isHighEnd = navigator.hardwareConcurrency && navigator.hardwareConcurrency >= 8;
-    
-    // Set device capability
-    if (isLowEnd) {
-      setDeviceCapability('low');
-    } else if (isHighEnd) {
-      setDeviceCapability('high');
-    } else {
-      setDeviceCapability('medium');
-    }
-  }, []);
-  
   // Track performance metrics
   const trackMetric = useCallback((componentName: string, metricName: string, value: number) => {
     if (!isMonitoring) return;
     
+    // Log in development mode
+    logPerformanceMetric(componentName, metricName, value);
+    
+    // Add to metrics collector
+    metricsCollector.trackComponentMetric(componentName, metricName, value);
+    
+    // Update internal state
     setMetrics(prev => {
       // Create component object if it doesn't exist
       const componentMetrics = prev[componentName] || {};
@@ -141,20 +157,41 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
   // Monitor core web vitals
   const monitorWebVitals = useCallback(() => {
     // Use dynamic import for better performance
-    import('web-vitals').then(({ onCLS, onFID, onLCP }) => {
+    import('web-vitals').then(({ onCLS, onFID, onLCP, onTTFB, onINP, onFCP }) => {
       // Cumulative Layout Shift
       onCLS(({ value }) => {
+        metricsCollector.addWebVital('CLS', value, 'visual_stability');
         trackMetric('CoreWebVitals', 'CLS', value);
       });
       
       // First Input Delay
       onFID(({ value }) => {
+        metricsCollector.addWebVital('FID', value, 'interaction');
         trackMetric('CoreWebVitals', 'FID', value);
       });
       
       // Largest Contentful Paint
       onLCP(({ value }) => {
+        metricsCollector.addWebVital('LCP', value, 'loading');
         trackMetric('CoreWebVitals', 'LCP', value);
+      });
+      
+      // Time To First Byte
+      onTTFB(({ value }) => {
+        metricsCollector.addWebVital('TTFB', value, 'loading');
+        trackMetric('CoreWebVitals', 'TTFB', value);
+      });
+      
+      // Interaction to Next Paint
+      onINP(({ value }) => {
+        metricsCollector.addWebVital('INP', value, 'interaction');
+        trackMetric('CoreWebVitals', 'INP', value);
+      });
+      
+      // First Contentful Paint
+      onFCP(({ value }) => {
+        metricsCollector.addWebVital('FCP', value, 'loading');
+        trackMetric('CoreWebVitals', 'FCP', value);
       });
     });
   }, [trackMetric]);
@@ -166,6 +203,9 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
       title: "Performance monitoring enabled",
       description: "The app will now collect performance metrics to optimize your experience."
     });
+    
+    // Enable metrics collector
+    metricsCollector.setEnabled(true);
   }, [toast]);
   
   // Stop monitoring
@@ -175,12 +215,47 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
       title: "Performance monitoring disabled",
       description: "The app will no longer collect performance metrics."
     });
+    
+    // Disable metrics collector
+    metricsCollector.setEnabled(false);
   }, [toast]);
   
   // Clear metrics
   const clearMetrics = useCallback(() => {
     setMetrics({});
+    
+    // Clear metrics collector
+    metricsCollector.clear();
   }, []);
+  
+  // Feature toggle helper
+  const shouldEnableFeature = useCallback((featureName: string): boolean => {
+    switch (featureName) {
+      case 'blur': 
+        return enableBlur;
+      case 'shadows': 
+        return enableShadows;
+      case 'particles': 
+        return enableParticles;
+      case 'complex-animations': 
+        return enableComplexAnimations;
+      case 'high-quality-effects':
+        return isHighPerformance;
+      case 'background-effects':
+        return !isLowPerformance;
+      case 'advanced-transitions':
+        return isHighPerformance;
+      default:
+        return true;
+    }
+  }, [
+    enableBlur, 
+    enableShadows, 
+    enableParticles, 
+    enableComplexAnimations,
+    isLowPerformance,
+    isHighPerformance
+  ]);
   
   // Provide context value
   const contextValue: PerformanceContextType = {
@@ -190,7 +265,18 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({
     trackMetric,
     startMonitoring,
     stopMonitoring,
-    clearMetrics
+    clearMetrics,
+    config,
+    // App performance features
+    isLowPerformance,
+    isMediumPerformance,
+    isHighPerformance,
+    enableBlur,
+    enableShadows,
+    enableParticles,
+    enableComplexAnimations,
+    // Feature toggle helper
+    shouldEnableFeature
   };
   
   return (

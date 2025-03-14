@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { usePerformance } from '@/contexts/PerformanceContext';
-import { getPerformanceCategory } from '@/utils/performanceUtils';
+import { getPerformanceCategory, DeviceCapability } from '@/utils/performanceUtils';
 import { Card } from '@/components/ui/card';
 
 export interface PerformanceMonitorProps {
@@ -11,6 +11,12 @@ export interface PerformanceMonitorProps {
   measuredOperation?: string;
 }
 
+/**
+ * PerformanceMonitor: A component that tracks and reports application performance metrics
+ * 
+ * This component wraps its children and monitors their render performance, 
+ * reporting metrics to the performance context.
+ */
 export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   children,
   enableMetrics = true,
