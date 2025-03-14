@@ -1,117 +1,126 @@
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
-import { SafeEntity, ensureEntityId } from '@/types/core';
+import { useAuth } from '@/hooks/auth/useAuth';
+import { supabase } from '@/lib/supabase/client';
 
-// Define explicit interface for user profile
-interface UserProfile extends SafeEntity<{
+export interface UserProfileData {
   id: string;
-  user_id?: string;
-  display_name?: string;
-  avatar_url?: string;
-  bio?: string;
-  preferences?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-}> {}
+  username: string;
+  astral_level: number;
+  energy_points: number;
+  joined_at: string;
+  last_active_at: string | null;
+}
 
-// Define challenge interface
-interface Challenge extends SafeEntity<{
-  id: string;
-  title: string;
-  description: string;
-  points?: number;
-  difficulty?: string;
-  created_at?: string;
-}> {}
+export interface UserStreak {
+  user_id: string;
+  current_streak: number;
+  longest_streak: number;
+  last_activity_date: string | null;
+}
 
-export const useUserProfile = () => {
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [todayChallenge, setTodayChallenge] = useState<Challenge | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function useUserProfile() {
   const { user } = useAuth();
-  const { toast } = useToast();
+  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [streak, setStreak] = useState<UserStreak | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (user) {
-        try {
-          setIsLoading(true);
-          const { data, error } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-            
-          if (error) throw error;
-          
-          // Ensure the profile has an id
-          setUserProfile(ensureEntityId(data));
-          
-          const { data: challengeData, error: challengeError } = await supabase
-            .from('challenges')
-            .select('*')
-            .limit(1)
-            .order('id', { ascending: false });
-            
-          if (challengeError) throw challengeError;
-          
-          if (challengeData && challengeData.length > 0) {
-            // Ensure the challenge has an id
-            setTodayChallenge(ensureEntityId(challengeData[0]));
-          }
-          
-          // Ensure user streak record exists
-          const { data: streakData, error: streakError } = await supabase
-            .from('user_streaks')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-            
-          if (streakError && streakError.code === 'PGRST116') {
-            // Create streak record if it doesn't exist
-            await supabase
-              .from('user_streaks')
-              .insert({
-                user_id: user.id,
-                current_streak: 0,
-                longest_streak: 0
-              });
-          }
-          
-        } catch (error: any) {
-          console.error('Error fetching user profile:', error);
-          toast({
-            title: "Failed to load profile",
-            description: error.message,
-            variant: "destructive"
-          });
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setIsLoading(false);
+    if (user) {
+      fetchUserProfile();
+    } else {
+      setProfile(null);
+      setStreak(null);
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  const fetchUserProfile = async () => {
+    if (!user) {
+      setError('No authenticated user');
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Fetch user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        throw profileError;
       }
-    };
-    
-    fetchUserProfile();
-  }, [user, toast]);
 
-  const updateUserProfile = (newData: Partial<UserProfile>) => {
-    setUserProfile(prev => prev ? {
-      ...prev,
-      ...newData,
-      // Always ensure id is present
-      id: prev.id || newData.id || 'unknown-id'
-    } : null);
+      // Fetch user streak
+      try {
+        const { data: streakData, error: streakError } = await supabase
+          .from('user_streaks')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!streakError && streakData) {
+          setStreak(streakData as UserStreak);
+        }
+      } catch (streakErr) {
+        console.warn('Failed to fetch user streak:', streakErr);
+        // Don't fail the whole operation if streak fetch fails
+      }
+
+      setProfile(profileData as UserProfileData);
+    } catch (err: any) {
+      console.error('Error fetching user profile:', err);
+      setError(err.message || 'Failed to load user profile');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  return { 
-    userProfile, 
-    todayChallenge, 
-    isLoading, 
-    updateUserProfile 
+  const updateProfile = async (updates: Partial<UserProfileData>) => {
+    if (!user) {
+      setError('No authenticated user');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
+      return data;
+    } catch (err: any) {
+      console.error('Error updating user profile:', err);
+      setError(err.message || 'Failed to update profile');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   };
-};
+
+  return {
+    profile,
+    streak,
+    isLoading,
+    error,
+    fetchUserProfile,
+    updateProfile
+  };
+}

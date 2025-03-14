@@ -21,6 +21,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   useEffect(() => {
     if (!enableMetrics || !componentName || !containerRef.current) return;
 
+    // Create performance observer
     const observer = new PerformanceObserver((list) => {
       list.getEntries().forEach((entry) => {
         if (componentName) {
@@ -29,8 +30,10 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       });
     });
 
+    // Start observing
     observer.observe({ entryTypes: ['measure'] });
 
+    // Cleanup
     return () => observer.disconnect();
   }, [enableMetrics, componentName, trackMetric]);
 

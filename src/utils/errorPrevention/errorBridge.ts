@@ -9,7 +9,15 @@
  */
 
 import { ValidationError } from '../validation/ValidationError';
-import { ErrorCode } from '../../supabase/functions/shared/responseUtils';
+
+// Local definition to avoid circular imports
+enum ErrorCode {
+  NETWORK_ERROR = 'network_error',
+  AUTHENTICATION_ERROR = 'authentication_error',
+  AUTHORIZATION_ERROR = 'authorization_error',
+  NOT_FOUND = 'not_found',
+  TIMEOUT = 'timeout'
+}
 
 /**
  * Types of environments where errors can originate

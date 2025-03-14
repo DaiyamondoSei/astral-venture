@@ -1,165 +1,143 @@
 
 /**
- * Custom error class for validation errors
- */
-export class ValidationError extends Error {
-  public readonly details: ValidationErrorDetail[] = [];
-  public readonly code: ValidationErrorCode;
-  public readonly statusCode: number;
-  
-  /**
-   * Create a new validation error
-   * 
-   * @param message Error message
-   * @param details Error details (optional)
-   * @param code Error code (optional)
-   * @param statusCode HTTP status code (optional)
-   */
-  constructor(
-    message: string, 
-    details?: ValidationErrorDetail | ValidationErrorDetail[],
-    code: ValidationErrorCode = ValidationErrorCode.VALIDATION_ERROR,
-    statusCode: number = 400
-  ) {
-    super(message);
-    this.name = 'ValidationError';
-    this.code = code;
-    this.statusCode = statusCode;
-    
-    if (details) {
-      this.details = Array.isArray(details) ? details : [details];
-    }
-
-    // Ensure Error stack traces work properly in modern JS engines
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ValidationError);
-    }
-  }
-
-  /**
-   * Create an error from an API response
-   */
-  static fromApiError(apiError: any): ValidationError {
-    // Default values
-    let message = "Validation failed";
-    let details: ValidationErrorDetail[] = [];
-    let code = ValidationErrorCode.VALIDATION_ERROR;
-    let statusCode = 400;
-
-    if (apiError) {
-      message = apiError.message || message;
-      statusCode = apiError.status || apiError.statusCode || statusCode;
-      
-      // Handle Supabase error format
-      if (apiError.details || apiError.hint || apiError.code) {
-        details = [{
-          path: apiError.details || 'unknown',
-          message: apiError.hint || apiError.message || 'Unknown error',
-          severity: ValidationSeverity.ERROR
-        }];
-      }
-    }
-
-    return new ValidationError(message, details, code, statusCode);
-  }
-}
-
-/**
- * Validation error codes
+ * Standard validation error class for consistent error handling across the application
  */
 export enum ValidationErrorCode {
-  VALIDATION_ERROR = 'validation_error',
-  REQUIRED = 'required',
-  FORMAT = 'format',
+  // Basic validation error codes
   TYPE = 'type',
-  CONSTRAINT = 'constraint',
-  LOGIC = 'logic',
+  FORMAT = 'format',
+  REQUIRED = 'required',
+  PATTERN = 'pattern',
   RANGE = 'range',
-  SCHEMA = 'schema'
+  LENGTH = 'length',
+  VALIDATION_ERROR = 'validation_error',
+  
+  // Domain-specific error codes
+  AUTH = 'auth',
+  PERMISSION = 'permission',
+  CONFIG = 'config',
+  DATA = 'data',
+  API = 'api',
+  NETWORK = 'network',
+  UNKNOWN = 'unknown'
 }
 
-/**
- * Validation error severity levels
- */
-export enum ValidationSeverity {
-  INFO = 'info',
-  WARNING = 'warning',
-  ERROR = 'error'
-}
-
-/**
- * Validation error detail structure
- */
 export interface ValidationErrorDetail {
   path: string;
   message: string;
   code?: ValidationErrorCode;
   rule?: string;
-  value?: unknown;
   severity: ValidationSeverity;
+}
+
+/**
+ * Severity levels for validation errors
+ */
+export enum ValidationSeverity {
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
+}
+
+/**
+ * Main validation error class
+ */
+export class ValidationError extends Error {
+  path?: string;
+  code?: string;
+  details?: any;
+  rule?: string;
+  field?: string;
+  expectedType?: string;
+  statusCode?: number;
+  originalError?: Error;
+
+  constructor(
+    message: string,
+    detailsOrOptions?: 
+      ValidationErrorDetail | 
+      ValidationErrorDetail[] | 
+      Record<string, any>,
+    code?: string,
+    statusCode?: number
+  ) {
+    super(message);
+    
+    // Set name explicitly for better error identification
+    this.name = 'ValidationError';
+    
+    // Process details/options depending on what was passed
+    if (Array.isArray(detailsOrOptions)) {
+      this.details = detailsOrOptions;
+    } else if (detailsOrOptions && typeof detailsOrOptions === 'object') {
+      // Extract common properties
+      this.field = detailsOrOptions.field || detailsOrOptions.path;
+      this.path = detailsOrOptions.path || detailsOrOptions.field;
+      this.rule = detailsOrOptions.rule || detailsOrOptions.code;
+      this.code = code || detailsOrOptions.code || detailsOrOptions.rule;
+      this.expectedType = detailsOrOptions.expectedType;
+      this.statusCode = statusCode || detailsOrOptions.statusCode;
+      this.details = detailsOrOptions;
+    }
+    
+    // Ensure code is set
+    if (!this.code) {
+      this.code = code || ValidationErrorCode.VALIDATION_ERROR;
+    }
+  }
+
+  /**
+   * Create a validation error from a schema validation error
+   */
+  static schemaError(
+    path: string,
+    details: Record<string, string>
+  ): ValidationError {
+    return new ValidationError(
+      `Schema validation failed at ${path}`,
+      {
+        path,
+        details,
+        rule: 'schema',
+      }
+    );
+  }
+
+  /**
+   * Create a validation error from an API error
+   */
+  static fromApiError(
+    message: string,
+    statusCode?: number,
+    details?: any
+  ): ValidationError {
+    return new ValidationError(
+      message,
+      {
+        path: 'api',
+        rule: 'api_error',
+        details,
+        statusCode,
+        severity: ValidationSeverity.ERROR
+      },
+      ValidationErrorCode.API,
+      statusCode
+    );
+  }
+
+  /**
+   * Check if an error is a ValidationError
+   */
+  static isValidationError(error: unknown): error is ValidationError {
+    return error instanceof ValidationError || 
+      (error instanceof Error && error.name === 'ValidationError');
+  }
 }
 
 /**
  * Check if an error is a ValidationError
  */
 export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
-
-/**
- * Helper to create a validation error for a required field
- */
-export function requiredFieldError(fieldName: string): ValidationErrorDetail {
-  return {
-    path: fieldName,
-    message: `The ${fieldName} field is required`,
-    code: ValidationErrorCode.REQUIRED,
-    severity: ValidationSeverity.ERROR
-  };
-}
-
-/**
- * Helper to create a validation error for an invalid type
- */
-export function typeError(fieldName: string, expectedType: string): ValidationErrorDetail {
-  return {
-    path: fieldName,
-    message: `The ${fieldName} field must be a ${expectedType}`,
-    code: ValidationErrorCode.TYPE,
-    severity: ValidationSeverity.ERROR
-  };
-}
-
-/**
- * Helper to create a validation error for a range constraint
- */
-export function rangeError(fieldName: string, min?: number, max?: number): ValidationErrorDetail {
-  let message = `The ${fieldName} field has an invalid value`;
-  
-  if (min !== undefined && max !== undefined) {
-    message = `The ${fieldName} field must be between ${min} and ${max}`;
-  } else if (min !== undefined) {
-    message = `The ${fieldName} field must be at least ${min}`;
-  } else if (max !== undefined) {
-    message = `The ${fieldName} field must not exceed ${max}`;
-  }
-  
-  return {
-    path: fieldName,
-    message,
-    code: ValidationErrorCode.RANGE,
-    severity: ValidationSeverity.ERROR
-  };
-}
-
-/**
- * Helper to create a validation error for an invalid format
- */
-export function formatError(fieldName: string, format: string): ValidationErrorDetail {
-  return {
-    path: fieldName,
-    message: `The ${fieldName} field must be in ${format} format`,
-    code: ValidationErrorCode.FORMAT,
-    severity: ValidationSeverity.ERROR
-  };
+  return ValidationError.isValidationError(error);
 }

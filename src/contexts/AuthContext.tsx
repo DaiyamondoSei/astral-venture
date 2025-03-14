@@ -1,308 +1,242 @@
-import { createContext, useState, useCallback, useEffect } from 'react';
-import type { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabaseClient';
 
-// Get the supabase client
-// Used synchronously to set up auth state listener
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client';
+import { IAuthContext, UserProfile } from '@/hooks/auth/types';
 
-export interface IUserProfile {
-  id: string;
-  email: string;
-  displayName?: string;
-  avatar?: string;
-  preferences?: Record<string, unknown>;
-}
+// Re-export the hook from the hooks/auth folder
+export { useAuth } from '@/hooks/auth/useAuth';
 
-export interface IUserStreak {
-  current: number;
-  longest: number;
-  lastActivity?: string;
-}
+// Create the authentication context with a default empty state
+const defaultContext: IAuthContext = {
+  user: null,
+  profile: null,
+  isLoading: true,
+  isAuthenticated: false,
+  error: null,
+  login: async () => {},
+  register: async () => {},
+  logout: async () => {},
+  resetPassword: async () => {},
+  updateProfile: async () => {},
+  refreshProfile: async () => {},
+};
 
-export interface IAuthContext {
-  user: User | null;
-  userProfile: IUserProfile | null;
-  userStreak: IUserStreak | null;
-  activatedChakras: number[];
-  todayChallenge: any; // Will be typed properly in next iteration
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  hasCompletedLoading: boolean;
-  profileLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
-  register: (email: string, password: string) => Promise<boolean>;
-  handleLogout: () => Promise<void>;
-  isLoggingOut: boolean;
-  updateStreak: (streak: IUserStreak) => void;
-  updateActivatedChakras: (chakras: number[]) => void;
-  updateUserProfile: (profile: Partial<IUserProfile>) => void;
-  errorMessage: string;
-}
-
-/**
- * Authentication Context
- * 
- * This context provides authentication state and methods throughout the application.
- * Use the useAuth() hook from '@/hooks/auth' to consume this context.
- */
-export const AuthContext = createContext<IAuthContext | null>(null);
-
-// IMPORTANT: This hook export is deprecated. Import from @/hooks/auth instead.
-// This export only remains for backward compatibility.
+export const AuthContext = createContext<IAuthContext>(defaultContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<IUserProfile | null>(null);
-  const [userStreak, setUserStreak] = useState<IUserStreak | null>(null);
-  const [activatedChakras, setActivatedChakras] = useState<number[]>([]);
-  const [todayChallenge, setTodayChallenge] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasCompletedLoading, setHasCompletedLoading] = useState(false);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      const { data: { user }, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-
-      if (error) {
-        console.error('Login error:', error);
-        setErrorMessage(error.message);
-        return false;
-      }
-
-      setUser(user);
-      return true;
-    } catch (err) {
-      const error = err as Error;
-      console.error('Unexpected login error:', error);
-      setErrorMessage(error.message || 'An unexpected error occurred during login');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const register = useCallback(async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      const { data: { user }, error } = await supabase.auth.signUp({
-        email: email,
-        password: password,
-      });
-
-      if (error) {
-        console.error('Registration error:', error);
-        setErrorMessage(error.message);
-        return false;
-      }
-
-      setUser(user);
-      return true;
-    } catch (err) {
-      const error = err as Error;
-      console.error('Unexpected registration error:', error);
-      setErrorMessage(error.message || 'An unexpected error occurred during registration');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const logout = useCallback(async (): Promise<void> => {
-    setIsLoggingOut(true);
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Logout error:', error);
-        setErrorMessage(error.message);
-      }
-      setUser(null);
-      setUserProfile(null);
-      setActivatedChakras([]);
-      setTodayChallenge(null);
-    } catch (err) {
-      const error = err as Error;
-      console.error('Unexpected logout error:', error);
-      setErrorMessage(error.message || 'An unexpected error occurred during logout');
-    } finally {
-      setIsLoggingOut(false);
-    }
-  }, []);
-
-  const handleLogout = useCallback(async (): Promise<void> => {
-    await logout();
-  }, [logout]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUserProfile = async (userId: string) => {
-      setProfileLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (error) {
-          console.error('Error fetching profile:', error);
-          setErrorMessage(error.message);
-        }
-
-        if (data) {
-          setUserProfile(data as IUserProfile);
+    // Check for active session on mount
+    checkSession();
+    
+    // Subscribe to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+        setIsAuthenticated(!!session?.user);
+        
+        if (session?.user) {
+          await fetchUserProfile(session.user.id);
         } else {
-          setUserProfile(null);
+          setProfile(null);
         }
-      } catch (err) {
-        const error = err as Error;
-        console.error('Unexpected error fetching user profile:', error);
-        setErrorMessage(error.message || 'Error fetching user profile');
-      } finally {
-        setProfileLoading(false);
       }
-    };
-
-    const fetchUserStreak = async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('user_streaks')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (error) {
-          console.error('Error fetching streak:', error);
-        }
-
-        if (data) {
-          setUserStreak({
-            current: data.current_streak || 0,
-            longest: data.longest_streak || 0,
-            lastActivity: data.last_activity_date
-          });
-        } else {
-          setUserStreak(null);
-        }
-      } catch (err) {
-        console.error("Unexpected error fetching user streak:", err);
-      }
-    };
-
-    const fetchActivatedChakras = async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('activated_chakras')
-          .select('chakra_id')
-          .eq('user_id', userId);
-
-        if (error) {
-          console.error('Error fetching activated chakras:', error);
-        }
-
-        const chakraIds = data ? data.map(item => item.chakra_id) : [];
-        setActivatedChakras(chakraIds);
-      } catch (err) {
-        console.error("Unexpected error fetching activated chakras:", err);
-      }
-    };
-
-    const fetchTodayChallenge = async (userId: string) => {
-      try {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data, error } = await supabase
-          .from('daily_challenges')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('date', today)
-          .single();
-
-        if (error) {
-          console.error('Error fetching today\'s challenge:', error);
-        }
-
-        setTodayChallenge(data || null);
-      } catch (err) {
-        console.error("Unexpected error fetching today's challenge:", err);
-      }
-    };
-
-    // Reset error message when auth state changes
-    setErrorMessage('');
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-      setIsLoading(false);
-      setHasCompletedLoading(true);
-
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-        fetchUserStreak(session.user.id);
-        fetchActivatedChakras(session.user.id);
-        fetchTodayChallenge(session.user.id);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-        fetchUserStreak(session.user.id);
-        fetchActivatedChakras(session.user.id);
-        fetchTodayChallenge(session.user.id);
-      } else {
-        setUserProfile(null);
-        setUserStreak(null);
-        setActivatedChakras([]);
-        setTodayChallenge(null);
-      }
-    });
+    );
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  const updateStreak = useCallback((streak: IUserStreak) => {
-    setUserStreak(streak);
-  }, []);
+  const setIsAuthenticated = (state: boolean) => {
+    // This function exists just to make the context definition cleaner
+  };
 
-  const updateActivatedChakras = useCallback((chakras: number[]) => {
-    setActivatedChakras(chakras);
-  }, []);
+  const checkSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        throw error;
+      }
+      
+      setUser(session?.user ?? null);
+      setIsAuthenticated(!!session?.user);
 
-  const updateUserProfile = useCallback((profile: Partial<IUserProfile>) => {
-    setUserProfile(prev => prev ? { ...prev, ...profile } as IUserProfile : { ...profile } as IUserProfile);
-  }, []);
+      if (session?.user) {
+        await fetchUserProfile(session.user.id);
+      }
+    } catch (error) {
+      console.error('Error checking auth session:', error);
+      setError('Failed to verify authentication status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      
+      setProfile(data as UserProfile);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setError('Failed to load user profile');
+    }
+  };
+
+  const login = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) throw error;
+      
+      setUser(data.user);
+      setIsAuthenticated(!!data.user);
+      
+      if (data.user) {
+        await fetchUserProfile(data.user.id);
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message || 'Failed to log in');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase.auth.signUp({ email, password });
+
+      if (error) throw error;
+      
+      setUser(data.user);
+      setIsAuthenticated(!!data.user);
+      
+      return data;
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setError(error.message || 'Failed to register');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { error } = await supabase.auth.signOut();
+
+      if (error) throw error;
+      
+      setUser(null);
+      setProfile(null);
+      setIsAuthenticated(false);
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      setError(error.message || 'Failed to log out');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      setError(error.message || 'Failed to reset password');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      if (!user) throw new Error('No authenticated user');
+
+      const { error } = await supabase
+        .from('user_profiles')
+        .update(updates)
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      // Refresh profile after update
+      await fetchUserProfile(user.id);
+    } catch (error: any) {
+      console.error('Profile update error:', error);
+      setError(error.message || 'Failed to update profile');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshProfile = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      if (!user) throw new Error('No authenticated user');
+      
+      await fetchUserProfile(user.id);
+    } catch (error: any) {
+      console.error('Profile refresh error:', error);
+      setError(error.message || 'Failed to refresh profile');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const value: IAuthContext = {
     user,
-    userProfile,
-    userStreak,
-    activatedChakras,
-    todayChallenge,
-    isAuthenticated: !!user,
+    profile,
     isLoading,
-    hasCompletedLoading,
-    profileLoading,
+    isAuthenticated: !!user,
+    error,
     login,
-    logout,
     register,
-    handleLogout,
-    isLoggingOut,
-    updateStreak,
-    updateActivatedChakras,
-    updateUserProfile,
-    errorMessage,
+    logout,
+    resetPassword,
+    updateProfile,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
