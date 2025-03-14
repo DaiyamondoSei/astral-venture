@@ -17,28 +17,28 @@ export interface UseAssistantResult {
   // Loading states
   isLoading: boolean;
   loading: boolean; // Alias for backward compatibility
+  isAnalyzing: boolean;
+  isFixing: boolean;
   
   // Response and data
   data: any;
   response: string; // HTML formatted response
   tokens: number;
+  question: string;
   
   // Question handling
-  question: string;
   setQuestion: (question: string) => void;
   submitQuestion: (question: string) => Promise<void>;
   
   // Code analysis
   suggestions: AssistantSuggestion[];
   currentComponent: string;
-  isAnalyzing: boolean;
   analyzeComponent: (componentName: string) => Promise<AssistantSuggestion[]>;
   
   // Error handling
   error: string;
   
   // Code fixing
-  isFixing: boolean;
   applyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
   applyAutoFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
   
@@ -67,7 +67,7 @@ export function useAssistant({ componentName = '' }: UseAssistantProps = {}): Us
       setCurrentComponent(componentName);
       fetchSuggestions(componentName);
     }
-  }, [componentName]);
+  }, [componentName, currentComponent]);
   
   // Fetch suggestions for a component
   const fetchSuggestions = async (componentId: string) => {
@@ -124,8 +124,11 @@ export function useAssistant({ componentName = '' }: UseAssistantProps = {}): Us
     }
   };
   
-  // Apply auto fix for a suggestion (alias for backward compatibility)
-  const applyAutoFix = applyFix;
+  // Apply auto fix for a suggestion (this is used by some components)
+  const applyAutoFix = async (suggestion: AssistantSuggestion) => {
+    // This is essentially the same as applyFix but kept for compatibility
+    return applyFix(suggestion);
+  };
   
   // Submit a question to the AI assistant
   const submitQuestion = async (questionText: string) => {
@@ -153,28 +156,28 @@ export function useAssistant({ componentName = '' }: UseAssistantProps = {}): Us
     // Loading states
     isLoading,
     loading: isLoading, // Alias for backward compatibility
+    isAnalyzing,
+    isFixing,
     
     // Response and data
     data: response,
     response,
     tokens,
+    question,
     
     // Question handling
-    question,
     setQuestion,
     submitQuestion,
     
     // Code analysis
     suggestions,
     currentComponent,
-    isAnalyzing,
     analyzeComponent,
     
     // Error handling
     error,
     
     // Code fixing
-    isFixing,
     applyFix,
     applyAutoFix,
     

@@ -45,7 +45,7 @@ export const AISuggestionList = ({ componentId, limit = 10 }: AISuggestionListPr
     if (componentId && componentId !== currentComponent) {
       analyzeComponent(componentId);
     }
-  }, [componentId, currentComponent]);
+  }, [componentId, currentComponent, analyzeComponent]);
   
   const handleRefresh = () => {
     if (componentId) {

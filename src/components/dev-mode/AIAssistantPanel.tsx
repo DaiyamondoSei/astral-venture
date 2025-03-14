@@ -18,17 +18,18 @@ const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) =>
   
   const {
     isLoading,
+    loading,
     submitQuestion,
     response,
-    loading,
     analyzeComponent,
+    question,
+    setQuestion
   } = useAssistant({ componentName });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
     
-    // Call the submitQuestion function from useAssistant
     await submitQuestion(inputValue);
     setInputValue('');
   };
