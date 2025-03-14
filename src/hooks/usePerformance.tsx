@@ -1,18 +1,8 @@
 
-import { useContext } from 'react';
-import { PerformanceContext } from '@/contexts/PerformanceContext';
+// This file now re-exports the usePerformance hook from the context file
+// for backward compatibility and consistent imports
 
-/**
- * Hook to use performance context
- */
-export function usePerformance() {
-  const context = useContext(PerformanceContext);
-  
-  if (!context) {
-    throw new Error('usePerformance must be used within a PerformanceProvider');
-  }
-  
-  return context;
-}
+import { usePerformance } from '@/contexts/PerformanceContext';
 
+export { usePerformance };
 export default usePerformance;

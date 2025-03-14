@@ -1,185 +1,213 @@
 
-/**
- * Performance Context
- * 
- * React context for performance monitoring and optimization.
- */
-import React, { createContext, useContext, useEffect, useState, useMemo, ReactNode } from 'react';
-import { metricsCollector } from '@/utils/performance/metricsCollector';
-import { detectDeviceCapability } from '@/utils/performanceUtils';
-import { 
-  DeviceCapability,
-  PerformanceMonitorConfig,
-  MetricType
-} from '@/utils/performance/types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/components/ui/use-toast';
 
-// Default monitor configuration
-export const DEFAULT_MONITOR_CONFIG: PerformanceMonitorConfig = {
-  enabled: true,
-  metricsEnabled: true,
-  slowRenderThreshold: 16, // 60fps threshold
-  samplingRate: 0.1, // Sample 10% of metrics by default
-  optimizationLevel: 'auto',
-  throttleInterval: 1000,
-  maxTrackedComponents: 50,
-  enablePerformanceTracking: true,
-  enableRenderTracking: true,
-  enableValidation: true,
-  enablePropTracking: false,
-  enableDebugLogging: false,
-  intelligentProfiling: false,
-  inactiveTabThrottling: true,
-  batchUpdates: true,
-  debugMode: false
+// Define performance capability levels
+export type DeviceCapability = 'low' | 'medium' | 'high';
+
+// Define context interface
+export interface PerformanceContextType {
+  deviceCapability: DeviceCapability;
+  isMonitoring: boolean;
+  metrics: Record<string, any>;
+  trackMetric: (componentName: string, metricName: string, value: number) => void;
+  startMonitoring: () => void;
+  stopMonitoring: () => void;
+  clearMetrics: () => void;
+}
+
+// Create the context with default values
+export const PerformanceContext = createContext<PerformanceContextType | undefined>(undefined);
+
+// Performance thresholds (in milliseconds)
+const PERFORMANCE_THRESHOLDS = {
+  LOW: { fps: 30, renderTime: 50, loadTime: 1000 },
+  MEDIUM: { fps: 45, renderTime: 20, loadTime: 500 },
+  HIGH: { fps: 60, renderTime: 10, loadTime: 200 }
 };
 
-// Context state
-interface PerformanceContextState {
-  // Configuration
-  config: PerformanceMonitorConfig;
-  updateConfig: (updates: Partial<PerformanceMonitorConfig>) => void;
-  
-  // Device capability
-  deviceCapability: DeviceCapability;
-  setDeviceCapability: (capability: DeviceCapability) => void;
-  
-  // Metrics tracking
-  trackMetric: (
-    componentName: string, 
-    metricName: string, 
-    value: number, 
-    metadata?: Record<string, any>
-  ) => void;
-  
-  // Performance levels
-  qualityLevel: number;
-  setQualityLevel: (level: number) => void;
-  
-  // Performance state
-  isLowPerformance: boolean;
-  isMediumPerformance: boolean;
-  isHighPerformance: boolean;
-}
-
-// Create the context
-const PerformanceContext = createContext<PerformanceContextState | undefined>(undefined);
-
-// Provider props
+// Props for the provider component
 interface PerformanceProviderProps {
-  children: ReactNode;
-  initialConfig?: Partial<PerformanceMonitorConfig>;
+  children: React.ReactNode;
+  initialCapability?: DeviceCapability;
 }
 
-/**
- * Performance Provider component
- */
-export function PerformanceProvider({ 
-  children,
-  initialConfig = {}
-}: PerformanceProviderProps) {
-  // Initialize configuration
-  const [config, setConfig] = useState<PerformanceMonitorConfig>({
-    ...DEFAULT_MONITOR_CONFIG,
-    ...initialConfig
-  });
-  
-  // Device capability state
-  const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>('medium');
-  
-  // Quality level state
-  const [qualityLevel, setQualityLevel] = useState<number>(3);
-  
-  // Derived performance states
-  const isLowPerformance = deviceCapability === 'low';
-  const isMediumPerformance = deviceCapability === 'medium';
-  const isHighPerformance = deviceCapability === 'high';
+export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ 
+  children, 
+  initialCapability = 'medium' 
+}) => {
+  // State management
+  const [deviceCapability, setDeviceCapability] = useState<DeviceCapability>(initialCapability);
+  const [isMonitoring, setIsMonitoring] = useState<boolean>(true);
+  const [metrics, setMetrics] = useState<Record<string, any>>({});
+  const { toast } = useToast();
   
   // Detect device capability on mount
   useEffect(() => {
-    const detectedCapability = detectDeviceCapability();
-    setDeviceCapability(detectedCapability);
+    detectDeviceCapability();
     
-    // Set appropriate quality level based on device capability
-    if (detectedCapability === 'low') {
-      setQualityLevel(1);
-    } else if (detectedCapability === 'medium') {
-      setQualityLevel(2);
+    // Start background monitoring of core web vitals
+    monitorWebVitals();
+    
+    return () => {
+      // Cleanup web vitals monitoring
+      // Currently no cleanup needed
+    };
+  }, []);
+  
+  // Detect device capability
+  const detectDeviceCapability = useCallback(() => {
+    // Simple detection based on user agent and hardware concurrency
+    const navigator = window.navigator;
+    const userAgent = navigator.userAgent.toLowerCase();
+    
+    // Check if device is low end
+    const isLowEnd = userAgent.includes('android 4') || 
+                     userAgent.includes('android 5') ||
+                     (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
+    
+    // Check if device is high end
+    const isHighEnd = navigator.hardwareConcurrency && navigator.hardwareConcurrency >= 8;
+    
+    // Set device capability
+    if (isLowEnd) {
+      setDeviceCapability('low');
+    } else if (isHighEnd) {
+      setDeviceCapability('high');
     } else {
-      setQualityLevel(4);
+      setDeviceCapability('medium');
     }
   }, []);
   
-  // Update configuration
-  const updateConfig = (updates: Partial<PerformanceMonitorConfig>) => {
-    setConfig(prev => {
-      const newConfig = { ...prev, ...updates };
+  // Track performance metrics
+  const trackMetric = useCallback((componentName: string, metricName: string, value: number) => {
+    if (!isMonitoring) return;
+    
+    setMetrics(prev => {
+      // Create component object if it doesn't exist
+      const componentMetrics = prev[componentName] || {};
       
-      // Apply configuration changes to the metrics collector
-      if (metricsCollector) {
-        metricsCollector.setEnabled(newConfig.enabled && newConfig.metricsEnabled);
-        if (typeof newConfig.throttleInterval === 'number') {
-          metricsCollector.setThrottleInterval(newConfig.throttleInterval);
-        }
-      }
+      // Add metric to component metrics
+      const updatedComponentMetrics = {
+        ...componentMetrics,
+        [metricName]: value
+      };
       
-      return newConfig;
+      // Return updated metrics
+      return {
+        ...prev,
+        [componentName]: updatedComponentMetrics
+      };
     });
-  };
+    
+    // For critical metrics that exceed thresholds, persist to backend
+    if (
+      (metricName === 'renderTime' && value > PERFORMANCE_THRESHOLDS.HIGH.renderTime * 2) ||
+      (metricName === 'loadTime' && value > PERFORMANCE_THRESHOLDS.HIGH.loadTime)
+    ) {
+      persistPerformanceMetric(componentName, metricName, value);
+    }
+  }, [isMonitoring]);
   
-  // Track a performance metric
-  const trackMetric = (
+  // Persist performance metric to Supabase if user is logged in
+  const persistPerformanceMetric = useCallback(async (
     componentName: string, 
     metricName: string, 
-    value: number, 
-    metadata?: Record<string, any>
+    value: number
   ) => {
-    if (config.enabled && config.enablePerformanceTracking) {
-      const type: MetricType = metricName.includes('render') ? 'render' : 'metric';
-      metricsCollector.collect(
-        metricName,
-        value,
-        type,
-        metadata,
-        componentName
-      );
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Use edge function to persist metric
+        await supabase.functions.invoke('track-performance', {
+          body: {
+            userId: user.id,
+            componentName,
+            metricName,
+            value,
+            deviceCapability,
+            userAgent: navigator.userAgent,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to persist performance metric:', error);
     }
-  };
+  }, [deviceCapability]);
   
-  // Context value
-  const contextValue = useMemo(() => ({
-    config,
-    updateConfig,
+  // Monitor core web vitals
+  const monitorWebVitals = useCallback(() => {
+    // Use dynamic import for better performance
+    import('web-vitals').then(({ onCLS, onFID, onLCP }) => {
+      // Cumulative Layout Shift
+      onCLS(({ value }) => {
+        trackMetric('CoreWebVitals', 'CLS', value);
+      });
+      
+      // First Input Delay
+      onFID(({ value }) => {
+        trackMetric('CoreWebVitals', 'FID', value);
+      });
+      
+      // Largest Contentful Paint
+      onLCP(({ value }) => {
+        trackMetric('CoreWebVitals', 'LCP', value);
+      });
+    });
+  }, [trackMetric]);
+  
+  // Start monitoring
+  const startMonitoring = useCallback(() => {
+    setIsMonitoring(true);
+    toast({
+      title: "Performance monitoring enabled",
+      description: "The app will now collect performance metrics to optimize your experience."
+    });
+  }, [toast]);
+  
+  // Stop monitoring
+  const stopMonitoring = useCallback(() => {
+    setIsMonitoring(false);
+    toast({
+      title: "Performance monitoring disabled",
+      description: "The app will no longer collect performance metrics."
+    });
+  }, [toast]);
+  
+  // Clear metrics
+  const clearMetrics = useCallback(() => {
+    setMetrics({});
+  }, []);
+  
+  // Provide context value
+  const contextValue: PerformanceContextType = {
     deviceCapability,
-    setDeviceCapability,
+    isMonitoring,
+    metrics,
     trackMetric,
-    qualityLevel,
-    setQualityLevel,
-    isLowPerformance,
-    isMediumPerformance,
-    isHighPerformance
-  }), [
-    config, 
-    deviceCapability, 
-    qualityLevel, 
-    isLowPerformance, 
-    isMediumPerformance, 
-    isHighPerformance
-  ]);
+    startMonitoring,
+    stopMonitoring,
+    clearMetrics
+  };
   
   return (
     <PerformanceContext.Provider value={contextValue}>
       {children}
     </PerformanceContext.Provider>
   );
-}
+};
 
-/**
- * Hook to use the performance context
- */
-export function usePerformance(): PerformanceContextState {
+export const usePerformance = () => {
   const context = useContext(PerformanceContext);
+  
   if (!context) {
     throw new Error('usePerformance must be used within a PerformanceProvider');
   }
+  
   return context;
-}
+};
+
+export default PerformanceProvider;

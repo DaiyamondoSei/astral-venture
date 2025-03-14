@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { usePerformance } from '@/contexts/PerformanceContext';
 import { getPerformanceCategory } from '@/utils/performanceUtils';
 import { Card } from '@/components/ui/card';
@@ -8,19 +8,37 @@ export interface PerformanceMonitorProps {
   children: React.ReactNode;
   enableMetrics?: boolean;
   componentName?: string;
+  measuredOperation?: string;
 }
 
 export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   children,
   enableMetrics = true,
-  componentName
+  componentName,
+  measuredOperation = 'render'
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const renderStartRef = useRef<number>(0);
   const { deviceCapability, trackMetric } = usePerformance();
-
+  
+  // Track component render time
+  useEffect(() => {
+    if (!enableMetrics || !componentName) return;
+    
+    // Mark render end and calculate duration
+    const renderEnd = performance.now();
+    const renderDuration = renderEnd - renderStartRef.current;
+    
+    // Only track if the component name is provided and the duration is valid
+    if (componentName && renderDuration > 0) {
+      trackMetric(componentName, `${measuredOperation}Time`, renderDuration);
+    }
+  }, [enableMetrics, componentName, trackMetric, measuredOperation]);
+  
+  // Create performance observer for more detailed metrics
   useEffect(() => {
     if (!enableMetrics || !componentName || !containerRef.current) return;
-
+    
     // Create performance observer
     const observer = new PerformanceObserver((list) => {
       list.getEntries().forEach((entry) => {
@@ -29,18 +47,42 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
         }
       });
     });
-
+    
     // Start observing
     observer.observe({ entryTypes: ['measure'] });
-
+    
     // Cleanup
     return () => observer.disconnect();
   }, [enableMetrics, componentName, trackMetric]);
-
+  
+  // Measure interactions with the component
+  const measureInteraction = useCallback((interactionName: string) => {
+    if (!enableMetrics || !componentName) return;
+    
+    const startMark = `${componentName}-${interactionName}-start`;
+    const endMark = `${componentName}-${interactionName}-end`;
+    
+    performance.mark(startMark);
+    
+    return () => {
+      performance.mark(endMark);
+      performance.measure(
+        `${componentName}-${interactionName}`,
+        startMark,
+        endMark
+      );
+    };
+  }, [enableMetrics, componentName]);
+  
+  // Set render start time
+  renderStartRef.current = performance.now();
+  
   return (
     <Card 
       ref={containerRef}
       className={`performance-${getPerformanceCategory(deviceCapability)}`}
+      data-component-name={componentName}
+      data-performance-monitor="true"
     >
       {children}
     </Card>

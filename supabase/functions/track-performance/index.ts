@@ -1,193 +1,116 @@
 
-/**
- * Performance Metrics Tracking Edge Function
- * 
- * This edge function receives performance metrics from clients and stores them in the database.
- * It includes comprehensive validation and error handling.
- */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { 
-  validatePerformancePayload 
-} from "./validation.ts";
-import { processMetrics, storePerformanceMetrics } from "./utils.ts";
-import { TrackPerformancePayload, PerformanceDataError } from "./types.ts";
 
-// CORS headers for cross-origin requests
+// CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Content-Type": "application/json"
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Supabase client initialization
-function getSupabaseClient() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL") || "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-}
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabaseServiceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-serve(async (req: Request) => {
+// Create Supabase admin client with service role key
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
+
+serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
-  }
-  
-  // Only accept POST requests
-  if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: "Method not allowed. Use POST."
-      }),
-      { 
-        status: 405, 
-        headers: corsHeaders 
-      }
-    );
   }
 
   try {
     // Parse request body
-    const requestData = await req.json();
-    
-    // Validate the request payload
-    const validation = validatePerformancePayload(requestData);
-    
-    if (!validation.valid) {
+    const { 
+      userId, 
+      componentName, 
+      metricName, 
+      value,
+      deviceCapability,
+      userAgent,
+      timestamp
+    } = await req.json();
+
+    // Validate required fields
+    if (!userId || !componentName || !metricName || value === undefined) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: validation.message || "Invalid payload",
-          details: validation.errors
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing required fields' 
         }),
         { 
           status: 400, 
-          headers: corsHeaders 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
         }
       );
     }
 
-    // Get authenticated user (if available)
-    const authHeader = req.headers.get('Authorization');
-    let userId = "anonymous";
-    
-    if (authHeader) {
-      const supabase = getSupabaseClient();
-      const { data: { user }, error } = await supabase.auth.getUser(authHeader.split(' ')[1]);
+    // Store metric in Supabase
+    const { data, error } = await supabaseAdmin
+      .from('performance_metrics')
+      .insert({
+        user_id: userId,
+        component_name: componentName,
+        metric_name: metricName,
+        value: value,
+        device_capability: deviceCapability || 'medium',
+        user_agent: userAgent || null,
+        recorded_at: timestamp || new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error storing performance metric:', error);
       
-      if (!error && user) {
-        userId = user.id;
-      }
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: error.message 
+        }),
+        { 
+          status: 500, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
     }
-    
-    // Use session ID from payload if available
-    if (requestData.userId) {
-      userId = requestData.userId;
-    }
-    
-    // Process the validated payload
-    const payload = requestData as TrackPerformancePayload;
-    const processedData = processMetrics(payload, userId);
-    
-    // Store metrics in the database
-    const storageResult = await storePerformanceMetrics(userId, processedData);
-    
-    if (!storageResult.saved) {
-      throw new Error(storageResult.error || "Failed to save metrics");
-    }
-    
-    // Calculate any performance recommendations
-    const recommendations = generateRecommendations(payload);
-    
+
     // Return success response
     return new Response(
-      JSON.stringify({
-        success: true,
-        metricsProcessed: payload.metrics.length + (payload.webVitals?.length || 0),
-        timestamp: new Date().toISOString(),
-        recommendations: recommendations.length > 0 ? recommendations : undefined
+      JSON.stringify({ 
+        success: true, 
+        message: 'Performance metric recorded successfully' 
       }),
       { 
         status: 200, 
-        headers: corsHeaders 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     );
   } catch (error) {
-    // Log the error
-    console.error("Error processing performance metrics:", error);
+    console.error('Error processing performance metric:', error);
     
-    // Return error response
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString()
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
       }),
       { 
         status: 500, 
-        headers: corsHeaders 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     );
   }
 });
-
-/**
- * Generate performance recommendations based on metrics
- */
-function generateRecommendations(payload: TrackPerformancePayload): string[] {
-  const recommendations: string[] = [];
-  
-  // Check for slow rendering
-  const renderMetrics = payload.metrics.filter(m => m.type === 'render');
-  const slowRenders = renderMetrics.filter(m => m.value > 16);
-  
-  if (slowRenders.length > 0) {
-    const components = [...new Set(slowRenders.map(m => m.component_name || 'Unknown'))];
-    if (components.length === 1) {
-      recommendations.push(`Consider optimizing the ${components[0]} component which is rendering slowly.`);
-    } else if (components.length > 1) {
-      recommendations.push(`Consider optimizing these slow rendering components: ${components.join(', ')}.`);
-    }
-  }
-  
-  // Check web vitals
-  if (payload.webVitals) {
-    const poorVitals = payload.webVitals.filter(v => v.rating === 'poor');
-    
-    if (poorVitals.length > 0) {
-      const vitalNames = [...new Set(poorVitals.map(v => v.name))];
-      recommendations.push(`Improve core web vitals: ${vitalNames.join(', ')}.`);
-    }
-    
-    // Specific LCP recommendation
-    const lcp = payload.webVitals.find(v => v.name === 'LCP');
-    if (lcp && lcp.value > 2500) {
-      recommendations.push(`Your Largest Contentful Paint (${Math.round(lcp.value)}ms) exceeds the recommended 2.5s threshold.`);
-    }
-    
-    // Specific CLS recommendation
-    const cls = payload.webVitals.find(v => v.name === 'CLS');
-    if (cls && cls.value > 0.1) {
-      recommendations.push(`Your Cumulative Layout Shift (${cls.value.toFixed(3)}) exceeds the recommended 0.1 threshold.`);
-    }
-  }
-  
-  // Check memory usage
-  const memoryMetrics = payload.metrics.filter(m => m.type === 'memory');
-  if (memoryMetrics.length > 0) {
-    const highMemory = memoryMetrics.filter(m => m.value > 50000000); // 50MB
-    if (highMemory.length > 0) {
-      recommendations.push("Memory usage is high. Consider checking for memory leaks or optimizing resource usage.");
-    }
-  }
-  
-  return recommendations;
-}
