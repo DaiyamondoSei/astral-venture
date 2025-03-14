@@ -8,7 +8,7 @@ import { AIQuestion, AIQuestionOptions, AIResponse } from '../types';
 export const useQuestionSubmit = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setResponse, setStreamingResponse, setModelInfo } = useAssistantState();
+  const { setResponse, setStreamingResponse, setModelInfo, setIsLoading: setStateIsLoading } = useAssistantState();
   const [tokenMetrics, setTokenMetrics] = useState<{ model: string; tokens: number }>({
     model: '',
     tokens: 0
@@ -36,6 +36,7 @@ export const useQuestionSubmit = () => {
     }
     
     setIsLoading(true);
+    setStateIsLoading(true);
     setError('');
     setStreamingResponse('');
     
@@ -51,6 +52,7 @@ export const useQuestionSubmit = () => {
       // Update state with response
       setResponse(response);
       setIsLoading(false);
+      setStateIsLoading(false);
       
       // Update token metrics, handling both tokenUsage and tokens properties
       if (response.meta?.tokenUsage) {
@@ -76,6 +78,7 @@ export const useQuestionSubmit = () => {
       return response;
     } catch (error: any) {
       setIsLoading(false);
+      setStateIsLoading(false);
       const errorMessage = error.message || 'Failed to communicate with AI assistant';
       setError(errorMessage);
       console.error('Error in AI request:', error);

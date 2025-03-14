@@ -64,7 +64,8 @@ export const useAIAssistant = ({
     question: state.question,
     setQuestion: state.setQuestion,
     response: state.response,
-    loading: state.isLoading,
+    loading: state.loading,
+    isLoading: state.isLoading, // Use isLoading from state
     error: state.error,
     handleSubmitQuestion,
     reset: state.reset,

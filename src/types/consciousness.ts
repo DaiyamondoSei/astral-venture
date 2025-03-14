@@ -8,6 +8,7 @@ export interface ChakraStatus {
   balance: number;
   blockages: string[];
   dominantEmotions: string[];
+  type?: string; // Optional type property
 }
 
 // Define system for tracking overall chakra health
@@ -20,7 +21,7 @@ export interface ChakraSystem {
 
 // Define entanglement state for quantum effects
 export interface EntanglementState {
-  activePairs: [number, number][];
+  activePairs: [number, number][] | { primaryChakra: number; secondaryChakra: number; entanglementStrength: number }[];
   entanglementStrength: number;
   quantumFluctuations: boolean;
   stabilityFactor: number;
@@ -44,4 +45,34 @@ export interface UserEnergyData {
   energyPoints: number;
   lastActivities: string[];
   emotionalProfile: EmotionalProfile;
+}
+
+// Define consciousness metrics for tracking progress
+export interface ConsciousnessMetrics {
+  overallLevel: number;
+  awarenessScore: number;
+  insightDepth: number;
+  integrationRate: number;
+  lastAssessment: string;
+}
+
+// Define dream record for tracking and analysis
+export interface DreamRecord {
+  id: string;
+  date: string;
+  content: string;
+  symbols: string[];
+  emotions: string[];
+  clarity: number;
+  chakraAssociations: Record<ChakraType, number>;
+  interpretation?: string;
+}
+
+// Define consciousness progression tracking
+export interface ConsciousnessProgress {
+  currentLevel: ConsciousnessLevel;
+  progressToNextLevel: number;
+  milestones: string[];
+  challenges: string[];
+  nextSteps: string[];
 }

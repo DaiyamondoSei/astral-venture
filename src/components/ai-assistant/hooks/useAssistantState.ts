@@ -9,6 +9,7 @@ export function useAssistantState() {
   const [hasError, setHasError] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // Added for compatibility
   const [streamingResponse, setStreamingResponse] = useState<string | null>(null);
   const [modelInfo, setModelInfo] = useState<{model: string; tokens: number} | null>(null);
   
@@ -19,6 +20,7 @@ export function useAssistantState() {
     setHasError(false);
     setError(null);
     setLoading(false);
+    setIsLoading(false);
     setStreamingResponse(null);
     setModelInfo(null);
   }, []);
@@ -36,6 +38,8 @@ export function useAssistantState() {
     setError,
     loading,
     setLoading,
+    isLoading,
+    setIsLoading,
     streamingResponse,
     setStreamingResponse,
     modelInfo,

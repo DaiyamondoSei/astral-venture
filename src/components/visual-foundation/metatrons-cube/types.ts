@@ -8,7 +8,11 @@ export interface MetatronsNode {
   activated?: boolean;
   importance?: number;
   label?: string;
-  radius?: number;  // Add radius property which was missing
+  radius?: number;
+  size?: number;
+  tooltip?: string;
+  pulsing?: boolean;
+  active?: boolean;
 }
 
 export interface MetatronsConnection {
@@ -17,6 +21,14 @@ export interface MetatronsConnection {
   target: string; // Target node ID
   strength?: number;
   activated?: boolean;
+  
+  // Additional properties needed
+  from?: string;
+  to?: string;
+  active?: boolean;
+  animated?: boolean;
+  width?: number;
+  intensity?: number;
 }
 
 export interface MetatronsCubeData {
@@ -36,6 +48,9 @@ export interface MetatronsCubeProps {
   className?: string;
   animationLevel?: 'minimal' | 'standard' | 'enhanced';
   pulseEffect?: boolean;
+  withAnimation?: boolean;
+  nodes?: MetatronsNode[];
+  connections?: MetatronsConnection[];
 }
 
 export interface CubeNodeProps {
@@ -45,6 +60,10 @@ export interface CubeNodeProps {
   glowIntensity?: GlowIntensity;
   theme?: CubeTheme;
   pulseEffect?: boolean;
+  primaryColor?: string;
+  secondaryColor?: string;
+  isActive?: boolean;
+  isSimplified?: boolean;
 }
 
 export interface CubeLinesProps {
@@ -53,6 +72,10 @@ export interface CubeLinesProps {
   activatedNodes: string[];
   theme?: CubeTheme;
   glowIntensity?: GlowIntensity;
+  primaryColor?: string;
+  secondaryColor?: string;
+  activeNodeId?: string;
+  isSimplified?: boolean;
 }
 
 export interface CubeRendererProps {
@@ -63,4 +86,19 @@ export interface CubeRendererProps {
   onNodeSelect?: (nodeId: string) => void;
   interactive?: boolean;
   pulseEffect?: boolean;
+  
+  // Additional properties needed
+  nodes?: MetatronsNode[];
+  connections?: MetatronsConnection[];
+  activeNodeId?: string;
+  onNodeClick?: (nodeId: string) => void;
+  variant?: string;
+  withAnimation?: boolean;
+  intensity?: GlowIntensity;
 }
+
+// Export these enum types to make them accessible
+export { CubeSize, CubeTheme, GlowIntensity };
+
+// Define a CubeConnection type (for backward compatibility)
+export type CubeConnection = MetatronsConnection;

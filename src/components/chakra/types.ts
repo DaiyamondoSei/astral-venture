@@ -22,6 +22,7 @@ export interface ChakraActivationProps {
   chakraColors?: Record<string, string>;
   backgroundEffect?: boolean;
   renderQuality?: 'low' | 'medium' | 'high';
+  className?: string;
 }
 
 // Entanglement state interface for quantum effects

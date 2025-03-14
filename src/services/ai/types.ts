@@ -34,6 +34,9 @@ export interface AIQuestionOptions {
   
   /** Whether to perform detailed analysis */
   detailedAnalysis?: boolean;
+  
+  /** Abort signal for cancelling the request */
+  signal?: AbortSignal;
 }
 
 // AI Question structure
@@ -52,6 +55,9 @@ export interface AIQuestion {
   
   /** Optional reflection IDs related to the question */
   reflectionIds?: string[];
+  
+  /** Whether to stream the response */
+  stream?: boolean;
 }
 
 // AI Response metadata
@@ -62,6 +68,9 @@ export interface AIResponseMeta {
   /** Total token usage for the request and response */
   tokenUsage: number;
   
+  /** Alias for tokenUsage - for backward compatibility */
+  tokens?: number;
+  
   /** Time taken to process the request in milliseconds */
   processingTime: number;
   
@@ -70,7 +79,7 @@ export interface AIResponseMeta {
 }
 
 // AI Response types
-export type AIResponseType = 'text' | 'markdown' | 'code' | 'error';
+export type AIResponseType = 'text' | 'markdown' | 'code' | 'error' | 'stream';
 
 // AI Response structure
 export interface AIResponse {
@@ -112,4 +121,32 @@ export interface AIModelInfo {
   
   /** Processing time in milliseconds */
   processingTime: number;
+}
+
+// AI Insight type for analysis results
+export interface AIInsight {
+  id: string;
+  category: string;
+  content: string;
+  confidence: number;
+  relevance: number;
+  created: string;
+}
+
+// Emotional analysis result structure
+export interface EmotionalAnalysisResult {
+  primaryEmotions: string[];
+  emotionalPatterns: Record<string, number>;
+  insightSummary: string;
+  recommendations: string[];
+  chakraCorrelations: Record<string, number>;
+}
+
+// AI Service options
+export interface AIServiceOptions {
+  cacheResults?: boolean;
+  detailedAnalysis?: boolean;
+  model?: string;
+  timeout?: number;
+  maxTokens?: number;
 }

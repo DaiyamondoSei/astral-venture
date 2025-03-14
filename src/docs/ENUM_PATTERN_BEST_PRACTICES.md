@@ -3,121 +3,153 @@
 
 ## Problem
 
-TypeScript's type system is erased at compile time. When we try to use types as values at runtime, we get errors like:
-
-```
-error TS2693: 'DeviceCapability' only refers to a type, but is being used as a value here.
-```
-
-This occurs frequently with enums, constants, and type definitions.
-
-## Root Cause (5 Whys Analysis)
-
-1. **Why do we get "X only refers to a type" errors?**  
-   Because we're trying to use a TypeScript type (which exists only at compile time) as a value at runtime.
-
-2. **Why are we trying to use types as values?**  
-   Because we need both type checking and runtime access to the same constants.
-
-3. **Why don't we use TypeScript enums?**  
-   Because TypeScript enums have downsides: they generate unnecessary runtime code and can lead to unexpected behavior.
-
-4. **Why do we have inconsistent patterns for types and values?**  
-   Because we didn't have a standardized approach for defining entities that need to exist as both types and values.
-
-5. **Why didn't we standardize this approach?**  
-   Because we didn't have clear documentation and examples of the correct pattern to follow.
-
-## Solution Pattern
-
-For any concept that needs to exist as both a type and a value, we should create both:
-
-1. **Type Definition** (for type checking)
-2. **Runtime Value Equivalent** (for runtime usage)
-
-## Implementation Pattern
-
-### Pattern 1: Type + Const Object (Recommended)
+TypeScript errors related to enums and type/value confusion are common in our codebase:
 
 ```typescript
-// 1. Define the type
+// ERROR: 'DeviceCapability' only refers to a type, but is being used as a value here.
+if (capability === DeviceCapability.HIGH) { ... }
+```
+
+## Root Cause Analysis (5 Whys)
+
+1. **Why are we seeing this error?**  
+   Because we're trying to use a type (compile-time entity) as a value (runtime entity).
+
+2. **Why are we using types as values?**  
+   Because for conceptual entities like enums, we need both type-checking and runtime values.
+
+3. **Why is there confusion between types and values?**  
+   Because TypeScript's type system is erased at runtime, but many developers expect type names to have runtime equivalents.
+
+4. **Why do developers expect this behavior?**  
+   Because in many strongly-typed languages (like C#, Java), enums exist both at compile-time and runtime.
+
+5. **Why isn't there a standard pattern in our codebase?**  
+   Because we haven't established clear guidelines for handling this common pattern.
+
+## Solution: The Enum Pattern
+
+Implement a consistent pattern for concepts that need both types and values:
+
+### 1. Define Both Types and Values
+
+For each conceptual "enum", define:
+1. A **type** (for compile-time type checking)
+2. A **constant object** (for runtime value usage)
+
+```typescript
+// Define the type
 export type DeviceCapability = 'low' | 'medium' | 'high';
 
-// 2. Define runtime constants (values)
+// Define the runtime values
 export const DeviceCapabilities = {
   LOW: 'low' as DeviceCapability,
   MEDIUM: 'medium' as DeviceCapability,
   HIGH: 'high' as DeviceCapability
-};
-
-// Usage
-function setCapability(capability: DeviceCapability) {
-  // Type-safe parameter
-  console.log(`Setting capability to: ${capability}`);
-}
-
-// Call with constant
-setCapability(DeviceCapabilities.HIGH); // ✓ Type-safe 
+} as const;
 ```
 
-### Pattern 2: TypeScript enum (Alternative)
+### 2. Use Type-Guards for Runtime Checking
 
 ```typescript
-// Define an enum
-export enum AlertType {
-  INFO = 'info',
-  WARNING = 'warning',
-  ERROR = 'error'
+// Type guard for runtime validation
+export function isDeviceCapability(value: string): value is DeviceCapability {
+  return Object.values(DeviceCapabilities).includes(value as DeviceCapability);
 }
 
 // Usage
-function showAlert(type: AlertType) {
-  console.log(`Showing ${type} alert`);
+function setCapability(capability: string) {
+  if (isDeviceCapability(capability)) {
+    // TypeScript knows capability is DeviceCapability here
+    // Safe to use
+  } else {
+    // Handle invalid input
+  }
 }
-
-showAlert(AlertType.WARNING); // ✓ Type-safe
 ```
 
-## When to Use Each Pattern
-
-Use **Pattern 1** (Type + Const Object) when:
-- You want more control over the exact output
-- You want to avoid the quirks of TypeScript enums
-- The values are primarily strings or other primitives
-
-Use **Pattern 2** (TypeScript enum) when:
-- You need a more traditional enum behavior
-- The enum is used extensively throughout the codebase
-- You're dealing with numeric values where enum auto-incrementing is helpful
-
-## Best Practices
-
-1. **Be consistent** - Choose one pattern and use it consistently throughout the codebase
-2. **Use PascalCase for the object** and UPPER_CASE for its properties
-3. **Use camelCase for the type** definition
-4. **Keep related types and values in the same file**
-5. **Document the pattern** in your codebase for other developers
-
-## Examples in Our Codebase
-
-Good examples to follow in our codebase:
+### 3. Create APIs for Type-Safe Values
 
 ```typescript
-// Types + Values for AI models
-export type AIModel = 'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo';
-
-export const AIModels = {
-  GPT_4: 'gpt-4' as AIModel,
-  GPT_4_TURBO: 'gpt-4-turbo' as AIModel,
-  GPT_3_5_TURBO: 'gpt-3.5-turbo' as AIModel
-};
-
-// Usage
-function callAI(model: AIModel) {
-  // Implementation
+// Function to get all possible values
+export function getAllDeviceCapabilities(): DeviceCapability[] {
+  return Object.values(DeviceCapabilities);
 }
 
-callAI(AIModels.GPT_4); // Type-safe
+// Function to get a default value
+export function getDefaultDeviceCapability(): DeviceCapability {
+  return DeviceCapabilities.MEDIUM;
+}
 ```
 
-By following these patterns, we can eliminate a whole class of TypeScript errors in our codebase.
+## Anti-Patterns to Avoid
+
+### 1. Inconsistent Naming
+
+❌ BAD: Confusing singular/plural or inconsistent casing
+```typescript
+export type deviceCapability = 'low' | 'medium' | 'high';
+export const DeviceCapability = { ... }; // Confusing with the type name
+```
+
+✅ GOOD: Consistent, clear naming convention
+```typescript
+export type DeviceCapability = 'low' | 'medium' | 'high';
+export const DeviceCapabilities = { ... }; // Clearly distinguished
+```
+
+### 2. Missing Type Safety
+
+❌ BAD: Not ensuring runtime values match the type
+```typescript
+export const DeviceCapabilities = {
+  LOW: 'low',    // Missing type assertion
+  MEDIUM: 'med', // Doesn't match the type definition ('medium')
+};
+```
+
+✅ GOOD: Ensuring type safety with assertions
+```typescript
+export const DeviceCapabilities = {
+  LOW: 'low' as DeviceCapability,
+  MEDIUM: 'medium' as DeviceCapability,
+} as const; // Makes the object deeply readonly
+```
+
+### 3. Using TypeScript Enums Inconsistently
+
+Avoid mixing our enum pattern with TypeScript's built-in enums:
+
+❌ BAD: Mixing patterns
+```typescript
+// File A
+export enum Priority { LOW, MEDIUM, HIGH }
+
+// File B
+export type Status = 'pending' | 'active' | 'completed';
+export const Statuses = { PENDING: 'pending' as Status, ... };
+```
+
+✅ GOOD: Consistent pattern application
+```typescript
+// File A
+export type Priority = 'low' | 'medium' | 'high';
+export const Priorities = { LOW: 'low' as Priority, ... };
+
+// File B
+export type Status = 'pending' | 'active' | 'completed';
+export const Statuses = { PENDING: 'pending' as Status, ... };
+```
+
+## Best Practices Summary
+
+1. **Always create both** type definitions and runtime constants for enum-like concepts
+2. **Use consistent naming**: `TypeName` for the type, `TypeNames` for the values object
+3. **Add type assertions** to ensure runtime values match the type definitions
+4. **Create type guards** for runtime validation of values
+5. **Document with JSDoc** to explain the purpose and usage
+6. **Add helper functions** for common operations on the enum
+7. **Use `as const`** to make objects deeply readonly
+8. **Prefer string literals** for better debugging and serialization
+
+By following these guidelines, we'll eliminate a whole class of common TypeScript errors while maintaining runtime type safety and developer ergonomics.
