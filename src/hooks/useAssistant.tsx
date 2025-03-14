@@ -1,192 +1,184 @@
 
-import { useState, useCallback } from 'react';
-import { useAssistantState } from '@/components/ai-assistant/hooks/useAssistantState';
-import { useQuestionSubmit } from '@/components/ai-assistant/hooks/useQuestionSubmit';
-import { AIQuestion, AssistantSuggestion } from '@/components/ai-assistant/types';
+import { useState, useCallback, useEffect } from 'react';
+import { AssistantSuggestion } from '@/components/ai-assistant/types';
+import { aiCodeAssistant } from '@/utils/ai/AICodeAssistant';
 
-interface UseAssistantProps {
-  initialQuestion?: string;
-  context?: string;
+/**
+ * Props for the useAssistant hook
+ */
+export interface UseAssistantProps {
   componentName?: string;
 }
 
 /**
- * Custom hook for AI assistant functionality
- * This provides a unified interface for components to interact with the AI assistant
+ * Return type for the useAssistant hook
  */
-export function useAssistant(props: UseAssistantProps = {}) {
-  const { initialQuestion = '', context = '', componentName = '' } = props;
+export interface UseAssistantResult {
+  // Loading states
+  isLoading: boolean;
+  loading: boolean; // Alias for backward compatibility
+  
+  // Response and data
+  data: any;
+  response: string; // HTML formatted response
+  tokens: number;
+  
+  // Question handling
+  question: string;
+  setQuestion: (question: string) => void;
+  submitQuestion: (question: string) => Promise<void>;
+  
+  // Code analysis
+  suggestions: AssistantSuggestion[];
+  currentComponent: string;
+  isAnalyzing: boolean;
+  analyzeComponent: (componentName: string) => Promise<AssistantSuggestion[]>;
+  
+  // Error handling
+  error: string;
+  
+  // Code fixing
+  isFixing: boolean;
+  applyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
+  applyAutoFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
+  
+  // Metadata
+  lastUpdated: Date;
+}
+
+/**
+ * Hook for interacting with the AI assistant
+ */
+export function useAssistant({ componentName = '' }: UseAssistantProps = {}): UseAssistantResult {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [question, setQuestion] = useState('');
+  const [response, setResponse] = useState('');
+  const [tokens, setTokens] = useState(0);
   const [suggestions, setSuggestions] = useState<AssistantSuggestion[]>([]);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<AssistantSuggestion | null>(null);
+  const [currentComponent, setCurrentComponent] = useState(componentName || '');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [lastUpdated, setLastUpdated] = useState(new Date());
   
-  // Use the core assistant state
-  const assistantState = useAssistantState();
-  
-  // Use the question submission hook
-  const { submitQuestion: submitQuestionToAPI, isLoading, error, tokenMetrics } = useQuestionSubmit();
-  
-  // Initialize with the initial question if provided
-  useState(() => {
-    if (initialQuestion) {
-      assistantState.setQuestion(initialQuestion);
+  // Fetch suggestions on component change
+  useEffect(() => {
+    if (componentName && componentName !== currentComponent) {
+      setCurrentComponent(componentName);
+      fetchSuggestions(componentName);
     }
-  });
+  }, [componentName]);
   
-  // Handle submitting a question
-  const submitQuestion = useCallback(async (questionText?: string) => {
-    const textToSubmit = questionText || assistantState.question;
-    
-    if (!textToSubmit.trim()) return;
-    
-    // Create a question object
-    const aiQuestion: AIQuestion = {
-      text: textToSubmit,
-      question: textToSubmit,
-      userId: 'current-user', // This should be replaced with actual user ID in a real implementation
-      context: context
-    };
-    
-    // Submit the question and return the result directly
-    const result = await submitQuestionToAPI(aiQuestion);
-    return result;
-  }, [assistantState.question, context, submitQuestionToAPI]);
-  
-  // Analyze a component or code
-  const analyzeComponent = useCallback(async (componentToAnalyze: string) => {
-    setIsAnalyzing(true);
+  // Fetch suggestions for a component
+  const fetchSuggestions = async (componentId: string) => {
+    if (!componentId) return;
     
     try {
-      // Create a specific question for component analysis
-      const analysisQuestion = `Analyze the ${componentToAnalyze} component and suggest improvements.`;
-      
-      // Submit the analysis question
-      await submitQuestion(analysisQuestion);
-      
-      // Here you would typically process the response to extract suggestions
-      // For now, we'll mock some suggestions
-      const mockSuggestions: AssistantSuggestion[] = [
-        {
-          id: '1',
-          title: 'Improve performance',
-          description: 'Consider memoizing expensive calculations',
-          priority: 'medium',
-          type: 'optimization',
-          status: 'pending',
-          component: componentToAnalyze,
-          context: {
-            component: componentToAnalyze
-          }
-        }
-      ];
-      
-      setSuggestions(mockSuggestions);
+      setIsAnalyzing(true);
+      const results = await aiCodeAssistant.analyzeComponent(componentId);
+      setSuggestions(results);
       setLastUpdated(new Date());
-      return mockSuggestions;
-    } catch (error) {
-      console.error('Error analyzing component:', error);
+    } catch (err) {
+      console.error('Error analyzing component:', err);
+      setError('Failed to analyze component');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+  
+  // Analyze component and fetch suggestions
+  const analyzeComponent = async (componentId: string) => {
+    try {
+      setIsAnalyzing(true);
+      const results = await aiCodeAssistant.analyzeComponent(componentId);
+      setSuggestions(results);
+      setCurrentComponent(componentId);
+      setLastUpdated(new Date());
+      return results;
+    } catch (err) {
+      console.error('Error analyzing component:', err);
+      setError('Failed to analyze component');
       return [];
     } finally {
       setIsAnalyzing(false);
     }
-  }, [submitQuestion]);
+  };
   
-  // Dismiss a suggestion
-  const dismissSuggestion = useCallback((suggestionId: string) => {
-    setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
-    if (selectedSuggestion?.id === suggestionId) {
-      setSelectedSuggestion(null);
-    }
-    setLastUpdated(new Date());
-  }, [selectedSuggestion]);
-  
-  // Implement a suggestion
-  const implementSuggestion = useCallback(async (suggestion: AssistantSuggestion) => {
-    // In a real implementation, this would communicate with the backend to implement the suggestion
-    setSuggestions(prev => 
-      prev.map(s => s.id === suggestion.id ? { ...s, status: 'implemented' } : s)
-    );
-    setLastUpdated(new Date());
-    return Promise.resolve();
-  }, []);
-
-  // Apply a fix for a suggestion
-  const applyFix = useCallback(async (suggestion: AssistantSuggestion) => {
-    setIsFixing(true);
+  // Apply fix for a suggestion
+  const applyFix = async (suggestion: AssistantSuggestion) => {
     try {
-      // Simulate applying a fix
+      setIsFixing(true);
+      const success = await aiCodeAssistant.applyFix(suggestion.id);
+      if (success) {
+        // Remove the fixed suggestion from the list
+        setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+        setLastUpdated(new Date());
+      }
+      return success;
+    } catch (err) {
+      console.error('Error applying fix:', err);
+      setError('Failed to apply fix');
+      return false;
+    } finally {
+      setIsFixing(false);
+    }
+  };
+  
+  // Apply auto fix for a suggestion (alias for backward compatibility)
+  const applyAutoFix = applyFix;
+  
+  // Submit a question to the AI assistant
+  const submitQuestion = async (questionText: string) => {
+    if (!questionText.trim()) return;
+    
+    try {
+      setIsLoading(true);
+      setQuestion(questionText);
+      
+      // Simulate response for now
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setSuggestions(prev => 
-        prev.map(s => s.id === suggestion.id ? { ...s, status: 'fixed' } : s)
-      );
+      setResponse(`<p>This is a simulated response to your question: "${questionText}"</p>`);
+      setTokens(Math.floor(Math.random() * 500) + 100);
+      
       setLastUpdated(new Date());
-      return true;
-    } catch (error) {
-      console.error('Error applying fix:', error);
-      return false;
+    } catch (err) {
+      console.error('Error submitting question:', err);
+      setError('Failed to get response');
     } finally {
-      setIsFixing(false);
+      setIsLoading(false);
     }
-  }, []);
-
-  // Apply an auto fix for a suggestion
-  const applyAutoFix = useCallback(async (suggestion: AssistantSuggestion) => {
-    setIsFixing(true);
-    try {
-      // Simulate auto-fixing
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setSuggestions(prev => 
-        prev.map(s => s.id === suggestion.id ? { ...s, status: 'fixed' } : s)
-      );
-      setLastUpdated(new Date());
-      return true;
-    } catch (error) {
-      console.error('Error applying auto fix:', error);
-      return false;
-    } finally {
-      setIsFixing(false);
-    }
-  }, []);
+  };
   
   return {
-    // Properties from assistantState
-    question: assistantState.question,
-    setQuestion: assistantState.setQuestion,
-    response: assistantState.response,
-    
-    // Submit function
-    submitQuestion,
-    
     // Loading states
     isLoading,
     loading: isLoading, // Alias for backward compatibility
-    isAnalyzing,
-    isFixing,
     
-    // Error information
+    // Response and data
+    data: response,
+    response,
+    tokens,
+    
+    // Question handling
+    question,
+    setQuestion,
+    submitQuestion,
+    
+    // Code analysis
+    suggestions,
+    currentComponent,
+    isAnalyzing,
+    analyzeComponent,
+    
+    // Error handling
     error,
     
-    // Metrics
-    tokenMetrics,
-    tokens: tokenMetrics?.total || 0, // For backward compatibility
-    
-    // Data (alias for backward compatibility)
-    data: assistantState.response,
-    
-    // Suggestions system
-    suggestions,
-    selectedSuggestion,
-    setSelectedSuggestion,
-    analyzeComponent,
-    dismissSuggestion,
-    implementSuggestion,
+    // Code fixing
+    isFixing,
     applyFix,
     applyAutoFix,
     
-    // Context
-    currentComponent: componentName,
+    // Metadata
     lastUpdated
   };
 }

@@ -1,283 +1,174 @@
 
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { useAssistant } from '@/hooks/useAssistant';
-import { AssistantSuggestion } from './types';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, AlertCircle, RefreshCw, Code, Wrench } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Check, AlertTriangle, Code, Zap, RefreshCw, Wrench } from 'lucide-react';
+import { AssistantSuggestion } from './types';
 
 export interface AISuggestionListProps {
   componentId?: string;
   limit?: number;
 }
 
-// Helper function to get color based on priority
-const getPriorityColor = (priority: string) => {
+/**
+ * Get color based on suggestion priority
+ */
+function getPriorityColor(priority: 'high' | 'medium' | 'low'): string {
   switch (priority) {
-    case 'high': return 'bg-red-500';
-    case 'medium': return 'bg-yellow-500';
-    case 'low': return 'bg-blue-500';
-    default: return 'bg-gray-500';
+    case 'high':
+      return 'text-red-500';
+    case 'medium':
+      return 'text-amber-500';
+    case 'low':
+      return 'text-blue-500';
+    default:
+      return 'text-gray-500';
   }
-};
+}
 
-export const AISuggestionList: React.FC<AISuggestionListProps> = ({
-  componentId,
-  limit = 5
-}) => {
+export const AISuggestionList = ({ componentId, limit = 10 }: AISuggestionListProps) => {
+  const [selectedSuggestion, setSelectedSuggestion] = useState<AssistantSuggestion | null>(null);
+  
   const { 
     suggestions, 
-    isFixing, 
-    isAnalyzing,
+    currentComponent, 
+    isAnalyzing, 
     analyzeComponent, 
-    dismissSuggestion, 
-    implementSuggestion, 
+    isFixing, 
     applyFix,
-    loading,
-    applyAutoFix,
-    lastUpdated,
-    currentComponent
-  } = useAssistant();
-
-  // Filter suggestions by component if provided
-  const filteredSuggestions = componentId 
-    ? suggestions.filter(s => s.context.component === componentId) 
-    : suggestions;
-
-  // Limit the number of suggestions shown
-  const limitedSuggestions = filteredSuggestions.slice(0, limit);
-
-  const handleAnalyze = () => {
+    applyAutoFix
+  } = useAssistant({ componentName: componentId });
+  
+  useEffect(() => {
+    if (componentId && componentId !== currentComponent) {
+      analyzeComponent(componentId);
+    }
+  }, [componentId, currentComponent]);
+  
+  const handleRefresh = () => {
     if (componentId) {
       analyzeComponent(componentId);
     }
   };
-
-  if (isAnalyzing || loading) {
+  
+  const handleApplyFix = async (suggestion: AssistantSuggestion) => {
+    if (suggestion.autoFixAvailable) {
+      await applyAutoFix(suggestion);
+    }
+  };
+  
+  const displayedSuggestions = suggestions.slice(0, limit);
+  
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'performance':
+        return <Zap className="h-4 w-4 mr-1" />;
+      case 'optimization':
+        return <Zap className="h-4 w-4 mr-1" />;
+      case 'bugfix':
+        return <AlertTriangle className="h-4 w-4 mr-1" />;
+      case 'refactoring':
+        return <Code className="h-4 w-4 mr-1" />;
+      default:
+        return <Code className="h-4 w-4 mr-1" />;
+    }
+  };
+  
+  if (isAnalyzing) {
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Analyzing...</h3>
-          <RefreshCw className="animate-spin h-5 w-5" />
-        </div>
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="mb-4">
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-3 w-full mb-2" />
-              <Skeleton className="h-3 w-full mb-2" />
-              <Skeleton className="h-3 w-3/4" />
-            </CardContent>
-            <CardFooter className="pt-0">
-              <Skeleton className="h-9 w-20 mr-2" />
-              <Skeleton className="h-9 w-20" />
-            </CardFooter>
-          </Card>
-        ))}
+      <div className="flex flex-col items-center justify-center h-full p-4">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary mb-2" />
+        <p className="text-center text-muted-foreground">
+          Analyzing component code...
+        </p>
       </div>
     );
   }
-
-  if (filteredSuggestions.length === 0) {
+  
+  if (displayedSuggestions.length === 0) {
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Suggestions</h3>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleAnalyze}
-          >
-            Analyze Component
-          </Button>
+      <div className="flex flex-col items-center justify-center h-full p-4">
+        <Check className="h-8 w-8 text-green-500 mb-2" />
+        <p className="text-center text-muted-foreground">
+          No suggestions found for this component.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-4"
+          onClick={handleRefresh}
+          disabled={isAnalyzing}
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh Analysis
+        </Button>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center mb-2">
+        <div>
+          <span className="text-sm font-medium">Suggestions for: </span>
+          <span className="text-sm text-muted-foreground">{componentId || 'Current Component'}</span>
         </div>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground">No suggestions available for this component.</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Run analysis to generate improvement suggestions.
-            </p>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleRefresh}
+          disabled={isAnalyzing}
+        >
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Refresh
+        </Button>
+      </div>
+      
+      {displayedSuggestions.map((suggestion) => (
+        <Card key={suggestion.id} className="overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center">
+                  {getTypeIcon(suggestion.type)}
+                  <h3 className="text-sm font-medium">{suggestion.title}</h3>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{suggestion.description}</p>
+                
+                {suggestion.codeExample && (
+                  <pre className="mt-2 bg-secondary p-2 rounded text-xs overflow-x-auto">
+                    <code>{suggestion.codeExample}</code>
+                  </pre>
+                )}
+                
+                <div className="flex mt-2 space-x-2">
+                  <Badge variant="outline" className={`text-xs ${getPriorityColor(suggestion.priority)}`}>
+                    {suggestion.priority} priority
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {suggestion.type}
+                  </Badge>
+                </div>
+              </div>
+              
+              {suggestion.autoFixAvailable && (
+                <Button 
+                  size="sm" 
+                  onClick={() => handleApplyFix(suggestion)}
+                  disabled={isFixing}
+                  className="ml-2 shrink-0"
+                >
+                  <Wrench className="h-4 w-4 mr-1" />
+                  Fix
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium">Suggestions</h3>
-        <div className="flex gap-2 items-center">
-          {lastUpdated && (
-            <span className="text-xs text-muted-foreground">
-              Updated {lastUpdated.toLocaleTimeString()}
-            </span>
-          )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleAnalyze}
-          >
-            Refresh Analysis
-          </Button>
-        </div>
-      </div>
-      
-      {limitedSuggestions.map((suggestion) => (
-        <SuggestionCard 
-          key={suggestion.id} 
-          suggestion={suggestion} 
-          onImplement={implementSuggestion}
-          onDismiss={dismissSuggestion}
-          onApplyFix={applyFix}
-          onApplyAutoFix={applyAutoFix}
-        />
       ))}
-      
-      {filteredSuggestions.length > limit && (
-        <div className="text-center mt-2">
-          <Button variant="link" size="sm">
-            Show {filteredSuggestions.length - limit} more suggestions
-          </Button>
-        </div>
-      )}
     </div>
-  );
-};
-
-interface SuggestionCardProps {
-  suggestion: AssistantSuggestion;
-  onImplement: (suggestion: AssistantSuggestion) => Promise<void>;
-  onDismiss: (suggestionId: string) => void;
-  onApplyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
-  onApplyAutoFix?: (suggestion: AssistantSuggestion) => Promise<boolean>;
-}
-
-const SuggestionCard: React.FC<SuggestionCardProps> = ({
-  suggestion,
-  onImplement,
-  onDismiss,
-  onApplyFix,
-  onApplyAutoFix
-}) => {
-  const [isImplementing, setIsImplementing] = React.useState(false);
-  const [isApplying, setIsApplying] = React.useState(false);
-  
-  const handleImplement = async () => {
-    setIsImplementing(true);
-    try {
-      await onImplement(suggestion);
-    } catch (error) {
-      console.error('Error implementing suggestion:', error);
-    } finally {
-      setIsImplementing(false);
-    }
-  };
-  
-  const handleApplyFix = async () => {
-    setIsApplying(true);
-    try {
-      await onApplyFix(suggestion);
-    } catch (error) {
-      console.error('Error applying fix:', error);
-    } finally {
-      setIsApplying(false);
-    }
-  };
-  
-  const handleApplyAutoFix = async () => {
-    if (!onApplyAutoFix) return;
-    
-    setIsApplying(true);
-    try {
-      await onApplyAutoFix(suggestion);
-    } catch (error) {
-      console.error('Error applying auto fix:', error);
-    } finally {
-      setIsApplying(false);
-    }
-  };
-  
-  return (
-    <Card className="mb-4">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-base">{suggestion.title}</CardTitle>
-          <Badge className={`${getPriorityColor(suggestion.priority)} text-white`}>
-            {suggestion.priority}
-          </Badge>
-        </div>
-        <CardDescription>
-          {suggestion.component && (
-            <span className="text-xs bg-muted px-1.5 py-0.5 rounded mr-2">
-              {suggestion.component}
-            </span>
-          )}
-          <span className="text-xs">{suggestion.type}</span>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm">{suggestion.description}</p>
-        {suggestion.codeExample && (
-          <div className="bg-muted p-2 rounded mt-2 text-xs font-mono overflow-x-auto">
-            <pre>{suggestion.codeExample}</pre>
-          </div>
-        )}
-      </CardContent>
-      <CardFooter>
-        <div className="flex gap-2">
-          {suggestion.autoFixAvailable && onApplyAutoFix && (
-            <Button 
-              variant="default" 
-              size="sm"
-              onClick={handleApplyAutoFix}
-              disabled={isApplying || isImplementing}
-            >
-              {isApplying ? <RefreshCw className="mr-1 h-3 w-3 animate-spin" /> : <Wrench className="mr-1 h-3 w-3" />}
-              Auto Fix
-            </Button>
-          )}
-          <Button 
-            variant="secondary" 
-            size="sm"
-            onClick={handleApplyFix}
-            disabled={isApplying || isImplementing}
-          >
-            {isApplying ? <RefreshCw className="mr-1 h-3 w-3 animate-spin" /> : <Code className="mr-1 h-3 w-3" />}
-            Apply Fix
-          </Button>
-          <Button 
-            variant={suggestion.status === 'implemented' ? 'ghost' : 'outline'}
-            size="sm"
-            onClick={handleImplement}
-            disabled={isImplementing || suggestion.status === 'implemented'}
-          >
-            {isImplementing ? (
-              <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
-            ) : suggestion.status === 'implemented' ? (
-              <CheckCircle className="mr-1 h-3 w-3 text-green-500" />
-            ) : (
-              <CheckCircle className="mr-1 h-3 w-3" />
-            )}
-            {suggestion.status === 'implemented' ? 'Implemented' : 'Implement'}
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => onDismiss(suggestion.id)}
-            disabled={isImplementing}
-          >
-            <AlertCircle className="mr-1 h-3 w-3" />
-            Dismiss
-          </Button>
-        </div>
-      </CardFooter>
-    </Card>
   );
 };
 

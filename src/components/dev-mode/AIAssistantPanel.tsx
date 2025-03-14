@@ -19,7 +19,7 @@ const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) =>
   const {
     isLoading,
     submitQuestion,
-    data: response, // Use alias for backward compatibility
+    response,
     loading,
     analyzeComponent,
   } = useAssistant({ componentName });
