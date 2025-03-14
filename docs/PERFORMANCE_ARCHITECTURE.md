@@ -120,4 +120,24 @@ The architecture supports delegating computational tasks to backend services, pa
 
 4. **Content Personalization**: Processing user metrics to deliver personalized content experiences.
 
+## Issue Resolution Strategy
+
+When facing implementation issues:
+
+1. **Root Cause Analysis**: Always apply a 5 Whys analysis to uncover and address the root cause of the issue instead of treating symptoms.
+
+2. **Proactive Problem-Solving**: When facing an issue during implementation, step back and analyze the full context before proceeding with changes.
+
+3. **Working with Protected Files**: When changes require modifying fundamental files that are protected:
+   - Create alternative implementation paths that achieve the same functionality
+   - Use composition and dependency injection instead of direct modification
+   - Implement adapter patterns to interface with protected systems
+   - Create wrapper services that provide the needed functionality
+
+4. **Preserving Architecture Integrity**: Always ensure workarounds maintain:
+   - Type safety
+   - Consistent error handling
+   - Performance characteristics
+   - Architectural patterns of the original system
+
 This architecture ensures clear separation between tracking technical app performance and measuring user progression, preventing confusion and enabling targeted optimizations.

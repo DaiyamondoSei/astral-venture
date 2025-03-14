@@ -1,171 +1,105 @@
 
 /**
- * AIQuestion interface for structured AI requests
+ * AI Service Types
  */
-export interface AIQuestion {
-  text: string;
-  question?: string;
-  context?: string;
-  reflectionIds?: string[];
-  userId?: string;
-  stream?: boolean;
+
+/**
+ * AI response type options
+ */
+export type AIResponseType = 'text' | 'markdown' | 'html' | 'json';
+
+/**
+ * Configuration options for AI service requests
+ */
+export interface AIServiceOptions {
+  /** Whether to use caching for this request */
+  useCache: boolean;
+  /** Whether to show a loading toast during processing */
+  showLoadingToast: boolean;
+  /** Whether to show error toasts */
+  showErrorToast: boolean;
+  /** OpenAI model to use */
+  model: string;
+  /** Temperature setting for response randomness */
+  temperature: number;
+  /** Maximum tokens to generate */
+  maxTokens: number;
 }
 
 /**
- * AIQuestionOptions interface for configuring AI requests
+ * Metadata about the AI response
  */
-export interface AIQuestionOptions {
-  cacheResults?: boolean;
-  stream?: boolean;
-  priority?: 'low' | 'medium' | 'high';
-  maxTokens?: number;
-  cacheKey?: string;
+export interface AIResponseMeta {
+  /** Model used to generate the response */
+  model: string;
+  /** Number of tokens used */
+  tokenUsage: number;
+  /** Processing time in milliseconds */
+  processingTime: number;
+  /** Whether the response came from cache */
+  cached?: boolean;
 }
 
 /**
- * AIResponse interface for structured AI responses
+ * Structured AI response
  */
 export interface AIResponse {
+  /** The main response text */
   answer: string;
-  insights?: string[];
+  /** The format of the response */
+  type: AIResponseType;
+  /** Optional list of suggested practices */
   suggestedPractices?: string[];
-  relatedInsights?: string[];
-  reflectionId?: string;
-  type?: 'text' | 'error' | 'stream';
-  meta?: {
-    processingTime?: number;
-    tokenUsage?: number;
-    model?: string;
-  };
-  sources?: any[];
-  response?: string;  // Added for compatibility
+  /** Metadata about the response */
+  meta: AIResponseMeta;
 }
 
 /**
- * AIInsight interface for structured insights
+ * Emotional analysis result for reflection entries
  */
-export interface AIInsight {
-  id: string;
-  type: 'chakra' | 'emotion' | 'practice' | 'wisdom';
-  text: string;
-  content?: string;
-  confidence: number;
-  relevance: number;
+export interface EmotionalAnalysisResult {
+  /** Detected emotions */
+  emotions: Array<{
+    name: string;
+    intensity: number;
+  }>;
+  /** Detected chakra activations */
+  chakras: Array<{
+    name: string;
+    activation: number;
+  }>;
+  /** AI-generated insights */
+  insights: string[];
+  /** Recommended practices based on analysis */
+  recommendedPractices: string[];
+  /** Raw analysis text */
+  rawAnalysis: string;
+}
+
+/**
+ * AI-generated chakra prediction
+ */
+export interface ChakraPrediction {
+  /** Chakra name */
+  name: string;
+  /** Activation level (0-100) */
+  activation: number;
+  /** Growth potential (0-100) */
+  growthPotential: number;
+  /** Personalized guidance */
+  guidance: string;
+}
+
+/**
+ * Achievement recommendation from AI
+ */
+export interface AchievementRecommendation {
+  /** Title of the recommended achievement */
   title: string;
-}
-
-/**
- * AssistantSuggestion interface for code-related suggestions
- */
-export interface AssistantSuggestion {
-  id: string;
-  type: 'performance' | 'quality' | 'security' | 'accessibility';
-  component: string;
-  title: string;
+  /** Description of the achievement */
   description: string;
-  priority: 'high' | 'medium' | 'low';
-  autoFixAvailable: boolean;
-  created: string;
-  status: 'pending' | 'applied' | 'dismissed';
-  context?: string;
-  codeExample?: string;
-}
-
-/**
- * AssistantIntent interface for code assistant intents
- */
-export interface AssistantIntent {
-  id: string;
-  type: 'fix' | 'optimize' | 'refactor';
-  description: string;
-  componentId: string;
-  status: 'pending' | 'completed' | 'failed';
-  created: string;
-  relatedComponents?: string[];
-}
-
-/**
- * Types for AI Code Assistant
- */
-export interface UseAICodeAssistantProps {
-  component?: string;
-  initialComponents?: string[];
-  options?: {
-    autoAnalyze?: boolean;
-    analysisDepth?: 'simple' | 'detailed';
-  };
-}
-
-/**
- * ChakraInsightsOptions interface for chakra-specific insights
- */
-export interface ChakraInsightsOptions {
-  includeRecommendations?: boolean;
-  detailLevel?: 'basic' | 'detailed';
-  timeframe?: 'recent' | 'all';
-}
-
-/**
- * CodeQualityStats interface for code quality metrics
- */
-export interface CodeQualityStats {
-  issueCount: number;
-  componentsAnalyzed: number;
-  highPriorityIssues: number;
-  lastUpdated: Date;
-}
-
-/**
- * CodeQualityIssue interface for code quality issues
- */
-export interface CodeQualityIssue {
-  id: string;
-  component: string;
-  type: 'security' | 'pattern' | 'complexity' | 'performance' | 'architecture' | 'render';
-  description: string;
-  priority: 'high' | 'medium' | 'low';
-  suggestions: string[];
-}
-
-/**
- * ComponentMetrics interface for component performance metrics
- */
-export interface ComponentMetrics {
-  componentName: string;
-  renderCount: number;
-  averageRenderTime: number;
-  totalRenderTime: number;
-  lastRenderTime: number;
-  firstRenderTime: number;
-}
-
-/**
- * Achievement data interface
- */
-export interface IAchievementData {
-  id: string;
-  title: string;
-  description: string;
-  type?: 'discovery' | 'completion' | 'interaction' | 'streak' | 'progressive' | 'milestone';
-  category?: string;
-  icon?: string;
-  progress: number;
-  maxProgress?: number;
-  completed: boolean;
-  completedAt?: string;
-  tier?: number;
-  points?: number;
-}
-
-/**
- * Feature tooltip data interface
- */
-export interface FeatureTooltipData {
-  id: string;
-  title: string;
-  description: string;
-  element: string;
-  position: 'top' | 'bottom' | 'left' | 'right';
-  priority: number;
-  dismissible: boolean;
+  /** Estimated difficulty (1-5) */
+  difficulty: number;
+  /** Expected growth areas */
+  growthAreas: string[];
 }

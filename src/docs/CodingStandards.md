@@ -314,4 +314,52 @@ const UserProfile = ({ userId }: { userId: string }) => {
 };
 ```
 
+## 11. Issue Resolution and Root Cause Analysis
+
+### 5 Whys Analysis
+When facing implementation issues, apply the 5 Whys technique to identify root causes:
+1. Ask "Why did this issue occur?"
+2. For each answer, ask "Why?" again to dig deeper
+3. Repeat until you've identified the fundamental cause
+4. Address the root cause rather than symptoms
+
+### Dealing with Protected Files
+When needing to modify protected/restricted files:
+1. Create adapter or facade patterns to interact with the protected system
+2. Implement alternative solutions that achieve the same functionality
+3. Use composition to extend functionality without modifying original files
+4. Document the workaround approach and reasons
+
+```typescript
+// Example: Adapter pattern for working with protected systems
+// Instead of modifying protected file directly:
+class ProtectedSystemAdapter {
+  private originalSystem: ProtectedSystem;
+  
+  constructor(system: ProtectedSystem) {
+    this.originalSystem = system;
+  }
+  
+  // Add new functionality while maintaining original behavior
+  public enhancedMethod(data: InputType): OutputType {
+    // Pre-process data if needed
+    const processedData = this.preProcess(data);
+    
+    // Use the original system
+    const result = this.originalSystem.processData(processedData);
+    
+    // Post-process result if needed
+    return this.postProcess(result);
+  }
+  
+  private preProcess(data: InputType): ProcessedInputType {
+    // Implementation
+  }
+  
+  private postProcess(result: OriginalOutputType): OutputType {
+    // Implementation
+  }
+}
+```
+
 By following these standards, we can ensure a high-quality, maintainable, and type-safe codebase.
