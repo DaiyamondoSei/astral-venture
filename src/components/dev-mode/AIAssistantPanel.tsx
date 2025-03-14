@@ -15,21 +15,27 @@ interface AIAssistantPanelProps {
 const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) => {
   const [activeTab, setActiveTab] = useState('chat');
   const [inputValue, setInputValue] = useState('');
+  const [questionText, setQuestionText] = useState('');
+  const [responseHtml, setResponseHtml] = useState('');
+  
   const {
-    question,
-    setQuestion,
-    response,
-    submitQuestion,
     isLoading,
+    data: response, // Use alias for backward compatibility
+    loading,
     analyzeComponent,
+    submitQuestion: handleSubmitQuestion
   } = useAssistant({ componentName });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
     
-    setQuestion(inputValue);
-    await submitQuestion(inputValue);
+    setQuestionText(inputValue);
+    // Call the submitQuestion function from useAssistant
+    const result = await handleSubmitQuestion(inputValue);
+    if (result) {
+      setResponseHtml(result); // Store the HTML response
+    }
     setInputValue('');
   };
 
@@ -52,9 +58,9 @@ const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) =>
         <TabsContent value="chat" className="p-0">
           <div className="flex flex-col h-[400px]">
             <div className="flex-1 overflow-auto p-4">
-              {response ? (
+              {responseHtml || response ? (
                 <div className="prose dark:prose-invert max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: response }} />
+                  <div dangerouslySetInnerHTML={{ __html: responseHtml || response }} />
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground h-full flex items-center justify-center">
@@ -68,10 +74,10 @@ const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) =>
                 placeholder="Ask about this component..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || loading}
               />
-              <Button type="submit" size="sm" disabled={isLoading || !inputValue.trim()}>
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <Button type="submit" size="sm" disabled={isLoading || loading || !inputValue.trim()}>
+                {isLoading || loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </form>
           </div>

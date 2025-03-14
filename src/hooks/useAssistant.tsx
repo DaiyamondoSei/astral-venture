@@ -26,7 +26,7 @@ export function useAssistant(props: UseAssistantProps = {}) {
   const assistantState = useAssistantState();
   
   // Use the question submission hook
-  const { submitQuestion, isLoading, error, tokenMetrics } = useQuestionSubmit();
+  const { submitQuestion: submitQuestionToAPI, isLoading, error, tokenMetrics } = useQuestionSubmit();
   
   // Initialize with the initial question if provided
   useState(() => {
@@ -36,7 +36,7 @@ export function useAssistant(props: UseAssistantProps = {}) {
   });
   
   // Handle submitting a question
-  const handleSubmitQuestion = useCallback(async (questionText?: string) => {
+  const submitQuestion = useCallback(async (questionText?: string) => {
     const textToSubmit = questionText || assistantState.question;
     
     if (!textToSubmit.trim()) return;
@@ -49,9 +49,10 @@ export function useAssistant(props: UseAssistantProps = {}) {
       context: context
     };
     
-    // Submit the question
-    return await submitQuestion(aiQuestion);
-  }, [assistantState.question, context, submitQuestion]);
+    // Submit the question and return the result directly
+    const result = await submitQuestionToAPI(aiQuestion);
+    return result;
+  }, [assistantState.question, context, submitQuestionToAPI]);
   
   // Analyze a component or code
   const analyzeComponent = useCallback(async (componentToAnalyze: string) => {
@@ -62,7 +63,7 @@ export function useAssistant(props: UseAssistantProps = {}) {
       const analysisQuestion = `Analyze the ${componentToAnalyze} component and suggest improvements.`;
       
       // Submit the analysis question
-      await handleSubmitQuestion(analysisQuestion);
+      await submitQuestion(analysisQuestion);
       
       // Here you would typically process the response to extract suggestions
       // For now, we'll mock some suggestions
@@ -90,7 +91,7 @@ export function useAssistant(props: UseAssistantProps = {}) {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [handleSubmitQuestion]);
+  }, [submitQuestion]);
   
   // Dismiss a suggestion
   const dismissSuggestion = useCallback((suggestionId: string) => {
@@ -150,26 +151,43 @@ export function useAssistant(props: UseAssistantProps = {}) {
   }, []);
   
   return {
-    ...assistantState,
-    submitQuestion: handleSubmitQuestion,
+    // Properties from assistantState
+    question: assistantState.question,
+    setQuestion: assistantState.setQuestion,
+    response: assistantState.response,
+    
+    // Submit function
+    submitQuestion,
+    
+    // Loading states
     isLoading,
     loading: isLoading, // Alias for backward compatibility
+    isAnalyzing,
+    isFixing,
+    
+    // Error information
     error,
+    
+    // Metrics
     tokenMetrics,
     tokens: tokenMetrics?.total || 0, // For backward compatibility
-    data: assistantState.response, // For backward compatibility
+    
+    // Data (alias for backward compatibility)
+    data: assistantState.response,
+    
+    // Suggestions system
     suggestions,
     selectedSuggestion,
     setSelectedSuggestion,
-    isAnalyzing,
     analyzeComponent,
     dismissSuggestion,
     implementSuggestion,
-    currentComponent: componentName,
-    isFixing,
-    lastUpdated,
     applyFix,
-    applyAutoFix
+    applyAutoFix,
+    
+    // Context
+    currentComponent: componentName,
+    lastUpdated
   };
 }
 

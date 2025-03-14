@@ -19,15 +19,19 @@ export const AISuggestionList: React.FC<AISuggestionListProps> = ({
 }) => {
   const { 
     suggestions, 
-    isAnalyzing, 
+    isFixing, 
     analyzeComponent, 
+    dismissSuggestion, 
     implementSuggestion, 
-    dismissSuggestion,
     applyFix,
     loading,
     applyAutoFix,
-    lastUpdated
+    lastUpdated,
+    currentComponent
   } = useAssistant();
+
+  // Check if the assistant is analyzing (loading)
+  const isAnalyzing = loading;
 
   // Filter suggestions by component if provided
   const filteredSuggestions = componentId 
@@ -43,6 +47,7 @@ export const AISuggestionList: React.FC<AISuggestionListProps> = ({
     }
   };
 
+  // Helper function to get color based on priority
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high': return 'bg-red-500';

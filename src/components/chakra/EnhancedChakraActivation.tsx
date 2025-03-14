@@ -1,3 +1,4 @@
+
 /**
  * Enhanced Chakra Activation Component
  * 
@@ -11,6 +12,83 @@ import { useChakraSystem } from '@/hooks/useChakraSystem';
 import { usePerformanceMonitoring } from '@/hooks/usePerformanceMonitoring';
 import { ChakraSystemProps } from '@/types/chakra/ChakraSystemTypes';
 import { CHAKRA_NAMES, CHAKRA_COLORS } from '../entry-animation/cosmic/types';
+
+// Define missing sub-components
+interface ChakraConnectionProps {
+  sourceChakra: number;
+  targetChakra: number;
+  strength: number;
+  opacity: number;
+}
+
+const ChakraConnection: React.FC<ChakraConnectionProps> = ({ 
+  sourceChakra, targetChakra, strength, opacity 
+}) => {
+  // Simple visualization of connection between chakras
+  return (
+    <div 
+      className="absolute h-0.5 bg-purple-500 transform-gpu z-0"
+      style={{
+        width: `${strength}%`,
+        opacity: opacity,
+        top: `${80 + sourceChakra * 90}px`,
+        left: '50%',
+        transform: 'translateX(-50%)'
+      }}
+    />
+  );
+};
+
+interface ChakraNodeProps {
+  chakraId: number;
+  activated: boolean;
+  activationLevel: number;
+  onClick: () => void;
+  glowIntensity: "high" | "medium" | "low" | "none";
+}
+
+const ChakraNode: React.FC<ChakraNodeProps> = ({
+  chakraId, activated, activationLevel, onClick, glowIntensity
+}) => {
+  const color = CHAKRA_COLORS[chakraId];
+  const glowSizes = {
+    high: "0 0 20px 5px",
+    medium: "0 0 15px 3px",
+    low: "0 0 10px 2px",
+    none: "none"
+  };
+  
+  return (
+    <motion.div
+      className="rounded-full flex items-center justify-center"
+      style={{
+        backgroundColor: color,
+        width: "50px",
+        height: "50px",
+        boxShadow: activated ? `${glowSizes[glowIntensity]} ${color}` : "none"
+      }}
+      animate={{
+        scale: activated ? [1, 1.05, 1] : 1,
+        transition: {
+          duration: 2,
+          repeat: Infinity,
+          repeatType: 'reverse'
+        }
+      }}
+      onClick={onClick}
+    >
+      <span className="text-white font-bold">{chakraId + 1}</span>
+    </motion.div>
+  );
+};
+
+// Helper function to determine glow intensity based on activation level
+const getGlowIntensity = (activationLevel: number): "high" | "medium" | "low" | "none" => {
+  if (activationLevel > 0.8) return "high";
+  if (activationLevel > 0.4) return "medium";
+  if (activationLevel > 0) return "low";
+  return "none";
+};
 
 // Chakra activation component props
 export interface ChakraActivationProps extends ChakraSystemProps {
@@ -129,35 +207,50 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
     const entangledPairs = system.quantumStates.entanglement.activePairs || [];
     
     // Check if this chakra is part of any entangled pair
-    const isEntangled = entangledPairs.some(
-      pair => pair.primaryChakra === chakraId || pair.secondaryChakra === chakraId
-    );
+    const isEntangled = entangledPairs.some(pair => {
+      // Using type guard to determine the type of pair
+      if (isChakraPair(pair)) {
+        return pair.primaryChakra === chakraId || pair.secondaryChakra === chakraId;
+      }
+      // For tuple type [number, number]
+      return pair[0] === chakraId || pair[1] === chakraId;
+    });
     
     if (!isEntangled) return {};
     
     // Find the strongest entanglement for this chakra
     const strongestPair = entangledPairs
-      .filter(pair => pair.primaryChakra === chakraId || pair.secondaryChakra === chakraId)
-      .sort((a, b) => b.entanglementStrength - a.entanglementStrength)[0];
+      .filter(pair => {
+        if (isChakraPair(pair)) {
+          return pair.primaryChakra === chakraId || pair.secondaryChakra === chakraId;
+        }
+        return pair[0] === chakraId || pair[1] === chakraId;
+      })
+      .map(pair => {
+        if (isChakraPair(pair)) {
+          return { strength: pair.entanglementStrength };
+        }
+        return { strength: 50 }; // Default for tuple type
+      })
+      .sort((a, b) => b.strength - a.strength)[0];
     
-    const entanglementIntensity = strongestPair ? strongestPair.entanglementStrength : 0;
+    const entanglementIntensity = strongestPair ? strongestPair.strength / 100 : 0;
     
     // Return the CSS properties for the glow effect
-    // Using boxShadow directly as a style prop, not ringColor
     return {
       boxShadow: `0 0 ${10 * entanglementIntensity}px ${2 * entanglementIntensity}px rgba(147, 51, 234, ${entanglementIntensity})`,
       transform: `scale(${1 + 0.1 * entanglementIntensity})`
     };
   };
   
-  // Convert chakra object to array for mapping
-  const chakraArray = Object.values(system.chakras.activationStates || {});
-  
   // Type guard function to check for object type in union
   const isChakraPair = (pair: [number, number] | { primaryChakra: number; secondaryChakra: number; entanglementStrength: number }): 
     pair is { primaryChakra: number; secondaryChakra: number; entanglementStrength: number } => {
-    return typeof pair === 'object' && 'primaryChakra' in pair;
+    return typeof pair === 'object' && !Array.isArray(pair) && 'primaryChakra' in pair;
   };
+
+  // Extract entangled chakras for rendering connections
+  const entangledChakras = system.quantumStates.entanglement.activePairs || [];
 
   // Using the type guard function in the rendering code
   const renderChakraConnections = () => {
@@ -195,25 +288,9 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
     });
   };
 
-  // Update the chakra item render function to handle active property correctly
-  const renderChakraItem = (chakra: number, status: ChakraStatus) => {
-    // Use activation instead of active (which doesn't exist on ChakraStatus)
-    const isActive = status.activation > 0;
-    // Use activation directly instead of activationLevel
-    const activationLevel = status.activation;
-    
-    return (
-      <ChakraNode
-        key={`chakra-${chakra}`}
-        chakraId={chakra}
-        activated={isActive}
-        activationLevel={activationLevel}
-        onClick={() => handleChakraClick(chakra)}
-        glowIntensity={getGlowIntensity(activationLevel)}
-      />
-    );
-  };
-
+  // Convert chakra object to array for mapping
+  const chakraArray = Object.values(system.chakras.activationStates || {});
+  
   return (
     <div 
       ref={setNodeRef}
@@ -231,13 +308,12 @@ const EnhancedChakraActivation: React.FC<ChakraActivationProps> = ({
       
       <div className="flex flex-col gap-6 items-center">
         {chakraArray.map((chakra, index) => {
-          const isActive = chakra.active;
-          const activationLevel = chakra.activationLevel;
+          const isActive = chakra.activation > 0; // Use activation instead of active
+          const activationLevel = chakra.activation; // Use activation directly
           const chakraName = CHAKRA_NAMES[index];
           const chakraColor = CHAKRA_COLORS[index];
           
           // Prepare the style object for the motion div
-          // Without the invalid ringColor property
           const motionStyle = {
             backgroundColor: chakraColor,
             ...(getEntanglementProps(index))
