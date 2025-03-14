@@ -1,53 +1,104 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getPersonalizedRecommendations } from '@/services/ai/aiService';
-import { Sparkles, MoreHorizontal } from 'lucide-react';
+import { ContentRecommendation } from '@/components/ai-assistant/types';
+import { Sparkles, BookOpen, Clock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import AIAssistantDialog from './AIAssistantDialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const PersonalizedInsights: React.FC = () => {
-  const [recommendations, setRecommendations] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+export interface PersonalizedInsightsProps {
+  limit?: number;
+  category?: string;
+}
+
+export const PersonalizedInsights: React.FC<PersonalizedInsightsProps> = ({
+  limit = 3,
+  category
+}) => {
   const { user } = useAuth();
+  const [recommendations, setRecommendations] = useState<ContentRecommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
-      if (!user) return;
+      if (!user?.id) return;
       
       try {
-        const personalizedRecommendations = await getPersonalizedRecommendations(user.id);
-        setRecommendations(personalizedRecommendations);
-      } catch (error) {
-        console.error('Error fetching recommendations:', error);
-        // Set some defaults if there's an error
-        setRecommendations([
-          "Practice mindful breathing for 5 minutes daily",
-          "Try a chakra balancing meditation",
-          "Journal about your energy experiences"
-        ]);
+        setLoading(true);
+        setError(null);
+        
+        const data = await getPersonalizedRecommendations(user.id, {
+          limit,
+          category
+        });
+        
+        setRecommendations(data);
+      } catch (err) {
+        console.error('Error fetching personalized insights:', err);
+        setError('Unable to load personalized insights');
       } finally {
         setLoading(false);
       }
     };
     
     fetchRecommendations();
-  }, [user]);
+  }, [user?.id, limit, category]);
 
   if (loading) {
     return (
-      <Card className="glass-card animate-pulse">
-        <CardHeader className="pb-2">
-          <div className="h-6 w-3/4 bg-white/20 rounded"></div>
-          <div className="h-4 w-1/2 bg-white/10 rounded mt-1"></div>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-20 w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-20 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Personalized Insights</CardTitle>
+          <CardDescription>Based on your activity</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <div className="h-4 w-full bg-white/10 rounded"></div>
-            <div className="h-4 w-full bg-white/10 rounded"></div>
-            <div className="h-4 w-3/4 bg-white/10 rounded"></div>
+          <p className="text-muted-foreground">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (recommendations.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Personalized Insights</CardTitle>
+          <CardDescription>Based on your activity</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4">
+            <Sparkles className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-muted-foreground">
+              Complete more activities to receive personalized insights
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -55,59 +106,46 @@ const PersonalizedInsights: React.FC = () => {
   }
 
   return (
-    <>
-      <Card className="glass-card border-quantum-400/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center text-lg">
-            <Sparkles size={18} className="mr-2 text-quantum-400" />
-            AI-Powered Insights
-          </CardTitle>
-          <CardDescription>
-            Personalized recommendations for your practice
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {recommendations.slice(0, 3).map((recommendation, index) => (
-              <li 
-                key={index} 
-                className="text-white/80 pl-4 border-l-2 border-quantum-400/30 py-1 text-sm"
-              >
-                {recommendation}
-              </li>
-            ))}
-          </ul>
-          
-          <div className="mt-4 flex justify-between">
-            <Button 
-              variant="link" 
-              size="sm" 
-              className="text-quantum-400 p-0 h-auto"
-              onClick={() => setAiDialogOpen(true)}
-            >
-              <Sparkles size={14} className="mr-1" />
-              <span>Ask AI Guide</span>
-            </Button>
-            
-            {recommendations.length > 3 && (
-              <Button 
-                variant="link" 
-                size="sm" 
-                className="text-white/60 p-0 h-auto"
-              >
-                <MoreHorizontal size={14} className="mr-1" />
-                <span>More</span>
+    <div className="space-y-4">
+      {recommendations.map((recommendation) => (
+        <Card key={recommendation.id}>
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-base">{recommendation.title}</CardTitle>
+              <span className="text-xs px-2 py-1 bg-muted rounded">
+                {recommendation.type}
+              </span>
+            </div>
+            <CardDescription className="flex items-center gap-1 text-xs">
+              <BookOpen className="h-3 w-3" />
+              {recommendation.category}
+              <span className="mx-1">•</span>
+              <Clock className="h-3 w-3" />
+              {recommendation.estimatedDuration} min
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm mb-3">{recommendation.description}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex flex-wrap gap-1">
+                {recommendation.tags.slice(0, 3).map((tag) => (
+                  <span 
+                    key={tag} 
+                    className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <Button size="sm" variant="outline" className="text-xs">
+                Explore
+                <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      
-      <AIAssistantDialog 
-        open={aiDialogOpen} 
-        onOpenChange={setAiDialogOpen} 
-      />
-    </>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 };
 

@@ -95,3 +95,35 @@ export interface AssistantIntent {
 }
 
 export type AssistantIntentStatus = 'processing' | 'completed' | 'failed' | 'implemented';
+
+// Define Assistant context type for consistency
+export interface AssistantContextValue {
+  suggestions: AssistantSuggestion[];
+  intents: AssistantIntent[];
+  isAnalyzing: boolean;
+  currentComponent: string;
+  error: string;
+  isFixing: boolean;
+  analyzeComponent: (componentId: string) => Promise<AssistantSuggestion[]>;
+  analyzeComponents: (componentIds: string[]) => Promise<AssistantSuggestion[]>;
+  dismissSuggestion: (suggestionId: string) => void;
+  implementSuggestion: (suggestion: AssistantSuggestion) => Promise<void>;
+  applyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
+  loading?: boolean;
+  applyAutoFix?: (suggestion: AssistantSuggestion) => Promise<boolean>;
+  lastUpdated?: Date; 
+}
+
+// Add a missing export for personalized recommendations
+export interface ContentRecommendation {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  category: string;
+  relevanceScore: number;
+  contentLevel: string;
+  estimatedDuration: number;
+  thumbnailUrl?: string;
+  tags: string[];
+}

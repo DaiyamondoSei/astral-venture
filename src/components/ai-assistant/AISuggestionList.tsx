@@ -1,152 +1,145 @@
 
-import React, { useState } from 'react';
+import React from 'react';
+import { useAssistant } from '@/hooks/useAssistant';
+import { AssistantSuggestion } from './types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, Code, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react';
-import { useAICodeAssistant } from '@/hooks/useAICodeAssistant';
-import { AssistantSuggestion } from '@/components/ai-assistant/types';
-import { aiLearningSystem } from '@/utils/ai/AIAssistantLearningSystem';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, AlertCircle, RefreshCw, Code, Wrench } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface AISuggestionListProps {
-  componentName?: string;
-  maxItems?: number;
-  category?: 'performance' | 'quality' | 'architecture' | 'refactoring';
+  componentId?: string;
+  limit?: number;
 }
 
-const AISuggestionList: React.FC<AISuggestionListProps> = ({
-  componentName,
-  maxItems = 5,
-  category
+export const AISuggestionList: React.FC<AISuggestionListProps> = ({
+  componentId,
+  limit = 5
 }) => {
   const { 
     suggestions, 
-    isAnalyzing: loading, // Map isAnalyzing to loading
-    refreshSuggestions,
-    applyFix: applyAutoFix, // Map applyFix to applyAutoFix
-    currentComponent, // Use this to check when last updated
-    error
-  } = useAICodeAssistant(componentName);
-  
-  // Calculate a lastUpdated date from the current time for now
-  const lastUpdated = new Date();
-  
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  
-  // Filter suggestions based on category if provided
-  const filteredSuggestions = category 
-    ? suggestions.filter(s => s.type === category)
+    isAnalyzing, 
+    analyzeComponent, 
+    implementSuggestion, 
+    dismissSuggestion,
+    applyFix,
+    loading,
+    applyAutoFix,
+    lastUpdated
+  } = useAssistant();
+
+  // Filter suggestions by component if provided
+  const filteredSuggestions = componentId 
+    ? suggestions.filter(s => s.context.component === componentId) 
     : suggestions;
-  
-  // Get top N suggestions
-  const topSuggestions = filteredSuggestions.slice(0, maxItems);
-  
-  const handleApplyFix = (suggestionId: string) => {
-    const success = applyAutoFix(suggestionId);
-    
-    if (success) {
-      // Record the learning event
-      aiLearningSystem.recordEvent('suggestion_accepted', {
-        suggestionId,
-        patternId: suggestionId.split('-')[0],
-        componentName
-      });
+
+  // Limit the number of suggestions shown
+  const limitedSuggestions = filteredSuggestions.slice(0, limit);
+
+  const handleAnalyze = () => {
+    if (componentId) {
+      analyzeComponent(componentId);
     }
   };
-  
-  const handleRejectSuggestion = (suggestionId: string) => {
-    // Record the learning event
-    aiLearningSystem.recordEvent('suggestion_rejected', {
-      suggestionId,
-      patternId: suggestionId.split('-')[0],
-      componentName
-    });
-    
-    // Hide the suggestion by setting state
-    setExpanded(prev => ({
-      ...prev,
-      [suggestionId]: false
-    }));
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'low': return 'bg-blue-500';
+      default: return 'bg-gray-500';
+    }
   };
-  
-  const toggleExpand = (suggestionId: string) => {
-    setExpanded(prev => ({
-      ...prev,
-      [suggestionId]: !prev[suggestionId]
-    }));
-  };
-  
-  if (loading) {
+
+  if (isAnalyzing || loading) {
     return (
       <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="overflow-hidden">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">Analyzing...</h3>
+          <RefreshCw className="animate-spin h-5 w-5" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="mb-4">
             <CardHeader className="pb-2">
-              <Skeleton className="h-5 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-3 w-full mb-2" />
+              <Skeleton className="h-3 w-full mb-2" />
+              <Skeleton className="h-3 w-3/4" />
             </CardContent>
+            <CardFooter className="pt-0">
+              <Skeleton className="h-9 w-20 mr-2" />
+              <Skeleton className="h-9 w-20" />
+            </CardFooter>
           </Card>
         ))}
       </div>
     );
   }
-  
-  if (topSuggestions.length === 0) {
+
+  if (filteredSuggestions.length === 0) {
     return (
-      <div className="text-center py-12 space-y-4">
-        <p className="text-muted-foreground">No suggestions available</p>
-        {componentName && (
-          <p className="text-sm text-muted-foreground">
-            There are no suggestions for component: {componentName}
-          </p>
-        )}
-        <Button variant="outline" size="sm" onClick={refreshSuggestions}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh Suggestions
-        </Button>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">Suggestions</h3>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleAnalyze}
+          >
+            Analyze Component
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <p className="text-muted-foreground">No suggestions available for this component.</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Run analysis to generate improvement suggestions.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-lg font-medium">
-            AI Code Suggestions
-            {componentName && <span className="text-sm text-muted-foreground ml-2">for {componentName}</span>}
-          </h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-medium">Suggestions</h3>
+        <div className="flex gap-2 items-center">
           {lastUpdated && (
-            <p className="text-xs text-muted-foreground">
-              Last updated: {lastUpdated.toLocaleTimeString()}
-            </p>
+            <span className="text-xs text-muted-foreground">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
           )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleAnalyze}
+          >
+            Refresh Analysis
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={refreshSuggestions}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
       </div>
       
-      {topSuggestions.map((suggestion) => (
+      {limitedSuggestions.map((suggestion) => (
         <SuggestionCard 
-          key={suggestion.id}
-          suggestion={suggestion}
-          expanded={expanded[suggestion.id] || false}
-          onToggleExpand={() => toggleExpand(suggestion.id)}
-          onApplyFix={() => handleApplyFix(suggestion.id)}
-          onReject={() => handleRejectSuggestion(suggestion.id)}
+          key={suggestion.id} 
+          suggestion={suggestion} 
+          onImplement={implementSuggestion}
+          onDismiss={dismissSuggestion}
+          onApplyFix={applyFix}
+          onApplyAutoFix={applyAutoFix}
         />
       ))}
       
-      {filteredSuggestions.length > maxItems && (
-        <div className="text-center pt-2">
-          <Button variant="ghost" size="sm">
-            Show {filteredSuggestions.length - maxItems} more suggestions
+      {filteredSuggestions.length > limit && (
+        <div className="text-center mt-2">
+          <Button variant="link" size="sm">
+            Show {filteredSuggestions.length - limit} more suggestions
           </Button>
         </div>
       )}
@@ -156,77 +149,142 @@ const AISuggestionList: React.FC<AISuggestionListProps> = ({
 
 interface SuggestionCardProps {
   suggestion: AssistantSuggestion;
-  expanded: boolean;
-  onToggleExpand: () => void;
-  onApplyFix: () => void;
-  onReject: () => void;
+  onImplement: (suggestion: AssistantSuggestion) => Promise<void>;
+  onDismiss: (suggestionId: string) => void;
+  onApplyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
+  onApplyAutoFix?: (suggestion: AssistantSuggestion) => Promise<boolean>;
 }
 
 const SuggestionCard: React.FC<SuggestionCardProps> = ({
   suggestion,
-  expanded,
-  onToggleExpand,
+  onImplement,
+  onDismiss,
   onApplyFix,
-  onReject
+  onApplyAutoFix
 }) => {
-  // Determine card color based on priority
-  const getBorderColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'border-red-500';
-      case 'high': return 'border-orange-500';
-      case 'medium': return 'border-yellow-500';
-      case 'low': return 'border-green-500';
-      default: return '';
+  const [isImplementing, setIsImplementing] = React.useState(false);
+  const [isApplying, setIsApplying] = React.useState(false);
+  
+  const handleImplement = async () => {
+    setIsImplementing(true);
+    try {
+      await onImplement(suggestion);
+    } catch (error) {
+      console.error('Error implementing suggestion:', error);
+    } finally {
+      setIsImplementing(false);
+    }
+  };
+  
+  const handleApplyFix = async () => {
+    setIsApplying(true);
+    try {
+      await onApplyFix(suggestion);
+    } catch (error) {
+      console.error('Error applying fix:', error);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+  
+  const handleApplyAutoFix = async () => {
+    if (!onApplyAutoFix) return;
+    
+    setIsApplying(true);
+    try {
+      await onApplyAutoFix(suggestion);
+    } catch (error) {
+      console.error('Error applying auto fix:', error);
+    } finally {
+      setIsApplying(false);
     }
   };
   
   return (
-    <Card className={`overflow-hidden ${getBorderColor(suggestion.priority)} border-l-4`}>
+    <Card className="mb-4">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <CardTitle className="text-base">{suggestion.title}</CardTitle>
-          <div className="flex space-x-1">
-            <Button variant="ghost" size="sm" onClick={onReject}>
-              <ThumbsDown className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onToggleExpand}>
-              {expanded ? 'Collapse' : 'Expand'}
-            </Button>
-          </div>
+          <Badge className={`${getPriorityColor(suggestion.priority)} text-white`}>
+            {suggestion.priority}
+          </Badge>
         </div>
         <CardDescription>
-          {suggestion.context && suggestion.context.component && (
-            <span className="text-xs bg-muted px-2 py-1 rounded">
-              {suggestion.context.component}
+          {suggestion.component && (
+            <span className="text-xs bg-muted px-1.5 py-0.5 rounded mr-2">
+              {suggestion.component}
             </span>
           )}
+          <span className="text-xs">{suggestion.type}</span>
         </CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-sm">{suggestion.description}</p>
-        
-        {expanded && suggestion.codeExample && (
-          <div className="mt-4 bg-muted p-3 rounded text-xs font-mono overflow-x-auto">
+        {suggestion.codeExample && (
+          <div className="bg-muted p-2 rounded mt-2 text-xs font-mono overflow-x-auto">
             <pre>{suggestion.codeExample}</pre>
           </div>
         )}
       </CardContent>
-      {expanded && (
-        <CardFooter className="flex justify-between pt-0">
-          <div className="text-xs text-muted-foreground">
-            {suggestion.type.charAt(0).toUpperCase() + suggestion.type.slice(1)} / 
-            {suggestion.priority.charAt(0).toUpperCase() + suggestion.priority.slice(1)} priority
-          </div>
-          {suggestion.autoFixAvailable && (
-            <Button size="sm" onClick={onApplyFix}>
-              <Zap className="h-4 w-4 mr-2" />
-              Apply Fix
+      <CardFooter>
+        <div className="flex gap-2">
+          {suggestion.autoFixAvailable && onApplyAutoFix && (
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={handleApplyAutoFix}
+              disabled={isApplying || isImplementing}
+            >
+              {isApplying ? <RefreshCw className="mr-1 h-3 w-3 animate-spin" /> : <Wrench className="mr-1 h-3 w-3" />}
+              Auto Fix
             </Button>
           )}
-        </CardFooter>
-      )}
+          <Button 
+            variant="secondary" 
+            size="sm"
+            onClick={handleApplyFix}
+            disabled={isApplying || isImplementing}
+          >
+            {isApplying ? <RefreshCw className="mr-1 h-3 w-3 animate-spin" /> : <Code className="mr-1 h-3 w-3" />}
+            Apply Fix
+          </Button>
+          <Button 
+            variant={suggestion.status === 'implemented' ? 'ghost' : 'outline'}
+            size="sm"
+            onClick={handleImplement}
+            disabled={isImplementing || suggestion.status === 'implemented'}
+          >
+            {isImplementing ? (
+              <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+            ) : suggestion.status === 'implemented' ? (
+              <CheckCircle className="mr-1 h-3 w-3 text-green-500" />
+            ) : (
+              <CheckCircle className="mr-1 h-3 w-3" />
+            )}
+            {suggestion.status === 'implemented' ? 'Implemented' : 'Implement'}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => onDismiss(suggestion.id)}
+            disabled={isImplementing}
+          >
+            <AlertCircle className="mr-1 h-3 w-3" />
+            Dismiss
+          </Button>
+        </div>
+      </CardFooter>
     </Card>
   );
 };
+
+function getPriorityColor(priority: string): string {
+  switch (priority) {
+    case 'high': return 'bg-red-500';
+    case 'medium': return 'bg-yellow-500';
+    case 'low': return 'bg-blue-500';
+    default: return 'bg-gray-500';
+  }
+}
 
 export default AISuggestionList;

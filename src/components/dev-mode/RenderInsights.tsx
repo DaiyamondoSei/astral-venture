@@ -1,206 +1,232 @@
 
 import React, { useState, useEffect } from 'react';
-import { performanceMonitor } from '@/utils/performance/performanceMonitor';
-import { RenderAnalyzer, RenderAnalysis } from '@/utils/performance/RenderAnalyzer';
-import { RenderFrequency, DeviceCapability } from '@/utils/performanceUtils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PerformanceMonitor } from '@/utils/performance/performanceMonitor';
+import { usePerformance } from '@/contexts/PerformanceContext';
+import { RenderFrequencies } from '@/utils/performance/constants';
+import { Loader, RefreshCw, Activity, PieChart, LineChart } from 'lucide-react';
 
-interface ComponentMetric {
-  componentName: string;
-  renderCount: number;
-  averageRenderTime: number;
-  renderTimes?: number[];
-  lastRenderTime?: number;
+interface RenderInsightsProps {
+  componentFilter?: string;
+  height?: number;
+  width?: number;
 }
 
-// Component to display insights about component rendering
-const RenderInsights = () => {
-  const [componentMetrics, setComponentMetrics] = useState<Record<string, ComponentMetric>>({});
-  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'renderCount' | 'renderTime'>('renderTime');
-  const [showProblematicOnly, setShowProblematicOnly] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<Record<string, RenderAnalysis>>({});
+export const RenderInsights: React.FC<RenderInsightsProps> = ({
+  componentFilter,
+  height = 400,
+  width = 600
+}) => {
+  const [componentMetrics, setComponentMetrics] = useState<Record<string, any>>({});
+  const [topComponents, setTopComponents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [chartType, setChartType] = useState<'renders' | 'duration'>('renders');
+  const { config } = usePerformance();
   
-  // Fetch metrics on initial load and periodically
   useEffect(() => {
-    // Initial fetch
-    fetchMetrics();
+    const metrics = PerformanceMonitor.getInstance().getAllMetrics();
+    setComponentMetrics(metrics as Record<string, any>);
     
-    // Setup interval for periodic updates
-    const interval = setInterval(fetchMetrics, 3000);
+    // Process metrics to get top components by render count
+    const components = Object.entries(metrics || {})
+      .filter(([name]) => !componentFilter || name.includes(componentFilter))
+      .map(([name, data]) => ({
+        name: formatComponentName(name),
+        renders: data.renderCount || 0,
+        duration: data.totalRenderTime || 0,
+        avgDuration: data.renderCount ? (data.totalRenderTime / data.renderCount).toFixed(2) : 0,
+        lastRender: data.lastRenderTime || 0,
+        rerenders: data.reRenderCount || 0
+      }))
+      .sort((a, b) => b[chartType] - a[chartType])
+      .slice(0, 10);
     
-    return () => clearInterval(interval);
-  }, []);
-  
-  // Fetch component metrics from performance monitor
-  const fetchMetrics = () => {
-    const metrics = performanceMonitor.getComponentMetrics() as Record<string, ComponentMetric>;
-    setComponentMetrics(metrics || {});
-    
-    // Analyze components for performance issues
-    const results: Record<string, RenderAnalysis> = {};
-    
-    for (const [name, metric] of Object.entries(metrics || {})) {
-      // Convert to format expected by RenderAnalyzer
-      const analysis = RenderAnalyzer.getInstance().analyzeComponent({
-        componentName: name,
-        renderTime: metric.averageRenderTime || 0,
-        renderCount: metric.renderCount || 0
-      });
+    setTopComponents(components);
+    setIsLoading(false);
+  }, [chartType, componentFilter]);
+
+  const handleRefresh = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      const metrics = PerformanceMonitor.getInstance().getAllMetrics();
+      setComponentMetrics(metrics as Record<string, any>);
       
-      results[name] = analysis;
-    }
-    
-    setAnalysisResults(results);
+      // Process metrics to get top components
+      const components = Object.entries(metrics || {})
+        .filter(([name]) => !componentFilter || name.includes(componentFilter))
+        .map(([name, data]) => ({
+          name: formatComponentName(name),
+          renders: data.renderCount || 0,
+          duration: data.totalRenderTime || 0,
+          avgDuration: data.renderCount ? (data.totalRenderTime / data.renderCount).toFixed(2) : 0,
+          lastRender: data.lastRenderTime || 0,
+          rerenders: data.reRenderCount || 0
+        }))
+        .sort((a, b) => b[chartType] - a[chartType])
+        .slice(0, 10);
+      
+      setTopComponents(components);
+      setIsLoading(false);
+    }, 200);
   };
-  
-  // Get sorted list of components
-  const getSortedComponents = (): [string, ComponentMetric][] => {
-    if (!componentMetrics) return [];
-    
-    let entries = Object.entries(componentMetrics);
-    
-    // Filter problematic components if option is selected
-    if (showProblematicOnly) {
-      entries = entries.filter(([name, metrics]) => {
-        return (
-          metrics.renderCount > 30 || 
-          metrics.averageRenderTime > 16 ||
-          (analysisResults[name]?.lastRenderTime || 0) > 30
-        );
-      });
+
+  const getComponentCategory = (renderCount: number) => {
+    if (renderCount > 20) {
+      return RenderFrequencies.HIGH;
+    } else if (renderCount > 5) {
+      return RenderFrequencies.MEDIUM;
     }
-    
-    // Sort components
-    return entries.sort(([nameA, metricsA], [nameB, metricsB]) => {
-      if (sortBy === 'renderCount') {
-        return (metricsB.renderCount || 0) - (metricsA.renderCount || 0);
-      } else {
-        return (metricsB.averageRenderTime || 0) - (metricsA.averageRenderTime || 0);
-      }
-    });
+    return RenderFrequencies.LOW;
   };
-  
-  // Get render frequency classification
-  const getRenderFrequencyClass = (frequency: RenderFrequency): string => {
-    if (frequency === RenderFrequency.EXCESSIVE) return 'text-red-400';
-    if (frequency === RenderFrequency.FREQUENT) return 'text-yellow-400';
-    return 'text-green-400';
-  };
-  
-  // Format optimization recommendations
-  const formatOptimizationPoints = (analysis?: RenderAnalysis): JSX.Element | null => {
-    if (!analysis || !analysis.possibleOptimizations || analysis.possibleOptimizations.length === 0) {
-      return null;
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case RenderFrequencies.HIGH:
+        return '#ef4444';
+      case RenderFrequencies.MEDIUM:
+        return '#f97316';
+      case RenderFrequencies.LOW:
+        return '#22c55e';
+      default:
+        return '#3b82f6';
     }
-    
+  };
+
+  const formatComponentName = (name: string) => {
+    return name.length > 20 ? name.substring(0, 17) + '...' : name;
+  };
+
+  if (isLoading) {
     return (
-      <div className="mt-2 text-xs">
-        <h4 className="font-semibold mb-1">Possible optimizations:</h4>
-        <ul className="list-disc pl-4 space-y-1 text-yellow-300">
-          {analysis.possibleOptimizations.map((opt, idx) => (
-            <li key={idx}>{opt}</li>
-          ))}
-        </ul>
-      </div>
+      <Card className="w-full h-full">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Component Render Analysis</CardTitle>
+          <CardDescription>Loading component render metrics...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center items-center" style={{ height: height - 100 }}>
+          <Loader className="w-8 h-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
     );
-  };
-  
-  // Select a component to view detailed metrics
-  const handleSelectComponent = (name: string) => {
-    setSelectedComponent(name === selectedComponent ? null : name);
-  };
-  
-  // Sort components by render count or render time
-  const handleSort = (criteria: 'renderCount' | 'renderTime') => {
-    setSortBy(criteria);
-  };
-  
-  // Components sorted according to current criteria
-  const sortedComponents = getSortedComponents();
-  
+  }
+
   return (
-    <div className="bg-gray-800 rounded-lg p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Component Render Insights</h2>
-        
-        <div className="flex items-center space-x-2">
-          <button 
-            onClick={() => handleSort('renderTime')}
-            className={`px-2 py-1 text-xs rounded ${sortBy === 'renderTime' ? 'bg-blue-500' : 'bg-gray-700'}`}
-          >
-            Sort by render time
-          </button>
-          <button 
-            onClick={() => handleSort('renderCount')}
-            className={`px-2 py-1 text-xs rounded ${sortBy === 'renderCount' ? 'bg-blue-500' : 'bg-gray-700'}`}
-          >
-            Sort by render count
-          </button>
-          <label className="flex items-center text-xs">
-            <input 
-              type="checkbox" 
-              checked={showProblematicOnly}
-              onChange={() => setShowProblematicOnly(!showProblematicOnly)}
-              className="mr-1"
-            />
-            Show problematic only
-          </label>
-        </div>
-      </div>
-      
-      <div className="space-y-3 max-h-80 overflow-y-auto">
-        {sortedComponents.map(([name, metrics]) => {
-          const analysis = analysisResults[name];
-          const renderFrequency = analysis?.renderFrequency || RenderFrequency.NORMAL;
-          
-          // Determine if this component has optimization potential
-          const needsOptimization = 
-            renderFrequency === RenderFrequency.EXCESSIVE || 
-            renderFrequency === RenderFrequency.FREQUENT;
-          
-          return (
-            <div 
-              key={name}
-              className={`p-3 rounded cursor-pointer transition-colors ${
-                selectedComponent === name ? 'bg-gray-700' : 'bg-gray-900 hover:bg-gray-800'
-              } ${needsOptimization ? 'border-l-2 border-yellow-500' : ''}`}
-              onClick={() => handleSelectComponent(name)}
-            >
-              <div className="flex justify-between items-center">
-                <h3 className="font-medium text-sm">{name}</h3>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${getRenderFrequencyClass(renderFrequency)}`}>
-                  {renderFrequency}
-                </span>
-              </div>
-              
-              <div className="flex mt-1 text-xs text-gray-400">
-                <div className="mr-4">
-                  <span className="font-medium">Renders:</span> {metrics.renderCount || 0}
-                </div>
-                <div>
-                  <span className="font-medium">Avg time:</span> {(metrics.averageRenderTime || 0).toFixed(2)}ms
-                </div>
-                <div className="ml-4">
-                  <span className="font-medium">Last:</span> {(analysis?.lastRenderTime || 0).toFixed(2)}ms
-                </div>
-              </div>
-              
-              {selectedComponent === name && analysis && (
-                <div className="mt-3 pt-3 border-t border-gray-700">
-                  {formatOptimizationPoints(analysis)}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        
-        {sortedComponents.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No component metrics available yet
+    <Card className="w-full">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="text-lg">Component Render Analysis</CardTitle>
+            <CardDescription>
+              Performance metrics for {Object.keys(componentMetrics).length} tracked components
+            </CardDescription>
           </div>
-        )}
-      </div>
-    </div>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="chart" className="w-full">
+          <div className="flex justify-between items-center mb-4">
+            <TabsList>
+              <TabsTrigger value="chart">
+                <BarChart className="w-4 h-4 mr-1" />
+                Chart
+              </TabsTrigger>
+              <TabsTrigger value="table">
+                <Activity className="w-4 h-4 mr-1" />
+                Table
+              </TabsTrigger>
+            </TabsList>
+            
+            <div className="flex gap-2">
+              <Button 
+                variant={chartType === 'renders' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => setChartType('renders')}
+              >
+                <LineChart className="w-3 h-3 mr-1" />
+                Renders
+              </Button>
+              <Button 
+                variant={chartType === 'duration' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => setChartType('duration')}
+              >
+                <PieChart className="w-3 h-3 mr-1" />
+                Duration
+              </Button>
+            </div>
+          </div>
+          
+          <TabsContent value="chart" className="pt-2">
+            <div className="flex justify-center">
+              <BarChart width={width - 50} height={height - 150} data={topComponents}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                <XAxis dataKey="name" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip 
+                  formatter={(value: any, name: string) => {
+                    return [name === 'duration' ? `${value} ms` : value, name === 'duration' ? 'Render Time' : 'Render Count'];
+                  }}
+                  labelFormatter={(label) => `Component: ${label}`}
+                />
+                <Legend />
+                <Bar 
+                  dataKey={chartType} 
+                  name={chartType === 'duration' ? 'Render Time (ms)' : 'Render Count'} 
+                  fill="#3b82f6"
+                  isAnimationActive={!config.disableAnimations}
+                />
+              </BarChart>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="table">
+            <div className="border rounded-md">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="p-2 text-left">Component</th>
+                    <th className="p-2 text-right">Renders</th>
+                    <th className="p-2 text-right">Re-renders</th>
+                    <th className="p-2 text-right">Total Time (ms)</th>
+                    <th className="p-2 text-right">Avg Time (ms)</th>
+                    <th className="p-2 text-center">Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topComponents.map((component, index) => {
+                    const category = getComponentCategory(component.renders);
+                    return (
+                      <tr key={index} className="border-b hover:bg-muted/50">
+                        <td className="p-2">{component.name}</td>
+                        <td className="p-2 text-right">{component.renders}</td>
+                        <td className="p-2 text-right">{component.rerenders || 0}</td>
+                        <td className="p-2 text-right">{component.duration.toFixed(1)}</td>
+                        <td className="p-2 text-right">{component.avgDuration}</td>
+                        <td className="p-2 text-center">
+                          <span 
+                            className="px-2 py-1 rounded text-xs text-white"
+                            style={{ backgroundColor: getCategoryColor(category) }}
+                          >
+                            {category}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 };
 

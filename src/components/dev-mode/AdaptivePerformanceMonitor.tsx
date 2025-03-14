@@ -1,248 +1,298 @@
-/**
- * AdaptivePerformanceMonitor
- * A component that monitors and controls performance based on device capabilities
- */
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { 
-  DeviceCapability, 
-  PerformanceMode, 
-  getPerformanceCategory,
-  throttleForPerformance 
-} from '@/utils/performanceUtils';
-import { usePerfConfig } from '@/hooks/usePerfConfig';
+import { usePerformance } from '@/contexts/PerformanceContext';
+import { ChevronDown, ChevronUp, Activity } from 'lucide-react';
+import { DeviceCapabilities, PerformanceModes } from '@/utils/performance/constants';
 
-// Helper function to convert string values to PerformanceMode safely
-const toPerformanceMode = (value: string): PerformanceMode => {
-  switch (value) {
-    case 'low': return DeviceCapability.LOW;
-    case 'medium': return DeviceCapability.MEDIUM;
-    case 'high': return DeviceCapability.HIGH;
-    case 'auto': return 'auto';
-    default: return DeviceCapability.MEDIUM;
-  }
-};
+// Add type annotation for the component props
+interface AdaptivePerformanceMonitorProps {
+  minimized?: boolean;
+}
 
-/**
- * Enhanced Performance Monitor component that displays web vitals
- * and adaptive performance features
- */
-const AdaptivePerformanceMonitor = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [showFull, setShowFull] = useState(false);
-  const [fps, setFps] = useState(0);
-  const [memoryUsage, setMemoryUsage] = useState<number | null>(null);
-  const frameCountRef = useRef(0);
-  const lastTimeRef = useRef(0);
-  
-  const { 
-    deviceCapability, 
-    manualPerformanceMode,
+export const AdaptivePerformanceMonitor: React.FC<AdaptivePerformanceMonitorProps> = ({ minimized = false }) => {
+  const [isMinimized, setIsMinimized] = useState(minimized);
+  const [activeTab, setActiveTab] = useState('general');
+  const performanceContext = usePerformance();
+  const deviceCapability = performanceContext.deviceCapability;
+  const isLowPerformance = performanceContext.isLowPerformance;
+  const manualPerformanceMode = PerformanceModes.AUTO;
+  const config = performanceContext.config;
+
+  // Use useRef for DOM references
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Destructure performance context properties safely
+  const {
+    updateConfig,
+    // Additional properties not in the original type
     features,
     webVitals,
-    setManualPerformanceMode 
-  } = usePerfConfig();
+    setManualPerformanceMode,
+  } = performanceContext;
 
-  // Performance monitoring
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    let rafId: number;
-    
-    const countFrame = (time: number) => {
-      // Increment frame count
-      frameCountRef.current++;
-      
-      // Calculate FPS once per second
-      if (time - lastTimeRef.current >= 1000) {
-        setFps(Math.round(frameCountRef.current * 1000 / (time - lastTimeRef.current)));
-        frameCountRef.current = 0;
-        lastTimeRef.current = time;
-        
-        // Try to get memory usage if available
-        if ((performance as any).memory) {
-          setMemoryUsage((performance as any).memory.usedJSHeapSize / (1024 * 1024));
-        }
-      }
-      
-      rafId = requestAnimationFrame(countFrame);
-    };
-    
-    rafId = requestAnimationFrame(countFrame);
-    
-    return () => {
-      cancelAnimationFrame(rafId);
-    };
-  }, [isOpen]);
+  // Toggle minimized state
+  const toggleMinimize = () => {
+    setIsMinimized(!isMinimized);
+  };
 
-  if (process.env.NODE_ENV === 'production') {
-    return null; // Don't show in production
-  }
-
-  // Helper to render metric value with appropriate color
-  const renderMetricValue = (name: string, value: number | null, rating: string | null) => {
-    if (value === null) return 'N/A';
-    
-    let className = '';
-    if (rating === 'good') className = 'text-green-400';
-    else if (rating === 'needs-improvement') className = 'text-yellow-400';
-    else if (rating === 'poor') className = 'text-red-400';
-    
-    const formattedValue = name === 'CLS' ? value.toFixed(3) : Math.round(value);
-    
-    return (
-      <span className={className}>
-        {formattedValue}
-        <span className="text-[8px] ml-1 opacity-60">
-          {name === 'CLS' ? '' : 'ms'}
-        </span>
-      </span>
-    );
+  // Handle config changes
+  const handleConfigChange = (key: string, value: any) => {
+    updateConfig({ [key]: value });
   };
 
   return (
-    <div className="fixed bottom-2 right-2 z-50">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="bg-black/80 p-2 rounded-full hover:bg-black/90 transition-colors"
-      >
-        <Activity size={16} className="text-white/80" />
-      </button>
-      
-      {isOpen && (
-        <div className="bg-black/80 text-white/90 p-4 mb-2 rounded-lg text-xs w-72">
-          <div className="flex justify-between items-center">
-            <h3 className="font-medium">Adaptive Performance Monitor</h3>
-            <button
-              onClick={() => setShowFull(!showFull)}
-              className="p-1 hover:bg-white/10 rounded"
-            >
-              {showFull ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
-          </div>
+    <Card className="w-full border-orange-500/20 shadow-lg">
+      <CardHeader className="py-2 px-4 flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-orange-500" />
+          <CardTitle className="text-sm font-medium">Performance Monitor</CardTitle>
           
-          <div className="space-y-2 mt-2">
-            <div className="flex justify-between">
-              <span>FPS:</span>
-              <span className={fps < 30 ? 'text-red-400' : fps < 50 ? 'text-yellow-400' : 'text-green-400'}>
-                {fps}
-              </span>
-            </div>
+          <Badge 
+            variant={isLowPerformance ? "destructive" : "secondary"}
+            className="ml-2 text-xs"
+          >
+            {deviceCapability}
+          </Badge>
+        </div>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-6 w-6 p-0" 
+          onClick={toggleMinimize}
+        >
+          {isMinimized ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+      </CardHeader>
+      
+      {!isMinimized && (
+        <CardContent ref={contentRef} className="p-0">
+          <Tabs 
+            value={activeTab} 
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <TabsList className="w-full">
+              <TabsTrigger value="general" className="flex-1">General</TabsTrigger>
+              <TabsTrigger value="advanced" className="flex-1">Advanced</TabsTrigger>
+              <TabsTrigger value="metrics" className="flex-1">Metrics</TabsTrigger>
+            </TabsList>
             
-            {memoryUsage !== null && (
-              <div className="flex justify-between">
-                <span>Memory:</span>
-                <span>{Math.round(memoryUsage)} MB</span>
+            <TabsContent value="general" className="p-4 space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium">Performance Mode</h3>
+                    <p className="text-xs text-muted-foreground">Select how the app should prioritize performance</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant={manualPerformanceMode === PerformanceModes.QUALITY ? "default" : "outline"}
+                      onClick={() => setManualPerformanceMode?.(PerformanceModes.QUALITY)}
+                      className="h-8"
+                    >
+                      Quality
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant={manualPerformanceMode === PerformanceModes.BALANCED ? "default" : "outline"}
+                      onClick={() => setManualPerformanceMode?.(PerformanceModes.BALANCED)}
+                      className="h-8"
+                    >
+                      Balanced
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant={manualPerformanceMode === PerformanceModes.PERFORMANCE ? "default" : "outline"}
+                      onClick={() => setManualPerformanceMode?.(PerformanceModes.PERFORMANCE)}
+                      className="h-8"
+                    >
+                      Performance
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant={manualPerformanceMode === PerformanceModes.AUTO ? "default" : "outline"}
+                      onClick={() => setManualPerformanceMode?.(PerformanceModes.AUTO)}
+                      className="h-8"
+                    >
+                      Auto
+                    </Button>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Visual Effects</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Animations</p>
+                        <p className="text-xs text-muted-foreground">Enable animations throughout the app</p>
+                      </div>
+                      <Switch 
+                        checked={!config.disableAnimations} 
+                        onCheckedChange={(checked) => handleConfigChange("disableAnimations", !checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Particle Effects</p>
+                        <p className="text-xs text-muted-foreground">Show particle effects and visual flourishes</p>
+                      </div>
+                      <Switch 
+                        checked={!config.disableParticles} 
+                        onCheckedChange={(checked) => handleConfigChange("disableParticles", !checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Blur Effects</p>
+                        <p className="text-xs text-muted-foreground">Enable backdrop blur and glass effects</p>
+                      </div>
+                      <Switch 
+                        checked={!config.disableBlur} 
+                        onCheckedChange={(checked) => handleConfigChange("disableBlur", !checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Shadows</p>
+                        <p className="text-xs text-muted-foreground">Show shadow effects for depth</p>
+                      </div>
+                      <Switch 
+                        checked={!config.disableShadows} 
+                        onCheckedChange={(checked) => handleConfigChange("disableShadows", !checked)}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
+            </TabsContent>
             
-            <div className="flex justify-between">
-              <span>Device Category:</span>
-              <span className="font-mono">{deviceCapability}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span>Mode:</span>
-              <span className="font-mono">{manualPerformanceMode}</span>
-            </div>
-            
-            {/* Web Vitals Section */}
-            {showFull && (
-              <>
-                <div className="pt-2 border-t border-white/10">
-                  <h4 className="text-xs font-medium mb-2">Web Vitals</h4>
-                  <div className="grid grid-cols-3 gap-2 text-[10px]">
+            <TabsContent value="advanced" className="p-4 space-y-4">
+              {/* Advanced performance settings here */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Animation Settings</h3>
+                  <div className="space-y-4">
                     <div>
-                      <div className="opacity-60">LCP</div>
-                      <div>{renderMetricValue('LCP', webVitals.LCP?.value || null, webVitals.LCP?.rating || null)}</div>
-                    </div>
-                    <div>
-                      <div className="opacity-60">FID</div>
-                      <div>{renderMetricValue('FID', webVitals.FID?.value || null, webVitals.FID?.rating || null)}</div>
-                    </div>
-                    <div>
-                      <div className="opacity-60">CLS</div>
-                      <div>{renderMetricValue('CLS', webVitals.CLS?.value || null, webVitals.CLS?.rating || null)}</div>
-                    </div>
-                    <div>
-                      <div className="opacity-60">FCP</div>
-                      <div>{renderMetricValue('FCP', webVitals.FCP?.value || null, webVitals.FCP?.rating || null)}</div>
-                    </div>
-                    <div>
-                      <div className="opacity-60">TTFB</div>
-                      <div>{renderMetricValue('TTFB', webVitals.TTFB?.value || null, webVitals.TTFB?.rating || null)}</div>
-                    </div>
-                    <div>
-                      <div className="opacity-60">INP</div>
-                      <div>{renderMetricValue('INP', webVitals.INP?.value || null, webVitals.INP?.rating || null)}</div>
+                      <div className="flex justify-between mb-1">
+                        <p className="text-sm">Animation Dampening</p>
+                        <span className="text-xs">{config.animationDampening}%</span>
+                      </div>
+                      <Slider 
+                        value={[config.animationDampening]} 
+                        min={0} 
+                        max={100} 
+                        step={5}
+                        onValueChange={(value) => handleConfigChange("animationDampening", value[0])}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Reduce animation complexity and duration</p>
                     </div>
                   </div>
                 </div>
                 
-                {/* Features section */}
-                <div className="pt-2">
-                  <h4 className="text-xs font-medium mb-1">Features</h4>
-                  <ul className="text-[10px] grid grid-cols-2 gap-x-2">
-                    <li className={features.enableParticles ? 'text-green-400' : 'text-red-400'}>
-                      Particles: {features.enableParticles ? 'On' : 'Off'}
-                    </li>
-                    <li className={features.enableComplexAnimations ? 'text-green-400' : 'text-red-400'}>
-                      Complex Animations: {features.enableComplexAnimations ? 'On' : 'Off'}
-                    </li>
-                    <li className={features.enableBlur ? 'text-green-400' : 'text-red-400'}>
-                      Blur Effects: {features.enableBlur ? 'On' : 'Off'}
-                    </li>
-                    <li className={features.enableShadows ? 'text-green-400' : 'text-red-400'}>
-                      Shadows: {features.enableShadows ? 'On' : 'Off'}
-                    </li>
-                    <li className={features.enableWebWorkers ? 'text-green-400' : 'text-red-400'}>
-                      Web Workers: {features.enableWebWorkers ? 'On' : 'Off'}
-                    </li>
-                    <li className={features.enableHighResImages ? 'text-green-400' : 'text-red-400'}>
-                      High-Res Images: {features.enableHighResImages ? 'On' : 'Off'}
-                    </li>
-                  </ul>
+                <Separator />
+                
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Rendering Options</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Viewport Culling</p>
+                        <p className="text-xs text-muted-foreground">Only render elements in viewport</p>
+                      </div>
+                      <Switch 
+                        checked={config.enableViewportCulling} 
+                        onCheckedChange={(checked) => handleConfigChange("enableViewportCulling", checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Lazy Loading</p>
+                        <p className="text-xs text-muted-foreground">Load components and assets on demand</p>
+                      </div>
+                      <Switch 
+                        checked={config.enableLazyLoading} 
+                        onCheckedChange={(checked) => handleConfigChange("enableLazyLoading", checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Simplified DOM</p>
+                        <p className="text-xs text-muted-foreground">Use simpler DOM structures when possible</p>
+                      </div>
+                      <Switch 
+                        checked={config.useSimplifiedDOM} 
+                        onCheckedChange={(checked) => handleConfigChange("useSimplifiedDOM", checked)}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </>
-            )}
-            
-            <div className="pt-2 space-y-2">
-              <h4 className="font-medium">Performance Settings</h4>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === 'low' ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode('low')}
-                >
-                  Low
-                </button>
-                <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === 'medium' ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode('medium')}
-                >
-                  Medium
-                </button>
-                <button
-                  className={`px-2 py-1 rounded text-xs ${deviceCapability === 'high' ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode('high')}
-                >
-                  High
-                </button>
-                <button
-                  className={`px-2 py-1 rounded text-xs ${manualPerformanceMode === 'auto' ? 'bg-quantum-600' : 'bg-black/40'}`}
-                  onClick={() => setManualPerformanceMode('auto')}
-                >
-                  Auto-detect
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
+            </TabsContent>
+            
+            <TabsContent value="metrics" className="p-4 space-y-4">
+              {/* Performance metrics display here */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Current Status</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-muted p-2 rounded">
+                      <p className="text-xs text-muted-foreground">Device</p>
+                      <p className="text-sm font-medium">{deviceCapability}</p>
+                    </div>
+                    <div className="bg-muted p-2 rounded">
+                      <p className="text-xs text-muted-foreground">Mode</p>
+                      <p className="text-sm font-medium">{manualPerformanceMode}</p>
+                    </div>
+                    <div className="bg-muted p-2 rounded">
+                      <p className="text-xs text-muted-foreground">FPS Target</p>
+                      <p className="text-sm font-medium">{config.targetFPS}</p>
+                    </div>
+                    <div className="bg-muted p-2 rounded">
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <p className="text-sm font-medium">{isLowPerformance ? "Low Performance" : "Normal"}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h3 className="text-sm font-medium mb-2">System Info</h3>
+                  <div className="text-xs space-y-1">
+                    <p><span className="text-muted-foreground">OS: </span>
+                       {typeof navigator !== 'undefined' ? navigator.platform : 'Unknown'}</p>
+                    <p><span className="text-muted-foreground">Browser: </span>
+                       {typeof navigator !== 'undefined' ? navigator.userAgent.split(' ').slice(-1)[0] : 'Unknown'}</p>
+                    <p><span className="text-muted-foreground">CPU Cores: </span>
+                       {typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 'Unknown' : 'Unknown'}</p>
+                    <p><span className="text-muted-foreground">Memory: </span>
+                       {(navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB` : 'Unknown'}</p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 };
 

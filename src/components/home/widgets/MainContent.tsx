@@ -49,7 +49,6 @@ const MainContent: React.FC<MainContentProps> = ({
     >
       <GlassmorphicContainer 
         variant={isMobile ? "subtle" : "medium"} 
-        blur={enableBlur ? (isMobile ? "light" : "medium") : "none"}
         className="p-1 md:p-3 relative overflow-hidden rounded-full aspect-square max-w-3xl mx-auto"
         animate={enableComplexAnimations}
         motionProps={
