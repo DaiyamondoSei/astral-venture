@@ -1,52 +1,16 @@
 
-// Core consciousness data types
+// Define a ChakraType enumeration type
+export type ChakraType = 'crown' | 'third-eye' | 'throat' | 'heart' | 'solar' | 'sacral' | 'root';
 
-export type ConsciousnessLevel = 
-  | 'awakening'
-  | 'aware'
-  | 'expanding'
-  | 'transcending'
-  | 'illuminated'
-  | 'cosmically_aware'
-  | 'unified';
-
-export type ChakraType = 
-  | 'root'
-  | 'sacral'
-  | 'solar'
-  | 'heart'
-  | 'throat'
-  | 'third'
-  | 'crown';
-
-export interface ConsciousnessMetrics {
-  userId: string;
-  level: ConsciousnessLevel;
-  awarenessScore: number;
-  expansionRate: number;
-  insightDepth: number;
-  reflectionQuality: number;
-  meditationConsistency: number;
-  energyClarity: number;
-  chakraBalance: number;
-  lastAssessment: string;
-  history: ConsciousnessHistoryEntry[];
-}
-
-export interface ConsciousnessHistoryEntry {
-  date: string;
-  awarenessScore: number;
-  level: ConsciousnessLevel;
-}
-
+// Define Chakra status to track individual chakra properties
 export interface ChakraStatus {
-  type: ChakraType;
   activation: number;
   balance: number;
   blockages: string[];
   dominantEmotions: string[];
 }
 
+// Define system for tracking overall chakra health
 export interface ChakraSystem {
   chakras: Record<ChakraType, ChakraStatus>;
   overallBalance: number;
@@ -54,67 +18,30 @@ export interface ChakraSystem {
   lastUpdated: string;
 }
 
-export interface DreamConsciousness {
-  depth: number;
-  insights: string[];
-  archetypes: string[];
+// Define entanglement state for quantum effects
+export interface EntanglementState {
+  activePairs: [number, number][];
+  entanglementStrength: number;
+  quantumFluctuations: boolean;
+  stabilityFactor: number;
 }
 
-export interface DreamAnalysis {
-  theme: string;
-  interpretation: string;
-  guidance: string;
+// Define consciousness level progression
+export type ConsciousnessLevel = 'awakening' | 'expanding' | 'integrating' | 'transcending' | 'cosmic';
+
+// Define emotional profile for a user
+export interface EmotionalProfile {
+  dominantEmotions: string[];
+  emotionalClarity: number;
+  traumaPatterns: string[];
+  emotionalMaturity: number;
 }
 
-export interface DreamRecord {
-  id: string;
-  userId: string;
-  date: string;
-  content: string;
-  lucidity: number;
-  emotionalTone: string[];
-  symbols: string[];
-  chakrasActivated: ChakraType[];
-  consciousness?: DreamConsciousness;
-  analysis?: DreamAnalysis;
-  tags: string[];
-}
-
-export interface ConsciousnessInsight {
-  id: string;
-  text: string;
-  source: 'meditation' | 'dream' | 'reflection' | 'chakra' | 'system';
-  relevance: number;
-  dateGenerated: string;
-}
-
-export interface ConsciousnessRecommendation {
-  id: string;
-  type: 'practice' | 'reflection' | 'meditation' | 'chakra';
-  title: string;
-  description: string;
-  priorityLevel: number;
-}
-
-export interface ConsciousnessProgress {
-  userId: string;
-  currentLevel: ConsciousnessLevel;
-  currentState: 'inactive' | 'active' | 'balanced' | 'expanding' | 'evolving';
+// Define user energy data including chakras and consciousness
+export interface UserEnergyData {
+  chakraSystem: ChakraSystem;
+  consciousnessLevel: ConsciousnessLevel;
   energyPoints: number;
-  meditationMinutes: number;
-  reflectionCount: number;
-  dreamRecallPercentage: number;
-  chakraSystem: {
-    chakras: Record<string, any>;
-    overallBalance: number;
-    dominantChakra: ChakraType | null;
-    lastUpdated: string;
-  };
-  nextMilestone: {
-    description: string;
-    pointsNeeded: number;
-    estimatedCompletion: string;
-  };
-  insights: ConsciousnessInsight[];
-  recommendations: ConsciousnessRecommendation[];
+  lastActivities: string[];
+  emotionalProfile: EmotionalProfile;
 }

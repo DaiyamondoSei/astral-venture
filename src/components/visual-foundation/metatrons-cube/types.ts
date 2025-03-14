@@ -1,82 +1,66 @@
 
-/**
- * Types for Metatron's Cube Visualization
- */
+import { CubeSize, CubeTheme, GlowIntensity } from '@/types/core/performance/constants';
 
-// Node in Metatron's Cube
 export interface MetatronsNode {
   id: string;
   x: number;
   y: number;
-  size: number;
-  active?: boolean;
-  pulsing?: boolean;
+  activated?: boolean;
+  importance?: number;
   label?: string;
-  tooltip?: string;
-  energy?: number;
-  state?: 'inactive' | 'active' | 'pulsing' | 'resonating';
-  category?: string;
+  radius?: number;  // Add radius property which was missing
 }
 
-// Connection between nodes
 export interface MetatronsConnection {
-  from: string;
-  to: string;
-  active?: boolean;
-  energy?: number;
-  width?: number;
-  type?: 'primary' | 'secondary' | 'energy' | 'resonance';
-  animated?: boolean;
+  id: string;
+  source: string; // Source node ID
+  target: string; // Target node ID
+  strength?: number;
+  activated?: boolean;
 }
 
-// Cube size options
-export type CubeSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-
-// Cube theme options
-export type CubeTheme = 'default' | 'cosmic' | 'chakra' | 'energy' | 'spiritual' | 'quantum';
-
-// Sacred geometry pattern types
-export type GeometryPattern = 
-  | 'metatronsCube' 
-  | 'flowerOfLife' 
-  | 'seedOfLife' 
-  | 'treeOfLife' 
-  | 'sri-yantra'
-  | 'toroidal'
-  | 'vesica-piscis'
-  | 'golden-ratio';
-
-// Energy field types
-export type EnergyFieldType = 
-  | 'resonance' 
-  | 'vortex' 
-  | 'torus' 
-  | 'spiral' 
-  | 'wave' 
-  | 'quantum';
-
-// Visual effect types  
-export type EffectType =
-  | 'glow'
-  | 'particles'
-  | 'rays'
-  | 'shimmer'
-  | 'ripple'
-  | 'pulse';
-
-// Animation quality configuration
-export interface AnimationQuality {
-  particleCount: number;
-  glowIntensity: number;
-  animationComplexity: number;
-  geometryDetail: number;
-  effectsEnabled: boolean;
+export interface MetatronsCubeData {
+  nodes: MetatronsNode[];
+  connections: MetatronsConnection[];
+  centerNodeId?: string;
 }
 
-// Resonance pattern configuration
-export interface ResonancePattern {
-  frequency: number;
-  amplitude: number;
-  phase: number;
-  harmonics: number[];
+export interface MetatronsCubeProps {
+  size?: CubeSize;
+  theme?: CubeTheme;
+  data?: MetatronsCubeData;
+  activatedNodes?: string[];
+  glowIntensity?: GlowIntensity;
+  interactive?: boolean;
+  onNodeSelect?: (nodeId: string) => void;
+  className?: string;
+  animationLevel?: 'minimal' | 'standard' | 'enhanced';
+  pulseEffect?: boolean;
+}
+
+export interface CubeNodeProps {
+  node: MetatronsNode;
+  activated: boolean;
+  onClick: () => void;
+  glowIntensity?: GlowIntensity;
+  theme?: CubeTheme;
+  pulseEffect?: boolean;
+}
+
+export interface CubeLinesProps {
+  connections: MetatronsConnection[];
+  nodes: Record<string, MetatronsNode>;
+  activatedNodes: string[];
+  theme?: CubeTheme;
+  glowIntensity?: GlowIntensity;
+}
+
+export interface CubeRendererProps {
+  data: MetatronsCubeData;
+  activatedNodes: string[];
+  theme?: CubeTheme;
+  glowIntensity?: GlowIntensity;
+  onNodeSelect?: (nodeId: string) => void;
+  interactive?: boolean;
+  pulseEffect?: boolean;
 }

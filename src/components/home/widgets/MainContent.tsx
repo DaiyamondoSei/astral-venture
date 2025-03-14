@@ -6,7 +6,7 @@ import { DownloadableMaterial } from '@/components/sacred-geometry/types/geometr
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import GlassmorphicContainer from '@/components/background/GlassmorphicContainer';
-import { usePerformance } from '@/contexts/PerformanceContext';
+import { usePerformance } from '@/hooks/usePerformance';
 import MainContentBackground from './MainContentBackground';
 
 interface MainContentProps {

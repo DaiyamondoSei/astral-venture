@@ -1,87 +1,122 @@
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { DeviceCapabilities, GlassmorphicVariants } from '@/types/runtime-values';
+import { GlassmorphicVariant, GlassmorphicVariants } from '@/types/core/performance/constants';
+import { usePerformance } from '@/hooks/usePerformance';
 
-export interface GlassmorphicContainerProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'cosmic' | 'medium' | 'purple';
-  intensity?: 'low' | 'medium' | 'high';
+export interface GlassmorphicContainerProps {
   children: React.ReactNode;
-  responsive?: boolean;
-  noFallback?: boolean;
+  className?: string;
+  variant?: GlassmorphicVariant;
+  blur?: string; // Support blur customization
+  animate?: boolean;
+  motionProps?: any;
+  centerContent?: boolean;
+  glowEffect?: boolean;
+  shimmer?: boolean;
+  transitionDuration?: number;
 }
 
-const GlassmorphicContainer = ({
-  variant = 'default',
-  intensity = 'medium',
+const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
   children,
-  className,
-  responsive = true,
-  noFallback = false,
-  ...props
-}: GlassmorphicContainerProps) => {
-  // Get intensity modifier
-  const getIntensityClass = () => {
-    switch (intensity) {
-      case 'low':
-        return 'bg-opacity-20 backdrop-blur-sm';
+  className = '',
+  variant = GlassmorphicVariants.DEFAULT,
+  blur,
+  animate = false,
+  motionProps = {},
+  centerContent = false,
+  glowEffect = false,
+  shimmer = false,
+  transitionDuration = 0.5
+}) => {
+  const { enableBlur, enableShadows } = usePerformance();
+  
+  // Default blur values based on variant
+  const getDefaultBlur = () => {
+    if (!enableBlur) return 'none';
+    
+    switch (variant) {
+      case 'quantum':
+        return 'blur(10px)';
+      case 'ethereal':
+        return 'blur(15px)';
+      case 'cosmic':
+      case 'purple':
+        return 'blur(12px)';
+      case 'elevated':
+        return 'blur(8px)';
       case 'medium':
-        return 'bg-opacity-30 backdrop-blur-md';
-      case 'high':
-        return 'bg-opacity-40 backdrop-blur-lg';
+        return 'blur(6px)';
+      case 'subtle':
+        return 'blur(3px)';
       default:
-        return 'bg-opacity-30 backdrop-blur-md';
+        return 'blur(5px)';
     }
   };
-
-  // Get variant class
-  const getVariantClass = () => {
-    // Use the runtime value constants to check
-    // Instead of using the type directly
-    if (variant === GlassmorphicVariants.DEFAULT) {
-      return 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800';
-    } else if (variant === GlassmorphicVariants.QUANTUM) {
-      return 'bg-indigo-900 border-indigo-600 text-white';
-    } else if (variant === GlassmorphicVariants.ETHEREAL) {
-      return 'bg-purple-900 border-purple-700 text-white';
-    } else if (variant === GlassmorphicVariants.ELEVATED) {
-      return 'bg-white dark:bg-gray-800 shadow-lg border-gray-100 dark:border-gray-700';
-    } else if (variant === GlassmorphicVariants.SUBTLE) {
-      return 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 shadow-sm';
-    } else if (variant === GlassmorphicVariants.COSMIC) {
-      return 'bg-indigo-950 border-indigo-800 text-white';
-    } else if (variant === GlassmorphicVariants.MEDIUM) {
-      return 'bg-indigo-800 border-indigo-700 text-white';
-    } else if (variant === GlassmorphicVariants.PURPLE) {
-      return 'bg-purple-800 border-purple-700 text-white';
+  
+  // Apply custom blur or use default based on variant
+  const blurValue = blur || getDefaultBlur();
+  
+  // Set base styles based on variant
+  const getVariantStyles = () => {
+    const baseStyles = 'rounded-lg overflow-hidden transition-all ';
+    
+    switch (variant) {
+      case 'quantum':
+        return baseStyles + 'bg-black/25 border border-white/20 text-white shadow-lg';
+      case 'ethereal':
+        return baseStyles + 'bg-white/10 border border-white/25 text-white shadow-lg';
+      case 'cosmic':
+        return baseStyles + 'bg-purple-900/20 border border-purple-500/30 text-white shadow-purple/10';
+      case 'purple':
+        return baseStyles + 'bg-purple-900/30 border border-purple-400/40 text-white shadow-purple/20';
+      case 'elevated':
+        return baseStyles + 'bg-black/40 border border-white/10 text-white shadow-md';
+      case 'medium':
+        return baseStyles + 'bg-black/30 border border-white/15 text-white';
+      case 'subtle':
+        return baseStyles + 'bg-black/20 border border-white/10 text-white';
+      default:
+        return baseStyles + 'bg-white/5 border border-white/10 text-white backdrop-blur';
     }
-    return 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800';
   };
-
-  // Get fallback class when backdrop-filter is not supported
-  const getFallbackClass = () => {
-    if (noFallback) return '';
-    return 'glassmorphic-fallback';
-  };
-
-  // Get responsive class
-  const getResponsiveClass = () => {
-    if (!responsive) return '';
-    return 'transition-all duration-500';
-  };
-
-  // Combine all classes
-  const containerClass = cn(
-    'glassmorphic rounded-xl border',
-    getVariantClass(),
-    getIntensityClass(),
-    getFallbackClass(),
-    getResponsiveClass(),
+  
+  // Set glow effect styles
+  const glowStyles = glowEffect && enableShadows 
+    ? 'after:absolute after:inset-0 after:rounded-lg after:opacity-30 after:bg-gradient-to-b after:from-white/5 after:to-transparent after:-z-10' 
+    : '';
+  
+  // Set shimmer animation styles
+  const shimmerStyles = shimmer 
+    ? 'before:absolute before:inset-0 before:w-full before:h-full before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent before:animate-shimmer'
+    : '';
+  
+  const containerStyles = cn(
+    getVariantStyles(),
+    glowStyles,
+    shimmerStyles,
+    centerContent && 'flex items-center justify-center',
+    'relative',
     className
   );
-
-  return (
-    <div className={containerClass} {...props}>
+  
+  const containerProps = {
+    className: containerStyles,
+    style: {
+      backdropFilter: blurValue,
+      WebkitBackdropFilter: blurValue,
+      transition: `all ${transitionDuration}s ease-in-out`
+    },
+    ...motionProps
+  };
+  
+  return animate ? (
+    <motion.div {...containerProps}>
+      {children}
+    </motion.div>
+  ) : (
+    <div {...containerProps}>
       {children}
     </div>
   );
