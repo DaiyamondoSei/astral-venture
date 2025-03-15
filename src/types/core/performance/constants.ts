@@ -1,45 +1,31 @@
 
 /**
- * Type definitions for performance-related constants
+ * Performance constants types
  * 
- * These types are paired with runtime constants following the Type-Value Pattern
- * to prevent errors where types are used as values.
+ * This module provides type definitions for performance-related constants
+ * following the Type-Value Pattern.
  */
 
-/**
- * Device capability levels
- * Used to indicate the processing power of the current device
- */
-export type DeviceCapability = 'low-end' | 'mid-range' | 'high-end';
+// Device capability levels
+export type DeviceCapability = 'low' | 'medium' | 'high' | 'core';
 
-/**
- * Performance mode options
- * Controls the balance between quality and performance
- */
-export type PerformanceMode = 'battery-saving' | 'balanced' | 'high-performance';
+// Performance modes
+export type PerformanceMode = 'battery' | 'balanced' | 'performance' | 'auto' | 'quality';
 
-/**
- * Render frequency settings
- * Controls how often components are updated
- */
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive';
+// Rendering frequency levels
+export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
 
-/**
- * Quality level settings
- * Controls the visual fidelity of the application
- */
+// Visual quality levels
 export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
 
-/**
- * Glassmorphic UI variants
- * Different style options for glass-like UI elements
- */
-export type GlassmorphicVariant = 
-  | 'default'
-  | 'quantum'
-  | 'ethereal' 
-  | 'elevated'
-  | 'subtle'
-  | 'cosmic'
-  | 'purple'
-  | 'medium';
+// Resource optimization levels
+export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
+
+// Render settings
+export type RenderSetting = 'auto' | 'low' | 'medium' | 'high';
+
+// Animation complexity
+export type AnimationComplexity = 'none' | 'minimal' | 'standard' | 'enhanced';
+
+// Rendering engine types
+export type RenderingEngine = 'canvas' | 'webgl' | 'svg' | 'css' | 'html';

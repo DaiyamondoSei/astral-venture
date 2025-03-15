@@ -5,14 +5,16 @@ import { usePerformance } from '@/contexts/PerformanceContext';
 import { DeviceCapabilities } from '@/utils/performance/constants';
 
 // GlassmorphicVariant is a local enum for the types of glass effects
-export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated';
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'cosmic' | 'purple';
 
 // Define runtime constants for the glass variants
 export const GlassmorphicVariants = {
   DEFAULT: 'default' as GlassmorphicVariant,
   QUANTUM: 'quantum' as GlassmorphicVariant,
   ETHEREAL: 'ethereal' as GlassmorphicVariant,
-  ELEVATED: 'elevated' as GlassmorphicVariant
+  ELEVATED: 'elevated' as GlassmorphicVariant,
+  COSMIC: 'cosmic' as GlassmorphicVariant,
+  PURPLE: 'purple' as GlassmorphicVariant
 };
 
 export interface GlassCardProps
@@ -45,7 +47,9 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
       default: "",
       quantum: "border-indigo-300/30 shadow-indigo-500/20",
       ethereal: "border-teal-300/30 shadow-teal-500/20",
-      elevated: "border-amber-300/30 shadow-amber-500/20"
+      elevated: "border-amber-300/30 shadow-amber-500/20",
+      cosmic: "border-purple-300/30 shadow-purple-500/20",
+      purple: "border-purple-300/30 shadow-purple-500/20"
     };
     
     // Interactive styles for hover and focus
@@ -59,7 +63,7 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
         className={cn(
           baseStyles,
           intensityStyles[intensity],
-          variantStyles[variant],
+          variantStyles[variant as keyof typeof variantStyles],
           interactiveStyles,
           simplifyForPerformance ? "backdrop-blur-[2px]" : "",
           className

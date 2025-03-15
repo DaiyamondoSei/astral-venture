@@ -6,14 +6,6 @@
  * following the Type-Value Pattern.
  */
 
-// Import core types from the constants file
-import { 
-  DeviceCapability, 
-  PerformanceMode, 
-  RenderFrequency, 
-  QualityLevel
-} from '@/types/core/performance/constants';
-
 /**
  * Types of performance metrics that can be measured
  */
@@ -43,6 +35,26 @@ export type MetricRating = 'good' | 'needs-improvement' | 'poor';
 export type DeviceCategory = 'mobile' | 'tablet' | 'desktop';
 
 /**
+ * Device capability levels (re-exported from constants)
+ */
+export type DeviceCapability = 'low' | 'medium' | 'high';
+
+/**
+ * Performance mode types (re-exported from constants)
+ */
+export type PerformanceMode = 'battery' | 'balanced' | 'performance' | 'auto' | 'quality';
+
+/**
+ * Render frequency types (re-exported from constants)
+ */
+export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
+
+/**
+ * Quality level types (re-exported from constants)
+ */
+export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
+
+/**
  * Performance metric data structure
  */
 export interface PerformanceMetric {
@@ -56,6 +68,7 @@ export interface PerformanceMetric {
   page_url?: string;
   metadata?: Record<string, any>;
   rating?: MetricRating;
+  component_name?: string; // Added to fix errors
 }
 
 /**
@@ -70,12 +83,13 @@ export interface ComponentMetrics {
   firstRenderTime?: number;
   memoryUsage?: number;
   renderSizes?: number[];
-  renderTimes?: number[];  // Added to fix references in performance code
-  minRenderTime?: number;  // Added to fix references in performance code
-  maxRenderTime?: number;  // Added to fix references in performance code
-  slowRenderCount?: number; // Added to fix references in performance code
-  lastUpdated?: number;    // Added to fix references in performance code
-  metricType?: string;     // Added to fix references in performance code
+  renderTimes?: number[];
+  minRenderTime?: number;
+  maxRenderTime?: number;
+  slowRenderCount?: number;
+  lastUpdated?: number;
+  metricType?: string;
+  reRenderCount?: number; // Added to fix missing property
   domSize?: {
     width: number;
     height: number;
@@ -111,9 +125,9 @@ export interface PerformanceSettings {
   adaptiveRendering: boolean;
   batchUpdates: boolean;
   useLowFidelityEffects: boolean;
-  adaptiveQuality?: boolean; // Added to fix missing property
-  performanceMetrics?: Record<string, number>; // Added to fix missing property
-  simplifiedForLowEnd?: boolean; // Added to fix missing property
+  adaptiveQuality?: boolean;
+  performanceMetrics?: Record<string, number>;
+  simplifiedForLowEnd?: boolean;
 }
 
 /**
@@ -153,6 +167,10 @@ export interface PerformanceMonitorConfig {
   debugMode: boolean;
   throttleInterval?: number;
   saveToLocalStorage?: boolean;
+  metricsEnabled?: boolean;
+  enablePerformanceTracking?: boolean;
+  slowRenderThreshold?: number;
+  reportingEndpoint?: string;
 }
 
 /**
@@ -164,6 +182,7 @@ export interface AdaptiveSettings {
   adaptiveRendering: boolean;
   adaptiveAnimations: boolean;
   qualityControl: 'auto' | 'manual';
+  virtualization?: boolean; // Added to fix missing property
 }
 
 /**

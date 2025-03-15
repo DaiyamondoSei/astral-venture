@@ -1,103 +1,117 @@
 
-# TypeScript Type-Value Pattern
+# Type-Value Pattern
 
-## Problem Definition
+## Problem
 
-One of the most common TypeScript errors in our application is attempting to use a TypeScript type as if it were a JavaScript value. This leads to errors like:
+TypeScript's type system is powerful for static type checking but doesn't provide runtime information. This leads to a common error pattern where we define types but don't have corresponding runtime values, creating a disconnect between compile-time and runtime behavior.
+
+## Solution: The Type-Value Pattern
+
+The Type-Value Pattern addresses this by ensuring every type has corresponding runtime values that match the type definition exactly. This pattern enforces a strict relationship between what the compiler knows (types) and what exists at runtime (values).
+
+### Pattern Structure
+
+1. **Define types** (usually as string literal unions or enums):
+   ```typescript
+   // Type definition - only available at compile time
+   export type DeviceCapability = 'low' | 'medium' | 'high';
+   ```
+
+2. **Create corresponding runtime constants** in a predictable format:
+   ```typescript
+   // Runtime values - available at execution time
+   export const DeviceCapabilities = {
+     LOW: 'low' as DeviceCapability,
+     MEDIUM: 'medium' as DeviceCapability,
+     HIGH: 'high' as DeviceCapability
+   };
+   ```
+
+3. **Use types for static checking** and constants for runtime references:
+   ```typescript
+   // In type definitions
+   interface Config {
+     capability: DeviceCapability;
+   }
+   
+   // In runtime code
+   if (config.capability === DeviceCapabilities.LOW) {
+     // Safe comparison with runtime constant
+   }
+   ```
+
+## Benefits
+
+1. **Type Safety**: Compiler ensures that only valid values are used.
+2. **Autocomplete Support**: IDE suggests available constants.
+3. **Refactoring Safety**: Renaming a value updates all references.
+4. **Runtime Validation**: Can validate data against known constants.
+5. **Consistent Naming**: Clear convention for types vs. runtime values.
+
+## Implementation Guidelines
+
+1. **Naming Convention**: 
+   - Types: PascalCase singular (e.g., `DeviceCapability`)
+   - Constants: PascalCase plural (e.g., `DeviceCapabilities`)
+
+2. **Organization**:
+   - Keep related types and constants in the same file
+   - Export both the type and constants
+
+3. **Type Assertion**:
+   - Use `as` typecasting to ensure constant values match the type
+   - This creates a compile-time check that constants conform to the type
+
+4. **Usage Priority**:
+   - For comparisons and assignments, always use the constants
+   - Use types only for type annotations
+
+## Examples
+
+### Performance Metrics
 
 ```typescript
-// ERROR: 'DeviceCapability' only refers to a type, but is being used as a value here.
-if (capability === DeviceCapability.HIGH) { ... }
-```
+// Type definition
+export type MetricType = 'render' | 'interaction' | 'load';
 
-This happens because TypeScript types don't exist at runtime - they're erased during compilation to JavaScript. When we try to reference a type name directly as if it were an object with properties, TypeScript correctly reports this as an error.
-
-## The Type-Value Pattern Solution
-
-The Type-Value Pattern involves creating two parallel structures:
-
-1. **Type Definition**: A TypeScript type used for type checking (compile-time)
-2. **Runtime Value**: A JavaScript object with the same structure (runtime)
-
-### Implementation Example
-
-```typescript
-// 1. Define the TYPE (for compile-time type checking)
-export type DeviceCapability = 'low-end' | 'mid-range' | 'high-end';
-
-// 2. Define the VALUE (for runtime usage)
-export const DeviceCapabilities = {
-  LOW: 'low-end' as DeviceCapability,
-  MEDIUM: 'mid-range' as DeviceCapability,
-  HIGH: 'high-end' as DeviceCapability
+// Runtime constants
+export const MetricTypes = {
+  RENDER: 'render' as MetricType,
+  INTERACTION: 'interaction' as MetricType,
+  LOAD: 'load' as MetricType
 };
 
-// 3. Usage in code
-// Correct: Using the VALUE at runtime
-if (capability === DeviceCapabilities.HIGH) { ... }
-
-// Correct: Using the TYPE for type annotations
-function setCapability(newCapability: DeviceCapability) { ... }
-```
-
-## Benefits of This Pattern
-
-1. **Type Safety**: You get full type checking for values
-2. **Runtime Access**: Values are available at runtime
-3. **IntelliSense Support**: IDE shows available options
-4. **Consistent Naming**: Clear distinction between types and values
-5. **Centralized Definition**: Single source of truth for related types and values
-
-## Naming Conventions
-
-To maintain consistency across the codebase:
-
-1. Types use singular nouns: `DeviceCapability`, `PerformanceMode`
-2. Values use plural nouns: `DeviceCapabilities`, `PerformanceModes`
-3. Type values use UPPER_CASE: `DeviceCapabilities.HIGH`, `PerformanceModes.BALANCED`
-4. Always export both the type and values object
-
-## Common Locations for Type-Value Pairs
-
-- `src/types/core/*/constants.ts`: Type definitions
-- `src/types/core/*/runtime-constants.ts`: Value definitions
-
-## When To Apply This Pattern
-
-Apply this pattern whenever you need to:
-
-1. Define a set of constants that will be referenced in multiple places
-2. Create enumerated values with specific string representations
-3. Define configuration options that need type checking
-4. Create any value that needs to be both type-checked and referenced at runtime
-
-## Alternatives
-
-In some cases, TypeScript enums can be used instead:
-
-```typescript
-export enum DeviceCapability {
-  LOW = 'low-end',
-  MEDIUM = 'mid-range',
-  HIGH = 'high-end'
+// Usage
+function trackMetric(type: MetricType, value: number) {
+  if (type === MetricTypes.RENDER) {
+    // Process render metrics...
+  }
 }
 ```
 
-However, we prefer the Type-Value Pattern because:
-- It produces more predictable JavaScript output
-- It allows more flexible string literal values
-- It's consistent with our other type definitions
-- It avoids some of the quirks of TypeScript enums
+### Component Variants
 
-## Implementation Checklist
+```typescript
+// Type definition
+export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
-When adding new constants to the system:
+// Runtime constants
+export const ButtonVariants = {
+  PRIMARY: 'primary' as ButtonVariant,
+  SECONDARY: 'secondary' as ButtonVariant,
+  DANGER: 'danger' as ButtonVariant
+};
 
-- [ ] Define the type in the appropriate constants.ts file
-- [ ] Create the corresponding values in the runtime-constants.ts file
-- [ ] Export both the type and values
-- [ ] Reference the type for type annotations
-- [ ] Reference the values for runtime comparisons
-- [ ] Use consistent naming following the conventions above
+// Usage in a component
+interface ButtonProps {
+  variant?: ButtonVariant;
+}
 
-By consistently applying this pattern, we can eliminate an entire class of TypeScript errors while maintaining clear, maintainable code.
+function Button({ variant = ButtonVariants.PRIMARY }: ButtonProps) {
+  // Use variant...
+}
+```
+
+## Conclusion
+
+The Type-Value Pattern bridges the gap between TypeScript's static type system and JavaScript's runtime, providing both compile-time safety and runtime expressiveness. By consistently applying this pattern, we reduce errors from type mismatches and create more maintainable code.

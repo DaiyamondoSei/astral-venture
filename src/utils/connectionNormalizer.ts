@@ -1,78 +1,74 @@
-import { MetatronsConnection } from '@/components/visual-foundation/metatrons-cube/types';
+
+import { MetatronsConnection, MetatronsNode } from '@/components/visual-foundation/metatrons-cube/types';
 
 /**
- * Normalizes a connection object to ensure it uses standardized field names
- * 
- * This utility helps with the transition from the legacy source/target pattern
- * to the standardized from/to pattern for connections.
- * 
- * @param connection - The connection to normalize
- * @returns A normalized connection with both old and new field patterns
+ * Normalizes connection structure by ensuring each connection has both 
+ * from/to and source/target properties with consistent values
  */
-export function normalizeConnection(connection: Partial<MetatronsConnection>): MetatronsConnection {
-  const source = connection.source || connection.from;
-  const target = connection.target || connection.to;
-  
-  if (!source || !target) {
-    throw new Error('Connection must have either source/target or from/to properties');
-  }
-  
-  return {
-    // Set standardized properties
-    from: source,
-    to: target,
+export function normalizeConnections(connections: Partial<MetatronsConnection>[]): MetatronsConnection[] {
+  return connections.map((connection, index) => {
+    // Create a consistent id if none exists
+    const id = connection.id || `connection-${index}`;
     
-    // Keep original properties for backward compatibility
-    source,
-    target,
+    // Normalize source and target properties
+    const source = connection.source || connection.from || '';
+    const target = connection.target || connection.to || '';
     
-    // Copy other properties
-    animated: connection.animated || false,
-    active: connection.active || false,
-    intensity: connection.intensity || 0.5
-  };
+    // Create a fully normalized connection
+    return {
+      id,
+      source,
+      target,
+      from: source,
+      to: target,
+      active: connection.active || false,
+      animated: connection.animated || false,
+      width: connection.width || 1
+    };
+  });
 }
 
 /**
- * Normalizes an array of connections to ensure they all use standardized field names
- * 
- * @param connections - Array of connections to normalize
- * @returns Array of normalized connections
+ * Ensures all node objects have the required properties with default values
  */
-export function normalizeConnections(
-  connections: Array<Partial<MetatronsConnection>>
-): MetatronsConnection[] {
-  return connections.map(normalizeConnection);
+export function normalizeNodes(nodes: Partial<MetatronsNode>[]): MetatronsNode[] {
+  return nodes.map((node, index) => {
+    return {
+      id: node.id || `node-${index}`,
+      x: node.x || 0,
+      y: node.y || 0,
+      radius: node.radius || 5,
+      size: node.size || 5,
+      label: node.label || '',
+      tooltip: node.tooltip || node.label || '',
+      active: node.active || false,
+      pulsing: node.pulsing || false
+    };
+  });
 }
 
 /**
- * Checks if a connection uses the legacy source/target pattern but not the new from/to pattern
- * 
- * @param connection - The connection to check
- * @returns True if the connection uses only legacy field names
+ * Converts an array of nodes to a record for faster lookup
  */
-export function isLegacyConnection(connection: Partial<MetatronsConnection>): boolean {
-  return (
-    (connection.source !== undefined || connection.target !== undefined) &&
-    (connection.from === undefined && connection.to === undefined)
-  );
+export function nodesToRecord(nodes: MetatronsNode[]): Record<string, MetatronsNode> {
+  return nodes.reduce((acc, node) => {
+    acc[node.id] = node;
+    return acc;
+  }, {} as Record<string, MetatronsNode>);
 }
 
 /**
- * Migrates legacy connections to the new format while maintaining backward compatibility
- * 
- * @param connections - Array of connections to migrate
- * @returns Array of connections with both old and new field patterns
+ * Converts a from/to connection format to a source/target format
  */
-export function migrateConnections(
-  connections: Array<Partial<MetatronsConnection>>
-): MetatronsConnection[] {
-  return connections.map(normalizeConnection);
+export function convertConnectionFormat(connections: { from: string; to: string }[]): MetatronsConnection[] {
+  return connections.map((conn, index) => ({
+    id: `connection-${index}`,
+    source: conn.from,
+    target: conn.to,
+    from: conn.from,
+    to: conn.to,
+    active: false,
+    animated: false,
+    width: 1
+  }));
 }
-
-export default {
-  normalizeConnection,
-  normalizeConnections,
-  isLegacyConnection,
-  migrateConnections
-};

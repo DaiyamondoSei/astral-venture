@@ -19,6 +19,19 @@ export interface AIQuestion {
 }
 
 /**
+ * AI service options
+ */
+export interface AIServiceOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  stream?: boolean;
+  useCache?: boolean;
+  includeMetadata?: boolean;
+  [key: string]: any;
+}
+
+/**
  * AI Response structure
  * Unified interface used across both services and components
  */
@@ -32,6 +45,7 @@ export interface AIResponse {
   type?: string;
   answer: string; // Making this required for consistency with component expectations
   suggestedPractices?: any[];
+  sources?: any[];
 }
 
 /**
@@ -59,7 +73,7 @@ export interface AssistantSuggestion {
   component: string;
   type: string;
   priority: 'high' | 'medium' | 'low';
-  status?: 'pending' | 'implemented' | 'dismissed';
+  status?: 'pending' | 'implemented' | 'dismissed' | 'abandoned';
   autoFixAvailable: boolean;
   codeExample?: string;
   context?: Record<string, any>;
@@ -81,7 +95,7 @@ export interface AssistantIntent {
 /**
  * Assistant intent status type
  */
-export type AssistantIntentStatus = 'pending' | 'completed' | 'failed';
+export type AssistantIntentStatus = 'pending' | 'completed' | 'failed' | 'implemented' | 'abandoned';
 
 /**
  * AI Question options
@@ -117,6 +131,7 @@ export interface AIModelInfo {
   contextWindow: number;
   costPer1KTokens: number;
   isDefault?: boolean;
+  model?: string; // Added to fix missing property
 }
 
 /**
@@ -126,6 +141,8 @@ export interface UseAICodeAssistantProps {
   componentName?: string;
   enableAnalysis?: boolean;
   autoAnalyze?: boolean;
+  initialComponents?: string[];
+  analysisDepth?: number;
 }
 
 /**
