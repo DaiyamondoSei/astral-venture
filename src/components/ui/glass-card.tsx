@@ -3,7 +3,10 @@ import React, { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { usePerformance } from '@/hooks/usePerformance';
-import { DeviceCapabilities, GlassmorphicVariant } from '@/types/core/performance/constants';
+import { 
+  GlassmorphicVariant, 
+  DeviceCapabilities 
+} from '@/types/core/performance/constants';
 
 export interface GlassCardProps {
   children: ReactNode;
@@ -55,6 +58,9 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       case 'ethereal': return 15;
       case 'elevated': return 8;
       case 'subtle': return 4;
+      case 'cosmic': return 12;
+      case 'purple': return 7;
+      case 'medium': return 6;
       default: return 6;
     }
   };
@@ -66,6 +72,9 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       case 'ethereal': return 0.15;
       case 'elevated': return 0.3;
       case 'subtle': return 0.1;
+      case 'cosmic': return 0.18;
+      case 'purple': return 0.25;
+      case 'medium': return 0.2;
       default: return 0.2;
     }
   };

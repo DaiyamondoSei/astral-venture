@@ -1,12 +1,42 @@
 
 import { useState, useCallback } from 'react';
-import { AssistantSuggestion } from '@/components/ai-assistant/types';
+import { 
+  AIResponse, 
+  AssistantSuggestion, 
+  AIQuestion 
+} from '@/services/ai/types';
+import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/components/ui/use-toast';
 
 /**
- * Hook for AI assistant functionality
- * @returns Assistant state and methods
+ * Interface for the useAssistant hook return value 
  */
-export const useAssistant = () => {
+export interface UseAssistantReturn {
+  isLoading: boolean;
+  tokens: number;
+  data: any;
+  suggestions: AssistantSuggestion[];
+  error: string;
+  isFixing: boolean;
+  currentComponent: string;
+  loading: boolean;
+  lastUpdated: Date;
+  response: AIResponse | null;
+  question: string;
+  isAnalyzing: boolean;
+  
+  // Methods
+  setQuestion: (question: string) => void;
+  submitQuestion: (context?: string) => Promise<void>;
+  analyzeComponent: (componentCode: string) => Promise<void>;
+  applyFix: (suggestion: AssistantSuggestion) => Promise<void>;
+  applyAutoFix: (suggestionId: string) => Promise<void>;
+}
+
+/**
+ * AI Assistant hook for developer assistance and code improvements
+ */
+export function useAssistant(): UseAssistantReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [tokens, setTokens] = useState(0);
   const [data, setData] = useState<any>(null);
@@ -15,93 +45,102 @@ export const useAssistant = () => {
   const [isFixing, setIsFixing] = useState(false);
   const [currentComponent, setCurrentComponent] = useState('');
   const [loading, setLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | undefined>(undefined);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [response, setResponse] = useState<AIResponse | null>(null);
+  const [question, setQuestion] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  const { toast } = useToast();
 
   /**
-   * Analyze a component to generate improvement suggestions
+   * Submit a question to the AI Assistant
    */
-  const analyzeComponent = useCallback(async (componentId: string): Promise<AssistantSuggestion[]> => {
+  const submitQuestion = useCallback(async (context?: string) => {
     setIsLoading(true);
-    setCurrentComponent(componentId);
-    setLoading(true);
+    setError('');
     
     try {
-      // Mock implementation - would connect to AI service in production
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const questionData: AIQuestion = {
+        text: question,
+        question,
+        userId: 'current-user', // This should be dynamically set in a real app
+        context: context || '',
+        stream: false
+      };
       
-      const mockSuggestions: AssistantSuggestion[] = [
-        {
-          id: `${componentId}-1`,
-          title: 'Optimize render performance',
-          description: 'This component re-renders too frequently. Consider using React.memo or useMemo for optimization.',
-          priority: 'medium',
-          type: 'optimization',
-          status: 'pending',
-          component: componentId,
-          autoFixAvailable: true,
-          context: {
-            component: componentId,
-            file: `src/components/${componentId}.tsx`,
-            severity: 'medium'
-          }
-        }
-      ];
+      const { data, error } = await supabase.functions.invoke('ask-assistant', {
+        body: questionData
+      });
       
-      setSuggestions(prev => [...prev, ...mockSuggestions]);
-      setTokens(prev => prev + 250); // Simulating token usage
-      setData(mockSuggestions);
-      setLastUpdated(new Date());
-      return mockSuggestions;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      return [];
-    } finally {
-      setIsLoading(false);
-      setLoading(false);
-    }
-  }, []);
-
-  /**
-   * Analyze multiple components at once
-   */
-  const analyzeComponents = useCallback(async (componentIds: string[]): Promise<AssistantSuggestion[]> => {
-    const allSuggestions: AssistantSuggestion[] = [];
-    setIsLoading(true);
-    setLoading(true);
-    
-    try {
-      for (const componentId of componentIds) {
-        const suggestions = await analyzeComponent(componentId);
-        allSuggestions.push(...suggestions);
+      if (error) {
+        throw new Error(error.message);
       }
-      return allSuggestions;
+      
+      setResponse(data as AIResponse);
+      setTokens(data.meta?.tokenUsage || 0);
+      setLastUpdated(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Unknown error occurred',
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
-      setLoading(false);
     }
-  }, [analyzeComponent]);
+  }, [question, toast]);
 
   /**
-   * Dismiss a suggestion
+   * Analyze a component for suggestions
    */
-  const dismissSuggestion = useCallback((suggestionId: string) => {
-    setSuggestions(prev => 
-      prev.map(suggestion => 
-        suggestion.id === suggestionId 
-          ? { ...suggestion, status: 'dismissed' } 
-          : suggestion
-      )
-    );
+  const analyzeComponent = useCallback(async (componentCode: string) => {
+    setIsAnalyzing(true);
+    setCurrentComponent(componentCode);
+    
+    try {
+      // This would call your actual API endpoint for code analysis
+      const { data, error } = await supabase.functions.invoke('analyze-code', {
+        body: { code: componentCode }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      setSuggestions(data.suggestions || []);
+      setLastUpdated(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setIsAnalyzing(false);
+    }
   }, []);
 
   /**
-   * Implement a suggestion
+   * Apply a fix for a suggestion
    */
-  const implementSuggestion = useCallback(async (suggestion: AssistantSuggestion): Promise<void> => {
+  const applyFix = useCallback(async (suggestion: AssistantSuggestion) => {
     setIsFixing(true);
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // This would call your actual API endpoint for fixing code
+      const { data, error } = await supabase.functions.invoke('apply-fix', {
+        body: { suggestionId: suggestion.id, component: currentComponent }
+      });
       
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Update with the fixed code
+      setData(data);
+      toast({
+        title: "Fix Applied",
+        description: `Successfully applied: ${suggestion.title}`,
+      });
+      
+      // Update the suggestion as implemented
       setSuggestions(prev => 
         prev.map(s => 
           s.id === suggestion.id 
@@ -109,28 +148,36 @@ export const useAssistant = () => {
             : s
         )
       );
+      
+      setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to apply fix',
+        variant: "destructive"
+      });
     } finally {
       setIsFixing(false);
     }
-  }, []);
+  }, [currentComponent, toast]);
 
   /**
-   * Apply a fix to a suggestion
+   * Apply an automatic fix by suggestion ID
    */
-  const applyFix = useCallback(async (suggestion: AssistantSuggestion): Promise<boolean> => {
-    setIsFixing(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      return false;
-    } finally {
-      setIsFixing(false);
+  const applyAutoFix = useCallback(async (suggestionId: string) => {
+    const suggestion = suggestions.find(s => s.id === suggestionId);
+    if (!suggestion) {
+      toast({
+        title: "Error",
+        description: "Suggestion not found",
+        variant: "destructive"
+      });
+      return;
     }
-  }, []);
+    
+    await applyFix(suggestion);
+  }, [suggestions, applyFix, toast]);
 
   return {
     isLoading,
@@ -142,12 +189,15 @@ export const useAssistant = () => {
     currentComponent,
     loading,
     lastUpdated,
+    response,
+    question,
+    isAnalyzing,
+    setQuestion,
+    submitQuestion,
     analyzeComponent,
-    analyzeComponents,
-    dismissSuggestion,
-    implementSuggestion,
-    applyFix
+    applyFix,
+    applyAutoFix
   };
-};
+}
 
 export default useAssistant;

@@ -20,8 +20,10 @@ export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive';
 
 /**
  * Glassmorphic variant options
+ * 
+ * Note: When adding new variants, be sure to update GlassmorphicVariants in runtime-constants.ts as well
  */
-export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'cosmic' | 'purple';
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'cosmic' | 'purple' | 'medium';
 
 /**
  * Runtime constants for DeviceCapability
@@ -63,5 +65,6 @@ export const GlassmorphicVariants = {
   ELEVATED: 'elevated' as GlassmorphicVariant,
   SUBTLE: 'subtle' as GlassmorphicVariant,
   COSMIC: 'cosmic' as GlassmorphicVariant,
-  PURPLE: 'purple' as GlassmorphicVariant
+  PURPLE: 'purple' as GlassmorphicVariant,
+  MEDIUM: 'medium' as GlassmorphicVariant
 };

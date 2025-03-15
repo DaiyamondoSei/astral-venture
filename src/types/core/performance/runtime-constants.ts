@@ -25,6 +25,8 @@ export const QualityLevels = {
 
 /**
  * Runtime values for glassmorphic variants
+ * 
+ * Note: These must match the type definition in constants.ts
  */
 export const GlassmorphicVariants = {
   DEFAULT: 'default' as GlassmorphicVariant,
@@ -33,25 +35,26 @@ export const GlassmorphicVariants = {
   ELEVATED: 'elevated' as GlassmorphicVariant,
   SUBTLE: 'subtle' as GlassmorphicVariant,
   COSMIC: 'cosmic' as GlassmorphicVariant,
-  PURPLE: 'purple' as GlassmorphicVariant
+  PURPLE: 'purple' as GlassmorphicVariant,
+  MEDIUM: 'medium' as GlassmorphicVariant
 };
 
 /**
  * Runtime values for device capabilities
  */
 export const DeviceCapabilities = {
-  LOW: 'low' as DeviceCapability,
-  MEDIUM: 'medium' as DeviceCapability,
-  HIGH: 'high' as DeviceCapability
+  LOW: 'low-end' as DeviceCapability,
+  MEDIUM: 'mid-range' as DeviceCapability,
+  HIGH: 'high-end' as DeviceCapability
 };
 
 /**
  * Runtime values for performance modes
  */
 export const PerformanceModes = {
-  QUALITY: 'quality' as PerformanceMode,
+  QUALITY: 'battery-saving' as PerformanceMode,
   BALANCED: 'balanced' as PerformanceMode,
-  PERFORMANCE: 'performance' as PerformanceMode
+  PERFORMANCE: 'high-performance' as PerformanceMode
 };
 
 /**
@@ -60,5 +63,6 @@ export const PerformanceModes = {
 export const RenderFrequencies = {
   LOW: 'low' as RenderFrequency,
   MEDIUM: 'medium' as RenderFrequency,
-  HIGH: 'high' as RenderFrequency
+  HIGH: 'high' as RenderFrequency,
+  ADAPTIVE: 'adaptive' as RenderFrequency
 };

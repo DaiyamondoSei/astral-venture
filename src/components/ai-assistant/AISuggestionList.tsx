@@ -1,174 +1,127 @@
 
-import { useState, useEffect } from 'react';
-import { useAssistant } from '@/hooks/useAssistant';
-import { Badge } from '@/components/ui/badge';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Check, AlertTriangle, Code, Zap, RefreshCw, Wrench } from 'lucide-react';
-import { AssistantSuggestion } from './types';
+import { useAssistant } from '@/hooks/useAssistant';
+import { Loader2, CheckCircle, Code } from 'lucide-react';
+import { AssistantSuggestion } from '@/services/ai/types';
 
-export interface AISuggestionListProps {
-  componentId?: string;
-  limit?: number;
+interface AISuggestionListProps {
+  onSelect?: (suggestion: AssistantSuggestion) => void;
 }
 
-/**
- * Get color based on suggestion priority
- */
-function getPriorityColor(priority: 'high' | 'medium' | 'low'): string {
-  switch (priority) {
-    case 'high':
-      return 'text-red-500';
-    case 'medium':
-      return 'text-amber-500';
-    case 'low':
-      return 'text-blue-500';
-    default:
-      return 'text-gray-500';
-  }
-}
-
-export const AISuggestionList = ({ componentId, limit = 10 }: AISuggestionListProps) => {
-  const [selectedSuggestion, setSelectedSuggestion] = useState<AssistantSuggestion | null>(null);
-  
+export const AISuggestionList: React.FC<AISuggestionListProps> = ({ onSelect }) => {
   const { 
-    suggestions, 
-    currentComponent, 
-    isAnalyzing, 
-    analyzeComponent, 
-    isFixing, 
-    applyFix,
-    applyAutoFix
-  } = useAssistant({ componentName: componentId });
-  
-  useEffect(() => {
-    if (componentId && componentId !== currentComponent) {
-      analyzeComponent(componentId);
-    }
-  }, [componentId, currentComponent, analyzeComponent]);
-  
-  const handleRefresh = () => {
-    if (componentId) {
-      analyzeComponent(componentId);
+    suggestions,
+    isFixing,
+    isAnalyzing,
+    applyAutoFix,
+    applyFix 
+  } = useAssistant();
+
+  const handleFixClick = async (suggestion: AssistantSuggestion) => {
+    await applyFix(suggestion);
+    if (onSelect) {
+      onSelect(suggestion);
     }
   };
-  
-  const handleApplyFix = async (suggestion: AssistantSuggestion) => {
-    if (suggestion.autoFixAvailable) {
-      await applyAutoFix(suggestion);
-    }
+
+  const handleQuickFixClick = async (suggestionId: string) => {
+    await applyAutoFix(suggestionId);
   };
-  
-  const displayedSuggestions = suggestions.slice(0, limit);
-  
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'performance':
-        return <Zap className="h-4 w-4 mr-1" />;
-      case 'optimization':
-        return <Zap className="h-4 w-4 mr-1" />;
-      case 'bugfix':
-        return <AlertTriangle className="h-4 w-4 mr-1" />;
-      case 'refactoring':
-        return <Code className="h-4 w-4 mr-1" />;
-      default:
-        return <Code className="h-4 w-4 mr-1" />;
-    }
-  };
-  
+
   if (isAnalyzing) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4">
-        <RefreshCw className="h-8 w-8 animate-spin text-primary mb-2" />
-        <p className="text-center text-muted-foreground">
-          Analyzing component code...
-        </p>
-      </div>
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-lg">Code Analysis</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-4 py-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Analyzing your code...</p>
+        </CardContent>
+      </Card>
     );
   }
-  
-  if (displayedSuggestions.length === 0) {
+
+  if (suggestions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4">
-        <Check className="h-8 w-8 text-green-500 mb-2" />
-        <p className="text-center text-muted-foreground">
-          No suggestions found for this component.
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-4"
-          onClick={handleRefresh}
-          disabled={isAnalyzing}
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh Analysis
-        </Button>
-      </div>
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-lg">Code Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">No suggestions found. Your code looks great!</p>
+        </CardContent>
+      </Card>
     );
   }
-  
+
   return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center mb-2">
-        <div>
-          <span className="text-sm font-medium">Suggestions for: </span>
-          <span className="text-sm text-muted-foreground">{componentId || 'Current Component'}</span>
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleRefresh}
-          disabled={isAnalyzing}
-        >
-          <RefreshCw className="h-3 w-3 mr-1" />
-          Refresh
-        </Button>
-      </div>
-      
-      {displayedSuggestions.map((suggestion) => (
-        <Card key={suggestion.id} className="overflow-hidden">
-          <CardContent className="p-4">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center">
-                  {getTypeIcon(suggestion.type)}
-                  <h3 className="text-sm font-medium">{suggestion.title}</h3>
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-lg">Enhancement Suggestions</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y">
+          {suggestions.map((suggestion) => (
+            <div key={suggestion.id} className="p-4 hover:bg-muted/50 transition-colors">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-medium">{suggestion.title}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {suggestion.description}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{suggestion.description}</p>
-                
-                {suggestion.codeExample && (
-                  <pre className="mt-2 bg-secondary p-2 rounded text-xs overflow-x-auto">
-                    <code>{suggestion.codeExample}</code>
-                  </pre>
-                )}
-                
-                <div className="flex mt-2 space-x-2">
-                  <Badge variant="outline" className={`text-xs ${getPriorityColor(suggestion.priority)}`}>
-                    {suggestion.priority} priority
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {suggestion.type}
-                  </Badge>
+                <div className="flex items-center space-x-2">
+                  {suggestion.status === 'implemented' ? (
+                    <CheckCircle className="text-green-500 h-5 w-5" />
+                  ) : (
+                    <>
+                      {suggestion.autoFixAvailable && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleQuickFixClick(suggestion.id)}
+                          disabled={isFixing}
+                        >
+                          {isFixing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>Quick Fix</>
+                          )}
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={() => handleFixClick(suggestion)}
+                        disabled={isFixing}
+                      >
+                        {isFixing ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Code className="h-4 w-4 mr-2" />
+                        )}
+                        Fix
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
-              
-              {suggestion.autoFixAvailable && (
-                <Button 
-                  size="sm" 
-                  onClick={() => handleApplyFix(suggestion)}
-                  disabled={isFixing}
-                  className="ml-2 shrink-0"
-                >
-                  <Wrench className="h-4 w-4 mr-1" />
-                  Fix
-                </Button>
+              {/* Show code example if available */}
+              {suggestion.codeExample && (
+                <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                  <pre className="text-xs overflow-x-auto">
+                    <code>{suggestion.codeExample}</code>
+                  </pre>
+                </div>
               )}
             </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

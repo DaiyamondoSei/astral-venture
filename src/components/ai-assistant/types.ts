@@ -1,137 +1,21 @@
 
-import { ReactNode } from 'react';
+import { AIResponse as ServiceAIResponse, AIInsight, AssistantSuggestion } from '@/services/ai/types';
 
-export interface AIDashboardWidgetProps {
-  initialPrompt?: string;
-  title?: string;
-  description?: string;
-  maxHeight?: string;
-}
-
-export interface AIGuidedPracticeProps {
-  title?: string;
-  description?: string;
-  initialPrompt?: string;
-  maxHeight?: string;
-}
-
-export interface AIResponseDisplayProps {
-  response: AIResponse;
-}
-
-// Update AIResponseType to include 'stream'
-export type AIResponseType = 'text' | 'code' | 'markdown' | 'error' | 'stream';
-
-export interface AIResponse {
+/**
+ * AI Response with required answer field for backward compatibility
+ */
+export interface AIResponse extends ServiceAIResponse {
   answer: string;
-  type: AIResponseType;
-  suggestedPractices?: string[];
-  meta: AIResponseMeta;
 }
 
-export interface AIResponseMeta {
-  model: string;
-  tokenUsage?: number; 
-  tokens?: number; // Support both property names for backward compatibility
-  processingTime: number;
-  cached?: boolean;
-}
-
-export interface AIQuestion {
-  text: string;
-  question: string;
-  userId: string;
-  context?: string;
-  reflectionIds?: string[];
-  stream?: boolean; // Add streaming support
-}
-
-export interface AIQuestionOptions {
-  useCache?: boolean;
-  showLoadingToast?: boolean;
-  showErrorToast?: boolean;
-  model?: string;
-  userId?: string;
-  context?: string;
-  reflectionIds?: string[];
-  signal?: AbortSignal; // Support for cancellation
-}
-
-// Define runtime constants for types that need to be used as values
-export const AI_MODELS = {
-  GPT_4: 'gpt-4',
-  GPT_4_TURBO: 'gpt-4-turbo',
-  GPT_3_5_TURBO: 'gpt-3.5-turbo',
-  GPT_4O_MINI: 'gpt-4o-mini'
-} as const;
-
-export type AIModel = typeof AI_MODELS[keyof typeof AI_MODELS];
-
-// Assistant Suggestion System types
-export interface AssistantSuggestion {
-  id: string;
-  title: string;
-  description: string;
-  priority: 'high' | 'medium' | 'low';
-  type: 'optimization' | 'bugfix' | 'enhancement' | 'refactoring';
-  status: 'pending' | 'implemented' | 'dismissed';
-  component?: string;
-  code?: string;
-  codeExample?: string;
-  autoFixAvailable?: boolean;
-  context: {
-    component?: string;
-    file?: string;
-    lineNumber?: number;
-    severity?: string;
+/**
+ * Convert service AI response to component-compatible format
+ */
+export function convertToComponentAIResponse(serviceResponse: ServiceAIResponse): AIResponse {
+  return {
+    ...serviceResponse,
+    answer: serviceResponse.answer || serviceResponse.response || ''
   };
 }
 
-export interface AssistantIntent {
-  id: string;
-  type: string;
-  description: string;
-  status: 'processing' | 'completed' | 'failed' | 'implemented';
-  created: Date;
-  updated?: Date;
-  relatedComponents: string[];
-}
-
-export type AssistantIntentStatus = 'processing' | 'completed' | 'failed' | 'implemented';
-
-// Define Assistant context type for consistency
-export interface AssistantContextValue {
-  suggestions: AssistantSuggestion[];
-  intents: AssistantIntent[];
-  isAnalyzing: boolean;
-  currentComponent: string;
-  error: string;
-  isFixing: boolean;
-  analyzeComponent: (componentId: string) => Promise<AssistantSuggestion[]>;
-  analyzeComponents: (componentIds: string[]) => Promise<AssistantSuggestion[]>;
-  dismissSuggestion: (suggestionId: string) => void;
-  implementSuggestion: (suggestion: AssistantSuggestion) => Promise<void>;
-  applyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
-  loading?: boolean;
-  applyAutoFix?: (suggestion: AssistantSuggestion) => Promise<boolean>;
-  lastUpdated?: Date; 
-}
-
-// Add a missing export for personalized recommendations
-export interface ContentRecommendation {
-  id: string;
-  title: string;
-  description: string;
-  type: string;
-  category: string;
-  relevanceScore: number;
-  contentLevel: string;
-  estimatedDuration: number;
-  thumbnailUrl?: string;
-  tags: string[];
-}
-
-export interface AISuggestionListProps {
-  maxItems?: number;
-  componentName?: string;
-}
+export type { AIInsight, AssistantSuggestion };

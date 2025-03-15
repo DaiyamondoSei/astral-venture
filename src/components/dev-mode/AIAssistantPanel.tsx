@@ -1,92 +1,92 @@
 
-import React, { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useAssistant } from '@/hooks/useAssistant';
-import { AISuggestionList } from '@/components/ai-assistant/AISuggestionList';
+import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send } from 'lucide-react';
+import { useAssistant } from '@/hooks/useAssistant';
 
-interface AIAssistantPanelProps {
-  componentName?: string;
-}
-
-const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({ componentName }) => {
-  const [activeTab, setActiveTab] = useState('chat');
-  const [inputValue, setInputValue] = useState('');
-  
-  const {
-    isLoading,
-    loading,
-    submitQuestion,
-    response,
-    analyzeComponent,
-    question,
-    setQuestion
-  } = useAssistant({ componentName });
+export const AIAssistantPanel: React.FC = () => {
+  const { 
+    isLoading, 
+    tokens, 
+    response, 
+    question, 
+    setQuestion,
+    submitQuestion
+  } = useAssistant();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (question.trim() === '') return;
     
-    await submitQuestion(inputValue);
-    setInputValue('');
-  };
-
-  const handleAnalyze = () => {
-    if (componentName) {
-      analyzeComponent(componentName);
-    }
+    await submitQuestion();
   };
 
   return (
-    <Card className="border rounded-lg shadow-sm overflow-hidden">
-      <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
-        <div className="p-4 border-b">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="chat">Chat</TabsTrigger>
-            <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
-          </TabsList>
-        </div>
+    <Card className="shadow-md">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex justify-between items-center">
+          <span>AI Assistant</span>
+          {tokens > 0 && (
+            <span className="text-xs text-muted-foreground">
+              Tokens: {tokens}
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Textarea
+            placeholder="Ask a question about your code..."
+            rows={4}
+            className="w-full resize-none"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+          />
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isLoading || question.trim() === ''}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Send className="mr-2 h-4 w-4" />
+                Submit
+              </>
+            )}
+          </Button>
+        </form>
 
-        <TabsContent value="chat" className="p-0">
-          <div className="flex flex-col h-[400px]">
-            <div className="flex-1 overflow-auto p-4">
-              {response ? (
-                <div className="prose dark:prose-invert max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: response }} />
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground h-full flex items-center justify-center">
-                  <p>Ask me anything about this component or how to improve it.</p>
-                </div>
-              )}
+        {response && (
+          <div className="mt-6">
+            <h3 className="font-medium mb-2">Response:</h3>
+            <div className="p-3 bg-muted/50 rounded-md text-sm whitespace-pre-wrap">
+              {response.answer || response.response}
             </div>
-
-            <form onSubmit={handleSubmit} className="border-t p-4 flex gap-2">
-              <Input
-                placeholder="Ask about this component..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                disabled={isLoading || loading}
-              />
-              <Button type="submit" size="sm" disabled={isLoading || loading || !inputValue.trim()}>
-                {isLoading || loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
-            </form>
+            
+            {response.insights && response.insights.length > 0 && (
+              <div className="mt-4">
+                <h3 className="font-medium mb-2">Insights:</h3>
+                <ul className="space-y-2">
+                  {response.insights.map((insight, index) => (
+                    <li key={index} className="text-sm">
+                      • {typeof insight === 'string' 
+                          ? insight 
+                          : insight.content || insight.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        </TabsContent>
-
-        <TabsContent value="suggestions" className="p-0">
-          <div className="h-[400px] overflow-auto p-4">
-            <AISuggestionList 
-              componentId={componentName} 
-              limit={5} 
-            />
-          </div>
-        </TabsContent>
-      </Tabs>
+        )}
+      </CardContent>
     </Card>
   );
 };
