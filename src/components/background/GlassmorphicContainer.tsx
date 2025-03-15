@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { GlassmorphicVariant, GlassmorphicVariants } from '@/types/core/performance/constants';
+import { GlassmorphicVariant, GlassmorphicVariants } from '@/types/core/performance';
 import { usePerformance } from '@/hooks/usePerformance';
 
 export interface GlassmorphicContainerProps {
@@ -37,18 +37,18 @@ const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
     if (!enableBlur) return 'none';
     
     switch (variant) {
-      case 'quantum':
+      case GlassmorphicVariants.QUANTUM:
         return 'blur(10px)';
-      case 'ethereal':
+      case GlassmorphicVariants.ETHEREAL:
         return 'blur(15px)';
-      case 'cosmic':
-      case 'purple':
+      case GlassmorphicVariants.COSMIC:
+      case GlassmorphicVariants.PURPLE:
         return 'blur(12px)';
-      case 'elevated':
+      case GlassmorphicVariants.ELEVATED:
         return 'blur(8px)';
-      case 'medium':
+      case GlassmorphicVariants.MEDIUM:
         return 'blur(6px)';
-      case 'subtle':
+      case GlassmorphicVariants.SUBTLE:
         return 'blur(3px)';
       default:
         return 'blur(5px)';
@@ -63,19 +63,19 @@ const GlassmorphicContainer: React.FC<GlassmorphicContainerProps> = ({
     const baseStyles = 'rounded-lg overflow-hidden transition-all ';
     
     switch (variant) {
-      case 'quantum':
+      case GlassmorphicVariants.QUANTUM:
         return baseStyles + 'bg-black/25 border border-white/20 text-white shadow-lg';
-      case 'ethereal':
+      case GlassmorphicVariants.ETHEREAL:
         return baseStyles + 'bg-white/10 border border-white/25 text-white shadow-lg';
-      case 'cosmic':
+      case GlassmorphicVariants.COSMIC:
         return baseStyles + 'bg-purple-900/20 border border-purple-500/30 text-white shadow-purple/10';
-      case 'purple':
+      case GlassmorphicVariants.PURPLE:
         return baseStyles + 'bg-purple-900/30 border border-purple-400/40 text-white shadow-purple/20';
-      case 'elevated':
+      case GlassmorphicVariants.ELEVATED:
         return baseStyles + 'bg-black/40 border border-white/10 text-white shadow-md';
-      case 'medium':
+      case GlassmorphicVariants.MEDIUM:
         return baseStyles + 'bg-black/30 border border-white/15 text-white';
-      case 'subtle':
+      case GlassmorphicVariants.SUBTLE:
         return baseStyles + 'bg-black/20 border border-white/10 text-white';
       default:
         return baseStyles + 'bg-white/5 border border-white/10 text-white backdrop-blur';

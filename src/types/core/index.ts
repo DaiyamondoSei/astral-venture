@@ -18,8 +18,7 @@ export * from './base/generic';
 export * from './validation/results';
 
 // Performance types
-export * from './performance/metrics';
-export * from './performance/config';
+export * from './performance';
 
 // Type guards
 export {

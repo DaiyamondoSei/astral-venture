@@ -22,6 +22,7 @@ import {
   MetatronsCubeProps
 } from '@/components/visual-foundation/metatrons-cube/types';
 import { normalizeConnections, normalizeNodes } from '@/utils/connectionNormalizer';
+import { CubeTheme, CubeSize, GlowIntensity } from '@/types/core/performance';
 
 /**
  * Creates a properly formatted props object for the VisualSystem component

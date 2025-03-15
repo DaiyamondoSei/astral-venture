@@ -9,7 +9,7 @@
  * @version 1.0.0
  */
 
-import { QualityLevel } from './metrics';
+import { DeviceCapability, QualityLevel, ResourceOptimizationLevel } from './constants';
 
 /**
  * Performance settings based on device capability
@@ -25,6 +25,8 @@ export interface PerformanceSettings {
   optimizationEnabled?: boolean;
   adaptiveQuality?: boolean;
   simplifiedForLowEnd?: boolean;
+  performanceMetrics?: boolean;
+  webglFallback?: boolean;
   id?: string;
 }
 
@@ -39,8 +41,6 @@ export interface PerformanceMonitorConfig {
   debugMode?: boolean;
   reportingEndpoint?: string;
   logSlowRenders?: boolean;
-  
-  // Advanced configuration
   optimizationLevel?: 'auto' | 'low' | 'medium' | 'high';
   throttleInterval: number;
   maxTrackedComponents: number;
@@ -75,6 +75,7 @@ export interface AdaptiveSettings {
   disableBlur: boolean;
   disableShadows: boolean;
   virtualization?: boolean;
+  lazyLoading?: boolean;
   id?: string;
 }
 
@@ -106,6 +107,7 @@ export interface PerformanceTrackingOptions {
   slowRenderThreshold?: number;
   logSlowRenders?: boolean;
   reportMetrics?: boolean;
+  autoStart?: boolean;
   id?: string;
 }
 
@@ -113,7 +115,7 @@ export interface PerformanceTrackingOptions {
  * Combined performance configuration
  */
 export interface PerfConfig {
-  deviceCapability: string;
+  deviceCapability: DeviceCapability;
   useManualCapability: boolean;
   disableAnimations: boolean;
   disableEffects: boolean;
@@ -122,11 +124,19 @@ export interface PerfConfig {
   maxTrackedComponents: number;
   slowRenderThreshold: number;
   metricsEnabled: boolean;
-  optimizationLevel: 'none' | 'conservative' | 'aggressive';
+  optimizationLevel: ResourceOptimizationLevel;
+  debugMode?: boolean;
   debugLogging: boolean;
   resourceOptimizationLevel: string;
   metricsReportingRate: number;
   enableValidation: boolean;
+  enablePerformanceTracking: boolean;
+  enableRenderTracking: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
   metricsPersistence: boolean;
 }
 

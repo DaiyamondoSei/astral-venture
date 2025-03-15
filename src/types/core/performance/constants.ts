@@ -29,3 +29,15 @@ export type AnimationComplexity = 'none' | 'minimal' | 'standard' | 'enhanced';
 
 // Rendering engine types
 export type RenderingEngine = 'canvas' | 'webgl' | 'svg' | 'css' | 'html';
+
+// Glassmorphic UI variants
+export type GlassmorphicVariant = 'default' | 'subtle' | 'medium' | 'elevated' | 'ethereal' | 'cosmic' | 'purple' | 'quantum';
+
+// Glow intensity levels
+export type GlowIntensity = 'none' | 'low' | 'medium' | 'high';
+
+// Cube theme types (for metatrons cube)
+export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'chakra' | 'energy' | 'spiritual' | 'quantum';
+
+// Cube size types
+export type CubeSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
