@@ -38,10 +38,12 @@ export async function getAIResponse(
       throw new Error('No response received from AI service');
     }
 
-    // Transform the response to the expected format
+    // Transform the response to the expected format with all required fields
     const response: AIResponse = {
-      answer: data.result || '',
+      response: data.result || '',
+      answer: data.result || '',  // Ensure answer is always present
       type: data.type || 'text',
+      insights: data.insights || [],
       suggestedPractices: data.suggestedPractices || [],
       meta: {
         model: data.model || finalOptions.model,
@@ -55,10 +57,12 @@ export async function getAIResponse(
   } catch (error) {
     console.error('Error in getAIResponse:', error);
     
-    // Return a formatted error response
+    // Return a formatted error response with all required fields
     return {
+      response: error instanceof Error ? error.message : 'An unknown error occurred',
       answer: error instanceof Error ? error.message : 'An unknown error occurred',
       type: 'error',
+      insights: [],
       suggestedPractices: [],
       meta: {
         model: options.model || 'unknown',
@@ -88,6 +92,29 @@ export async function analyzeEmotionalContent(text: string, options: AIQuestionO
     return data;
   } catch (error) {
     console.error('Error analyzing emotional content:', error);
+    throw error;
+  }
+}
+
+/**
+ * Analyze reflection content for insights
+ */
+export async function analyzeReflection(text: string, options: AIQuestionOptions = {}) {
+  try {
+    const { data, error } = await supabase.functions.invoke('analyze-reflection', {
+      body: {
+        text,
+        options: {
+          includeEmotionalAnalysis: true,
+          ...options
+        }
+      }
+    });
+
+    if (error) throw new Error(error.message);
+    return data;
+  } catch (error) {
+    console.error('Error analyzing reflection:', error);
     throw error;
   }
 }

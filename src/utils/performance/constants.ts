@@ -9,7 +9,11 @@
 import { 
   MetricType, 
   MetricRating, 
-  DeviceCategory 
+  DeviceCategory,
+  DeviceCapability,
+  PerformanceMode,
+  RenderFrequency,
+  QualityLevel
 } from './types';
 
 /**
@@ -47,6 +51,44 @@ export const DeviceCategories = {
   MOBILE: 'mobile' as DeviceCategory,
   TABLET: 'tablet' as DeviceCategory,
   DESKTOP: 'desktop' as DeviceCategory
+};
+
+/**
+ * Runtime values for device capabilities
+ */
+export const DeviceCapabilities = {
+  LOW: 'low' as DeviceCapability,
+  MEDIUM: 'medium' as DeviceCapability,
+  HIGH: 'high' as DeviceCapability
+};
+
+/**
+ * Runtime values for performance modes
+ */
+export const PerformanceModes = {
+  BATTERY: 'battery' as PerformanceMode,
+  BALANCED: 'balanced' as PerformanceMode,
+  PERFORMANCE: 'performance' as PerformanceMode
+};
+
+/**
+ * Runtime values for render frequencies
+ */
+export const RenderFrequencies = {
+  LOW: 'low' as RenderFrequency,
+  MEDIUM: 'medium' as RenderFrequency,
+  HIGH: 'high' as RenderFrequency,
+  EXCESSIVE: 'excessive' as RenderFrequency
+};
+
+/**
+ * Runtime values for quality levels
+ */
+export const QualityLevels = {
+  LOW: 'low' as QualityLevel,
+  MEDIUM: 'medium' as QualityLevel,
+  HIGH: 'high' as QualityLevel,
+  ULTRA: 'ultra' as QualityLevel
 };
 
 /**

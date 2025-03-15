@@ -20,13 +20,17 @@ export interface AIQuestion {
 
 /**
  * AI Response structure
+ * Unified interface used across both services and components
  */
 export interface AIResponse {
+  // Required fields
   response: string;
   insights: any[];
-  type?: string;
-  answer?: string;
   meta: Record<string, any>;
+  
+  // Optional fields
+  type?: string;
+  answer: string; // Making this required for consistency with component expectations
   suggestedPractices?: any[];
 }
 
@@ -80,10 +84,58 @@ export interface AssistantIntent {
 export type AssistantIntentStatus = 'pending' | 'completed' | 'failed';
 
 /**
+ * AI Question options
+ */
+export interface AIQuestionOptions {
+  model?: string;
+  useCache?: boolean;
+  showLoadingToast?: boolean;
+  showErrorToast?: boolean;
+  stream?: boolean;
+  [key: string]: any;
+}
+
+/**
+ * AI Response metadata structure
+ */
+export interface AIResponseMeta {
+  model: string;
+  tokenUsage: number;
+  processingTime: number;
+  cached?: boolean;
+  [key: string]: any;
+}
+
+/**
+ * AI Model information structure
+ */
+export interface AIModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  capabilities: string[];
+  contextWindow: number;
+  costPer1KTokens: number;
+  isDefault?: boolean;
+}
+
+/**
  * AI Code Assistant props type
  */
 export interface UseAICodeAssistantProps {
   componentName?: string;
   enableAnalysis?: boolean;
   autoAnalyze?: boolean;
+}
+
+/**
+ * Emotional analysis result type
+ */
+export interface EmotionalAnalysisResult {
+  dominantEmotion: string;
+  emotionScores: Record<string, number>;
+  sentimentScore: number;
+  insights: string[];
+  keywords: string[];
+  summary: string;
 }

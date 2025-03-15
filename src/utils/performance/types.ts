@@ -70,6 +70,12 @@ export interface ComponentMetrics {
   firstRenderTime?: number;
   memoryUsage?: number;
   renderSizes?: number[];
+  renderTimes?: number[];  // Added to fix references in performance code
+  minRenderTime?: number;  // Added to fix references in performance code
+  maxRenderTime?: number;  // Added to fix references in performance code
+  slowRenderCount?: number; // Added to fix references in performance code
+  lastUpdated?: number;    // Added to fix references in performance code
+  metricType?: string;     // Added to fix references in performance code
   domSize?: {
     width: number;
     height: number;
@@ -105,4 +111,70 @@ export interface PerformanceSettings {
   adaptiveRendering: boolean;
   batchUpdates: boolean;
   useLowFidelityEffects: boolean;
+  adaptiveQuality?: boolean; // Added to fix missing property
+  performanceMetrics?: Record<string, number>; // Added to fix missing property
+  simplifiedForLowEnd?: boolean; // Added to fix missing property
+}
+
+/**
+ * Web vital metric data structure
+ */
+export interface WebVitalMetric {
+  name: string;
+  value: number;
+  category: WebVitalCategory;
+  timestamp: number;
+  rating?: WebVitalRating;
+  path?: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Web vital category types
+ */
+export type WebVitalCategory = 'interaction' | 'loading' | 'visual_stability';
+
+/**
+ * Web vital rating levels
+ */
+export type WebVitalRating = 'good' | 'needs-improvement' | 'poor';
+
+/**
+ * Web vital name types
+ */
+export type WebVitalName = 'FCP' | 'LCP' | 'CLS' | 'FID' | 'TTFB' | 'INP';
+
+/**
+ * Performance monitor configuration
+ */
+export interface PerformanceMonitorConfig {
+  enabled: boolean;
+  samplingRate: number;
+  debugMode: boolean;
+  throttleInterval?: number;
+  saveToLocalStorage?: boolean;
+}
+
+/**
+ * Adaptive settings configuration
+ */
+export interface AdaptiveSettings {
+  adaptiveQuality: boolean;
+  adaptiveEffects: boolean;
+  adaptiveRendering: boolean;
+  adaptiveAnimations: boolean;
+  qualityControl: 'auto' | 'manual';
+}
+
+/**
+ * Performance report payload
+ */
+export interface PerformanceReportPayload {
+  metrics: PerformanceMetric[];
+  webVitals: WebVitalMetric[];
+  device: DeviceInfo;
+  timestamp: number;
+  sessionId: string;
+  userId?: string;
+  metadata?: Record<string, any>;
 }

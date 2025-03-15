@@ -1,99 +1,77 @@
 
-import React, { forwardRef } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
 import { cn } from '@/lib/utils';
-import { usePerformance } from '@/hooks/usePerformance';
-import { 
-  GlassmorphicVariant
-} from '@/types/core/performance/constants';
-import { 
-  GlassmorphicVariants, 
-  DeviceCapabilities 
-} from '@/types/core/performance/runtime-constants';
+import { usePerformance } from '@/contexts/PerformanceContext';
+import { DeviceCapabilities } from '@/utils/performance/constants';
 
-export interface GlassCardProps {
-  children: React.ReactNode;
-  className?: string;
+// GlassmorphicVariant is a local enum for the types of glass effects
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated';
+
+// Define runtime constants for the glass variants
+export const GlassmorphicVariants = {
+  DEFAULT: 'default' as GlassmorphicVariant,
+  QUANTUM: 'quantum' as GlassmorphicVariant,
+  ETHEREAL: 'ethereal' as GlassmorphicVariant,
+  ELEVATED: 'elevated' as GlassmorphicVariant
+};
+
+export interface GlassCardProps
+  extends React.HTMLAttributes<HTMLDivElement> {
   variant?: GlassmorphicVariant;
-  glowEffect?: boolean;
-  shimmer?: boolean;
-  animate?: boolean;
+  intensity?: 'light' | 'medium' | 'heavy';
+  adaptiveOpacity?: boolean;
+  interactive?: boolean;
 }
 
-/**
- * A glass morphic card component with various visual effects.
- * Automatically adapts visual complexity based on device capability.
- */
-const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({
-  children,
-  className,
-  variant = GlassmorphicVariants.DEFAULT,
-  glowEffect = false,
-  shimmer = false,
-  animate = false,
-  ...props
-}, ref) => {
-  const { deviceCapability, isLowPerformance } = usePerformance();
-  
-  // Simplify effects for low-end devices
-  const shouldSimplify = 
-    isLowPerformance || 
-    deviceCapability === DeviceCapabilities.LOW_END;
-  
-  // Use simplified styles for low-end devices
-  const simplifiedStyles = shouldSimplify 
-    ? { background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'none' } 
-    : {};
+const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
+  ({ className, variant = 'default', intensity = 'medium', adaptiveOpacity = true, interactive = false, ...props }, ref) => {
+    const { deviceCapability } = usePerformance();
     
-  // Style variations based on variant prop
-  const getVariantStyles = () => {
-    switch(variant) {
-      case GlassmorphicVariants.QUANTUM:
-        return "bg-black/20 backdrop-blur-xl border border-white/10 shadow-lg";
-      case GlassmorphicVariants.ETHEREAL:
-        return "bg-white/10 backdrop-blur-md border border-white/20 shadow-md";
-      case GlassmorphicVariants.ELEVATED:
-        return "bg-white/5 backdrop-blur-sm border-b border-white/10 shadow-xl";
-      case GlassmorphicVariants.SUBTLE:
-        return "bg-black/5 backdrop-blur-sm border border-white/5";
-      case GlassmorphicVariants.COSMIC:
-        return "bg-indigo-800/10 backdrop-blur-xl border border-indigo-600/20";
-      case GlassmorphicVariants.PURPLE:
-        return "bg-purple-900/20 backdrop-blur-xl border border-purple-600/20";
-      case GlassmorphicVariants.MEDIUM:
-        return "bg-slate-900/40 backdrop-blur-md border border-slate-700/50";
-      default:
-        return "bg-black/30 backdrop-blur-md border border-white/5";
-    }
-  };
-  
-  const transition = {
-    type: 'spring',
-    stiffness: 300, 
-    damping: 20
-  };
-  
-  return (
-    <motion.div
-      ref={ref}
-      className={cn(
-        "rounded-xl overflow-hidden",
-        getVariantStyles(),
-        glowEffect && !shouldSimplify && "shadow-glow",
-        shimmer && !shouldSimplify && "shimmer-effect",
-        className
-      )}
-      style={simplifiedStyles}
-      initial={animate ? { opacity: 0, y: 10 } : undefined}
-      animate={animate ? { opacity: 1, y: 0 } : undefined}
-      transition={transition}
-      {...props}
-    >
-      {children}
-    </motion.div>
-  );
-});
+    // Reduce visual complexity on low-end devices
+    const simplifyForPerformance = deviceCapability === DeviceCapabilities.LOW;
+    
+    // Base styles that apply to all variants
+    const baseStyles = "rounded-lg backdrop-blur-sm transition-all duration-300";
+    
+    // Intensity-based styles
+    const intensityStyles = {
+      light: "bg-white/10 border border-white/20 shadow-sm",
+      medium: "bg-white/15 border border-white/30 shadow-md",
+      heavy: "bg-white/20 border border-white/40 shadow-lg"
+    };
+    
+    // Variant-specific styles
+    const variantStyles = {
+      default: "",
+      quantum: "border-indigo-300/30 shadow-indigo-500/20",
+      ethereal: "border-teal-300/30 shadow-teal-500/20",
+      elevated: "border-amber-300/30 shadow-amber-500/20"
+    };
+    
+    // Interactive styles for hover and focus
+    const interactiveStyles = interactive
+      ? "hover:bg-white/25 hover:border-white/50 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+      : "";
+    
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          baseStyles,
+          intensityStyles[intensity],
+          variantStyles[variant],
+          interactiveStyles,
+          simplifyForPerformance ? "backdrop-blur-[2px]" : "",
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
 
-GlassCard.displayName = 'GlassCard';
+GlassCard.displayName = "GlassCard";
+
+export { GlassCard };
 
 export default GlassCard;
