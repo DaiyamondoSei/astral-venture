@@ -126,3 +126,23 @@ export const CubeSizes = {
   XL: 'xl' as CubeSize,
   FULL: 'full' as CubeSize
 } as const;
+
+// Default PerfConfig
+export const DEFAULT_PERF_CONFIG = {
+  // Feature toggles
+  enablePerformanceTracking: true,
+  enableRenderTracking: true,
+  enableValidation: false,
+  enablePropTracking: false,
+  enableDebugLogging: false,
+  
+  // Optimization strategies
+  intelligentProfiling: true,
+  inactiveTabThrottling: true,
+  batchUpdates: true,
+  
+  // Performance metrics
+  samplingRate: 0.5,
+  throttleInterval: 100,
+  maxTrackedComponents: 50
+};

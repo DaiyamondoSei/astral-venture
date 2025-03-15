@@ -41,3 +41,23 @@ export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'chakra' | 'energy' 
 
 // Cube size types
 export type CubeSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+// Performance config interface for consistent use across components
+export interface PerfConfig {
+  // Feature toggles
+  enablePerformanceTracking: boolean;
+  enableRenderTracking: boolean;
+  enableValidation: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  
+  // Optimization strategies
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
+  
+  // Performance metrics
+  samplingRate: number;
+  throttleInterval: number;
+  maxTrackedComponents: number;
+}

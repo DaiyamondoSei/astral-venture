@@ -1,185 +1,124 @@
 
 /**
- * Performance Configuration Types
+ * Performance configuration types
  * 
- * This module defines configuration types for the performance monitoring and
- * optimization system.
- * 
- * @category Performance
- * @version 1.0.0
+ * This module provides types for performance configuration
+ * and default values.
  */
 
-import { DeviceCapability, QualityLevel, ResourceOptimizationLevel } from './constants';
+import { PerfConfig } from './constants';
+import { DEFAULT_PERF_CONFIG } from './runtime-constants';
 
 /**
- * Performance settings based on device capability
+ * Extended performance configuration with validation methods
  */
-export interface PerformanceSettings {
-  targetFPS: number;
-  qualityLevel: QualityLevel;
-  useSimplifiedEffects: boolean;
-  disableBlur: boolean;
-  disableShadows: boolean;
-  particleCount: number;
-  maxAnimationsPerFrame: number;
-  optimizationEnabled?: boolean;
-  adaptiveQuality?: boolean;
-  simplifiedForLowEnd?: boolean;
-  performanceMetrics?: boolean;
-  webglFallback?: boolean;
-  id?: string;
-}
-
-/**
- * Performance monitor configuration
- */
-export interface PerformanceMonitorConfig {
-  enabled: boolean;
-  metricsEnabled: boolean;
-  slowRenderThreshold: number;
-  samplingRate: number;
-  debugMode?: boolean;
-  reportingEndpoint?: string;
-  logSlowRenders?: boolean;
-  optimizationLevel?: 'auto' | 'low' | 'medium' | 'high';
-  throttleInterval: number;
-  maxTrackedComponents: number;
+export interface PerformanceConfiguration extends PerfConfig {
+  /**
+   * Validate the configuration
+   */
+  validate(): { valid: boolean; issues?: string[] };
   
-  // Feature flags
-  enablePerformanceTracking?: boolean;
-  enableRenderTracking?: boolean;
-  enableValidation?: boolean;
-  enablePropTracking?: boolean;
-  enableDebugLogging?: boolean;
-  enableAdaptiveRendering?: boolean;
-  enableDetailedLogging?: boolean;
-  enableMemoryMonitoring?: boolean;
-  trackComponentSize?: boolean;
+  /**
+   * Reset to default values
+   */
+  reset(): void;
   
-  // Advanced features
-  intelligentProfiling?: boolean;
-  inactiveTabThrottling?: boolean;
-  batchUpdates?: boolean;
-  id?: string;
+  /**
+   * Create a configuration optimized for the given device capability
+   */
+  optimizeFor(deviceCapability: 'low' | 'medium' | 'high'): PerformanceConfiguration;
 }
 
 /**
- * Adaptive rendering settings
+ * Create a new performance configuration with the given overrides
  */
-export interface AdaptiveSettings {
-  qualityLevel: QualityLevel;
-  targetFPS: number;
-  particleCount: number;
-  maxAnimationsPerFrame: number;
-  useSimplifiedEffects: boolean;
-  disableBlur: boolean;
-  disableShadows: boolean;
-  virtualization?: boolean;
-  lazyLoading?: boolean;
-  id?: string;
-}
-
-/**
- * Performance boundaries for different capability levels
- */
-export interface PerformanceBoundaries {
-  lowFPS: number;
-  mediumFPS: number;
-  highFPS: number;
-  criticalMemory: number;
-  highMemory: number;
-  mediumMemory: number;
-  id?: string;
-}
-
-/**
- * Performance tracking options for hooks and components
- */
-export interface PerformanceTrackingOptions {
-  enabled?: boolean;
-  componentName?: string;
-  trackProps?: boolean;
-  trackRenders?: boolean;
-  trackEffects?: boolean;
-  trackMounts?: boolean;
-  debugMode?: boolean;
-  samplingRate?: number;
-  slowRenderThreshold?: number;
-  logSlowRenders?: boolean;
-  reportMetrics?: boolean;
-  autoStart?: boolean;
-  id?: string;
-}
-
-/**
- * Combined performance configuration
- */
-export interface PerfConfig {
-  deviceCapability: DeviceCapability;
-  useManualCapability: boolean;
-  disableAnimations: boolean;
-  disableEffects: boolean;
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  slowRenderThreshold: number;
-  metricsEnabled: boolean;
-  optimizationLevel: ResourceOptimizationLevel;
-  debugMode?: boolean;
-  debugLogging: boolean;
-  resourceOptimizationLevel: string;
-  metricsReportingRate: number;
-  enableValidation: boolean;
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  metricsPersistence: boolean;
-}
-
-/**
- * Performance visualization system config
- */
-export interface VisualizationSystem {
-  performanceSettings: PerformanceSettings;
-  renderingEngine: 'canvas' | 'webgl' | 'svg' | 'dom';
-  animations: {
-    enabled: boolean;
-    complexity: 'low' | 'medium' | 'high';
-    frameRate: number;
+export function createPerfConfig(
+  overrides?: Partial<PerfConfig>
+): PerformanceConfiguration {
+  const config = {
+    ...DEFAULT_PERF_CONFIG,
+    ...overrides,
+    
+    validate() {
+      const issues: string[] = [];
+      
+      // Validate sampling rate is between 0 and 1
+      if (this.samplingRate < 0 || this.samplingRate > 1) {
+        issues.push('Sampling rate must be between 0 and 1');
+      }
+      
+      // Validate throttle interval is positive
+      if (this.throttleInterval < 0) {
+        issues.push('Throttle interval must be positive');
+      }
+      
+      // Validate max tracked components is positive
+      if (this.maxTrackedComponents <= 0) {
+        issues.push('Max tracked components must be positive');
+      }
+      
+      return {
+        valid: issues.length === 0,
+        issues: issues.length > 0 ? issues : undefined
+      };
+    },
+    
+    reset() {
+      Object.assign(this, DEFAULT_PERF_CONFIG);
+    },
+    
+    optimizeFor(deviceCapability: 'low' | 'medium' | 'high'): PerformanceConfiguration {
+      switch (deviceCapability) {
+        case 'low':
+          return createPerfConfig({
+            ...this,
+            enablePerformanceTracking: true,
+            enableRenderTracking: false,
+            enableValidation: false,
+            enablePropTracking: false,
+            enableDebugLogging: false,
+            intelligentProfiling: true,
+            inactiveTabThrottling: true,
+            batchUpdates: true,
+            samplingRate: 0.2,
+            throttleInterval: 200,
+            maxTrackedComponents: 20
+          });
+        
+        case 'medium':
+          return createPerfConfig({
+            ...this,
+            enablePerformanceTracking: true,
+            enableRenderTracking: true,
+            enableValidation: false,
+            enablePropTracking: false,
+            enableDebugLogging: false,
+            intelligentProfiling: true,
+            inactiveTabThrottling: true,
+            batchUpdates: true,
+            samplingRate: 0.5,
+            throttleInterval: 100,
+            maxTrackedComponents: 50
+          });
+        
+        case 'high':
+          return createPerfConfig({
+            ...this,
+            enablePerformanceTracking: true,
+            enableRenderTracking: true,
+            enableValidation: true,
+            enablePropTracking: true,
+            enableDebugLogging: true,
+            intelligentProfiling: true,
+            inactiveTabThrottling: false,
+            batchUpdates: false,
+            samplingRate: 1.0,
+            throttleInterval: 0,
+            maxTrackedComponents: 100
+          });
+      }
+    }
   };
-  visualStates: {
-    active: boolean;
-    transitioning: boolean;
-    lastUpdated: number;
-    transitionProgress?: number;
-  };
-  effects: {
-    primary: {
-      enabled: boolean;
-      intensity: number;
-    };
-    secondary: {
-      enabled: boolean;
-      intensity: number;
-    };
-    background: {
-      enabled: boolean;
-      intensity: number;
-    };
-    particles: {
-      count: number;
-      size: number;
-      speed: number;
-      enabled?: boolean;
-    };
-    glow: {
-      enabled: boolean;
-      radius: number;
-      intensity: number;
-    };
-  };
+  
+  return config as PerformanceConfiguration;
 }
