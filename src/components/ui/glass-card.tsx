@@ -4,8 +4,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { usePerformance } from '@/hooks/usePerformance';
 import { 
-  GlassmorphicVariant, 
-  DeviceCapability 
+  GlassmorphicVariant
 } from '@/types/core/performance/constants';
 import { 
   GlassmorphicVariants, 

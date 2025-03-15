@@ -10,17 +10,18 @@ import {
   DeviceCapability, 
   PerformanceMode, 
   RenderFrequency,
-  GlassmorphicVariant
+  GlassmorphicVariant,
+  QualityLevel
 } from './constants';
 
 /**
  * Runtime values for performance settings quality levels
  */
 export const QualityLevels = {
-  LOW: 'low' as const,
-  MEDIUM: 'medium' as const,
-  HIGH: 'high' as const,
-  ULTRA: 'ultra' as const
+  LOW: 'low' as QualityLevel,
+  MEDIUM: 'medium' as QualityLevel,
+  HIGH: 'high' as QualityLevel,
+  ULTRA: 'ultra' as QualityLevel
 };
 
 /**
@@ -39,8 +40,11 @@ export const DeviceCapabilities = {
  * Runtime values for performance modes
  */
 export const PerformanceModes = {
-  QUALITY: 'battery-saving' as PerformanceMode,
+  BATTERY_SAVING: 'battery-saving' as PerformanceMode,
   BALANCED: 'balanced' as PerformanceMode,
+  HIGH_PERFORMANCE: 'high-performance' as PerformanceMode,
+  // Aliases for backward compatibility
+  QUALITY: 'battery-saving' as PerformanceMode,
   PERFORMANCE: 'high-performance' as PerformanceMode
 };
 

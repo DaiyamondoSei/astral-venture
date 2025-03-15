@@ -1,113 +1,103 @@
 
-# Type-Value Pattern for TypeScript
+# TypeScript Type-Value Pattern
 
-## The Problem
+## Problem Definition
 
-One of the most common TypeScript errors we encounter is:
+One of the most common TypeScript errors in our application is attempting to use a TypeScript type as if it were a JavaScript value. This leads to errors like:
 
+```typescript
+// ERROR: 'DeviceCapability' only refers to a type, but is being used as a value here.
+if (capability === DeviceCapability.HIGH) { ... }
 ```
-TS2693: 'DeviceCapability' only refers to a type, but is being used as a value here.
-```
 
-This happens when we try to use a TypeScript type as a value in our code. TypeScript types only exist at compile time and are erased at runtime, so they cannot be used as values.
+This happens because TypeScript types don't exist at runtime - they're erased during compilation to JavaScript. When we try to reference a type name directly as if it were an object with properties, TypeScript correctly reports this as an error.
 
 ## The Type-Value Pattern Solution
 
-The Type-Value Pattern solves this by maintaining two parallel definitions:
+The Type-Value Pattern involves creating two parallel structures:
 
-1. A TypeScript **type** for type checking at compile time
-2. A JavaScript **value** (object) containing constants that match the type
+1. **Type Definition**: A TypeScript type used for type checking (compile-time)
+2. **Runtime Value**: A JavaScript object with the same structure (runtime)
 
-### Example Pattern
+### Implementation Example
 
 ```typescript
-// 1. Define the type
+// 1. Define the TYPE (for compile-time type checking)
 export type DeviceCapability = 'low-end' | 'mid-range' | 'high-end';
 
-// 2. Define the corresponding runtime values
+// 2. Define the VALUE (for runtime usage)
 export const DeviceCapabilities = {
-  LOW_END: 'low-end' as DeviceCapability,
-  MID_RANGE: 'mid-range' as DeviceCapability,
-  HIGH_END: 'high-end' as DeviceCapability
-};
-```
-
-### Usage
-
-```typescript
-// WRONG - Causes "only refers to a type, but is being used as a value here" error
-if (device === DeviceCapability.LOW_END) { ... }
-
-// RIGHT - Use the value object, not the type
-if (device === DeviceCapabilities.LOW_END) { ... }
-
-// Type checking still works
-function setCapability(capability: DeviceCapability) {
-  // TypeScript will ensure only valid values are passed
-}
-
-// Pass the constant value
-setCapability(DeviceCapabilities.LOW_END);
-```
-
-## Best Practices
-
-1. **Keep Type and Value Together**: Define both the type and its companion value object in the same file to maintain consistency.
-
-2. **Consistent Naming**: Use plural for value objects (`DeviceCapabilities`) and singular for types (`DeviceCapability`).
-
-3. **Type Assertion**: Always use the `as` syntax to ensure the constant values conform to the type:
-   ```typescript
-   LOW_END: 'low-end' as DeviceCapability
-   ```
-
-4. **Consider Separate Files**: For large applications, consider separating types and runtime constants:
-   ```
-   types/core/performance/constants.ts       // Type definitions 
-   types/core/performance/runtime-constants.ts  // Runtime values
-   ```
-
-5. **Re-Export Both**: When separating files, re-export both from a common entry point for ease of use.
-
-6. **Document the Pattern**: Add comments explaining the pattern to help other developers understand the approach.
-
-## Example Implementation
-
-### constants.ts (Types)
-```typescript
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive';
-
-export type DeviceCapability = 'low-end' | 'mid-range' | 'high-end';
-```
-
-### runtime-constants.ts (Values)
-```typescript
-import { RenderFrequency, DeviceCapability } from './constants';
-
-export const RenderFrequencies = {
-  LOW: 'low' as RenderFrequency,
-  MEDIUM: 'medium' as RenderFrequency,
-  HIGH: 'high' as RenderFrequency,
-  ADAPTIVE: 'adaptive' as RenderFrequency
+  LOW: 'low-end' as DeviceCapability,
+  MEDIUM: 'mid-range' as DeviceCapability,
+  HIGH: 'high-end' as DeviceCapability
 };
 
-export const DeviceCapabilities = {
-  LOW_END: 'low-end' as DeviceCapability,
-  MID_RANGE: 'mid-range' as DeviceCapability,
-  HIGH_END: 'high-end' as DeviceCapability
-};
+// 3. Usage in code
+// Correct: Using the VALUE at runtime
+if (capability === DeviceCapabilities.HIGH) { ... }
+
+// Correct: Using the TYPE for type annotations
+function setCapability(newCapability: DeviceCapability) { ... }
 ```
 
-### Using in components
-```typescript
-import { DeviceCapability } from '../types/core/performance/constants';
-import { DeviceCapabilities } from '../types/core/performance/runtime-constants';
+## Benefits of This Pattern
 
-function optimizeForDevice(capability: DeviceCapability) {
-  if (capability === DeviceCapabilities.LOW_END) {
-    // Optimize for low-end devices
-  }
+1. **Type Safety**: You get full type checking for values
+2. **Runtime Access**: Values are available at runtime
+3. **IntelliSense Support**: IDE shows available options
+4. **Consistent Naming**: Clear distinction between types and values
+5. **Centralized Definition**: Single source of truth for related types and values
+
+## Naming Conventions
+
+To maintain consistency across the codebase:
+
+1. Types use singular nouns: `DeviceCapability`, `PerformanceMode`
+2. Values use plural nouns: `DeviceCapabilities`, `PerformanceModes`
+3. Type values use UPPER_CASE: `DeviceCapabilities.HIGH`, `PerformanceModes.BALANCED`
+4. Always export both the type and values object
+
+## Common Locations for Type-Value Pairs
+
+- `src/types/core/*/constants.ts`: Type definitions
+- `src/types/core/*/runtime-constants.ts`: Value definitions
+
+## When To Apply This Pattern
+
+Apply this pattern whenever you need to:
+
+1. Define a set of constants that will be referenced in multiple places
+2. Create enumerated values with specific string representations
+3. Define configuration options that need type checking
+4. Create any value that needs to be both type-checked and referenced at runtime
+
+## Alternatives
+
+In some cases, TypeScript enums can be used instead:
+
+```typescript
+export enum DeviceCapability {
+  LOW = 'low-end',
+  MEDIUM = 'mid-range',
+  HIGH = 'high-end'
 }
 ```
 
-By following this pattern consistently throughout the codebase, we can avoid the "refers to a type, but is being used as a value" errors while maintaining strong type safety.
+However, we prefer the Type-Value Pattern because:
+- It produces more predictable JavaScript output
+- It allows more flexible string literal values
+- It's consistent with our other type definitions
+- It avoids some of the quirks of TypeScript enums
+
+## Implementation Checklist
+
+When adding new constants to the system:
+
+- [ ] Define the type in the appropriate constants.ts file
+- [ ] Create the corresponding values in the runtime-constants.ts file
+- [ ] Export both the type and values
+- [ ] Reference the type for type annotations
+- [ ] Reference the values for runtime comparisons
+- [ ] Use consistent naming following the conventions above
+
+By consistently applying this pattern, we can eliminate an entire class of TypeScript errors while maintaining clear, maintainable code.

@@ -10,6 +10,7 @@ export interface AIQuestion {
   userId: string;
   context?: string;
   stream?: boolean;
+  reflectionIds?: string[]; // Added to support reflection context
 }
 
 /**
@@ -18,8 +19,15 @@ export interface AIQuestion {
 export interface AIQuestionOptions {
   reflectionId?: string;
   reflectionContent?: string;
+  reflectionIds?: string[]; // Added to match implementation
   stream?: boolean;
   cacheKey?: string;
+  userId?: string; // Added to match implementation
+  context?: string; // Added to match implementation
+  useCache?: boolean; // Added to match implementation
+  showLoadingToast?: boolean; // Added to match implementation
+  showErrorToast?: boolean; // Added to match implementation
+  model?: string; // Added to match implementation
 }
 
 /**
@@ -32,6 +40,9 @@ export interface ContentRecommendation {
   type: 'article' | 'practice' | 'reflection' | 'meditation';
   relevance: number;
   url?: string;
+  category?: string; // Added to match implementation
+  estimatedDuration?: string; // Added to match implementation
+  tags?: string[]; // Added to match implementation
 }
 
 /**
@@ -50,6 +61,9 @@ export interface AIDashboardWidgetProps {
   title?: string;
   className?: string;
   showInsights?: boolean;
+  initialPrompt?: string; // Added to match implementation
+  description?: string; // Added to match implementation
+  maxHeight?: string; // Added to match implementation
 }
 
 /**

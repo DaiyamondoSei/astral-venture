@@ -14,7 +14,9 @@ export function convertToComponentAIResponse(serviceResponse: ServiceAIResponse)
     // Include type for component compatibility
     type: serviceResponse.type || 'general',
     // Ensure other optional properties are handled
-    suggestedPractices: serviceResponse.suggestedPractices || []
+    suggestedPractices: serviceResponse.suggestedPractices || [],
+    // Forward insights if present
+    insights: serviceResponse.insights || []
   };
 }
 
