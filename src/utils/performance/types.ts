@@ -1,65 +1,108 @@
 
-import { ComponentMetrics, PerformanceMetric, MetricType } from '@/utils/performance/core/metrics';
+/**
+ * Performance metrics types
+ * 
+ * This module contains type definitions related to performance measurement
+ * following the Type-Value Pattern.
+ */
 
-// Re-export the types from core/metrics to make them available in a consistent location
-export type { ComponentMetrics, PerformanceMetric, MetricType };
+// Import core types from the constants file
+import { 
+  DeviceCapability, 
+  PerformanceMode, 
+  RenderFrequency, 
+  QualityLevel
+} from '@/types/core/performance/constants';
 
-// Define additional types needed for performance monitoring
-export type DeviceCapability = 'low' | 'medium' | 'high';
-export type PerformanceMode = 'quality' | 'balanced' | 'performance' | 'auto';
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
-export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
+/**
+ * Types of performance metrics that can be measured
+ */
+export type MetricType = 
+  | 'render' 
+  | 'interaction'
+  | 'load'
+  | 'memory'
+  | 'network'
+  | 'resource'
+  | 'javascript'
+  | 'css'
+  | 'animation'
+  | 'metric'
+  | 'summary'
+  | 'performance'
+  | 'webVital';
 
-// Performance configuration interface
-export interface PerformanceConfig {
-  // Core settings
+/**
+ * Performance metric rating levels
+ */
+export type MetricRating = 'good' | 'needs-improvement' | 'poor';
+
+/**
+ * Device category types
+ */
+export type DeviceCategory = 'mobile' | 'tablet' | 'desktop';
+
+/**
+ * Performance metric data structure
+ */
+export interface PerformanceMetric {
+  metric_name: string;
+  value: number;
+  timestamp: string | number;
+  category: string;
+  type: MetricType;
+  user_id?: string;
+  session_id?: string;
+  page_url?: string;
+  metadata?: Record<string, any>;
+  rating?: MetricRating;
+}
+
+/**
+ * Component rendering performance metrics
+ */
+export interface ComponentMetrics {
+  componentName: string;
+  renderCount: number;
+  totalRenderTime: number;
+  averageRenderTime: number;
+  lastRenderTime: number;
+  firstRenderTime?: number;
+  memoryUsage?: number;
+  renderSizes?: number[];
+  domSize?: {
+    width: number;
+    height: number;
+    elements?: number;
+  };
+}
+
+/**
+ * Device information for performance context
+ */
+export interface DeviceInfo {
+  userAgent: string;
+  deviceCategory: DeviceCategory;
+  screenSize: {
+    width: number;
+    height: number;
+  };
+  connection?: {
+    type?: string;
+    speed?: number;
+  };
+}
+
+/**
+ * Performance settings configuration
+ */
+export interface PerformanceSettings {
   deviceCapability: DeviceCapability;
-  useManualCapability: boolean;
-  disableAnimations: boolean;
-  disableEffects: boolean;
-  
-  // Collector settings
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  slowRenderThreshold?: number;
-  
-  // Feature flags
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  
-  // Advanced features
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
+  performanceMode: PerformanceMode;
+  renderFrequency: RenderFrequency;
+  qualityLevel: QualityLevel;
+  enableMonitoring: boolean;
+  adaptiveRendering: boolean;
   batchUpdates: boolean;
-  
-  // Additional optional settings
-  enableAdaptiveRendering?: boolean;
-  trackComponentSize?: boolean;
-  enableMemoryMonitoring?: boolean;
-  enableDetailedLogging?: boolean;
-  metricsEnabled?: boolean;
-  resourceOptimizationLevel?: 'none' | 'conservative' | 'aggressive';
-  metricsPersistence?: boolean;
-}
-
-// Performance monitoring options
-export interface PerformanceMonitorOptions {
-  enabled?: boolean;
-  samplingRate?: number;
-  debugMode?: boolean;
-  maxTrackedComponents?: number;
-  componentName?: string;
-}
-
-// Performance data snapshot
-export interface PerformanceData {
-  fps: number;
-  memory: number;
-  isThrottled: boolean;
-  lastUpdated: number;
-  componentMetrics?: Record<string, ComponentMetrics>;
+  useLowFidelityEffects: boolean;
 }

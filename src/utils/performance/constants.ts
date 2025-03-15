@@ -1,86 +1,76 @@
 
+/**
+ * Performance constants
+ * 
+ * This module provides runtime values for performance-related types
+ * following the Type-Value Pattern.
+ */
+
 import { 
-  DeviceCapability,
-  PerformanceMode,
-  QualityLevel,
-  RenderFrequency
-} from '@/utils/performance/types';
+  MetricType, 
+  MetricRating, 
+  DeviceCategory 
+} from './types';
 
-// Runtime representation of DeviceCapability
-export const DeviceCapabilities = {
-  LOW: 'low' as DeviceCapability,
-  MEDIUM: 'medium' as DeviceCapability,
-  HIGH: 'high' as DeviceCapability
-};
-
-// Runtime representation of PerformanceMode
-export const PerformanceModes = {
-  QUALITY: 'quality' as PerformanceMode,
-  BALANCED: 'balanced' as PerformanceMode,
-  PERFORMANCE: 'performance' as PerformanceMode,
-  AUTO: 'auto' as PerformanceMode
-};
-
-// Runtime representation of QualityLevel
-export const QualityLevels = {
-  LOW: 'low' as QualityLevel,
-  MEDIUM: 'medium' as QualityLevel,
-  HIGH: 'high' as QualityLevel,
-  ULTRA: 'ultra' as QualityLevel
-};
-
-// Runtime representation of RenderFrequency
-export const RenderFrequencies = {
-  LOW: 'low' as RenderFrequency,
-  MEDIUM: 'medium' as RenderFrequency,
-  HIGH: 'high' as RenderFrequency
+/**
+ * Runtime values for metric types
+ */
+export const MetricTypes = {
+  RENDER: 'render' as MetricType,
+  INTERACTION: 'interaction' as MetricType,
+  LOAD: 'load' as MetricType,
+  MEMORY: 'memory' as MetricType,
+  NETWORK: 'network' as MetricType,
+  RESOURCE: 'resource' as MetricType,
+  JAVASCRIPT: 'javascript' as MetricType,
+  CSS: 'css' as MetricType,
+  ANIMATION: 'animation' as MetricType,
+  METRIC: 'metric' as MetricType,
+  SUMMARY: 'summary' as MetricType,
+  PERFORMANCE: 'performance' as MetricType,
+  WEB_VITAL: 'webVital' as MetricType
 };
 
 /**
- * Helper function to detect device capability based on browser features
+ * Runtime values for metric ratings
  */
-export function detectDeviceCapability(): DeviceCapability {
-  // Implementation would use navigator.hardwareConcurrency, etc.
-  // Simplified version for now
-  const memory = (navigator as any).deviceMemory || 4;
-  const cores = navigator.hardwareConcurrency || 4;
-  
-  if (memory >= 8 && cores >= 8) {
-    return DeviceCapabilities.HIGH;
-  } else if (memory >= 4 && cores >= 4) {
-    return DeviceCapabilities.MEDIUM;
-  } else {
-    return DeviceCapabilities.LOW;
-  }
-}
+export const MetricRatings = {
+  GOOD: 'good' as MetricRating,
+  NEEDS_IMPROVEMENT: 'needs-improvement' as MetricRating,
+  POOR: 'poor' as MetricRating
+};
 
-// Default performance settings based on device capability
-export const DEFAULT_PERFORMANCE_SETTINGS = {
-  [DeviceCapabilities.LOW]: {
-    targetFPS: 30,
-    qualityLevel: QualityLevels.LOW,
-    particleCount: 50,
-    disableBlur: true,
-    disableShadows: true,
-    useSimplifiedEffects: true,
-    maxAnimationsPerFrame: 2
-  },
-  [DeviceCapabilities.MEDIUM]: {
-    targetFPS: 45,
-    qualityLevel: QualityLevels.MEDIUM,
-    particleCount: 150,
-    disableBlur: false,
-    disableShadows: false,
-    useSimplifiedEffects: false,
-    maxAnimationsPerFrame: 4
-  },
-  [DeviceCapabilities.HIGH]: {
-    targetFPS: 60,
-    qualityLevel: QualityLevels.HIGH,
-    particleCount: 300,
-    disableBlur: false,
-    disableShadows: false,
-    useSimplifiedEffects: false,
-    maxAnimationsPerFrame: 8
-  }
+/**
+ * Runtime values for device categories
+ */
+export const DeviceCategories = {
+  MOBILE: 'mobile' as DeviceCategory,
+  TABLET: 'tablet' as DeviceCategory,
+  DESKTOP: 'desktop' as DeviceCategory
+};
+
+/**
+ * Thresholds for render time performance categorization
+ */
+export const RenderTimeThresholds = {
+  GOOD: 16, // Under 16ms (60fps)
+  WARNING: 33, // Under 33ms (30fps)
+  // Anything above WARNING is considered poor
+};
+
+/**
+ * Batch update thresholds for adaptive performance
+ */
+export const BatchUpdateThresholds = {
+  LOW_END: 500, // 500ms for low-end devices
+  MID_RANGE: 250, // 250ms for mid-range devices
+  HIGH_END: 100 // 100ms for high-end devices
+};
+
+/**
+ * Memory usage thresholds in MB
+ */
+export const MemoryThresholds = {
+  WARNING: 150, // 150MB
+  CRITICAL: 300 // 300MB
 };

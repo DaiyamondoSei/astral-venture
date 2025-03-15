@@ -8,13 +8,41 @@ import EntryAnimationPage from './pages/EntryAnimationPage';
 import DesignSystemDemo from './pages/DesignSystemDemo';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PerformanceProvider } from './contexts/PerformanceContext';
-import { supabase, isSupabaseConfigValid } from './lib/supabaseClient';
+import { supabase, isSupabaseConfigValid } from './lib/supabaseClientSingleton';
 import TestPage from './routes/test';
+import { assetRegistry, initializeGlobalAssets } from './utils/assetManager';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initError, setInitError] = useState<Error | null>(null);
+  const [assetsReady, setAssetsReady] = useState(false);
 
+  // Initialize assets
+  useEffect(() => {
+    const prepareAssets = async () => {
+      try {
+        // Make sure global assets are initialized
+        initializeGlobalAssets();
+        
+        // Wait a bit for assets to load
+        setTimeout(() => {
+          const stats = assetRegistry.getLoadingStats();
+          console.log('Asset loading stats:', stats);
+          
+          // Even if some assets failed, we'll continue
+          setAssetsReady(true);
+        }, 1000);
+      } catch (error) {
+        console.warn('Asset initialization warning:', error);
+        // Continue anyway
+        setAssetsReady(true);
+      }
+    };
+    
+    prepareAssets();
+  }, []);
+
+  // Check Supabase connection
   useEffect(() => {
     // Simple initialization check
     const checkConnection = async () => {
@@ -50,16 +78,20 @@ function App() {
       }
     };
     
-    checkConnection();
-  }, []);
+    // Only check connection once assets are ready
+    if (assetsReady) {
+      checkConnection();
+    }
+  }, [assetsReady]);
 
   // Show loading state
-  if (isLoading) {
+  if (isLoading || !assetsReady) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-semibold">Loading Application...</h1>
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          {!assetsReady && <p className="text-sm text-muted-foreground">Preparing assets...</p>}
         </div>
       </div>
     );
