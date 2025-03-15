@@ -10,7 +10,11 @@ export function convertToComponentAIResponse(serviceResponse: ServiceAIResponse)
   return {
     ...serviceResponse,
     // Ensure answer is always a string, even when optional in service response
-    answer: serviceResponse.answer || serviceResponse.response || ''
+    answer: serviceResponse.answer || serviceResponse.response || '',
+    // Include type for component compatibility
+    type: serviceResponse.type || 'general',
+    // Ensure other optional properties are handled
+    suggestedPractices: serviceResponse.suggestedPractices || []
   };
 }
 

@@ -1,75 +1,113 @@
 
-# Type vs. Value Pattern Best Practices
+# Type-Value Pattern for TypeScript
 
-## Problem
+## The Problem
 
-A common source of TypeScript errors is confusion between types (which exist only at compile time) and values (which exist at runtime). This leads to errors like:
+One of the most common TypeScript errors we encounter is:
 
-```typescript
-// ERROR: 'DeviceCapability' only refers to a type, but is being used as a value here.
-if (capability === DeviceCapability.HIGH_END) { ... }
+```
+TS2693: 'DeviceCapability' only refers to a type, but is being used as a value here.
 ```
 
-## Root Cause
+This happens when we try to use a TypeScript type as a value in our code. TypeScript types only exist at compile time and are erased at runtime, so they cannot be used as values.
 
-TypeScript's type system is erased during compilation - types don't exist at runtime. When you try to use a type name as if it were a value (like an enum or object), TypeScript reports this error.
+## The Type-Value Pattern Solution
 
-## Solution Pattern: Mirror Types with Runtime Constants
+The Type-Value Pattern solves this by maintaining two parallel definitions:
 
-Create parallel definitions for each concept:
-1. A **TypeScript type** for compile-time type checking
-2. A **constant object** with the same values for runtime usage
+1. A TypeScript **type** for type checking at compile time
+2. A JavaScript **value** (object) containing constants that match the type
 
-### Implementation Example
+### Example Pattern
 
 ```typescript
-// 1. Define the type (for compile-time checking)
+// 1. Define the type
 export type DeviceCapability = 'low-end' | 'mid-range' | 'high-end';
 
-// 2. Define constants (for runtime usage)
+// 2. Define the corresponding runtime values
 export const DeviceCapabilities = {
   LOW_END: 'low-end' as DeviceCapability,
   MID_RANGE: 'mid-range' as DeviceCapability,
   HIGH_END: 'high-end' as DeviceCapability
-} as const;
-
-// Usage in type positions (for parameters, return types, etc.)
-function configureForDevice(capability: DeviceCapability) {
-  // Implementation
-}
-
-// Usage in value positions (comparisons, assignments, etc.)
-if (userDevice === DeviceCapabilities.LOW_END) {
-  enableLowEndMode();
-}
+};
 ```
 
-### Benefits
-
-1. **Type Safety**: The type system ensures you only use valid values
-2. **Runtime Access**: Constants are available at runtime for comparison
-3. **IntelliSense Support**: You get autocomplete for both the type and constants
-4. **Clear Intent**: Clearly distinguishes between type usage and value usage
-
-### Naming Conventions
-
-To avoid confusion:
-- Use singular nouns for type names: `DeviceCapability`, `PerformanceMode`
-- Use plural nouns for constant objects: `DeviceCapabilities`, `PerformanceModes`
-
-### Best Practices
-
-1. **Keep Types and Constants in Sync**: Always update both if values change
-2. **Use Type Assertion**: Use `as Type` to ensure constants match the type
-3. **Use `as const`**: Add `as const` to the constants object for exact types
-4. **Group Related Types**: Keep related types and constants in the same file
-5. **Consider Type Guards**: Create type guard functions for runtime validation:
+### Usage
 
 ```typescript
-function isValidDeviceCapability(value: unknown): value is DeviceCapability {
-  return typeof value === 'string' && 
-    Object.values(DeviceCapabilities).includes(value as DeviceCapability);
+// WRONG - Causes "only refers to a type, but is being used as a value here" error
+if (device === DeviceCapability.LOW_END) { ... }
+
+// RIGHT - Use the value object, not the type
+if (device === DeviceCapabilities.LOW_END) { ... }
+
+// Type checking still works
+function setCapability(capability: DeviceCapability) {
+  // TypeScript will ensure only valid values are passed
+}
+
+// Pass the constant value
+setCapability(DeviceCapabilities.LOW_END);
+```
+
+## Best Practices
+
+1. **Keep Type and Value Together**: Define both the type and its companion value object in the same file to maintain consistency.
+
+2. **Consistent Naming**: Use plural for value objects (`DeviceCapabilities`) and singular for types (`DeviceCapability`).
+
+3. **Type Assertion**: Always use the `as` syntax to ensure the constant values conform to the type:
+   ```typescript
+   LOW_END: 'low-end' as DeviceCapability
+   ```
+
+4. **Consider Separate Files**: For large applications, consider separating types and runtime constants:
+   ```
+   types/core/performance/constants.ts       // Type definitions 
+   types/core/performance/runtime-constants.ts  // Runtime values
+   ```
+
+5. **Re-Export Both**: When separating files, re-export both from a common entry point for ease of use.
+
+6. **Document the Pattern**: Add comments explaining the pattern to help other developers understand the approach.
+
+## Example Implementation
+
+### constants.ts (Types)
+```typescript
+export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive';
+
+export type DeviceCapability = 'low-end' | 'mid-range' | 'high-end';
+```
+
+### runtime-constants.ts (Values)
+```typescript
+import { RenderFrequency, DeviceCapability } from './constants';
+
+export const RenderFrequencies = {
+  LOW: 'low' as RenderFrequency,
+  MEDIUM: 'medium' as RenderFrequency,
+  HIGH: 'high' as RenderFrequency,
+  ADAPTIVE: 'adaptive' as RenderFrequency
+};
+
+export const DeviceCapabilities = {
+  LOW_END: 'low-end' as DeviceCapability,
+  MID_RANGE: 'mid-range' as DeviceCapability,
+  HIGH_END: 'high-end' as DeviceCapability
+};
+```
+
+### Using in components
+```typescript
+import { DeviceCapability } from '../types/core/performance/constants';
+import { DeviceCapabilities } from '../types/core/performance/runtime-constants';
+
+function optimizeForDevice(capability: DeviceCapability) {
+  if (capability === DeviceCapabilities.LOW_END) {
+    // Optimize for low-end devices
+  }
 }
 ```
 
-By consistently applying this pattern, you'll eliminate "type used as value" errors and create a more maintainable codebase.
+By following this pattern consistently throughout the codebase, we can avoid the "refers to a type, but is being used as a value" errors while maintaining strong type safety.

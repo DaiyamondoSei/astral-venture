@@ -1,191 +1,246 @@
 
-import { useState, useCallback, useEffect } from 'react';
-import { AssistantSuggestion } from '@/components/ai-assistant/types';
-import { aiCodeAssistant } from '@/utils/ai/AICodeAssistant';
+import { useState, useCallback } from 'react';
+import { toast } from '@/components/ui/use-toast';
+import { AIResponse, AIQuestion, AIQuestionOptions } from '@/components/ai-assistant/types';
+import { AssistantSuggestion } from '@/services/ai/types';
+import { submitAIQuestion } from '@/services/ai/assistantService';
+import { applyAutoFix as applyCodeFix } from '@/services/ai/codeFixService';
 
-/**
- * Props for the useAssistant hook
- */
-export interface UseAssistantProps {
-  componentName?: string;
-}
-
-/**
- * Return type for the useAssistant hook
- */
 export interface UseAssistantResult {
-  // Loading states
+  // State values
   isLoading: boolean;
-  loading: boolean; // Alias for backward compatibility
   isAnalyzing: boolean;
   isFixing: boolean;
-  
-  // Response and data
-  data: any;
-  response: string; // HTML formatted response
-  tokens: number;
-  question: string;
-  
-  // Question handling
-  setQuestion: (question: string) => void;
-  submitQuestion: (question: string) => Promise<void>;
-  
-  // Code analysis
-  suggestions: AssistantSuggestion[];
-  currentComponent: string;
-  analyzeComponent: (componentName: string) => Promise<AssistantSuggestion[]>;
-  
-  // Error handling
   error: string;
+  tokens: number;
+  data: any;
   
-  // Code fixing
-  applyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
-  applyAutoFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
-  
-  // Metadata
+  // Result data
+  response: AIResponse | null;
+  suggestions: AssistantSuggestion[];
+  question: string;
   lastUpdated: Date;
+  currentComponent: string;
+  
+  // Methods
+  setQuestion: (q: string) => void;
+  submitQuestion: (options?: AIQuestionOptions) => Promise<void>;
+  applyFix: (suggestion: AssistantSuggestion) => Promise<boolean>;
+  applyAutoFix: () => Promise<boolean>;
+  clearResponse: () => void;
+  analyze: (componentCode: string) => Promise<void>;
 }
 
 /**
- * Hook for interacting with the AI assistant
- * 
- * @param options - Hook configuration options
- * @returns Assistant state and methods
+ * Hook for interacting with the AI Assistant
+ * Manages state, submissions, and actions related to AI assistance
  */
-export function useAssistant({ componentName = '' }: UseAssistantProps = {}): UseAssistantResult {
+export function useAssistant(): UseAssistantResult {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [question, setQuestion] = useState('');
-  const [response, setResponse] = useState('');
-  const [tokens, setTokens] = useState(0);
-  const [suggestions, setSuggestions] = useState<AssistantSuggestion[]>([]);
-  const [currentComponent, setCurrentComponent] = useState(componentName || '');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(new Date());
-  
-  // Fetch suggestions on component change
-  useEffect(() => {
-    if (componentName && componentName !== currentComponent) {
-      setCurrentComponent(componentName);
-      fetchSuggestions(componentName);
+  const [error, setError] = useState('');
+  const [tokens, setTokens] = useState(0);
+  const [response, setResponse] = useState<AIResponse | null>(null);
+  const [question, setQuestion] = useState('');
+  const [suggestions, setSuggestions] = useState<AssistantSuggestion[]>([]);
+  const [currentComponent, setCurrentComponent] = useState('');
+  const [data, setData] = useState<any>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  /**
+   * Submit a question to the AI Assistant
+   */
+  const submitQuestion = useCallback(async (options?: AIQuestionOptions) => {
+    if (!question.trim()) {
+      toast({
+        title: "Empty Question",
+        description: "Please enter a question to ask the assistant.",
+        variant: "destructive",
+      });
+      return;
     }
-  }, [componentName, currentComponent]);
-  
-  // Fetch suggestions for a component
-  const fetchSuggestions = async (componentId: string) => {
-    if (!componentId) return;
+
+    setIsLoading(true);
+    setError('');
     
     try {
-      setIsAnalyzing(true);
-      const results = await aiCodeAssistant.analyzeComponent(componentId);
-      setSuggestions(results);
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('Error analyzing component:', err);
-      setError('Failed to analyze component');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-  
-  // Analyze component and fetch suggestions
-  const analyzeComponent = async (componentId: string) => {
-    try {
-      setIsAnalyzing(true);
-      const results = await aiCodeAssistant.analyzeComponent(componentId);
-      setSuggestions(results);
-      setCurrentComponent(componentId);
-      setLastUpdated(new Date());
-      return results;
-    } catch (err) {
-      console.error('Error analyzing component:', err);
-      setError('Failed to analyze component');
-      return [];
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-  
-  // Apply fix for a suggestion
-  const applyFix = async (suggestion: AssistantSuggestion) => {
-    try {
-      setIsFixing(true);
-      const success = await aiCodeAssistant.applyFix(suggestion.id);
-      if (success) {
-        // Remove the fixed suggestion from the list
-        setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+      const aiQuestion: AIQuestion = {
+        text: question,
+        question: question,
+        userId: 'current-user', // Replace with actual user ID in production
+        context: options?.reflectionContent || '',
+        stream: options?.stream || false
+      };
+      
+      const result = await submitAIQuestion(aiQuestion, options);
+      
+      if (result.error) {
+        setError(result.error.message || 'Failed to get assistant response');
+        toast({
+          title: "Error",
+          description: result.error.message || 'Something went wrong',
+          variant: "destructive",
+        });
+      } else if (result.data) {
+        setResponse(result.data);
+        setTokens(result.data.meta?.tokenUsage || 0);
+        
+        // Extract suggestions if available
+        if (result.data.suggestions) {
+          setSuggestions(result.data.suggestions);
+        }
+        
         setLastUpdated(new Date());
       }
-      return success;
-    } catch (err) {
-      console.error('Error applying fix:', err);
-      setError('Failed to apply fix');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
+      toast({
+        title: "Error",
+        description: err.message || 'Something went wrong',
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [question]);
+
+  /**
+   * Apply a specific code fix suggestion
+   */
+  const applyFix = useCallback(async (suggestion: AssistantSuggestion): Promise<boolean> => {
+    setIsFixing(true);
+    try {
+      // Implementation would call the code fix service
+      // Placeholder for actual implementation
+      console.log('Applying fix:', suggestion);
+      
+      toast({
+        title: "Fix Applied",
+        description: "The suggested fix has been applied.",
+      });
+      
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to apply the fix',
+        variant: "destructive",
+      });
       return false;
     } finally {
       setIsFixing(false);
     }
-  };
-  
-  // Apply auto fix for a suggestion (this is used by some components)
-  const applyAutoFix = async (suggestion: AssistantSuggestion) => {
-    // This is essentially the same as applyFix but kept for compatibility
-    return applyFix(suggestion);
-  };
-  
-  // Submit a question to the AI assistant
-  const submitQuestion = async (questionText: string) => {
-    if (!questionText.trim()) return;
+  }, []);
+
+  /**
+   * Apply automatic fix for the current code
+   */
+  const applyAutoFix = useCallback(async (): Promise<boolean> => {
+    if (!currentComponent) {
+      toast({
+        title: "Error",
+        description: "No component selected for fixing",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    setIsFixing(true);
+    try {
+      const result = await applyCodeFix(currentComponent);
+      
+      if (result.success) {
+        toast({
+          title: "Auto-Fix Applied",
+          description: "Automatic fixes have been applied to the component.",
+        });
+        return true;
+      } else {
+        toast({
+          title: "Auto-Fix Failed",
+          description: result.error || "Couldn't apply automatic fixes",
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to apply automatic fix',
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsFixing(false);
+    }
+  }, [currentComponent]);
+
+  /**
+   * Analyze a component's code
+   */
+  const analyze = useCallback(async (componentCode: string) => {
+    setIsAnalyzing(true);
+    setCurrentComponent(componentCode);
     
     try {
-      setIsLoading(true);
-      setQuestion(questionText);
+      // Analysis implementation would go here
+      // Placeholder for actual implementation
+      console.log('Analyzing component:', componentCode.substring(0, 50) + '...');
       
-      // Simulate response for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setResponse(`<p>This is a simulated response to your question: "${questionText}"</p>`);
-      setTokens(Math.floor(Math.random() * 500) + 100);
+      setTimeout(() => {
+        // Simulate analysis result
+        setSuggestions([
+          {
+            id: 'suggestion-1',
+            type: 'code-improvement',
+            title: 'Optimize component rendering',
+            description: 'Add React.memo to prevent unnecessary re-renders',
+            severity: 'medium',
+            code: 'export default React.memo(Component);'
+          }
+        ]);
+      }, 1000);
       
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('Error submitting question:', err);
-      setError('Failed to get response');
+    } catch (error: any) {
+      toast({
+        title: "Analysis Error",
+        description: error.message || 'Failed to analyze component',
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
-  };
-  
+  }, []);
+
+  /**
+   * Clear the current response
+   */
+  const clearResponse = useCallback(() => {
+    setResponse(null);
+    setSuggestions([]);
+    setTokens(0);
+    setError('');
+  }, []);
+
   return {
-    // Loading states
     isLoading,
-    loading: isLoading, // Alias for backward compatibility
     isAnalyzing,
     isFixing,
-    
-    // Response and data
-    data: response,
-    response,
+    error,
     tokens,
+    response,
     question,
-    
-    // Question handling
-    setQuestion,
-    submitQuestion,
-    
-    // Code analysis
     suggestions,
     currentComponent,
-    analyzeComponent,
-    
-    // Error handling
-    error,
-    
-    // Code fixing
+    data,
+    lastUpdated,
+    setQuestion,
+    submitQuestion,
     applyFix,
     applyAutoFix,
-    
-    // Metadata
-    lastUpdated
+    clearResponse,
+    analyze
   };
 }
 

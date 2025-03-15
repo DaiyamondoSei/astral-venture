@@ -67,7 +67,7 @@ export const AIAssistantPanel: React.FC = () => {
           <div className="mt-6">
             <h3 className="font-medium mb-2">Response:</h3>
             <div className="p-3 bg-muted/50 rounded-md text-sm whitespace-pre-wrap">
-              {response.answer || response.response}
+              {response.answer}
             </div>
             
             {response.insights && response.insights.length > 0 && (
