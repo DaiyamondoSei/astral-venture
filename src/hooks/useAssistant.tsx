@@ -48,6 +48,9 @@ export interface UseAssistantResult {
 
 /**
  * Hook for interacting with the AI assistant
+ * 
+ * @param options - Hook configuration options
+ * @returns Assistant state and methods
  */
 export function useAssistant({ componentName = '' }: UseAssistantProps = {}): UseAssistantResult {
   const [isLoading, setIsLoading] = useState(false);

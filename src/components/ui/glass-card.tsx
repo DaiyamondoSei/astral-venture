@@ -3,14 +3,7 @@ import React, { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { usePerformance } from '@/hooks/usePerformance';
-import { DeviceCapabilities } from '@/types/core/performance/constants';
-
-export type GlassmorphicVariant = 
-  | 'default' 
-  | 'quantum' 
-  | 'ethereal' 
-  | 'elevated' 
-  | 'subtle';
+import { DeviceCapabilities, GlassmorphicVariant } from '@/types/core/performance/constants';
 
 export interface GlassCardProps {
   children: ReactNode;

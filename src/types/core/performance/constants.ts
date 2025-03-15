@@ -19,6 +19,11 @@ export type PerformanceMode = 'battery-saving' | 'balanced' | 'high-performance'
 export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive';
 
 /**
+ * Glassmorphic variant options
+ */
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'cosmic' | 'purple';
+
+/**
  * Runtime constants for DeviceCapability
  * This pattern resolves the common TypeScript error:
  * "X only refers to a type, but is being used as a value here"
@@ -46,4 +51,17 @@ export const RenderFrequencies = {
   MEDIUM: 'medium' as RenderFrequency,
   HIGH: 'high' as RenderFrequency,
   ADAPTIVE: 'adaptive' as RenderFrequency
+};
+
+/**
+ * Runtime constants for GlassmorphicVariant
+ */
+export const GlassmorphicVariants = {
+  DEFAULT: 'default' as GlassmorphicVariant,
+  QUANTUM: 'quantum' as GlassmorphicVariant,
+  ETHEREAL: 'ethereal' as GlassmorphicVariant,
+  ELEVATED: 'elevated' as GlassmorphicVariant,
+  SUBTLE: 'subtle' as GlassmorphicVariant,
+  COSMIC: 'cosmic' as GlassmorphicVariant,
+  PURPLE: 'purple' as GlassmorphicVariant
 };
