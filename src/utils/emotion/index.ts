@@ -9,9 +9,21 @@ export { evaluateEmotionalDepth, getDepthCategory, getDepthFeedback } from './an
 export { calculateEmotionalIntelligence } from './analysis/intelligenceCalculator';
 
 // Export chakra-related utilities
-export { calculateEmotionalGrowth } from './chakra/emotionalGrowth';
+export {
+  getChakraNames,
+  getChakraColors,
+  getChakraColor,
+  getChakraName,
+  calculateChakraBalance,
+  addReflectionBasedChakras,
+  calculateEmotionalGrowth,
+  getChakraIntensity,
+  getChakraResonance,
+  normalizeChakraData
+} from './chakraUtils';
+
+// Export chakra analysis utilities
 export { analyzeChakraActivation, getActivatedChakraNames } from './chakra/analysis';
-export { getChakraIntensity, getChakraResonance, calculateChakraBalance } from './chakra/intensity';
 
 // Export dream analysis utilities
 export { analyzeDreamTheme } from './dreamAnalysis';
@@ -19,4 +31,3 @@ export { analyzeDreamTheme } from './dreamAnalysis';
 // Export generic emotion utilities
 export * from './types';
 export * from './mappings';
-export * from './chakraUtils';

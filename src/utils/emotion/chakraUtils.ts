@@ -97,7 +97,87 @@ export const calculateChakraBalance = (chakras: ChakraActivated): number => {
 };
 
 /**
- * Re-export other chakra utility functions
+ * Gets the intensity for a specific chakra activation
+ * @param chakraIndex The index of the chakra
+ * @param activatedChakras Array of activated chakra indices
  */
-export { addReflectionBasedChakras } from './chakra/reflectionActivation';
-export { calculateEmotionalGrowth } from './chakra/emotionalGrowth';
+export const getChakraIntensity = (chakraIndex: number, activatedChakras: number[] = []): number => {
+  const normalizedChakras = normalizeChakraData(activatedChakras);
+  return normalizedChakras.includes(chakraIndex) ? 1.0 : 0.3;
+};
+
+/**
+ * Gets the resonance or connection strength between chakras
+ * @param chakra1 First chakra index
+ * @param chakra2 Second chakra index
+ * @param activatedChakras Activated chakra indices
+ */
+export const getChakraResonance = (chakra1: number, chakra2: number, activatedChakras: number[] = []): number => {
+  const normalizedChakras = normalizeChakraData(activatedChakras);
+  const bothActive = normalizedChakras.includes(chakra1) && normalizedChakras.includes(chakra2);
+  
+  if (bothActive) return 1.0;
+  if (normalizedChakras.includes(chakra1) || normalizedChakras.includes(chakra2)) return 0.5;
+  return 0.1;
+};
+
+/**
+ * Adds reflection-based chakras to the existing activated chakras
+ * @param existingChakras Currently activated chakra indices
+ * @param reflectionContent Content of the reflection
+ */
+export const addReflectionBasedChakras = (existingChakras: number[] = [], reflectionContent: string = ""): number[] => {
+  if (!reflectionContent) return existingChakras;
+  
+  const normalizedChakras = normalizeChakraData(existingChakras);
+  const newChakras = new Set(normalizedChakras);
+  
+  // Simple keywords mapping for chakras
+  const chakraKeywords = [
+    ["security", "survival", "grounding", "stability", "foundation"],     // Root
+    ["creativity", "passion", "emotion", "pleasure", "relationships"],    // Sacral
+    ["confidence", "power", "will", "personal", "strength"],              // Solar Plexus
+    ["love", "compassion", "healing", "harmony", "balance"],              // Heart
+    ["communication", "expression", "truth", "voice", "clarity"],         // Throat
+    ["intuition", "insight", "third eye", "vision", "awareness"],         // Third Eye
+    ["spirituality", "connection", "divine", "consciousness", "unity"]    // Crown
+  ];
+  
+  const lowerContent = reflectionContent.toLowerCase();
+  
+  chakraKeywords.forEach((keywords, chakraIndex) => {
+    if (keywords.some(keyword => lowerContent.includes(keyword))) {
+      newChakras.add(chakraIndex);
+    }
+  });
+  
+  return Array.from(newChakras);
+};
+
+/**
+ * Calculates emotional growth based on chakra activation patterns
+ * @param chakrasBefore Previous chakra activation state
+ * @param chakrasAfter New chakra activation state
+ */
+export const calculateEmotionalGrowth = (chakrasBefore: number[] = [], chakrasAfter: number[] = []): number => {
+  const normalizedBefore = normalizeChakraData(chakrasBefore);
+  const normalizedAfter = normalizeChakraData(chakrasAfter);
+  
+  // Calculate balance before and after
+  const balanceBefore = calculateChakraBalance({ indices: normalizedBefore });
+  const balanceAfter = calculateChakraBalance({ indices: normalizedAfter });
+  
+  // Count newly activated chakras
+  const newlyActivated = normalizedAfter.filter(c => !normalizedBefore.includes(c)).length;
+  
+  // Calculate growth score
+  const balanceImprovement = Math.max(0, balanceAfter - balanceBefore);
+  const activationBonus = newlyActivated * 0.15;
+  
+  return Math.min(balanceImprovement + activationBonus, 1.0);
+};
+
+/**
+ * Re-export other chakra utility functions to maintain API compatibility
+ */
+export { normalizeChakraData } from './chakraTypes';

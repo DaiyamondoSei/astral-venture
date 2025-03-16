@@ -1,4 +1,3 @@
-
 # Interface Synchronization Best Practices
 
 ## Problem
@@ -148,6 +147,33 @@ export interface ButtonProps extends WithLoading, WithDisabled {
 }
 ```
 
+#### 6. Use Adapter Pattern for Protected Components
+
+When working with components you can't modify directly:
+
+```typescript
+// Define adapter props that match your internal patterns
+export interface AdaptedVisualizationProps {
+  // Your standardized props
+  chakras: ChakraData[];
+  intensity: number;
+  theme: VisualTheme;
+}
+
+// Create an adapter component
+export const VisualizationAdapter: React.FC<AdaptedVisualizationProps> = (props) => {
+  // Transform your props to match the third-party component
+  const adaptedProps = {
+    system: transformChakras(props.chakras),
+    energyPoints: calculateEnergyPoints(props.intensity),
+    // Other adaptations...
+  };
+  
+  // Render the component you can't modify with adapted props
+  return <ProtectedVisualization {...adaptedProps} />;
+};
+```
+
 ## Interface Evolution Checklist
 
 When updating a component:
@@ -158,6 +184,7 @@ When updating a component:
 - [ ] Add deprecation comments for properties being replaced
 - [ ] Verify all implementations conform to the updated interface
 - [ ] Check all component consumers for compatibility
+- [ ] Consider creating dedicated adapter for protected components
 
 ## Enforcement Strategies
 
@@ -166,6 +193,7 @@ When updating a component:
 3. **PR Reviews**: Include interface review in your PR process
 4. **Documentation**: Keep interfaces well-documented with JSDoc
 5. **Tests**: Write tests that verify interface compliance
+6. **Automated Checks**: Run TypeScript validation as part of CI pipeline
 
 ## Conclusion
 

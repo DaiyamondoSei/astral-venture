@@ -98,3 +98,25 @@ export const generateCosmicGlow = (
   // Default cosmic glow
   return baseColor.replace(/[\d\.]+\)$/, `${intensity})`);
 };
+
+/**
+ * Converts chakra index to CSS color
+ * Bridge function for compatibility with the chakraUtils module
+ */
+export const chakraIndexToColor = (chakraIndex: number): string => {
+  // Use the same color mapping as in chakraUtils
+  const CHAKRA_COLORS = [
+    "#FF0000", // Root - Red
+    "#FF8000", // Sacral - Orange
+    "#FFFF00", // Solar Plexus - Yellow
+    "#00FF00", // Heart - Green
+    "#00FFFF", // Throat - Light Blue
+    "#0000FF", // Third Eye - Indigo
+    "#8000FF"  // Crown - Violet
+  ];
+  
+  if (chakraIndex >= 0 && chakraIndex < CHAKRA_COLORS.length) {
+    return CHAKRA_COLORS[chakraIndex];
+  }
+  return "#FFFFFF"; // Default white for unknown
+};

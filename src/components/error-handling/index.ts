@@ -1,8 +1,10 @@
 
-/**
- * Error handling component exports
- */
+// Export unified error boundary components
+export { 
+  default as ErrorBoundary,
+  ErrorBoundaryProvider,
+  withErrorBoundary
+} from './UnifiedErrorBoundary';
 
-import ErrorBoundary from './ErrorBoundary';
-
-export { ErrorBoundary };
+// Export error reporting utilities
+export * from '../../utils/errorHandling/errorReporter';

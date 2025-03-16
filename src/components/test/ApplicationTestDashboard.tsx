@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import UserFlowTestRunner from './UserFlowTestRunner';
 import EnhancedDataFlowVisualization from './EnhancedDataFlowVisualization';
 import { usePerformance } from '@/contexts/PerformanceContext';
+import { ErrorBoundaryProvider } from '@/components/error-handling';
 
 /**
  * Combined test dashboard component
@@ -45,11 +46,15 @@ const ApplicationTestDashboard: React.FC = () => {
         </TabsList>
         
         <TabsContent value="userflows">
-          <UserFlowTestRunner />
+          <ErrorBoundaryProvider componentName="UserFlowTestRunner">
+            <UserFlowTestRunner />
+          </ErrorBoundaryProvider>
         </TabsContent>
         
         <TabsContent value="dataflow">
-          <EnhancedDataFlowVisualization />
+          <ErrorBoundaryProvider componentName="EnhancedDataFlowVisualization">
+            <EnhancedDataFlowVisualization />
+          </ErrorBoundaryProvider>
         </TabsContent>
       </Tabs>
     </div>
