@@ -1,63 +1,67 @@
 
 /**
- * Performance constants types
- * 
- * This module provides type definitions for performance-related constants
- * following the Type-Value Pattern.
+ * Performance-related constants following the Type-Value Pattern
  */
+import { 
+  MetricType, 
+  DeviceCapability, 
+  PerformanceMode, 
+  RenderFrequency, 
+  QualityLevel 
+} from './types';
 
-// Device capability levels
-export type DeviceCapability = 'low' | 'medium' | 'high' | 'core';
+// Runtime values for MetricType
+export const MetricTypes = {
+  RENDER: 'render' as MetricType,
+  INTERACTION: 'interaction' as MetricType,
+  LOAD: 'load' as MetricType,
+  MEMORY: 'memory' as MetricType,
+  NETWORK: 'network' as MetricType,
+  RESOURCE: 'resource' as MetricType,
+  JAVASCRIPT: 'javascript' as MetricType,
+  CSS: 'css' as MetricType,
+  ANIMATION: 'animation' as MetricType,
+  METRIC: 'metric' as MetricType,
+  SUMMARY: 'summary' as MetricType,
+  PERFORMANCE: 'performance' as MetricType,
+  WEB_VITAL: 'web_vital' as MetricType
+};
 
-// Performance modes
-export type PerformanceMode = 'battery' | 'balanced' | 'performance' | 'auto' | 'quality';
+// Runtime values for DeviceCapability
+export const DeviceCapabilities = {
+  LOW: 'low' as DeviceCapability,
+  MEDIUM: 'medium' as DeviceCapability,
+  HIGH: 'high' as DeviceCapability
+};
 
-// Rendering frequency levels
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
+// Runtime values for PerformanceMode
+export const PerformanceModes = {
+  BATTERY: 'battery' as PerformanceMode,
+  BALANCED: 'balanced' as PerformanceMode,
+  PERFORMANCE: 'performance' as PerformanceMode,
+  AUTO: 'auto' as PerformanceMode,
+  QUALITY: 'quality' as PerformanceMode
+};
 
-// Visual quality levels
-export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
+// Runtime values for RenderFrequency
+export const RenderFrequencies = {
+  LOW: 'low' as RenderFrequency,
+  MEDIUM: 'medium' as RenderFrequency,
+  HIGH: 'high' as RenderFrequency,
+  EXCESSIVE: 'excessive' as RenderFrequency
+};
 
-// Resource optimization levels
-export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
+// Runtime values for QualityLevel
+export const QualityLevels = {
+  LOW: 'low' as QualityLevel,
+  MEDIUM: 'medium' as QualityLevel,
+  HIGH: 'high' as QualityLevel,
+  ULTRA: 'ultra' as QualityLevel
+};
 
-// Render settings
-export type RenderSetting = 'auto' | 'low' | 'medium' | 'high';
-
-// Animation complexity
-export type AnimationComplexity = 'none' | 'minimal' | 'standard' | 'enhanced';
-
-// Rendering engine types
-export type RenderingEngine = 'canvas' | 'webgl' | 'svg' | 'css' | 'html';
-
-// Glassmorphic UI variants
-export type GlassmorphicVariant = 'default' | 'subtle' | 'medium' | 'elevated' | 'ethereal' | 'cosmic' | 'purple' | 'quantum';
-
-// Glow intensity levels
-export type GlowIntensity = 'none' | 'low' | 'medium' | 'high';
-
-// Cube theme types (for metatrons cube)
-export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'chakra' | 'energy' | 'spiritual' | 'quantum';
-
-// Cube size types
-export type CubeSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
-
-// Performance config interface for consistent use across components
-export interface PerfConfig {
-  // Feature toggles
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enableValidation: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  
-  // Optimization strategies
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  
-  // Performance metrics
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-}
+// Default quality levels for different device capabilities
+export const DEFAULT_QUALITY_LEVELS = {
+  [DeviceCapabilities.LOW]: QualityLevels.LOW,
+  [DeviceCapabilities.MEDIUM]: QualityLevels.MEDIUM,
+  [DeviceCapabilities.HIGH]: QualityLevels.HIGH
+};

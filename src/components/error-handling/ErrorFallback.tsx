@@ -1,67 +1,52 @@
 
-import React from 'react';
-import { AlertCircle, RefreshCw } from 'lucide-react';
-
-interface ErrorFallbackProps {
-  /** The error that occurred */
-  error: Error;
-  /** Function to reset the error boundary */
-  resetErrorBoundary: () => void;
-  /** Optional title for the error message */
-  title?: string;
-  /** Optional description for the error message */
-  description?: string;
-  /** Whether to show the error details */
-  showDetails?: boolean;
-}
-
 /**
- * Default error fallback component for error boundaries
+ * ErrorFallback Component
+ * 
+ * Used by ErrorBoundary to display errors in a user-friendly way
  */
-const ErrorFallback: React.FC<ErrorFallbackProps> = ({
-  error,
-  resetErrorBoundary,
-  title = 'Something went wrong',
-  description = 'An error occurred while rendering this component.',
-  showDetails = true
+import React from 'react';
+import { ErrorFallbackProps } from './index';
+import { getUserFriendlyErrorMessage } from '@/utils/errorHandling/errorReporter';
+
+const ErrorFallback: React.FC<ErrorFallbackProps> = ({ 
+  error, 
+  componentName, 
+  resetErrorBoundary 
 }) => {
+  const errorMessage = getUserFriendlyErrorMessage(error);
+  const displayName = componentName || 'this component';
+
   return (
-    <div className="p-4 border border-red-500 rounded-lg bg-red-50 dark:bg-red-900/10 text-red-900 dark:text-red-100">
-      <div className="flex items-start">
-        <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400" />
-        <div className="ml-3 flex-1">
-          <h3 className="text-lg font-medium">{title}</h3>
-          <p className="mt-1 text-sm text-red-800 dark:text-red-200">{description}</p>
-          
-          {showDetails && (
-            <div className="mt-3">
-              <details className="group">
-                <summary className="text-sm cursor-pointer text-red-700 dark:text-red-300 hover:underline">
-                  Error details
-                </summary>
-                <pre className="mt-2 text-xs p-2 bg-red-100 dark:bg-red-900/30 rounded overflow-auto max-h-40">
-                  {error.message}
-                  {error.stack && (
-                    <>
-                      {'\n\n'}
-                      <span className="text-red-600 dark:text-red-400">Stack trace:</span>
-                      {'\n'}
-                      {error.stack.split('\n').slice(1).join('\n')}
-                    </>
-                  )}
-                </pre>
-              </details>
-            </div>
-          )}
-          
-          <button
-            onClick={resetErrorBoundary}
-            className="mt-4 inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4 mr-1.5" />
-            Try again
-          </button>
-        </div>
+    <div className="p-4 border border-red-300 bg-red-50 rounded-md">
+      <div className="flex items-center gap-2 mb-2">
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          className="h-6 w-6 text-red-500" 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+          />
+        </svg>
+        <h3 className="text-lg font-medium text-red-800">
+          Something went wrong in {displayName}
+        </h3>
+      </div>
+      
+      <p className="mb-4 text-red-700">{errorMessage}</p>
+      
+      <div className="flex justify-end">
+        <button
+          onClick={resetErrorBoundary}
+          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+        >
+          Try Again
+        </button>
       </div>
     </div>
   );

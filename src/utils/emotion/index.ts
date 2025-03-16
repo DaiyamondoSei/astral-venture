@@ -53,3 +53,4 @@ export * from './mappings';
 
 // Export constants following the Type-Value Pattern
 export * from './constants';
+export * from '@/types/chakra/constants';

@@ -1,75 +1,73 @@
 
-import { ChakraType, ChakraStatus, EntanglementState } from '@/types/consciousness';
+/**
+ * Chakra system type definitions
+ * Following the Type-Value Pattern for type safety
+ */
 
-// Define ChakraSystemProps for consistency across components
-export interface ChakraSystemProps {
-  system?: any;
-  energyPoints?: number;
-  activatedChakras?: number[];
-  onActivationChange?: (activatedChakras: number[]) => void;
-  activePairs?: Array<[number, number] | { primaryChakra: number; secondaryChakra: number; entanglementStrength: number; }>;
-}
+// Chakra type identifiers
+export type ChakraType = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
 
-// Additional types needed for the ChakraSystem
-export interface ChakraActivationState {
-  chakraId: number;
+// Chakra status structure
+export interface ChakraStatus {
   active: boolean;
   activationLevel: number;
-  lastActivated?: string;
-  activationHistory?: { timestamp: string; level: number }[];
+  blockages: number;
+  resonanceQuality: number;
+  lastActivated?: Date;
 }
 
+// Energy level structure
 export interface EnergyLevel {
   currentLevel: number;
   maxLevel: number;
   flowRate: number;
-  blockagePoints: any[];
+  blockagePoints?: Array<{ position: number; strength: number }>;
 }
 
+// Balance metrics structure
 export interface BalanceMetrics {
   overallBalance: number;
   energyDistribution: Record<ChakraType, number>;
-  dominantChakra?: ChakraType;
-  weakestChakra?: ChakraType;
-  recommendedFocus?: ChakraType[];
-  chakraBalanceRatios?: Record<number, number>;
+  balanceHistory?: Array<{ timestamp: number; balance: number }>;
 }
 
+// Resonance pattern structure
 export interface ResonancePattern {
-  sourceChakra: number;
-  targetChakra: number;
-  resonanceStrength: number;
-  harmonicQuality: number;
+  pattern: string;
+  strength: number;
+  frequency: number;
+  harmonic: boolean;
 }
 
-export interface CoherenceMetrics {
-  overallCoherence: number;
-  chakraPairCoherence: Record<string, number>;
-  coherenceHistory: { timestamp: string; value: number }[];
-  phaseSynchronization?: Record<string, number>;
+// Entanglement state structure
+export interface EntanglementState {
+  quantum: boolean;
+  entanglementLevel: number;
+  connectedChakras: ChakraType[];
 }
 
+// Superposition state structure
 export interface SuperpositionState {
-  potentialStates: Record<string, number> | number;
-  stateAmplitudes: Record<string, number>;
-  waveFunction: any[];
-  collapseThreshold: number;
+  enabled: boolean;
+  probability: number;
+  potentialStates: number;
 }
 
-export interface ProgressionMetrics {
-  currentStage: string;
-  progressToNextStage: number;
-  stageHistory: { stage: string; achievedAt: string }[];
-  overallProgress?: number;
-}
-
+// Performance stats structure
 export interface PerformanceStats {
   renderTime: number;
-  optimizationLevel: number;
   memoryUsage: number;
-  activationLatency?: Record<number, number>;
+  optimizationLevel: number;
 }
 
+// Progression metrics structure
+export interface ProgressionMetrics {
+  growth: number;
+  stability: number;
+  adaptability: number;
+}
+
+// Complete chakra system structure
 export interface ChakraSystem {
   chakras: {
     activationStates: Record<ChakraType, ChakraStatus>;
@@ -80,51 +78,9 @@ export interface ChakraSystem {
   quantumStates: {
     entanglement: EntanglementState;
     superposition: SuperpositionState;
-    coherence: CoherenceMetrics;
   };
   metrics?: {
     progression: ProgressionMetrics;
     performance: PerformanceStats;
   };
-}
-
-// Define MetatronsNode and MetatronsConnection types
-export interface MetatronsNode {
-  id: string;
-  x: number;
-  y: number;
-  chakraIndex?: number;
-  active?: boolean;
-  state?: string;
-}
-
-export interface MetatronsConnection {
-  id: string;
-  source: string;
-  target: string;
-  active?: boolean;
-  intensity?: number;
-  animated?: boolean;
-}
-
-// Add the GlassmorphicVariant type to support the missing variants in errors
-export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'subtle' | 'medium' | 'cosmic' | 'purple';
-
-// Metatron's Cube types for type errors
-export type CubeTheme = 'default' | 'light' | 'dark' | 'cosmic' | 'chakra' | 'etheric';
-export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
-export type GlowIntensity = 'high' | 'medium' | 'low' | 'none';
-
-export interface MetatronsCubeData {
-  nodes: MetatronsNode[];
-  connections: MetatronsConnection[];
-}
-
-export interface VisualizationProps {
-  system?: ChakraSystem;
-  energyPoints?: number;
-  activatedChakras?: number[];
-  onActivationChange?: (activatedChakras: number[]) => void;
-  onVisualizationRendered?: () => void;
-  deviceCapability?: string;
 }

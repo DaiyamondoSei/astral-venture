@@ -1,126 +1,122 @@
 
 /**
- * Render Analyzer
+ * RenderAnalyzer
  * 
- * Analyzes component render patterns and frequencies to identify performance issues.
+ * Analyzes component render performance and provides optimization suggestions
  */
-
+import { ComponentMetrics } from '@/types/core/performance/types';
 import { performanceMonitor } from './performanceMonitor';
-import { RenderFrequency } from './types';
-import { RenderFrequencies } from './constants';
 
-// Constants for render frequency thresholds
-const RENDER_FREQUENCY_THRESHOLDS = {
-  LOW: 1, // 1 render per second
-  MEDIUM: 3, // 3 renders per second
-  HIGH: 10, // 10 renders per second
-  // Anything above HIGH is considered EXCESSIVE
-};
-
-// Time window to look back for render frequency analysis (in ms)
-const ANALYSIS_WINDOW_MS = 5000; // 5 seconds
-
-/**
- * Analyzes component render patterns and determines the frequency category
- */
-export class RenderAnalyzer {
-  private componentMetrics: Map<string, number[]> = new Map();
-  private lastAnalysis: Map<string, { frequency: RenderFrequency, timestamp: number }> = new Map();
-  
-  /**
-   * Record a render for a specific component
-   */
-  public recordRender(componentName: string, renderTime: number): void {
-    const now = performance.now();
-    
-    if (!this.componentMetrics.has(componentName)) {
-      this.componentMetrics.set(componentName, []);
-    }
-    
-    // Store timestamp of the render
-    this.componentMetrics.get(componentName)?.push(now);
-    
-    // Clean old data from the analysis window
-    this.cleanOldData(componentName, now);
-    
-    // Report the render to the performance monitor
-    performanceMonitor.addComponentMetric(componentName, renderTime);
-  }
-  
-  /**
-   * Analyze render frequency for a specific component
-   */
-  public analyzeComponent(componentName: string): RenderFrequency {
-    const now = performance.now();
-    const metrics = this.componentMetrics.get(componentName);
-    
-    // If no metrics or last analysis is recent, return the last result
-    const lastAnalysis = this.lastAnalysis.get(componentName);
-    if (!metrics || metrics.length === 0) {
-      return RenderFrequencies.LOW;
-    }
-    
-    if (lastAnalysis && (now - lastAnalysis.timestamp < 1000)) {
-      return lastAnalysis.frequency;
-    }
-    
-    // Count renders in the analysis window
-    const rendersInWindow = metrics.filter(timestamp => now - timestamp <= ANALYSIS_WINDOW_MS).length;
-    
-    // Calculate renders per second
-    const rendersPerSecond = (rendersInWindow / (ANALYSIS_WINDOW_MS / 1000));
-    
-    // Determine frequency category
-    let frequency: RenderFrequency;
-    if (rendersPerSecond <= RENDER_FREQUENCY_THRESHOLDS.LOW) {
-      frequency = RenderFrequencies.LOW;
-    } else if (rendersPerSecond <= RENDER_FREQUENCY_THRESHOLDS.MEDIUM) {
-      frequency = RenderFrequencies.MEDIUM;
-    } else if (rendersPerSecond <= RENDER_FREQUENCY_THRESHOLDS.HIGH) {
-      frequency = RenderFrequencies.HIGH;
-    } else {
-      frequency = RenderFrequencies.EXCESSIVE;
-    }
-    
-    // Store the analysis result
-    this.lastAnalysis.set(componentName, { frequency, timestamp: now });
-    
-    return frequency;
-  }
-  
-  /**
-   * Remove old render data outside the analysis window
-   */
-  private cleanOldData(componentName: string, now: number): void {
-    const metrics = this.componentMetrics.get(componentName);
-    if (!metrics) return;
-    
-    const cutoffTime = now - ANALYSIS_WINDOW_MS;
-    const newMetrics = metrics.filter(timestamp => timestamp >= cutoffTime);
-    this.componentMetrics.set(componentName, newMetrics);
-  }
-  
-  /**
-   * Get render frequency for all components
-   */
-  public getAllComponentFrequencies(): Record<string, RenderFrequency> {
-    const result: Record<string, RenderFrequency> = {};
-    
-    for (const componentName of this.componentMetrics.keys()) {
-      result[componentName] = this.analyzeComponent(componentName);
-    }
-    
-    return result;
-  }
-  
-  /**
-   * Reset all metrics
-   */
-  public reset(): void {
-    this.componentMetrics.clear();
-    this.lastAnalysis.clear();
-  }
+export interface RenderAnalysis {
+  componentName: string;
+  renderTime: number;
+  renderCount: number;
+  isPerformanceCritical: boolean;
+  possibleIssues: string[];
+  possibleOptimizations: string[];
 }
 
-// Export a singleton instance
-export const renderAnalyzer = new RenderAnalyzer();
+export class RenderAnalyzer {
+  private static instance: RenderAnalyzer;
+  private slowRenderThreshold: number = 16; // ms
+  private reRenderThreshold: number = 3; // consecutive renders
+
+  private constructor() {
+    // Initialize as a singleton
+  }
+
+  /**
+   * Get the singleton instance
+   */
+  public static getInstance(): RenderAnalyzer {
+    if (!RenderAnalyzer.instance) {
+      RenderAnalyzer.instance = new RenderAnalyzer();
+    }
+    return RenderAnalyzer.instance;
+  }
+
+  /**
+   * Set the slow render threshold
+   */
+  public setSlowRenderThreshold(thresholdMs: number): void {
+    this.slowRenderThreshold = thresholdMs;
+  }
+
+  /**
+   * Set the re-render threshold
+   */
+  public setReRenderThreshold(count: number): void {
+    this.reRenderThreshold = count;
+  }
+
+  /**
+   * Analyze component render metrics
+   */
+  public analyzeComponent(metrics: { 
+    componentName: string; 
+    renderTime: number;
+    renderCount: number;
+  }): RenderAnalysis {
+    const { componentName, renderTime, renderCount } = metrics;
+    
+    const isPerformanceCritical = renderTime > this.slowRenderThreshold;
+    const issues: string[] = [];
+    const optimizations: string[] = [];
+
+    // Identify possible issues
+    if (renderTime > this.slowRenderThreshold) {
+      issues.push(`Slow render time (${renderTime.toFixed(2)}ms > ${this.slowRenderThreshold}ms threshold)`);
+    }
+
+    if (renderCount > this.reRenderThreshold) {
+      issues.push(`Excessive re-renders (${renderCount} renders)`);
+    }
+
+    // Suggest optimizations
+    if (renderTime > this.slowRenderThreshold) {
+      optimizations.push('Consider using React.memo to prevent unnecessary re-renders');
+      optimizations.push('Check for expensive calculations that could be memoized');
+    }
+
+    if (renderCount > this.reRenderThreshold) {
+      optimizations.push('Verify dependency arrays in useEffect, useMemo, and useCallback');
+      optimizations.push('Check for object/array literals in props that cause re-renders');
+    }
+
+    // Add general optimization suggestions
+    if (isPerformanceCritical) {
+      optimizations.push('Consider code splitting or lazy loading');
+      optimizations.push('Optimize expensive DOM operations');
+    }
+
+    return {
+      componentName,
+      renderTime,
+      renderCount,
+      isPerformanceCritical,
+      possibleIssues: issues,
+      possibleOptimizations: optimizations
+    };
+  }
+
+  /**
+   * Get metrics for a component
+   */
+  public getComponentMetrics(componentName: string): ComponentMetrics | null {
+    return performanceMonitor.getComponentMetrics(componentName);
+  }
+
+  /**
+   * Get all components sorted by render time
+   */
+  public getSlowestComponents(limit: number = 5): ComponentMetrics[] {
+    return performanceMonitor.getSortedComponents('lastRenderTime', limit);
+  }
+
+  /**
+   * Get the most frequently rendering components
+   */
+  public getMostFrequentlyRenderingComponents(limit: number = 5): ComponentMetrics[] {
+    return performanceMonitor.getSortedComponents('renderCount', limit);
+  }
+}

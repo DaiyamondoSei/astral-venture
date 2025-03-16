@@ -1,117 +1,158 @@
 
-# Type-Value Pattern
+# Type-Value Pattern Best Practices
 
 ## Problem
 
-TypeScript's type system is powerful for static type checking but doesn't provide runtime information. This leads to a common error pattern where we define types but don't have corresponding runtime values, creating a disconnect between compile-time and runtime behavior.
+One of the most common TypeScript errors in our application is the confusion between types and values:
+
+```typescript
+// ERROR: 'ChakraType' only refers to a type, but is being used as a value here
+if (chakra === ChakraType.ROOT) { ... }
+```
+
+This happens because TypeScript types are erased during compilation - they don't exist at runtime.
 
 ## Solution: The Type-Value Pattern
 
-The Type-Value Pattern addresses this by ensuring every type has corresponding runtime values that match the type definition exactly. This pattern enforces a strict relationship between what the compiler knows (types) and what exists at runtime (values).
+The Type-Value pattern provides both compile-time type safety and runtime values for the same concepts:
 
-### Pattern Structure
+```typescript
+// TYPE (used in type annotations)
+export type ChakraType = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
 
-1. **Define types** (usually as string literal unions or enums):
+// VALUE (used in runtime code)
+export const ChakraTypes = {
+  ROOT: 'root' as ChakraType,
+  SACRAL: 'sacral' as ChakraType,
+  SOLAR: 'solar' as ChakraType,
+  HEART: 'heart' as ChakraType,
+  THROAT: 'throat' as ChakraType,
+  THIRD_EYE: 'third-eye' as ChakraType,
+  CROWN: 'crown' as ChakraType
+};
+
+// Type usage (compile-time)
+function activateChakra(chakra: ChakraType) { ... }
+
+// Value usage (runtime)
+if (currentChakra === ChakraTypes.ROOT) { ... }
+```
+
+## Implementation Guidelines
+
+1. **Naming Conventions**:
+   - Use singular for the type (`ChakraType`)
+   - Use plural for the values object (`ChakraTypes`)
+   - Use uppercase for value constants
+
+2. **File Organization**:
+   - Put related types and constants in separate files (`types.ts` and `constants.ts`)
+   - Re-export both from an `index.ts` file
+
+3. **Type Assertions**:
+   - Always use `as` to assert string literals to their specific type
+   - Use `as const` on the constants object to make it deeply readonly
+
+4. **Type Guards for Runtime Validation**:
    ```typescript
-   // Type definition - only available at compile time
-   export type DeviceCapability = 'low' | 'medium' | 'high';
-   ```
-
-2. **Create corresponding runtime constants** in a predictable format:
-   ```typescript
-   // Runtime values - available at execution time
-   export const DeviceCapabilities = {
-     LOW: 'low' as DeviceCapability,
-     MEDIUM: 'medium' as DeviceCapability,
-     HIGH: 'high' as DeviceCapability
-   };
-   ```
-
-3. **Use types for static checking** and constants for runtime references:
-   ```typescript
-   // In type definitions
-   interface Config {
-     capability: DeviceCapability;
-   }
-   
-   // In runtime code
-   if (config.capability === DeviceCapabilities.LOW) {
-     // Safe comparison with runtime constant
+   function isChakraType(value: string): value is ChakraType {
+     return Object.values(ChakraTypes).includes(value as ChakraType);
    }
    ```
 
 ## Benefits
 
-1. **Type Safety**: Compiler ensures that only valid values are used.
-2. **Autocomplete Support**: IDE suggests available constants.
-3. **Refactoring Safety**: Renaming a value updates all references.
-4. **Runtime Validation**: Can validate data against known constants.
-5. **Consistent Naming**: Clear convention for types vs. runtime values.
-
-## Implementation Guidelines
-
-1. **Naming Convention**: 
-   - Types: PascalCase singular (e.g., `DeviceCapability`)
-   - Constants: PascalCase plural (e.g., `DeviceCapabilities`)
-
-2. **Organization**:
-   - Keep related types and constants in the same file
-   - Export both the type and constants
-
-3. **Type Assertion**:
-   - Use `as` typecasting to ensure constant values match the type
-   - This creates a compile-time check that constants conform to the type
-
-4. **Usage Priority**:
-   - For comparisons and assignments, always use the constants
-   - Use types only for type annotations
+1. **Type Safety**: Enforces correct values at compile time
+2. **Runtime Validation**: Allows checking values at runtime
+3. **Autocompletion**: IDE provides autocomplete for both types and values
+4. **Single Source of Truth**: Types and values stay in sync
+5. **Maintainability**: Changes to one place automatically update both
 
 ## Examples
 
-### Performance Metrics
+### Example 1: Performance Modes
 
 ```typescript
-// Type definition
-export type MetricType = 'render' | 'interaction' | 'load';
+// types.ts
+export type PerformanceMode = 'battery' | 'balanced' | 'performance' | 'auto' | 'quality';
 
-// Runtime constants
-export const MetricTypes = {
-  RENDER: 'render' as MetricType,
-  INTERACTION: 'interaction' as MetricType,
-  LOAD: 'load' as MetricType
-};
+// constants.ts
+export const PerformanceModes = {
+  BATTERY: 'battery' as PerformanceMode,
+  BALANCED: 'balanced' as PerformanceMode,
+  PERFORMANCE: 'performance' as PerformanceMode,
+  AUTO: 'auto' as PerformanceMode,
+  QUALITY: 'quality' as PerformanceMode
+} as const;
+
+// usage.ts
+function setPerformanceMode(mode: PerformanceMode) { ... }
+
+// Correct runtime usage
+setPerformanceMode(PerformanceModes.BALANCED);
+```
+
+### Example 2: Validation Error Codes
+
+```typescript
+// types.ts
+export type ValidationErrorCode = 
+  | 'REQUIRED' 
+  | 'TYPE_ERROR' 
+  | 'FORMAT_ERROR'
+  | 'CONSTRAINT_ERROR';
+
+// constants.ts
+export const ValidationErrorCodes = {
+  REQUIRED: 'REQUIRED' as ValidationErrorCode,
+  TYPE_ERROR: 'TYPE_ERROR' as ValidationErrorCode,
+  FORMAT_ERROR: 'FORMAT_ERROR' as ValidationErrorCode,
+  CONSTRAINT_ERROR: 'CONSTRAINT_ERROR' as ValidationErrorCode
+} as const;
 
 // Usage
-function trackMetric(type: MetricType, value: number) {
-  if (type === MetricTypes.RENDER) {
-    // Process render metrics...
-  }
-}
+function createError(code: ValidationErrorCode, message: string) { ... }
+
+// Correct runtime usage
+createError(ValidationErrorCodes.REQUIRED, "Field is required");
 ```
 
-### Component Variants
+## Anti-Patterns to Avoid
 
-```typescript
-// Type definition
-export type ButtonVariant = 'primary' | 'secondary' | 'danger';
+1. **Using Type as Value**:
+   ```typescript
+   // WRONG
+   if (mode === PerformanceMode.BATTERY) { ... }
+   
+   // RIGHT
+   if (mode === PerformanceModes.BATTERY) { ... }
+   ```
 
-// Runtime constants
-export const ButtonVariants = {
-  PRIMARY: 'primary' as ButtonVariant,
-  SECONDARY: 'secondary' as ButtonVariant,
-  DANGER: 'danger' as ButtonVariant
-};
+2. **Using Enum Instead**:
+   ```typescript
+   // AVOID TypeScript enums when possible
+   enum ChakraType { ROOT, SACRAL, SOLAR }
+   
+   // Prefer string literal types with constants
+   ```
 
-// Usage in a component
-interface ButtonProps {
-  variant?: ButtonVariant;
-}
+3. **Missing Type Assertion**:
+   ```typescript
+   // WRONG
+   export const ChakraTypes = {
+     ROOT: 'root', // Missing type assertion
+   };
+   
+   // RIGHT
+   export const ChakraTypes = {
+     ROOT: 'root' as ChakraType,
+   };
+   ```
 
-function Button({ variant = ButtonVariants.PRIMARY }: ButtonProps) {
-  // Use variant...
-}
-```
+## When to Apply This Pattern
 
-## Conclusion
+- Whenever you have a concept that needs both type checking and runtime comparison
+- For all string literal unions that will be used as values in the code
+- Any time you're tempted to use a TypeScript enum
 
-The Type-Value Pattern bridges the gap between TypeScript's static type system and JavaScript's runtime, providing both compile-time safety and runtime expressiveness. By consistently applying this pattern, we reduce errors from type mismatches and create more maintainable code.
+By consistently applying the Type-Value pattern, you'll eliminate a whole class of common TypeScript errors and improve code maintainability.
