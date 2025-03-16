@@ -83,8 +83,8 @@ For clarity and maintainability, separate types and constants:
 /types/
   /core/
     /performance/
-      constants.ts       # Type definitions
-      runtime-constants.ts  # Runtime constants
+      types.ts           # Type definitions
+      constants.ts       # Runtime constants
       index.ts           # Re-exports both
 ```
 

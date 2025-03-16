@@ -27,6 +27,7 @@ export interface ValidationErrorDetail {
   message: string;
   code: ValidationErrorCode;
   severity: ErrorSeverity;
+  field?: string; // For backward compatibility
 }
 
 // Validation result interface
@@ -37,11 +38,14 @@ export interface ValidationResult<T> {
 }
 
 /**
- * This interface intentionally does not use generics to avoid TS1149 errors with barrel files.
- * Type checking is still maintained through the generic ValidationResult interface.
+ * This interface can be used when generic type isn't needed
+ * to avoid TS1149 errors with barrel files.
  */
 export interface ValidationResultBase {
   valid: boolean;
   value?: any;
   errors?: ValidationErrorDetail[];
 }
+
+// Type for validation severity
+export type ValidationSeverity = ErrorSeverity;

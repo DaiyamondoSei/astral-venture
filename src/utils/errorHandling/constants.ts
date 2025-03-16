@@ -24,3 +24,19 @@ export const ErrorSeverities = {
   MEDIUM: 'medium' as ErrorSeverity,
   LOW: 'low' as ErrorSeverity
 } as const;
+
+// Map validation severity to error severity
+export const mapValidationToErrorSeverity = (
+  validationSeverity: import('../validation/types').ErrorSeverity
+): ErrorSeverity => {
+  switch (validationSeverity) {
+    case 'error':
+      return ErrorSeverities.HIGH;
+    case 'warning':
+      return ErrorSeverities.MEDIUM;
+    case 'info':
+      return ErrorSeverities.LOW;
+    default:
+      return ErrorSeverities.MEDIUM;
+  }
+};

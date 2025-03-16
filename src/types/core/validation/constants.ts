@@ -26,3 +26,6 @@ export const ErrorSeverities = {
   WARNING: 'warning' as ErrorSeverity,
   INFO: 'info' as ErrorSeverity
 } as const;
+
+// Validation severity aliases for backward compatibility
+export const ValidationSeverities = ErrorSeverities;

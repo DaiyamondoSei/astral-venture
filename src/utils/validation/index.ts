@@ -5,35 +5,41 @@
  * Central exports for the validation system
  */
 
-// Export core types and constants
-export * from './types';
+// Export core types and constants from the types directory
+// These types are our source of truth following the Type-Value Pattern
 export * from '@/types/core/validation/types';
 export * from '@/types/core/validation/constants';
 
-// Export core validators
+// Export ValidationError and related utilities
+export { 
+  ValidationError, 
+  isValidationError,
+  createRequiredError,
+  createTypeError
+} from './ValidationError';
+
+// Export core validators and validation utilities
+export * from './validationUtils';
 export * from './validators';
+
+// Export validation services and pipelines
 export * from './ValidationService';
 export * from './ValidationPipeline';
 
-// Export error handling
-export { ValidationError } from './ValidationError';
-export * from './validationUtils';
-
-// Export schema validation
+// Export schema validation utilities
 export * from './schemaValidator';
 export * from './inputValidator';
 
-// Export runtime validation
+// Export runtime validation utilities
 export * from './runtimeValidator';
 export * from './runtimeValidation';
 export * from './typeValidation';
 
-// Type safe validation
-export * from './typeSafeValidator';
+// Export type-safe validation
 export * from './core';
 
-// Performance validation
+// Export performance validation
 export * from './performanceValidator';
 
-// Export type validation utilities
+// Export type validation bridge
 export * from './typeValidationBridge';
