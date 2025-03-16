@@ -5,7 +5,7 @@ import ChakraGlow from './ChakraGlow';
 import ChakraRays from './ChakraRays';
 import ChakraTranscendence from './ChakraTranscendence';
 import ChakraInfinity from './ChakraInfinity';
-import { CHAKRA_COLORS } from '../../types';
+import { getChakraColor } from '@/utils/emotion/chakraUtils';
 
 interface ChakraPointProps {
   index: number;
@@ -41,8 +41,8 @@ const ChakraPoint: React.FC<ChakraPointProps> = ({
   showInfinity = false,
   baseProgressPercentage = 1
 }) => {
-  // Using CHAKRA_COLORS directly instead of relying on CHAKRA_POSITIONS
-  const color = CHAKRA_COLORS[index];
+  // Get the chakra color based on the index
+  const color = getChakraColor(index);
   
   // Scale size and opacity based on activation, details level, and intensity
   const baseSize = isActivated ? 4 : 2;
