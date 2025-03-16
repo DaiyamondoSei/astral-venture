@@ -1,61 +1,87 @@
 
 /**
  * Utilities for working with chakras and emotional growth
- * This file re-exports functionality from more focused chakra utility files
+ * This file provides unified chakra utility functions
  */
 
-export { addReflectionBasedChakras } from './chakra/reflectionActivation';
-export { calculateEmotionalGrowth } from './chakra/emotionalGrowth';
+import { ChakraActivated, normalizeChakraData } from './chakraTypes';
+
+// Memoized chakra names for faster lookups
+const CHAKRA_NAMES = [
+  "Root", "Sacral", "Solar Plexus", "Heart", 
+  "Throat", "Third Eye", "Crown"
+];
+
+// Memoized chakra colors for faster lookups
+const CHAKRA_COLORS = [
+  "#FF0000", // Root - Red
+  "#FF8000", // Sacral - Orange
+  "#FFFF00", // Solar Plexus - Yellow
+  "#00FF00", // Heart - Green
+  "#00FFFF", // Throat - Light Blue
+  "#0000FF", // Third Eye - Indigo
+  "#8000FF"  // Crown - Violet
+];
 
 /**
- * Converts chakra numbers to chakra names
+ * Efficiently gets chakra names based on indices
  */
 export const getChakraNames = (chakraIndices: number[]): string[] => {
-  const chakraNames = [
-    "Root", "Sacral", "Solar Plexus", "Heart", 
-    "Throat", "Third Eye", "Crown"
-  ];
+  if (!chakraIndices || !chakraIndices.length) return [];
   
-  return chakraIndices.map(index => {
-    if (index >= 0 && index < chakraNames.length) {
-      return chakraNames[index];
-    }
-    return "Unknown";
-  });
+  return chakraIndices
+    .filter(index => index >= 0 && index < CHAKRA_NAMES.length)
+    .map(index => CHAKRA_NAMES[index]);
 };
 
 /**
- * Gets chakra colors based on chakra indices
+ * Efficiently gets chakra colors based on indices
  */
 export const getChakraColors = (chakraIndices: number[]): string[] => {
-  const chakraColors = [
-    "#FF0000", // Root - Red
-    "#FF8000", // Sacral - Orange
-    "#FFFF00", // Solar Plexus - Yellow
-    "#00FF00", // Heart - Green
-    "#00FFFF", // Throat - Light Blue
-    "#0000FF", // Third Eye - Indigo
-    "#8000FF"  // Crown - Violet
-  ];
+  if (!chakraIndices || !chakraIndices.length) return [];
   
-  return chakraIndices.map(index => {
-    if (index >= 0 && index < chakraColors.length) {
-      return chakraColors[index];
-    }
-    return "#FFFFFF"; // Default white for unknown
-  });
+  return chakraIndices
+    .filter(index => index >= 0 && index < CHAKRA_COLORS.length)
+    .map(index => CHAKRA_COLORS[index]);
 };
 
 /**
- * Calculates the chakra balance percentage
+ * Gets the color for a specific chakra by index
  */
-export const calculateChakraBalance = (activatedChakras: number[]): number => {
-  if (activatedChakras.length === 0) return 0;
+export const getChakraColor = (chakraIndex: number): string => {
+  if (chakraIndex >= 0 && chakraIndex < CHAKRA_COLORS.length) {
+    return CHAKRA_COLORS[chakraIndex];
+  }
+  return "#FFFFFF"; // Default white for unknown
+};
+
+/**
+ * Gets the name for a specific chakra by index
+ */
+export const getChakraName = (chakraIndex: number): string => {
+  if (chakraIndex >= 0 && chakraIndex < CHAKRA_NAMES.length) {
+    return CHAKRA_NAMES[chakraIndex];
+  }
+  return "Unknown";
+};
+
+/**
+ * Calculates the chakra balance percentage with optimized performance
+ */
+export const calculateChakraBalance = (chakras: ChakraActivated): number => {
+  const activatedChakras = normalizeChakraData(chakras);
   
-  // Calculate balance by looking at distribution across all chakra levels
-  const lowerChakras = activatedChakras.filter(i => i < 3).length;
-  const middleChakras = activatedChakras.filter(i => i >= 3 && i < 5).length;
-  const higherChakras = activatedChakras.filter(i => i >= 5).length;
+  if (!activatedChakras.length) return 0;
+  
+  // Pre-filter the arrays using Set operations for better performance
+  const lowerChakrasSet = new Set([0, 1, 2]);
+  const middleChakrasSet = new Set([3, 4]);
+  const higherChakrasSet = new Set([5, 6]);
+  
+  // Use efficient Set operations
+  const lowerChakras = activatedChakras.filter(i => lowerChakrasSet.has(i)).length;
+  const middleChakras = activatedChakras.filter(i => middleChakrasSet.has(i)).length;
+  const higherChakras = activatedChakras.filter(i => higherChakrasSet.has(i)).length;
   
   // Perfect balance would have representation in all three ranges
   let balance = 0;
@@ -69,3 +95,9 @@ export const calculateChakraBalance = (activatedChakras: number[]): number => {
   
   return Math.min(balance + totalBonus, 1.0);
 };
+
+/**
+ * Re-export other chakra utility functions
+ */
+export { addReflectionBasedChakras } from './chakra/reflectionActivation';
+export { calculateEmotionalGrowth } from './chakra/emotionalGrowth';

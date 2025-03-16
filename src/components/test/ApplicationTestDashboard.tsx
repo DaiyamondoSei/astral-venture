@@ -4,8 +4,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import UserFlowTestRunner from './UserFlowTestRunner';
 import EnhancedDataFlowVisualization from './EnhancedDataFlowVisualization';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
+/**
+ * Combined test dashboard component
+ */
 const ApplicationTestDashboard: React.FC = () => {
+  // Use the performance context to track metrics
+  const { trackMetric } = usePerformance();
+
+  // Track component render
+  React.useEffect(() => {
+    trackMetric('ApplicationTestDashboard', 'render', performance.now());
+    return () => {
+      trackMetric('ApplicationTestDashboard', 'unmount', performance.now());
+    };
+  }, [trackMetric]);
+
   return (
     <div className="container mx-auto py-8">
       <Card className="mb-6">

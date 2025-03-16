@@ -1,5 +1,8 @@
 
-// Enhanced color utilities for energy visualizations
+/**
+ * Color utilities for energy visualizations
+ * Provides centralized functions for generating colors based on energy states
+ */
 
 /**
  * Generates a color based on energy level - moves through a refined spectrum
@@ -48,8 +51,6 @@ export const generateEnergyColor = (
 
 /**
  * Generates gradient colors for chakra-specific elements
- * @param chakraIndex The index of the chakra
- * @param intensity The intensity factor
  */
 export const generateChakraGradient = (chakraIndex: number, intensity: number = 1) => {
   // Enhanced chakra color mapping with better color harmony
