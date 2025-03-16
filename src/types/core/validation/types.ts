@@ -35,3 +35,13 @@ export interface ValidationResult<T> {
   value?: T;
   errors?: ValidationErrorDetail[];
 }
+
+/**
+ * This interface intentionally does not use generics to avoid TS1149 errors with barrel files.
+ * Type checking is still maintained through the generic ValidationResult interface.
+ */
+export interface ValidationResultBase {
+  valid: boolean;
+  value?: any;
+  errors?: ValidationErrorDetail[];
+}

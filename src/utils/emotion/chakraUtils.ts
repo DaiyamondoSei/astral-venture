@@ -1,109 +1,110 @@
 
 /**
- * Chakra utility functions for emotion and energy system
+ * Chakra Utility Functions
+ * 
+ * Centralizes chakra-related utility functions
  */
-import { 
-  ChakraType, 
-  ChakraStatus, 
-  EnergyLevel 
-} from '@/types/chakra/ChakraSystemTypes';
-import { 
-  ChakraTypes, 
-  CHAKRA_COLORS, 
-  CHAKRA_NAMES,
-  CHAKRA_COLOR_MAP,
-  CHAKRA_NAME_MAP
-} from '@/types/chakra/constants';
+import { ChakraType } from '@/types/chakra/ChakraSystemTypes';
+import { CHAKRA_COLOR_MAP, CHAKRA_NAME_MAP, CHAKRA_COLORS, CHAKRA_NAMES } from './constants';
 
 /**
- * Get all chakra names
+ * Get chakra names for display
  */
 export function getChakraNames(): string[] {
   return CHAKRA_NAMES;
 }
 
 /**
- * Get all chakra colors
+ * Get chakra colors for visualization
  */
 export function getChakraColors(): string[] {
   return CHAKRA_COLORS;
 }
 
 /**
- * Get color for specific chakra
+ * Get color for a specific chakra
+ * @param chakra Chakra type or index
  */
-export function getChakraColor(chakraType: ChakraType): string {
-  return CHAKRA_COLOR_MAP[chakraType] || '#FFFFFF';
+export function getChakraColor(chakra: ChakraType | number): string {
+  if (typeof chakra === 'number') {
+    return CHAKRA_COLORS[chakra % CHAKRA_COLORS.length];
+  }
+  return CHAKRA_COLOR_MAP[chakra] || CHAKRA_COLORS[0];
 }
 
 /**
- * Get name for specific chakra
+ * Get name for a specific chakra
+ * @param chakra Chakra type or index
  */
-export function getChakraName(chakraType: ChakraType): string {
-  return CHAKRA_NAME_MAP[chakraType] || 'Unknown';
+export function getChakraName(chakra: ChakraType | number): string {
+  if (typeof chakra === 'number') {
+    return CHAKRA_NAMES[chakra % CHAKRA_NAMES.length];
+  }
+  return CHAKRA_NAME_MAP[chakra] || CHAKRA_NAMES[0];
 }
 
 /**
- * Calculate chakra balance from activation states
+ * Calculate overall chakra balance
+ * @param chakras Chakra activation values
  */
-export function calculateChakraBalance(chakraStates: Record<ChakraType, ChakraStatus>): number {
-  // Get all chakra activation levels
-  const activationLevels = Object.values(chakraStates).map(state => state.activationLevel);
+export function calculateChakraBalance(chakras: Record<ChakraType, number>): number {
+  const values = Object.values(chakras);
+  if (values.length === 0) return 0;
   
-  if (activationLevels.length === 0) return 0;
+  const sum = values.reduce((a, b) => a + b, 0);
+  const mean = sum / values.length;
   
-  // Calculate average
-  const sum = activationLevels.reduce((acc, level) => acc + level, 0);
-  const avg = sum / activationLevels.length;
+  // Calculate standard deviation
+  const squareDiffs = values.map(value => {
+    const diff = value - mean;
+    return diff * diff;
+  });
   
-  // Calculate standard deviation to measure balance
-  const squaredDiffs = activationLevels.map(level => Math.pow(level - avg, 2));
-  const avgSquaredDiff = squaredDiffs.reduce((acc, diff) => acc + diff, 0) / squaredDiffs.length;
-  const stdDev = Math.sqrt(avgSquaredDiff);
+  const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / squareDiffs.length;
+  const stdDev = Math.sqrt(avgSquareDiff);
   
-  // Convert to a 0-100 balance score (lower deviation = better balance)
-  // Max deviation would be if all chakras were at 0 except one at 100
-  const maxPossibleStdDev = 50; // Approximate maximum standard deviation
-  const balance = 100 - (stdDev / maxPossibleStdDev * 100);
-  
-  // Ensure result is between 0 and 100
-  return Math.max(0, Math.min(100, balance));
+  // Calculate normalized balance (1 is perfect balance, 0 is totally unbalanced)
+  const maxPossibleStdDev = mean; // Theoretical maximum standard deviation
+  return Math.max(0, 1 - (stdDev / maxPossibleStdDev));
 }
 
 /**
  * Add chakra activations based on reflection content
+ * @param baseChakras Base chakra activation levels
+ * @param content Reflection content
  */
 export function addReflectionBasedChakras(
-  reflectionText: string,
-  currentActivations: Record<ChakraType, number>
+  baseChakras: Record<ChakraType, number>,
+  content: string
 ): Record<ChakraType, number> {
-  const result = { ...currentActivations };
+  const result = { ...baseChakras };
   
-  // Simple keyword-based analysis
-  const keywords = {
-    [ChakraTypes.ROOT]: ['grounded', 'secure', 'safety', 'survival', 'stability'],
-    [ChakraTypes.SACRAL]: ['creative', 'emotion', 'pleasure', 'sensation', 'feeling'],
-    [ChakraTypes.SOLAR]: ['confident', 'power', 'control', 'self-esteem', 'will'],
-    [ChakraTypes.HEART]: ['love', 'compassion', 'forgiveness', 'acceptance', 'relationship'],
-    [ChakraTypes.THROAT]: ['expression', 'truth', 'communication', 'voice', 'speak'],
-    [ChakraTypes.THIRD_EYE]: ['insight', 'intuition', 'vision', 'imagination', 'perception'],
-    [ChakraTypes.CROWN]: ['awareness', 'consciousness', 'universal', 'spiritual', 'divine']
+  // Map of keywords to chakra types
+  const chakraKeywords: Record<ChakraType, string[]> = {
+    'root': ['security', 'survival', 'grounding', 'stability', 'safety'],
+    'sacral': ['creativity', 'emotion', 'sensation', 'pleasure', 'movement'],
+    'solar': ['confidence', 'power', 'control', 'identity', 'transformation'],
+    'heart': ['love', 'compassion', 'forgiveness', 'harmony', 'peace'],
+    'throat': ['communication', 'expression', 'truth', 'voice', 'speaking'],
+    'third-eye': ['intuition', 'insight', 'vision', 'imagination', 'perception'],
+    'crown': ['awareness', 'consciousness', 'spirituality', 'connection', 'divine']
   };
   
-  const lowerText = reflectionText.toLowerCase();
-  
-  // Check for keywords in the reflection
-  Object.entries(keywords).forEach(([chakra, words]) => {
+  // Count keyword matches in content
+  Object.entries(chakraKeywords).forEach(([chakra, keywords]) => {
     const chakraType = chakra as ChakraType;
-    const matchCount = words.reduce((count, word) => {
-      const regex = new RegExp(`\\b${word}\\b`, 'gi');
-      const matches = lowerText.match(regex) || [];
-      return count + matches.length;
-    }, 0);
+    let matches = 0;
     
-    // Add activation based on matches
-    if (matchCount > 0) {
-      result[chakraType] = (result[chakraType] || 0) + (matchCount * 5);
+    keywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      const occurrences = (content.match(regex) || []).length;
+      matches += occurrences;
+    });
+    
+    // Add activation based on matches (normalized to 0-1 range)
+    if (matches > 0) {
+      const activation = Math.min(matches * 0.2, 1); // Cap at 1.0
+      result[chakraType] = Math.min(1, (result[chakraType] || 0) + activation);
     }
   });
   
@@ -111,73 +112,101 @@ export function addReflectionBasedChakras(
 }
 
 /**
- * Calculate emotional growth based on chakra changes
+ * Calculate emotional growth between two chakra states
+ * @param previous Previous chakra states
+ * @param current Current chakra states
  */
 export function calculateEmotionalGrowth(
   previous: Record<ChakraType, number>,
   current: Record<ChakraType, number>
-): number {
-  // Get total activation for both states
-  const previousTotal = Object.values(previous).reduce((sum, val) => sum + val, 0);
-  const currentTotal = Object.values(current).reduce((sum, val) => sum + val, 0);
+): Record<ChakraType, number> {
+  const growth: Record<ChakraType, number> = {} as Record<ChakraType, number>;
   
-  // Calculate change as a percentage
-  if (previousTotal === 0) return currentTotal > 0 ? 100 : 0;
+  Object.keys(current).forEach(key => {
+    const chakra = key as ChakraType;
+    const prevValue = previous[chakra] || 0;
+    const currValue = current[chakra] || 0;
+    growth[chakra] = currValue - prevValue;
+  });
   
-  const growthPercent = ((currentTotal - previousTotal) / previousTotal) * 100;
-  
-  // Cap at reasonable bounds
-  return Math.max(-100, Math.min(100, growthPercent));
+  return growth;
 }
 
 /**
- * Get intensity value for a chakra
+ * Get chakra intensity level
+ * @param value Chakra activation value (0-1)
  */
-export function getChakraIntensity(
-  chakraType: ChakraType,
-  chakraStates: Record<ChakraType, ChakraStatus>
-): number {
-  const chakra = chakraStates[chakraType];
-  if (!chakra) return 0;
-  
-  return chakra.activationLevel * (1 - chakra.blockages / 10);
+export function getChakraIntensity(value: number): 'low' | 'medium' | 'high' {
+  if (value < 0.3) return 'low';
+  if (value < 0.7) return 'medium';
+  return 'high';
 }
 
 /**
- * Get resonance between two chakras
+ * Get chakra resonance between two chakras
+ * @param chakra1 First chakra
+ * @param chakra2 Second chakra
+ * @param activations Chakra activation values
  */
 export function getChakraResonance(
   chakra1: ChakraType,
   chakra2: ChakraType,
-  chakraStates: Record<ChakraType, ChakraStatus>
+  activations: Record<ChakraType, number>
 ): number {
-  const state1 = chakraStates[chakra1];
-  const state2 = chakraStates[chakra2];
+  const activation1 = activations[chakra1] || 0;
+  const activation2 = activations[chakra2] || 0;
   
-  if (!state1 || !state2) return 0;
+  // Calculate resonance based on activation levels and relationship
+  const baseResonance = (activation1 + activation2) / 2;
   
-  // Simplified resonance calculation
-  const activationDiff = Math.abs(state1.activationLevel - state2.activationLevel);
-  const blockageDiff = Math.abs(state1.blockages - state2.blockages);
+  // Get indices
+  const chakraOrder: ChakraType[] = ['root', 'sacral', 'solar', 'heart', 'throat', 'third-eye', 'crown'];
+  const index1 = chakraOrder.indexOf(chakra1);
+  const index2 = chakraOrder.indexOf(chakra2);
   
-  // Closer activation levels and blockages = higher resonance
-  return 100 - (activationDiff + blockageDiff) * 5;
+  // Apply relationship factors
+  const distance = Math.abs(index1 - index2);
+  let relationshipFactor = 1;
+  
+  if (distance === 1) {
+    // Adjacent chakras have enhanced resonance
+    relationshipFactor = 1.3;
+  } else if (distance === 0) {
+    // Same chakra has maximum resonance
+    relationshipFactor = 1.5;
+  } else if (distance === 3) {
+    // Opposite chakras can have special resonance (like crown-root, third eye-sacral)
+    relationshipFactor = 1.2;
+  } else {
+    // Decrease with distance
+    relationshipFactor = 1 - (distance * 0.1);
+  }
+  
+  return baseResonance * relationshipFactor;
 }
 
 /**
- * Normalize chakra data for visualizations
+ * Normalize chakra data to ensure all required chakras are present
+ * @param data Partial chakra data
  */
-export function normalizeChakraData(
-  chakraStates: Record<ChakraType, ChakraStatus>
-): Record<ChakraType, number> {
-  const result: Record<ChakraType, number> = {} as Record<ChakraType, number>;
+export function normalizeChakraData(data?: Partial<Record<ChakraType, number>>): Record<ChakraType, number> {
+  const result: Record<ChakraType, number> = {
+    'root': 0,
+    'sacral': 0,
+    'solar': 0,
+    'heart': 0,
+    'throat': 0,
+    'third-eye': 0,
+    'crown': 0
+  };
   
-  Object.entries(chakraStates).forEach(([type, state]) => {
-    const chakraType = type as ChakraType;
-    // Normalize to 0-100 scale
-    result[chakraType] = state.active ? 
-      state.activationLevel * (1 - state.blockages / 10) : 0;
-  });
+  if (data) {
+    Object.entries(data).forEach(([key, value]) => {
+      if (key in result) {
+        result[key as ChakraType] = value;
+      }
+    });
+  }
   
   return result;
 }

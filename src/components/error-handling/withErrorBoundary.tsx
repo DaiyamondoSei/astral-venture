@@ -1,13 +1,13 @@
 
-import React, { ComponentType, forwardRef } from 'react';
-import ErrorBoundary from '../ErrorBoundary';
+import React, { ComponentType, forwardRef, ForwardedRef } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 import ErrorFallback from './ErrorFallback';
-import { usePerformance } from '../../contexts/PerformanceContext';
-import { usePerformanceTracking } from '../../hooks/usePerformanceTracking';
+import { usePerformance } from '@/contexts/PerformanceContext';
+import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 
 interface WithErrorBoundaryOptions {
   fallback?: React.ReactNode;
-  errorComponent?: ComponentType<{ error: Error; resetErrorBoundary: () => void }>;
+  errorComponent?: ComponentType<{ error: Error; resetErrorBoundary: () => void; showDetails?: boolean }>;
   trackErrors?: boolean;
   trackPerformance?: boolean;
   logErrors?: boolean;
@@ -44,10 +44,10 @@ export function withErrorBoundary<P extends object>(
     const performance = usePerformance();
     const { trackInteraction } = usePerformanceTracking({
       componentName,
-      trackRenderCount: trackPerformance,
+      trackRenders: trackPerformance,
       trackMountTime: trackPerformance,
       trackUpdateTime: trackPerformance,
-      logSlowRenders: performance.config.enableDetailedLogging
+      logSlowRenders: trackPerformance && performance.config.enableDetailedLogging
     });
 
     // Create a custom error handler
@@ -60,10 +60,10 @@ export function withErrorBoundary<P extends object>(
 
       // Track the error if enabled
       if (trackErrors && trackPerformance) {
-        performance.trackEvent('component_error', {
+        performance.trackMetric('component_error', 1, {
           componentName,
-          error: error.message,
-          stack: error.stack
+          errorMessage: error.message,
+          errorName: error.name
         });
       }
 
@@ -73,16 +73,16 @@ export function withErrorBoundary<P extends object>(
       }
     };
 
-    // Create a custom fallback component if none is provided
-    const errorFallback = fallback || (
-      (errorProps: { error: Error; resetErrorBoundary: () => void }) => (
-        <ErrorComponent {...errorProps} />
-      )
+    // Create the fallback element
+    const errorFallback = (errorProps: { error: Error; resetErrorBoundary: () => void }) => (
+      <ErrorComponent {...errorProps} />
     );
 
     return (
       <ErrorBoundary
-        fallback={errorFallback}
+        fallback={fallback || errorFallback}
+        onError={handleError}
+        componentName={componentName}
       >
         <Component {...props} ref={ref} />
       </ErrorBoundary>

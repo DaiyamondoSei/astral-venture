@@ -14,7 +14,7 @@ export const ChakraTypes = {
   THROAT: 'throat' as ChakraType,
   THIRD_EYE: 'third-eye' as ChakraType,
   CROWN: 'crown' as ChakraType
-};
+} as const;
 
 // Chakra names for display
 export const CHAKRA_NAMES = [

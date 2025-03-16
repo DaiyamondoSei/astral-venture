@@ -18,11 +18,11 @@ export const ValidationErrorCodes = {
   CONSTRAINT_ERROR: 'CONSTRAINT_ERROR' as ValidationErrorCode,
   FIELD_REQUIRED: 'FIELD_REQUIRED' as ValidationErrorCode,
   UNKNOWN_ERROR: 'UNKNOWN_ERROR' as ValidationErrorCode
-};
+} as const;
 
 // Runtime values for ErrorSeverity
 export const ErrorSeverities = {
   ERROR: 'error' as ErrorSeverity,
   WARNING: 'warning' as ErrorSeverity,
   INFO: 'info' as ErrorSeverity
-};
+} as const;

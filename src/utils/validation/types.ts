@@ -45,3 +45,11 @@ export type ErrorMessageGetter = (path: string) => string;
 export interface ValidationSchema<T> {
   [key: string]: Validator<any> | ValidationSchema<any>;
 }
+
+// Validation metadata for enhanced error reporting
+export interface ValidationMetadata {
+  field: string;
+  expectedType?: string;
+  constraints?: Record<string, any>;
+  message?: string;
+}

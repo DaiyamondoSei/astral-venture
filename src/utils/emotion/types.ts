@@ -1,46 +1,72 @@
 
-// Emotion analysis types
-export type SacredGeometryType = 
-  | 'flowerOfLife' 
-  | 'metatronsCube' 
-  | 'sriYantra' 
-  | 'seedOfLife' 
-  | 'vesicaPiscis'
-  | 'treeOfLife';
+/**
+ * Emotion system types
+ * Following the Type-Value Pattern
+ */
 
-export type GeometryResourceType = {
-  type: SacredGeometryType;
-  path: string;
+// Emotion category
+export type EmotionCategory = 
+  | 'joy' 
+  | 'sadness' 
+  | 'anger' 
+  | 'fear' 
+  | 'surprise' 
+  | 'disgust' 
+  | 'anticipation'
+  | 'trust'
+  | 'other';
+
+// Emotional depth level
+export type EmotionalDepthLevel = 
+  | 'surface' 
+  | 'shallow' 
+  | 'moderate' 
+  | 'deep' 
+  | 'profound';
+
+// Import ChakraType directly to avoid circular dependencies
+export { ChakraType } from '@/types/chakra/ChakraSystemTypes';
+
+// Dream theme type
+export type DreamTheme = 
+  | 'water' 
+  | 'fire' 
+  | 'earth' 
+  | 'air' 
+  | 'light' 
+  | 'darkness' 
+  | 'transformation' 
+  | 'journey' 
+  | 'conflict'
+  | 'unknown';
+
+// Emotion intensity
+export type EmotionIntensity = 'low' | 'medium' | 'high' | 'extreme';
+
+// Analysis detail level
+export type AnalysisDetailLevel = 'basic' | 'standard' | 'detailed' | 'comprehensive';
+
+// Emotion data structure
+export interface EmotionData {
+  category: EmotionCategory;
+  intensity: EmotionIntensity;
   description?: string;
-  energyLevel?: number;
-  svgContent?: string;
-  loaded?: boolean;
-  error?: string;
-};
-
-// Emotion analysis result interface
-export interface EmotionAnalysisResult {
-  dominantEmotion?: string;
-  emotionalDepth?: number;
-  chakrasActivated?: number[];
-  emotionBreakdown?: Record<string, number>;
-  recommendations?: string[];
-  chakras?: number[]; // For backward compatibility
-  dominantThemes?: string[]; // For backward compatibility
-  emotions?: string[]; // For backward compatibility
-  insights?: string[]; // For backward compatibility
+  relatedChakras?: string[];
 }
 
-// Chakra analysis result interface
-export interface ChakraAnalysisResult {
-  activatedChakras?: number[];
-  dominantChakra?: number;
-  chakraBalance?: Record<number, number>;
-  recommendations?: string[];
-  chakras?: number[]; // For backward compatibility
-  dominantThemes?: string[]; // For backward compatibility
-  emotions?: string[]; // For backward compatibility
-  insights?: string[]; // For backward compatibility
-  intensity?: number[]; // For backward compatibility with intensity
-  balanceScore?: number; // For backward compatibility
+// Reflection analysis result
+export interface ReflectionAnalysis {
+  emotions: EmotionData[];
+  themes: string[];
+  depth: EmotionalDepthLevel;
+  insights: string[];
+  chakraActivations?: Record<string, number>;
+}
+
+// Chakra resonance data
+export interface ChakraResonance {
+  chakra: string;
+  resonanceScore: number;
+  keywords: string[];
+  elements: string[];
 }

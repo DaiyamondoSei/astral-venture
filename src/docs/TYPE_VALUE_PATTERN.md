@@ -1,158 +1,192 @@
 
-# Type-Value Pattern Best Practices
+# Type-Value Pattern
 
 ## Problem
 
-One of the most common TypeScript errors in our application is the confusion between types and values:
+In TypeScript, we often encounter the error:
 
 ```typescript
-// ERROR: 'ChakraType' only refers to a type, but is being used as a value here
-if (chakra === ChakraType.ROOT) { ... }
+// ERROR: 'ErrorCategory' only refers to a type, but is being used as a value here.
+if (error.category === ErrorCategory.VALIDATION) { ... }
 ```
 
-This happens because TypeScript types are erased during compilation - they don't exist at runtime.
+This happens because TypeScript types exist only at compile-time, yet we try to use them at runtime.
 
 ## Solution: The Type-Value Pattern
 
-The Type-Value pattern provides both compile-time type safety and runtime values for the same concepts:
+The Type-Value Pattern solves this by separating types (compile-time) from values (runtime):
 
 ```typescript
-// TYPE (used in type annotations)
-export type ChakraType = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
+// TYPE definition (for compile-time checking)
+export type ErrorCategory = 'validation' | 'network' | 'api' | 'unknown';
 
-// VALUE (used in runtime code)
-export const ChakraTypes = {
-  ROOT: 'root' as ChakraType,
-  SACRAL: 'sacral' as ChakraType,
-  SOLAR: 'solar' as ChakraType,
-  HEART: 'heart' as ChakraType,
-  THROAT: 'throat' as ChakraType,
-  THIRD_EYE: 'third-eye' as ChakraType,
-  CROWN: 'crown' as ChakraType
-};
+// VALUE definition (for runtime usage)
+export const ErrorCategories = {
+  VALIDATION: 'validation' as ErrorCategory,
+  NETWORK: 'network' as ErrorCategory,
+  API: 'api' as ErrorCategory,
+  UNKNOWN: 'unknown' as ErrorCategory
+} as const;
 
-// Type usage (compile-time)
-function activateChakra(chakra: ChakraType) { ... }
-
-// Value usage (runtime)
-if (currentChakra === ChakraTypes.ROOT) { ... }
+// CORRECT usage
+if (error.category === ErrorCategories.VALIDATION) {
+  // This works correctly
+}
 ```
+
+## Benefits of This Pattern
+
+1. **Type Safety**: The compiler ensures we only use valid values from the type.
+2. **Runtime Access**: We can use the constants at runtime in JavaScript.
+3. **IntelliSense Support**: IDEs provide autocompletion for both types and values.
+4. **Refactoring Support**: Renaming is safer since the compiler tracks both usages.
+5. **Single Source of Truth**: Types and values stay synchronized.
 
 ## Implementation Guidelines
 
-1. **Naming Conventions**:
-   - Use singular for the type (`ChakraType`)
-   - Use plural for the values object (`ChakraTypes`)
-   - Use uppercase for value constants
-
-2. **File Organization**:
-   - Put related types and constants in separate files (`types.ts` and `constants.ts`)
-   - Re-export both from an `index.ts` file
-
-3. **Type Assertions**:
-   - Always use `as` to assert string literals to their specific type
-   - Use `as const` on the constants object to make it deeply readonly
-
-4. **Type Guards for Runtime Validation**:
-   ```typescript
-   function isChakraType(value: string): value is ChakraType {
-     return Object.values(ChakraTypes).includes(value as ChakraType);
-   }
-   ```
-
-## Benefits
-
-1. **Type Safety**: Enforces correct values at compile time
-2. **Runtime Validation**: Allows checking values at runtime
-3. **Autocompletion**: IDE provides autocomplete for both types and values
-4. **Single Source of Truth**: Types and values stay in sync
-5. **Maintainability**: Changes to one place automatically update both
-
-## Examples
-
-### Example 1: Performance Modes
+### 1. Basic Implementation
 
 ```typescript
-// types.ts
-export type PerformanceMode = 'battery' | 'balanced' | 'performance' | 'auto' | 'quality';
+// File: types.ts
+export type Status = 'pending' | 'active' | 'completed' | 'failed';
 
-// constants.ts
-export const PerformanceModes = {
-  BATTERY: 'battery' as PerformanceMode,
-  BALANCED: 'balanced' as PerformanceMode,
-  PERFORMANCE: 'performance' as PerformanceMode,
-  AUTO: 'auto' as PerformanceMode,
-  QUALITY: 'quality' as PerformanceMode
+// File: constants.ts
+import { Status } from './types';
+
+export const Statuses = {
+  PENDING: 'pending' as Status,
+  ACTIVE: 'active' as Status,
+  COMPLETED: 'completed' as Status,
+  FAILED: 'failed' as Status
 } as const;
-
-// usage.ts
-function setPerformanceMode(mode: PerformanceMode) { ... }
-
-// Correct runtime usage
-setPerformanceMode(PerformanceModes.BALANCED);
 ```
 
-### Example 2: Validation Error Codes
+### 2. Recommended File Structure
+
+For smaller systems:
+```
+src/types/core/domain/
+  ├── types.ts       # Type definitions
+  └── constants.ts   # Runtime constants
+```
+
+For larger systems:
+```
+src/types/core/domain/
+  ├── types/
+  │   ├── status.ts
+  │   └── user.ts
+  └── constants/
+      ├── status.ts
+      └── user.ts
+```
+
+### 3. Export Pattern
+
+Use barrel exports to simplify imports:
 
 ```typescript
-// types.ts
-export type ValidationErrorCode = 
-  | 'REQUIRED' 
-  | 'TYPE_ERROR' 
-  | 'FORMAT_ERROR'
-  | 'CONSTRAINT_ERROR';
+// File: types/index.ts
+export * from './types';
+export * from './constants';
 
-// constants.ts
-export const ValidationErrorCodes = {
-  REQUIRED: 'REQUIRED' as ValidationErrorCode,
-  TYPE_ERROR: 'TYPE_ERROR' as ValidationErrorCode,
-  FORMAT_ERROR: 'FORMAT_ERROR' as ValidationErrorCode,
-  CONSTRAINT_ERROR: 'CONSTRAINT_ERROR' as ValidationErrorCode
-} as const;
+// Usage elsewhere
+import { Status, Statuses } from '@/types';
+
+function checkStatus(status: Status) {
+  if (status === Statuses.COMPLETED) {
+    // ...
+  }
+}
+```
+
+### 4. Type Guards
+
+Add type guards for runtime validation:
+
+```typescript
+export function isValidStatus(value: string): value is Status {
+  return Object.values(Statuses).includes(value as Status);
+}
 
 // Usage
-function createError(code: ValidationErrorCode, message: string) { ... }
-
-// Correct runtime usage
-createError(ValidationErrorCodes.REQUIRED, "Field is required");
+function processStatus(status: string) {
+  if (isValidStatus(status)) {
+    // TypeScript knows 'status' is of type 'Status' here
+  } else {
+    // Handle invalid status
+  }
+}
 ```
 
-## Anti-Patterns to Avoid
+## Common Pitfalls
 
-1. **Using Type as Value**:
-   ```typescript
-   // WRONG
-   if (mode === PerformanceMode.BATTERY) { ... }
-   
-   // RIGHT
-   if (mode === PerformanceModes.BATTERY) { ... }
-   ```
+### 1. Using TypeScript Enums
 
-2. **Using Enum Instead**:
-   ```typescript
-   // AVOID TypeScript enums when possible
-   enum ChakraType { ROOT, SACRAL, SOLAR }
-   
-   // Prefer string literal types with constants
-   ```
+TypeScript enums mix types and values, causing confusion:
 
-3. **Missing Type Assertion**:
-   ```typescript
-   // WRONG
-   export const ChakraTypes = {
-     ROOT: 'root', // Missing type assertion
-   };
-   
-   // RIGHT
-   export const ChakraTypes = {
-     ROOT: 'root' as ChakraType,
-   };
-   ```
+```typescript
+// NOT RECOMMENDED
+enum Status {
+  PENDING = 'pending',
+  ACTIVE = 'active'
+}
+```
 
-## When to Apply This Pattern
+### 2. Inconsistent Naming
 
-- Whenever you have a concept that needs both type checking and runtime comparison
-- For all string literal unions that will be used as values in the code
-- Any time you're tempted to use a TypeScript enum
+Keep naming consistent:
 
-By consistently applying the Type-Value pattern, you'll eliminate a whole class of common TypeScript errors and improve code maintainability.
+```typescript
+// GOOD
+type ErrorCategory = '...';
+const ErrorCategories = { ... };
+
+// BAD - inconsistent plurality
+type ErrorCategory = '...';
+const ErrorCategory = { ... };
+```
+
+### 3. Missing 'as const'
+
+Without `as const`, TypeScript assumes broader types:
+
+```typescript
+// Without 'as const', TypeScript sees this as { PENDING: string, ... }
+export const Statuses = { PENDING: 'pending' as Status, ... }
+
+// WITH 'as const', TypeScript sees specific literals
+export const Statuses = { PENDING: 'pending' as Status, ... } as const;
+```
+
+## Real-World Example
+
+```typescript
+// types.ts
+export type NotificationType = 'info' | 'warning' | 'error' | 'success';
+
+// constants.ts
+import { NotificationType } from './types';
+
+export const NotificationTypes = {
+  INFO: 'info' as NotificationType,
+  WARNING: 'warning' as NotificationType,
+  ERROR: 'error' as NotificationType,
+  SUCCESS: 'success' as NotificationType
+} as const;
+
+// Component usage
+function Notification({ type = NotificationTypes.INFO, message }: NotificationProps) {
+  // Type-safe usage at runtime
+  const icon = type === NotificationTypes.ERROR ? <AlertIcon /> : <InfoIcon />;
+  
+  return (
+    <div className={`notification notification-${type}`}>
+      {icon}
+      <p>{message}</p>
+    </div>
+  );
+}
+```
+
+By consistently applying this pattern, you'll eliminate a whole class of TypeScript errors while maintaining runtime type safety.

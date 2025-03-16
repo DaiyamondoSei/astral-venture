@@ -1,16 +1,50 @@
 
 /**
- * Performance-related constants following the Type-Value Pattern
+ * Performance system type definitions
+ * Following the Type-Value Pattern
  */
 import { 
-  MetricType, 
-  DeviceCapability, 
-  PerformanceMode, 
-  RenderFrequency, 
-  QualityLevel 
+  DeviceCapability,
+  PerformanceMode,
+  RenderFrequency,
+  QualityLevel,
+  MetricType,
+  WebVitalCategory
 } from './types';
 
-// Runtime values for MetricType
+// Device capability values
+export const DeviceCapabilities = {
+  LOW: 'low' as DeviceCapability,
+  MEDIUM: 'medium' as DeviceCapability,
+  HIGH: 'high' as DeviceCapability
+} as const;
+
+// Performance mode values
+export const PerformanceModes = {
+  BATTERY: 'battery' as PerformanceMode,
+  BALANCED: 'balanced' as PerformanceMode,
+  PERFORMANCE: 'performance' as PerformanceMode,
+  AUTO: 'auto' as PerformanceMode,
+  QUALITY: 'quality' as PerformanceMode
+} as const;
+
+// Render frequency values
+export const RenderFrequencies = {
+  LOW: 'low' as RenderFrequency,
+  MEDIUM: 'medium' as RenderFrequency,
+  HIGH: 'high' as RenderFrequency,
+  EXCESSIVE: 'excessive' as RenderFrequency
+} as const;
+
+// Quality level values
+export const QualityLevels = {
+  LOW: 'low' as QualityLevel,
+  MEDIUM: 'medium' as QualityLevel,
+  HIGH: 'high' as QualityLevel,
+  ULTRA: 'ultra' as QualityLevel
+} as const;
+
+// Metric types
 export const MetricTypes = {
   RENDER: 'render' as MetricType,
   INTERACTION: 'interaction' as MetricType,
@@ -25,43 +59,54 @@ export const MetricTypes = {
   SUMMARY: 'summary' as MetricType,
   PERFORMANCE: 'performance' as MetricType,
   WEB_VITAL: 'web_vital' as MetricType
-};
+} as const;
 
-// Runtime values for DeviceCapability
-export const DeviceCapabilities = {
-  LOW: 'low' as DeviceCapability,
-  MEDIUM: 'medium' as DeviceCapability,
-  HIGH: 'high' as DeviceCapability
-};
+// Web vital categories
+export const WebVitalCategories = {
+  LOADING: 'loading' as WebVitalCategory,
+  INTERACTION: 'interaction' as WebVitalCategory,
+  VISUAL_STABILITY: 'visual_stability' as WebVitalCategory
+} as const;
 
-// Runtime values for PerformanceMode
-export const PerformanceModes = {
-  BATTERY: 'battery' as PerformanceMode,
-  BALANCED: 'balanced' as PerformanceMode,
-  PERFORMANCE: 'performance' as PerformanceMode,
-  AUTO: 'auto' as PerformanceMode,
-  QUALITY: 'quality' as PerformanceMode
-};
+// Resource optimization levels
+export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
 
-// Runtime values for RenderFrequency
-export const RenderFrequencies = {
-  LOW: 'low' as RenderFrequency,
-  MEDIUM: 'medium' as RenderFrequency,
-  HIGH: 'high' as RenderFrequency,
-  EXCESSIVE: 'excessive' as RenderFrequency
-};
+export const ResourceOptimizationLevels = {
+  NONE: 'none' as ResourceOptimizationLevel,
+  CONSERVATIVE: 'conservative' as ResourceOptimizationLevel,
+  AGGRESSIVE: 'aggressive' as ResourceOptimizationLevel
+} as const;
 
-// Runtime values for QualityLevel
-export const QualityLevels = {
-  LOW: 'low' as QualityLevel,
-  MEDIUM: 'medium' as QualityLevel,
-  HIGH: 'high' as QualityLevel,
-  ULTRA: 'ultra' as QualityLevel
-};
-
-// Default quality levels for different device capabilities
-export const DEFAULT_QUALITY_LEVELS = {
-  [DeviceCapabilities.LOW]: QualityLevels.LOW,
-  [DeviceCapabilities.MEDIUM]: QualityLevels.MEDIUM,
-  [DeviceCapabilities.HIGH]: QualityLevels.HIGH
-};
+// Performance configuration interface
+export interface PerfConfig {
+  // Core settings
+  deviceCapability: DeviceCapability;
+  useManualCapability: boolean;
+  disableAnimations: boolean;
+  disableEffects: boolean;
+  
+  // Sampling settings
+  samplingRate: number;
+  throttleInterval: number;
+  
+  // Monitoring configuration
+  slowRenderThreshold: number;
+  maxTrackedComponents: number;
+  
+  // Feature toggles
+  enableValidation: boolean;
+  enablePerformanceTracking: boolean;
+  enableRenderTracking: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  
+  // Optimizations
+  batchUpdates: boolean;
+  inactiveTabThrottling: boolean;
+  intelligentProfiling: boolean;
+  resourceOptimizationLevel: ResourceOptimizationLevel;
+  
+  // Advanced settings
+  customThrottleInterval?: number;
+  metricsPersistence: boolean;
+}
