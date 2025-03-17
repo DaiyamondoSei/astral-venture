@@ -1,90 +1,75 @@
 
 /**
- * Performance metrics types
+ * Performance Metrics Types
  * 
- * This module provides type definitions for performance metrics
- * including component metrics, web vitals, and custom performance metrics.
+ * This module provides types for performance metrics and monitoring.
  */
 
-// Basic metric types
-export type MetricType = 'performance' | 'interaction' | 'memory' | 'network' | 'custom';
+import { MetricType, WebVitalCategory, WebVitalName } from './types';
 
-// Web Vitals names
-export type WebVitalName = 'FCP' | 'LCP' | 'CLS' | 'FID' | 'TTFB' | 'INP';
-
-// Web Vitals categories
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
-
-// Performance metric base interface
-export interface PerformanceMetric {
-  metric_name: string;
-  value: number;
-  timestamp?: number;
-  type: MetricType;
-  category?: string;
-  metadata?: Record<string, any>;
-}
-
-// Web Vitals metric interface
-export interface WebVitalMetric extends PerformanceMetric {
-  metric_name: WebVitalName;
-  category: WebVitalCategory;
-}
-
-// Component metrics interface
-export interface ComponentMetrics {
+// Component render metrics
+export interface RenderMetrics {
   componentName: string;
+  renderTime: number;
   renderCount: number;
-  averageRenderTime: number;
-  maxRenderTime?: number;
-  minRenderTime?: number;
-  slowRenderCount?: number;
-  lastRenderTime?: number;
-  totalRenderTime?: number;
-  renderTimes?: number[];
-  interactionMetrics?: Record<string, number>;
+  timeToFirstRender?: number;
+  reRenderCount?: number;
+  lastUpdate: number;
 }
 
-// Type guards
+// Performance summary metrics
+export interface PerformanceSummary {
+  averageFPS: number;
+  memoryUsage: number;
+  cpuUsage?: number;
+  totalComponentsRendered: number;
+  averageRenderTime: number;
+  slowRenders: number;
+  timestamp: number;
+  windowSize: { width: number; height: number };
+}
+
+// Device information for metrics context
+export interface DeviceInfo {
+  userAgent: string;
+  deviceCategory: 'mobile' | 'tablet' | 'desktop';
+  screenSize: {
+    width: number;
+    height: number;
+  };
+  connection?: {
+    type?: string;
+    speed?: number;
+  };
+}
+
+// Type guards for metrics
 export function isValidMetricType(type: string): type is MetricType {
-  return ['performance', 'interaction', 'memory', 'network', 'custom'].includes(type);
+  return ['render', 'interaction', 'load', 'memory', 'network', 'resource', 
+          'javascript', 'css', 'animation', 'metric', 'summary', 
+          'performance', 'webVital'].includes(type);
 }
 
 export function isValidWebVitalName(name: string): name is WebVitalName {
-  return ['FCP', 'LCP', 'CLS', 'FID', 'TTFB', 'INP'].includes(name);
+  return ['CLS', 'FCP', 'LCP', 'TTFB', 'FID', 'INP'].includes(name);
 }
 
 export function isValidWebVitalCategory(category: string): category is WebVitalCategory {
   return ['loading', 'interaction', 'visual_stability'].includes(category);
 }
 
-export function isPerformanceMetric(metric: any): metric is PerformanceMetric {
+export function isComponentMetrics(metrics: unknown): metrics is ComponentMetrics {
+  if (!metrics || typeof metrics !== 'object') return false;
+  
+  const m = metrics as Partial<ComponentMetrics>;
   return (
-    typeof metric === 'object' &&
-    typeof metric.metric_name === 'string' &&
-    typeof metric.value === 'number' &&
-    isValidMetricType(metric.type)
+    typeof m.componentName === 'string' &&
+    typeof m.renderCount === 'number' &&
+    typeof m.averageRenderTime === 'number'
   );
 }
 
-export function isWebVitalMetric(metric: any): metric is WebVitalMetric {
-  return (
-    isPerformanceMetric(metric) &&
-    isValidWebVitalName(metric.metric_name) &&
-    isValidWebVitalCategory(metric.category)
-  );
-}
-
-export function isComponentMetrics(metrics: any): metrics is ComponentMetrics {
-  return (
-    typeof metrics === 'object' &&
-    typeof metrics.componentName === 'string' &&
-    typeof metrics.renderCount === 'number' &&
-    typeof metrics.averageRenderTime === 'number'
-  );
-}
-
-// ID generation for metrics
-export function ensureMetricId(metric: PerformanceMetric): string {
-  return `${metric.type}-${metric.metric_name}-${metric.timestamp || Date.now()}`;
+// Helper function to create an ID for metrics
+export function ensureMetricId(metric: { metric_name: string; timestamp?: number }): string {
+  return `${metric.metric_name}-${metric.timestamp || Date.now()}`;
 }

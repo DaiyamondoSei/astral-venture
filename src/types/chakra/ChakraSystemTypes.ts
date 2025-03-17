@@ -1,4 +1,10 @@
 
+/**
+ * Chakra System Types
+ * 
+ * This module provides types for the chakra energy system.
+ */
+
 export type ChakraType = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
 
 export interface ChakraStatus {
@@ -16,6 +22,8 @@ export interface ChakraSystem {
     overallBalance: number;
     chakraBalanceRatios: Record<ChakraType, number>;
   };
+  quantumStates?: Record<string, unknown>;
+  metrics?: Record<string, number>;
 }
 
 export interface ChakraSystemProps {

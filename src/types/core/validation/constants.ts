@@ -1,8 +1,11 @@
 
 /**
  * Validation system constants
- * Following the Type-Value Pattern for type safety
+ * 
+ * This module provides runtime constants that correspond to the types in types.ts,
+ * following the Type-Value Pattern for TypeScript.
  */
+
 import { ValidationErrorCode, ErrorSeverity } from './types';
 
 // Runtime values for ErrorSeverity 
@@ -44,48 +47,21 @@ export const ValidationErrorCodes = {
   GET_ACHIEVEMENT_PROGRESS_ERROR: 'GET_ACHIEVEMENT_PROGRESS_ERROR' as ValidationErrorCode
 } as const;
 
-// Create a config type for performance configuration
-export interface PerfConfig {
-  // Core settings
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  
-  // Feature flags
-  enabled: boolean;
-  enableValidation: boolean;
-  enableRenderTracking: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  
-  // Performance optimization features
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  
-  // Resource settings
-  resourceOptimizationLevel: 'none' | 'conservative' | 'aggressive';
-  
-  // Data persistence
-  metricsPersistence: boolean;
-}
-
-// Performance level options
-export const PerfOptimizationLevels = {
-  NONE: 'none',
-  CONSERVATIVE: 'conservative',
-  AGGRESSIVE: 'aggressive'
-} as const;
-
 // Default performance configurations for different device types
-export const DEFAULT_PERF_CONFIGS: Record<'low' | 'medium' | 'high', PerfConfig> = {
+export const DEFAULT_PERF_CONFIGS = {
   low: {
     samplingRate: 0.1,
     throttleInterval: 1000,
     maxTrackedComponents: 20,
-    enabled: true,
-    enableValidation: false,
+    useManualCapability: false,
+    deviceCapability: 'low',
+    disableAnimations: true,
+    disableEffects: true,
+    disableBlur: true, 
+    disableShadows: true,
+    enablePerformanceTracking: true,
     enableRenderTracking: true,
+    enableValidation: false,
     enablePropTracking: false,
     enableDebugLogging: false,
     intelligentProfiling: false,
@@ -98,9 +74,15 @@ export const DEFAULT_PERF_CONFIGS: Record<'low' | 'medium' | 'high', PerfConfig>
     samplingRate: 0.3,
     throttleInterval: 500,
     maxTrackedComponents: 50,
-    enabled: true,
-    enableValidation: true,
+    useManualCapability: false,
+    deviceCapability: 'medium',
+    disableAnimations: false,
+    disableEffects: false,
+    disableBlur: true, 
+    disableShadows: true,
+    enablePerformanceTracking: true,
     enableRenderTracking: true,
+    enableValidation: true,
     enablePropTracking: true,
     enableDebugLogging: false,
     intelligentProfiling: true,
@@ -113,9 +95,15 @@ export const DEFAULT_PERF_CONFIGS: Record<'low' | 'medium' | 'high', PerfConfig>
     samplingRate: 0.5,
     throttleInterval: 200,
     maxTrackedComponents: 100,
-    enabled: true,
-    enableValidation: true,
+    useManualCapability: false,
+    deviceCapability: 'high',
+    disableAnimations: false,
+    disableEffects: false,
+    disableBlur: false, 
+    disableShadows: false,
+    enablePerformanceTracking: true,
     enableRenderTracking: true,
+    enableValidation: true,
     enablePropTracking: true,
     enableDebugLogging: true,
     intelligentProfiling: true,

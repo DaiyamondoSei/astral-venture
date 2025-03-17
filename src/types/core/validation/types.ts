@@ -1,6 +1,8 @@
 
 /**
- * Validation system types
+ * Validation System Types
+ * 
+ * This module provides the foundational types for the validation system.
  */
 
 // Validation error severity levels
@@ -36,6 +38,24 @@ export type ValidationErrorCode =
   | 'CHECK_ACHIEVEMENT_ERROR'
   | 'AWARD_ACHIEVEMENT_ERROR'
   | 'GET_ACHIEVEMENT_PROGRESS_ERROR';
+
+// Validation error detail with required properties
+export interface ValidationErrorDetail {
+  path: string;
+  message: string;
+  code: ValidationErrorCode;
+  severity: ErrorSeverity;
+  metadata?: Record<string, unknown>;
+}
+
+// Validation result for generic type T
+export interface ValidationResult<T = unknown> {
+  isValid: boolean;
+  errors: ValidationErrorDetail[];
+  value?: T;
+  validatedData?: T; // For backward compatibility
+  metadata?: Record<string, unknown>;
+}
 
 // Validation field options for constraining values
 export interface ValidationFieldOptions {
@@ -85,25 +105,16 @@ export interface ValidationContext {
   metadata?: Record<string, unknown>;
 }
 
-// Validator function type
-export type Validator<T = any> = (
+// Validator function type - used for creating custom validators
+export type Validator<T = unknown> = (
   value: unknown,
   context?: ValidationContext
 ) => Promise<ValidationResult<T>> | ValidationResult<T>;
 
-// Validation error detail with required properties
-export interface ValidationErrorDetail {
-  path: string;
-  message: string;
-  code: ValidationErrorCode;
-  severity: ErrorSeverity;
-  metadata?: Record<string, unknown>;
-}
-
-// Validation result for generic type T
-export interface ValidationResult<T = any> {
-  isValid: boolean;
-  errors: ValidationErrorDetail[];
-  value?: T;
-  validatedData?: T; // For backward compatibility
+// Validation metadata
+export interface ValidationMetadata {
+  timestamp: number;
+  validatorName: string;
+  contextPath?: string;
+  executionTime?: number;
 }

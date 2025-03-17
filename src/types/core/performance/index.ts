@@ -4,39 +4,52 @@
  * 
  * This file serves as the central export point for all performance-related
  * types and their corresponding runtime constants.
+ * 
+ * @version 1.0.0
  */
 
 // Export all types
-export * from './constants';
+export * from './types';
 
 // Export all runtime constants
-export * from './runtime-constants';
+export * from './constants';
 
-// Export metrics and config
-export * from './metrics';
+// Export additional utility types
 export * from './config';
+export * from './metrics';
 
-/**
- * Best Practices for Performance Types
- * 
- * 1. Type-Value Pattern Implementation:
- *    - Define types in 'constants.ts'
- *    - Define runtime constants in 'runtime-constants.ts'
- *    - Ensure each type has a corresponding runtime constant
- *    - Use 'as const' to ensure type safety
- * 
- * 2. Interface Synchronization:
- *    - Always update both the interface and implementation when adding new features
- *    - Use default values to maintain backwards compatibility
- *    - Add adapter patterns when existing interfaces need to evolve
- * 
- * 3. Consistent Naming:
- *    - Use PascalCase for type names and interfaces
- *    - Use UPPER_SNAKE_CASE for runtime constants
- *    - Use camelCase for function names and variables
- * 
- * 4. File Organization:
- *    - Group related types in logical files
- *    - Use index files to create a clean public API
- *    - Document the purpose of each file
- */
+// Type guards and utility functions
+export const isValidDeviceCapability = (value: unknown): value is DeviceCapability => {
+  return typeof value === 'string' && 
+    Object.values(DeviceCapabilities).includes(value as DeviceCapability);
+};
+
+export const isValidPerformanceMode = (value: unknown): value is PerformanceMode => {
+  return typeof value === 'string' && 
+    Object.values(PerformanceModes).includes(value as PerformanceMode);
+};
+
+export const isValidQualityLevel = (value: unknown): value is QualityLevel => {
+  return typeof value === 'string' && 
+    Object.values(QualityLevels).includes(value as QualityLevel);
+};
+
+export const isValidCubeTheme = (value: unknown): value is CubeTheme => {
+  return typeof value === 'string' && 
+    Object.values(CubeThemes).includes(value as CubeTheme);
+};
+
+export const isValidCubeSize = (value: unknown): value is CubeSize => {
+  return typeof value === 'string' && 
+    Object.values(CubeSizes).includes(value as CubeSize);
+};
+
+export const isValidGlowIntensity = (value: unknown): value is GlowIntensity => {
+  return typeof value === 'string' && 
+    Object.values(GlowIntensities).includes(value as GlowIntensity);
+};
+
+export const isValidGlassmorphicVariant = (value: unknown): value is GlassmorphicVariant => {
+  return typeof value === 'string' && 
+    Object.values(GlassmorphicVariants).includes(value as GlassmorphicVariant);
+};

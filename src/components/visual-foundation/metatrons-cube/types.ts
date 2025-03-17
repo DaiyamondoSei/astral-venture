@@ -2,6 +2,7 @@
 /**
  * Types for the Metatron's Cube visualization components
  */
+import { CubeSize, CubeTheme, GlowIntensity } from '@/types/core/performance/types';
 
 // Node Types
 export interface MetatronsNode {
@@ -21,21 +22,13 @@ export interface MetatronsConnection {
   id: string;
   source: string;
   target: string;
+  // Compatibility aliases for backward compatibility
   from?: string;
   to?: string;
   active?: boolean;
   animated?: boolean;
   width?: number;
 }
-
-// Cube Size
-export type CubeSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
-
-// Cube Theme
-export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'chakra' | 'energy' | 'spiritual' | 'quantum';
-
-// Glow Intensity
-export type GlowIntensity = 'none' | 'low' | 'medium' | 'high';
 
 // Cube Data Structure
 export interface MetatronsCubeData {

@@ -1,5 +1,9 @@
 
-import { CubeSize, CubeTheme, GlowIntensity, MetatronsNode, MetatronsConnection } from './types';
+/**
+ * Utility functions for Metatron's Cube visualization
+ */
+import { CubeSize, CubeTheme, GlowIntensity } from '@/types/core/performance/types';
+import { MetatronsNode, MetatronsConnection } from './types';
 
 // Helper function to get theme color based on variant
 export const getCubeThemeColors = (variant: CubeTheme = 'default') => {
@@ -80,25 +84,25 @@ export const createDefaultNodes = (): MetatronsNode[] => {
 // Create default connections between nodes
 export const createDefaultConnections = (): MetatronsConnection[] => {
   return [
-    { from: 'center', to: 'node1' },
-    { from: 'center', to: 'node2' },
-    { from: 'center', to: 'node3' },
-    { from: 'center', to: 'node4' },
-    { from: 'center', to: 'node5' },
-    { from: 'center', to: 'node6' },
-    { from: 'center', to: 'node7' },
-    { from: 'center', to: 'node8' },
-    { from: 'node1', to: 'node5' },
-    { from: 'node5', to: 'node2' },
-    { from: 'node2', to: 'node6' },
-    { from: 'node6', to: 'node3' },
-    { from: 'node3', to: 'node7' },
-    { from: 'node7', to: 'node4' },
-    { from: 'node4', to: 'node8' },
-    { from: 'node8', to: 'node1' },
-    { from: 'node9', to: 'node10' },
-    { from: 'node10', to: 'node11' },
-    { from: 'node11', to: 'node12' },
-    { from: 'node12', to: 'node9' },
+    { id: 'conn1', source: 'center', target: 'node1', from: 'center', to: 'node1' },
+    { id: 'conn2', source: 'center', target: 'node2', from: 'center', to: 'node2' },
+    { id: 'conn3', source: 'center', target: 'node3', from: 'center', to: 'node3' },
+    { id: 'conn4', source: 'center', target: 'node4', from: 'center', to: 'node4' },
+    { id: 'conn5', source: 'center', target: 'node5', from: 'center', to: 'node5' },
+    { id: 'conn6', source: 'center', target: 'node6', from: 'center', to: 'node6' },
+    { id: 'conn7', source: 'center', target: 'node7', from: 'center', to: 'node7' },
+    { id: 'conn8', source: 'center', target: 'node8', from: 'center', to: 'node8' },
+    { id: 'conn9', source: 'node1', target: 'node5', from: 'node1', to: 'node5' },
+    { id: 'conn10', source: 'node5', target: 'node2', from: 'node5', to: 'node2' },
+    { id: 'conn11', source: 'node2', target: 'node6', from: 'node2', to: 'node6' },
+    { id: 'conn12', source: 'node6', target: 'node3', from: 'node6', to: 'node3' },
+    { id: 'conn13', source: 'node3', target: 'node7', from: 'node3', to: 'node7' },
+    { id: 'conn14', source: 'node7', target: 'node4', from: 'node7', to: 'node4' },
+    { id: 'conn15', source: 'node4', target: 'node8', from: 'node4', to: 'node8' },
+    { id: 'conn16', source: 'node8', target: 'node1', from: 'node8', to: 'node1' },
+    { id: 'conn17', source: 'node9', target: 'node10', from: 'node9', to: 'node10' },
+    { id: 'conn18', source: 'node10', target: 'node11', from: 'node10', to: 'node11' },
+    { id: 'conn19', source: 'node11', target: 'node12', from: 'node11', to: 'node12' },
+    { id: 'conn20', source: 'node12', target: 'node9', from: 'node12', to: 'node9' },
   ];
 };

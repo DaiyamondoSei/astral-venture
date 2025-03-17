@@ -5,7 +5,6 @@
  * This module serves as the central barrel export for all core types
  * used throughout the application.
  * 
- * @category Core
  * @version 1.0.0
  */
 
@@ -15,7 +14,7 @@ export * from './base/branded';
 export * from './base/generic';
 
 // Validation types
-export * from './validation/results';
+export * from './validation';
 
 // Performance types
 export * from './performance';
@@ -45,14 +44,12 @@ export {
   createValidError,
   createValidErrors,
   ValidationError
-} from './validation/results';
+} from './validation';
 
 export {
   isValidMetricType,
   isValidWebVitalName,
   isValidWebVitalCategory,
-  isPerformanceMetric,
-  isWebVitalMetric,
   isComponentMetrics,
   ensureMetricId
 } from './performance/metrics';
