@@ -6,12 +6,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualProcessingService, GeometryPattern, VisualProcessingOptions } from '../services/VisualProcessingService';
-import { usePerformance } from '@/shared/hooks/usePerformance';
+import { visualProcessingService, GeometryPattern, VisualProcessingOptions } from '@/utils/ai/VisualProcessingService';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { AI_CONFIG } from '../config';
-
-// Initialize service
-const visualProcessingService = new VisualProcessingService();
 
 export interface UseAIVisualProcessingProps {
   chakraAssociations?: number[];
