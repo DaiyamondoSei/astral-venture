@@ -1,60 +1,76 @@
 
 /**
- * Validation system type definitions
- * Following the Type-Value Pattern for type safety
+ * Validation system types
  */
 
-// Error severity levels
+// Validation error severity levels
 export type ErrorSeverity = 'error' | 'warning' | 'info';
 
 // Validation error codes
 export type ValidationErrorCode = 
   | 'REQUIRED' 
   | 'TYPE_ERROR' 
-  | 'FORMAT_ERROR'
-  | 'MIN_LENGTH_ERROR'
-  | 'MAX_LENGTH_ERROR'
-  | 'MIN_VALUE_ERROR'
-  | 'MAX_VALUE_ERROR'
+  | 'FORMAT_ERROR' 
+  | 'MIN_LENGTH_ERROR' 
+  | 'MAX_LENGTH_ERROR' 
+  | 'MIN_VALUE_ERROR' 
+  | 'MAX_VALUE_ERROR' 
   | 'PATTERN_ERROR'
   | 'CONSTRAINT_ERROR'
   | 'FIELD_REQUIRED'
-  | 'UNKNOWN_ERROR';
+  | 'UNKNOWN_ERROR'
+  | 'VALIDATION_FAILED'
+  | 'SCHEMA_ERROR'
+  | 'NOT_INTEGER'
+  | 'MIN_ITEMS'
+  | 'MAX_ITEMS'
+  | 'MIN_DATE'
+  | 'MAX_DATE'
+  | 'INVALID_ENUM'
+  | 'INVALID_FORMAT'
+  | 'MISSING_USER_ID'
+  | 'MISSING_ACHIEVEMENT_ID'
+  | 'FETCH_ACHIEVEMENTS_ERROR'
+  | 'FETCH_USER_ACHIEVEMENTS_ERROR'
+  | 'UPDATE_ACHIEVEMENT_PROGRESS_ERROR'
+  | 'CHECK_ACHIEVEMENT_ERROR'
+  | 'AWARD_ACHIEVEMENT_ERROR'
+  | 'GET_ACHIEVEMENT_PROGRESS_ERROR';
 
-// Validation error detail structure
-export interface ValidationErrorDetail {
-  path: string;
-  message: string;
-  code: ValidationErrorCode;
-  severity: ErrorSeverity;
-  field?: string; // For backward compatibility
+// Validation field options for constraining values
+export interface ValidationFieldOptions {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  minValue?: number;
+  maxValue?: number;
+  pattern?: RegExp;
+  custom?: (value: any) => boolean | string;
 }
 
-// Validation error options used for creating errors
-export interface ValidationErrorOptions {
-  severity?: ErrorSeverity;
-  details?: Record<string, unknown>;
-  path?: string;
-  originalError?: Error;
-  code?: ValidationErrorCode;
+// Validation field type options
+export type ValidationFieldType = 
+  | 'string' 
+  | 'number' 
+  | 'boolean' 
+  | 'object' 
+  | 'array' 
+  | 'date' 
+  | 'email'
+  | 'url'
+  | 'uuid'
+  | 'integer'
+  | 'float'
+  | 'enum';
+
+// Validation schema field definition
+export interface ValidationSchemaField {
+  type: ValidationFieldType;
+  options?: ValidationFieldOptions;
+  items?: ValidationSchemaField; // For array types
+  properties?: Record<string, ValidationSchemaField>; // For object types
+  enum?: string[] | number[]; // For enum types
 }
 
-// Validation result interface
-export interface ValidationResult<T> {
-  valid: boolean;
-  value?: T;
-  errors?: ValidationErrorDetail[];
-}
-
-/**
- * This interface can be used when generic type isn't needed
- * to avoid TS1149 errors with barrel files.
- */
-export interface ValidationResultBase {
-  valid: boolean;
-  value?: any;
-  errors?: ValidationErrorDetail[];
-}
-
-// Type for validation severity
-export type ValidationSeverity = ErrorSeverity;
+// Validation schema definition
+export type ValidationSchema = Record<string, ValidationSchemaField>;

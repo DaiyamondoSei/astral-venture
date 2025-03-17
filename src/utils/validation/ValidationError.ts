@@ -1,128 +1,181 @@
 
-/**
- * ValidationError class
- * A standardized error class for validation errors
- */
-import { ValidationErrorDetail, ValidationErrorCode, ErrorSeverity, ValidationErrorOptions } from '@/types/core/validation/types';
+import { ValidationErrorDetail, ValidationErrorCode } from '@/types/core/validation/types';
 import { ValidationErrorCodes, ErrorSeverities } from '@/types/core/validation/constants';
 
+export interface ValidationErrorOptions {
+  message?: string;
+  code?: ValidationErrorCode;
+  details?: ValidationErrorDetail[];
+  path?: string;
+  context?: Record<string, unknown>;
+  statusCode?: number;
+}
+
+/**
+ * ValidationError class for handling validation errors
+ * Follows the structured error pattern with metadata
+ */
 export class ValidationError extends Error {
   public readonly details: ValidationErrorDetail[];
   public readonly code: ValidationErrorCode;
-  public readonly severity: ErrorSeverity;
-  public readonly path: string;
-  public readonly originalError?: Error;
+  public readonly path?: string;
+  public readonly context?: Record<string, unknown>;
+  public readonly statusCode?: number;
 
-  constructor(message: string, options: ValidationErrorOptions = {}) {
+  constructor(options: ValidationErrorOptions = {}) {
+    const message = options.message || 'Validation error occurred';
     super(message);
+    
     this.name = 'ValidationError';
     this.code = options.code || ValidationErrorCodes.UNKNOWN_ERROR;
-    this.severity = options.severity || ErrorSeverities.ERROR;
-    this.path = options.path || '';
-    this.originalError = options.originalError;
+    this.details = options.details || [];
+    this.path = options.path;
+    this.context = options.context || {};
+    this.statusCode = options.statusCode;
     
-    // If details were provided directly, use them
-    // Otherwise, create a single detail from the message and options
-    if (Array.isArray(options.details)) {
-      this.details = options.details as ValidationErrorDetail[];
-    } else {
-      this.details = [{
-        path: options.path || '',
-        field: options.path || '', // For backwards compatibility
-        message,
-        code: this.code,
-        severity: this.severity
-      }];
-    }
-    
-    // Capture stack trace
+    // Support for Error cause in modern browsers
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, ValidationError);
     }
   }
 
   /**
-   * Creates a required field error
+   * Creates a ValidationError for a required field
    */
-  static createRequiredError(fieldName: string): ValidationError {
-    return new ValidationError(`Field '${fieldName}' is required`, {
+  static requiredError(path: string, message?: string): ValidationError {
+    return new ValidationError({
       code: ValidationErrorCodes.REQUIRED,
-      path: fieldName,
-      severity: ErrorSeverities.ERROR
+      path,
+      message: message || `'${path}' is required`,
+      details: [{
+        path,
+        message: message || `'${path}' is required`,
+        code: ValidationErrorCodes.REQUIRED,
+        severity: ErrorSeverities.ERROR
+      }]
     });
   }
 
   /**
-   * Creates a type error
+   * Creates a ValidationError for a type error
    */
-  static createTypeError(fieldName: string, expectedType: string): ValidationError {
-    return new ValidationError(
-      `Field '${fieldName}' must be of type '${expectedType}'`, 
-      {
+  static typeError(path: string, expectedType: string, message?: string): ValidationError {
+    return new ValidationError({
+      code: ValidationErrorCodes.TYPE_ERROR,
+      path,
+      message: message || `'${path}' must be a ${expectedType}`,
+      details: [{
+        path,
+        message: message || `'${path}' must be a ${expectedType}`,
         code: ValidationErrorCodes.TYPE_ERROR,
-        path: fieldName,
-        severity: ErrorSeverities.ERROR
-      }
-    );
-  }
-
-  /**
-   * Creates a format error
-   */
-  static createFormatError(fieldName: string, format: string): ValidationError {
-    return new ValidationError(
-      `Field '${fieldName}' must match format '${format}'`,
-      {
-        code: ValidationErrorCodes.FORMAT_ERROR,
-        path: fieldName,
-        severity: ErrorSeverities.ERROR
-      }
-    );
-  }
-
-  /**
-   * Create an error from API response
-   */
-  static fromApiError(apiError: any): ValidationError {
-    let message = 'API validation error';
-    let details: ValidationErrorDetail[] = [];
-    let code = ValidationErrorCodes.UNKNOWN_ERROR;
-    
-    if (apiError && typeof apiError === 'object') {
-      // Handle common API error formats
-      if (apiError.message) {
-        message = apiError.message;
-      }
-      
-      if (apiError.code) {
-        code = apiError.code;
-      }
-      
-      if (Array.isArray(apiError.details)) {
-        details = apiError.details.map((detail: any) => ({
-          path: detail.path || detail.field || '',
-          field: detail.field || detail.path || '',
-          message: detail.message || 'Invalid value',
-          code: detail.code || ValidationErrorCodes.UNKNOWN_ERROR,
-          severity: detail.severity || ErrorSeverities.ERROR
-        }));
-      }
-    }
-    
-    return new ValidationError(message, {
-      code,
-      details
+        severity: ErrorSeverities.ERROR,
+        metadata: { expectedType }
+      }]
     });
   }
+
+  /**
+   * Creates a ValidationError for a format error
+   */
+  static formatError(path: string, format: string, message?: string): ValidationError {
+    return new ValidationError({
+      code: ValidationErrorCodes.FORMAT_ERROR,
+      path,
+      message: message || `'${path}' must be in the format: ${format}`,
+      details: [{
+        path,
+        message: message || `'${path}' must be in the format: ${format}`,
+        code: ValidationErrorCodes.FORMAT_ERROR,
+        severity: ErrorSeverities.ERROR,
+        metadata: { format }
+      }]
+    });
+  }
+
+  /**
+   * Creates a ValidationError for a schema error
+   */
+  static schemaError(errors: ValidationErrorDetail[]): ValidationError {
+    return new ValidationError({
+      code: ValidationErrorCodes.SCHEMA_ERROR,
+      message: 'Schema validation failed',
+      details: errors
+    });
+  }
+
+  /**
+   * Creates a ValidationError from an API error
+   */
+  static fromApiError(
+    error: Error | unknown, 
+    path?: string, 
+    code: ValidationErrorCode = ValidationErrorCodes.UNKNOWN_ERROR
+  ): ValidationError {
+    const message = error instanceof Error ? error.message : String(error);
+    return new ValidationError({
+      code,
+      path,
+      message,
+      details: [{
+        path: path || 'api',
+        message,
+        code,
+        severity: ErrorSeverities.ERROR
+      }]
+    });
+  }
+
+  /**
+   * Check if an error is a ValidationError
+   */
+  static isValidationError(error: unknown): error is ValidationError {
+    return error instanceof ValidationError;
+  }
+
+  /**
+   * Get a human-readable formatted message
+   */
+  getFormattedMessage(): string {
+    if (this.details.length === 0) {
+      return this.message;
+    }
+
+    return this.details
+      .map(detail => detail.message)
+      .join('\n');
+  }
+
+  /**
+   * Get details for UI display
+   */
+  getUIDetails() {
+    return {
+      message: this.message,
+      details: this.details.map(detail => ({
+        field: detail.path,
+        message: detail.message,
+        severity: detail.severity
+      }))
+    };
+  }
+
+  /**
+   * Convert to a plain object for serialization
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      details: this.details,
+      path: this.path,
+      context: this.context,
+      statusCode: this.statusCode
+    };
+  }
 }
 
-/**
- * Type guard to check if an error is a ValidationError
- */
-export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
+// Export isValidationError function separately for easier imports
+export const isValidationError = ValidationError.isValidationError;
 
-// Export convenience functions
-export const createRequiredError = ValidationError.createRequiredError;
-export const createTypeError = ValidationError.createTypeError;
+export default ValidationError;

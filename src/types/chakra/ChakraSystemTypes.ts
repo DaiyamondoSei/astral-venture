@@ -1,13 +1,13 @@
 
 /**
- * Chakra system type definitions
+ * Chakra System Types
  * Following the Type-Value Pattern for type safety
  */
 
-// Chakra types
+// ChakraType as a string literal union
 export type ChakraType = 'root' | 'sacral' | 'solar' | 'heart' | 'throat' | 'third-eye' | 'crown';
 
-// Chakra constants
+// Runtime constants for ChakraType
 export const ChakraTypes = {
   ROOT: 'root' as ChakraType,
   SACRAL: 'sacral' as ChakraType,
@@ -16,15 +16,9 @@ export const ChakraTypes = {
   THROAT: 'throat' as ChakraType,
   THIRD_EYE: 'third-eye' as ChakraType,
   CROWN: 'crown' as ChakraType
-};
+} as const;
 
-// ChakraID is a numeric identifier for chakras (0-based index)
-export type ChakraId = number;
-
-// Activation level for chakras (0-10 scale)
-export type ActivationLevel = number;
-
-// Chakra status structure
+// ChakraStatus represents the activation state of a chakra
 export interface ChakraStatus {
   activation: number;
   balance: number;
@@ -32,82 +26,26 @@ export interface ChakraStatus {
   dominantEmotions: string[];
 }
 
-// Energy level structure
+// Define a type for the chakra activation component props
+export interface ChakraActivationProps {
+  system?: ChakraSystem;
+  energyPoints?: number;
+  activatedChakras?: number[];
+  onActivationChange?: (chakras: number[]) => void;
+  showLabels?: boolean;
+  interactive?: boolean;
+  animationLevel?: 'basic' | 'enhanced' | 'minimal';
+}
+
+// EnergyLevel represents the energy flow in a chakra
 export interface EnergyLevel {
   currentLevel: number;
   maxLevel: number;
   flowRate: number;
+  blockagePoints: any[]; // Should be further defined for specific blockage types
 }
 
-// Balance metrics
-export interface BalanceMetrics {
-  overallBalance: number;
-  polarityRatio: number;
-  flowConsistency: number;
-  balanceFactors: Record<string, number>;
-}
-
-// Resonance pattern
-export interface ResonancePattern {
-  chakras: ChakraType[];
-  strength: number;
-  frequency: number;
-  harmonicQuality: number;
-}
-
-// Entanglement state
-export interface EntanglementState {
-  activePairs: [ChakraType, ChakraType][];
-  entanglementStrength: number;
-  entanglementMatrix: Record<string, number>;
-  quantumFluctuations: number;
-  stabilityFactor: number;
-  overallCoherence: number;
-}
-
-// Superposition state
-export interface SuperpositionState {
-  potentialStates: number[];
-  probabilityDistribution: number[];
-  collapseThreshold: number;
-  waveFunction: number[];
-}
-
-// Coherence state
-export interface CoherenceState {
-  individualCoherence: Record<ChakraType, number>;
-  pairCoherence: Record<string, number>;
-  globalCoherence: number;
-  overallCoherence: number;
-}
-
-// Progress metrics
-export interface ProgressionMetrics {
-  activationProgress: Record<ChakraType, number>;
-  balanceProgress: Record<ChakraType, number>;
-  alignmentScore: number;
-  evolutionRate: number;
-  overallProgress: number;
-}
-
-// Performance stats
-export interface PerformanceStats {
-  energyEfficiency: number;
-  responseTime: number;
-  recoveryRate: number;
-  adaptability: number;
-}
-
-// Activation history
-export interface ChakraActivationHistory {
-  timestamp: number;
-  chakraType: ChakraType;
-  activationChange: number;
-  balanceChange: number;
-  triggerEvent?: string;
-}
-
-// Complete chakra system state
+// ChakraSystem represents the full model of the chakra system
 export interface ChakraSystem {
   chakras: {
     activationStates: Record<ChakraType, ChakraStatus>;
@@ -127,19 +65,78 @@ export interface ChakraSystem {
   };
 }
 
-// Chakra Activation Component Props
-export interface ChakraActivationProps {
-  system: ChakraSystem;
-  energyPoints: number;
-  activatedChakras: number[];
-  onActivationChange?: (activatedChakras: number[]) => void;
+// Balance metrics for the chakra system
+export interface BalanceMetrics {
+  overallBalance: number;
+  polarityRatio: number;
+  flowConsistency: number;
+  balanceFactors: Record<string, number>;
 }
 
-// Visualization Component Props
+// Resonance patterns between chakras
+export interface ResonancePattern {
+  primaryChakra: ChakraType;
+  secondaryChakra: ChakraType;
+  resonanceStrength: number;
+  harmonicLevel: number;
+}
+
+// Quantum entanglement between chakras
+export interface EntanglementState {
+  activePairs: [ChakraType, ChakraType][];
+  entanglementStrength: number;
+  quantumFluctuations: number;
+  stabilityFactor: number;
+}
+
+// Superposition of chakra states
+export interface SuperpositionState {
+  potentialStates: number[];
+  collapseThreshold: number;
+  observationImpact: number;
+}
+
+// Coherence of the chakra system
+export interface CoherenceState {
+  globalCoherence: number;
+  localCoherenceFactors: Record<ChakraType, number>;
+  coherenceDuration: number;
+}
+
+// Progress metrics for the chakra system
+export interface ProgressionMetrics {
+  activationGrowth: number;
+  balanceImprovement: number;
+  blockageReduction: number;
+  overallProgress: number;
+}
+
+// Performance stats for the chakra system
+export interface PerformanceStats {
+  averageActivationTime: number;
+  energyEfficiency: number;
+  blockageClearanceRate: number;
+}
+
+// History of chakra activations
+export interface ChakraActivationHistory {
+  timestamp: number;
+  chakra: ChakraType;
+  activationLevel: number;
+  duration: number;
+}
+
+// ChakraId as a number
+export type ChakraId = number;
+
+// VisualizationProps for chakra visualization components
 export interface VisualizationProps {
-  system: ChakraSystem;
-  energyPoints: number;
-  activatedChakras: number[];
+  system?: ChakraSystem;
+  energyPoints?: number;
+  activatedChakras?: number[];
   onVisualizationRendered?: () => void;
   deviceCapability?: string;
 }
+
+// Export default so we can use this in tests
+export default ChakraType;
