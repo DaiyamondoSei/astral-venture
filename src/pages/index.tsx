@@ -1,16 +1,13 @@
 
-import { Inter } from "next/font/google";
 import { Button } from "@/components/ui/button";
 import { AiAnalysisDemo } from "@/components/ai/AiAnalysisDemo";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, Zap, BarChart, Gauge } from "lucide-react";
 
-const inter = Inter({ subsets: ["latin"] });
-
 export default function Home() {
   return (
     <main
-      className={`flex min-h-screen flex-col p-8 ${inter.className}`}
+      className="flex min-h-screen flex-col p-8 font-sans"
     >
       <div className="container mx-auto max-w-5xl">
         <h1 className="text-4xl font-bold mb-6 text-center">AI-Powered Analysis System</h1>
