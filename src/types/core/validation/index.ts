@@ -15,15 +15,17 @@ export * from './results';
 
 // Additional utilities and type guards
 export const isValidationErrorCode = (code: string): code is import('./types').ValidationErrorCode => {
-  return Object.values(import('./constants').ValidationErrorCodes).includes(code as any);
+  const { ValidationErrorCodes } = require('./constants');
+  return Object.values(ValidationErrorCodes).includes(code as any);
 };
 
 export const isErrorSeverity = (severity: string): severity is import('./types').ErrorSeverity => {
-  return Object.values(import('./constants').ErrorSeverities).includes(severity as any);
+  const { ErrorSeverities } = require('./constants');
+  return Object.values(ErrorSeverities).includes(severity as any);
 };
 
 // Default export for easier imports
 export default {
-  ErrorSeverities: import('./constants').ErrorSeverities,
-  ValidationErrorCodes: import('./constants').ValidationErrorCodes
+  ErrorSeverities: require('./constants').ErrorSeverities,
+  ValidationErrorCodes: require('./constants').ValidationErrorCodes
 };

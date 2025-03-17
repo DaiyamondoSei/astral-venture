@@ -74,3 +74,35 @@ export interface ValidationSchemaField {
 
 // Validation schema definition
 export type ValidationSchema = Record<string, ValidationSchemaField>;
+
+// Additional validation context interface for enhanced validations
+export interface ValidationContext {
+  userId?: string;
+  path?: string;
+  parentValue?: any;
+  rootValue?: any;
+  isOptional?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+// Validator function type
+export type Validator<T = any> = (
+  value: unknown,
+  context?: ValidationContext
+) => Promise<ValidationResult<T>> | ValidationResult<T>;
+
+// ValidationResult type (imported from results.ts)
+export interface ValidationResult<T = any> {
+  valid: boolean;
+  validatedData?: T;
+  error?: {
+    path: string;
+    message: string;
+    code?: ValidationErrorCode;
+  };
+  errors?: Array<{
+    path: string;
+    message: string;
+    code?: ValidationErrorCode;
+  }>;
+}

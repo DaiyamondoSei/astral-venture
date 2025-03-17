@@ -69,3 +69,59 @@ export interface PerfConfig {
   // Data persistence
   metricsPersistence: boolean;
 }
+
+// Performance level options
+export const PerfOptimizationLevels = {
+  NONE: 'none',
+  CONSERVATIVE: 'conservative',
+  AGGRESSIVE: 'aggressive'
+} as const;
+
+// Default performance configurations for different device types
+export const DEFAULT_PERF_CONFIGS: Record<'low' | 'medium' | 'high', PerfConfig> = {
+  low: {
+    samplingRate: 0.1,
+    throttleInterval: 1000,
+    maxTrackedComponents: 20,
+    enabled: true,
+    enableValidation: false,
+    enableRenderTracking: true,
+    enablePropTracking: false,
+    enableDebugLogging: false,
+    intelligentProfiling: false,
+    inactiveTabThrottling: true,
+    batchUpdates: true,
+    resourceOptimizationLevel: 'aggressive',
+    metricsPersistence: false
+  },
+  medium: {
+    samplingRate: 0.3,
+    throttleInterval: 500,
+    maxTrackedComponents: 50,
+    enabled: true,
+    enableValidation: true,
+    enableRenderTracking: true,
+    enablePropTracking: true,
+    enableDebugLogging: false,
+    intelligentProfiling: true,
+    inactiveTabThrottling: true,
+    batchUpdates: true,
+    resourceOptimizationLevel: 'conservative',
+    metricsPersistence: true
+  },
+  high: {
+    samplingRate: 0.5,
+    throttleInterval: 200,
+    maxTrackedComponents: 100,
+    enabled: true,
+    enableValidation: true,
+    enableRenderTracking: true,
+    enablePropTracking: true,
+    enableDebugLogging: true,
+    intelligentProfiling: true,
+    inactiveTabThrottling: false,
+    batchUpdates: false,
+    resourceOptimizationLevel: 'none',
+    metricsPersistence: true
+  }
+};
