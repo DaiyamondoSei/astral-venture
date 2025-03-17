@@ -42,6 +42,193 @@ function createErrorResponse(message: string, error: any = null, status = 400) {
   );
 }
 
+// Generate SVG path without using OpenAI (local algorithm)
+function generateGeometryLocally(
+  seed: string, 
+  complexity: number,
+  chakraAssociations: number[]
+) {
+  // Use seed for pseudo-random generation
+  const seedValue = seed.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const random = (min: number, max: number) => {
+    const x = Math.sin(seedValue + complexity) * 10000;
+    const rand = x - Math.floor(x);
+    return min + rand * (max - min);
+  };
+  
+  // Generate a sacred geometry pattern based on complexity and chakras
+  const centerX = 50;
+  const centerY = 50;
+  const radius = 40;
+  
+  // Choose pattern type based on chakra associations
+  const patternType = chakraAssociations.length > 0 
+    ? (chakraAssociations[0] % 3) // 0, 1, or 2
+    : (seedValue % 3);
+    
+  let svgPath = '';
+  let points: [number, number][] = [];
+  
+  // Create different geometry patterns based on type
+  if (patternType === 0) {
+    // Flower of life pattern
+    const petals = 6 + Math.floor(complexity * 2);
+    const innerRadius = radius * 0.4;
+    const outerRadius = radius * 0.8;
+    
+    svgPath = `M ${centerX + outerRadius} ${centerY} `;
+    
+    for (let i = 0; i < petals; i++) {
+      const angle = (i / petals) * Math.PI * 2;
+      const nextAngle = ((i + 1) / petals) * Math.PI * 2;
+      
+      const x1 = centerX + outerRadius * Math.cos(angle);
+      const y1 = centerY + outerRadius * Math.sin(angle);
+      const x2 = centerX + innerRadius * Math.cos(angle + Math.PI / petals);
+      const y2 = centerY + innerRadius * Math.sin(angle + Math.PI / petals);
+      const x3 = centerX + outerRadius * Math.cos(nextAngle);
+      const y3 = centerY + outerRadius * Math.sin(nextAngle);
+      
+      svgPath += `L ${x2} ${y2} L ${x3} ${y3} `;
+      points.push([x1, y1], [x2, y2]);
+    }
+    
+    svgPath += 'Z';
+  } else if (patternType === 1) {
+    // Sri Yantra inspired pattern
+    const layers = 3 + Math.floor(complexity);
+    const points = [];
+    
+    svgPath = `M ${centerX} ${centerY - radius} `;
+    
+    for (let layer = 0; layer < layers; layer++) {
+      const layerRadius = radius * (1 - layer / layers * 0.6);
+      const vertices = 3 + layer * 2;
+      
+      for (let i = 0; i < vertices; i++) {
+        const angle = (i / vertices) * Math.PI * 2 + (layer % 2) * Math.PI / vertices;
+        const x = centerX + layerRadius * Math.cos(angle);
+        const y = centerY + layerRadius * Math.sin(angle);
+        
+        svgPath += `L ${x} ${y} `;
+        points.push([x, y]);
+      }
+      
+      // Connect back to first point of this layer
+      const firstAngle = (0 / vertices) * Math.PI * 2 + (layer % 2) * Math.PI / vertices;
+      const firstX = centerX + layerRadius * Math.cos(firstAngle);
+      const firstY = centerY + layerRadius * Math.sin(firstAngle);
+      svgPath += `L ${firstX} ${firstY} `;
+      
+      // Move to next layer's starting point
+      if (layer < layers - 1) {
+        const nextLayerRadius = radius * (1 - (layer + 1) / layers * 0.6);
+        const nextAngle = ((layer + 1) % 2) * Math.PI / (3 + (layer + 1) * 2);
+        const nextX = centerX + nextLayerRadius * Math.cos(nextAngle);
+        const nextY = centerY + nextLayerRadius * Math.sin(nextAngle);
+        svgPath += `M ${nextX} ${nextY} `;
+      }
+    }
+  } else {
+    // Metatron's Cube pattern
+    const vertices = 6 + Math.floor(complexity * 3);
+    const points: [number, number][] = [];
+    
+    // Create points in a circle
+    for (let i = 0; i < vertices; i++) {
+      const angle = (i / vertices) * Math.PI * 2;
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      points.push([x, y]);
+    }
+    
+    // Add center point
+    points.push([centerX, centerY]);
+    
+    // Start with a circle
+    svgPath = `M ${points[0][0]} ${points[0][1]} `;
+    
+    // Connect all outer points to form the circle
+    for (let i = 1; i < vertices; i++) {
+      svgPath += `L ${points[i][0]} ${points[i][1]} `;
+    }
+    svgPath += `L ${points[0][0]} ${points[0][1]} `;
+    
+    // Connect points to create the inner structure
+    // Connect every point to every other point based on complexity
+    const connectFactor = Math.max(1, Math.min(vertices - 1, Math.floor(complexity * 3)));
+    
+    for (let i = 0; i < vertices; i++) {
+      for (let j = 1; j <= connectFactor; j++) {
+        const targetIndex = (i + j) % vertices;
+        svgPath += `M ${points[i][0]} ${points[i][1]} `;
+        svgPath += `L ${points[targetIndex][0]} ${points[targetIndex][1]} `;
+      }
+    }
+  }
+  
+  // Generate significant points if none were created
+  if (points.length === 0) {
+    const numPoints = 5 + Math.floor(complexity * 3);
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2;
+      const distance = radius * (0.3 + random(0.4, 0.7));
+      const x = centerX + distance * Math.cos(angle);
+      const y = centerY + distance * Math.sin(angle);
+      points.push([x, y]);
+    }
+  }
+  
+  // Create energy qualities based on chakra associations
+  const energyQualities = [];
+  const chakraNames = [
+    "Root", "Sacral", "Solar Plexus", "Heart", "Throat", "Third Eye", "Crown"
+  ];
+  
+  // Energy qualities based on chakras
+  if (chakraAssociations.includes(1)) energyQualities.push("grounding", "stability");
+  if (chakraAssociations.includes(2)) energyQualities.push("creativity", "passion");
+  if (chakraAssociations.includes(3)) energyQualities.push("confidence", "willpower");
+  if (chakraAssociations.includes(4)) energyQualities.push("love", "compassion");
+  if (chakraAssociations.includes(5)) energyQualities.push("communication", "expression");
+  if (chakraAssociations.includes(6)) energyQualities.push("intuition", "insight");
+  if (chakraAssociations.includes(7)) energyQualities.push("connection", "spirituality");
+  
+  // If no chakras specified, add some default qualities
+  if (energyQualities.length === 0) {
+    energyQualities.push("harmony", "balance", "focus", "clarity");
+  }
+  
+  // Add animation properties
+  const animationProperties = {
+    duration: 3000 + (complexity * 1000),
+    easing: 'ease-in-out',
+    rotation: seedValue % 2 === 0,
+    pulsate: seedValue % 3 === 0,
+    scale: complexity > 3
+  };
+  
+  return {
+    result: {
+      svgPath: svgPath,
+      points: points,
+      energyAlignment: energyQualities,
+      chakraAssociations: chakraAssociations,
+      animationProperties
+    },
+    confidence: 0.7,
+    reasoning: "Generated sacred geometry pattern using algorithmic approach",
+    metadata: {
+      processingTime: 0,
+      modelUsed: "local-algorithm",
+      tokenUsage: 0,
+      cached: false,
+      complexity,
+      generatedLocally: true
+    }
+  };
+}
+
 // Generate SVG path using OpenAI
 async function generateGeometryWithAI(
   seed: string,
@@ -129,7 +316,8 @@ async function generateGeometryWithAI(
         modelUsed: data.model,
         tokenUsage: data.usage?.total_tokens || 0,
         cached: false,
-        complexity
+        complexity,
+        generatedLocally: false
       }
     };
   } catch (error) {
@@ -153,11 +341,15 @@ serve(async (req: Request) => {
     
     // Check if OpenAI API key is available
     if (!OPENAI_API_KEY) {
-      return createErrorResponse(
-        "OpenAI API key is not configured",
-        null,
-        500
-      );
+      console.log("OpenAI API key not found, using local geometry generation");
+      
+      // Use local algorithm-based generation
+      const result = generateGeometryLocally(seed, complexity, chakraAssociations);
+      
+      // Add processing time
+      result.metadata.processingTime = performance.now() - startTime;
+      
+      return createResponse(result);
     }
     
     // Generate geometry with AI
@@ -169,10 +361,25 @@ serve(async (req: Request) => {
     return createResponse(result);
   } catch (error) {
     console.error("Error in generate-geometry edge function:", error);
-    return createErrorResponse(
-      "Failed to generate geometry pattern",
-      error instanceof Error ? error.message : String(error),
-      500
-    );
+    
+    // If AI generation fails, fall back to local generation
+    try {
+      console.log("Falling back to local geometry generation");
+      const { seed = "default", complexity = 3, chakraAssociations = [] } = 
+        (req.method === "POST" && await req.json()) || {};
+      
+      const result = generateGeometryLocally(seed, complexity, chakraAssociations);
+      result.metadata.processingTime = performance.now() - startTime;
+      result.metadata.fallback = true;
+      
+      return createResponse(result);
+    } catch (fallbackError) {
+      console.error("Fallback generation also failed:", fallbackError);
+      return createErrorResponse(
+        "Failed to generate geometry pattern",
+        error instanceof Error ? error.message : String(error),
+        500
+      );
+    }
   }
 });
