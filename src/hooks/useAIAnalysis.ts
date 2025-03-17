@@ -4,146 +4,136 @@
  */
 
 import { useState, useCallback } from 'react';
-import { AIResponse, EmotionalAnalysisResult, AIServiceOptions } from '@/services/ai/types';
-import { getAIResponse, analyzeReflection } from '@/services/ai/aiProcessingService';
+import { aiAnalysisService, AIAnalysisOptions } from '@/utils/ai/AIAnalysisService';
 
-interface AIAnalysisState {
-  /** Loading state for the current request */
-  isLoading: boolean;
-  /** Error state for the current request */
-  error: Error | null;
-  /** Last AI text response */
-  lastResponse: AIResponse | null;
-  /** Last emotional analysis result */
-  lastAnalysis: EmotionalAnalysisResult | null;
+interface UseAIAnalysisOptions extends Partial<AIAnalysisOptions> {
+  apiKey?: string;
 }
 
-interface AIAnalysisOptions extends Partial<AIServiceOptions> {
-  /** Clear previous results on new request */
-  clearPrevious?: boolean;
+interface UseAIAnalysisState {
+  isLoading: boolean;
+  error: Error | null;
+  lastChakraAnalysis: any | null;
+  lastPerformanceAnalysis: any | null;
 }
 
 /**
  * Hook for accessing AI analysis capabilities
  */
-export function useAIAnalysis(defaultOptions: Partial<AIServiceOptions> = {}) {
-  const [state, setState] = useState<AIAnalysisState>({
+export function useAIAnalysis(options: UseAIAnalysisOptions = {}) {
+  const [state, setState] = useState<UseAIAnalysisState>({
     isLoading: false,
     error: null,
-    lastResponse: null,
-    lastAnalysis: null,
+    lastChakraAnalysis: null,
+    lastPerformanceAnalysis: null
   });
 
+  // Set the API key if provided
+  useCallback(() => {
+    if (options.apiKey) {
+      aiAnalysisService.setApiKey(options.apiKey);
+    }
+  }, [options.apiKey]);
+
   /**
-   * Ask a question to the AI assistant
+   * Analyze chakra system with AI
    */
-  const askQuestion = useCallback(async (
-    question: string,
-    options: AIAnalysisOptions = {}
+  const analyzeChakraSystem = useCallback(async (
+    chakraData: {
+      activatedChakras: number[];
+      emotionalData?: Record<string, number>;
+      reflectionContent?: string;
+      userHistory?: any;
+    }
   ) => {
-    const { clearPrevious = false, ...serviceOptions } = options;
-    
     try {
-      // Update loading state
-      setState(prev => ({
-        ...prev,
-        isLoading: true,
-        error: null,
-        ...(clearPrevious ? { lastResponse: null } : {}),
-      }));
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // Call AI service
-      const response = await getAIResponse(question, {
-        ...defaultOptions,
-        ...serviceOptions,
-        showLoadingToast: false, // We'll handle loading state ourselves
+      const result = await aiAnalysisService.analyzeChakraSystem(chakraData, {
+        model: options.model,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        showMetadata: options.showMetadata
       });
       
-      // Update state with response
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        lastResponse: response,
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        lastChakraAnalysis: result 
       }));
       
-      return response;
+      return result;
     } catch (error) {
-      // Handle errors
       const errorObj = error instanceof Error ? error : new Error(String(error));
       
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: errorObj,
+        error: errorObj
       }));
       
       throw errorObj;
     }
-  }, [defaultOptions]);
+  }, [options]);
 
   /**
-   * Analyze a reflection entry
+   * Analyze performance metrics with AI
    */
-  const analyzeReflectionEntry = useCallback(async (
-    reflectionText: string,
-    options: AIAnalysisOptions = {}
+  const analyzePerformanceMetrics = useCallback(async (
+    metrics: {
+      componentRenderTimes: Record<string, number>;
+      memoryUsage?: number;
+      fps?: number;
+      networkRequests?: { url: string; time: number; size: number }[];
+      errorRates?: Record<string, number>;
+    }
   ) => {
-    const { clearPrevious = false, ...serviceOptions } = options;
-    
     try {
-      // Update loading state
-      setState(prev => ({
-        ...prev,
-        isLoading: true,
-        error: null,
-        ...(clearPrevious ? { lastAnalysis: null } : {}),
-      }));
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // Call analysis service
-      const analysis = await analyzeReflection(reflectionText, {
-        ...defaultOptions,
-        ...serviceOptions,
-        showLoadingToast: false, // We'll handle loading state ourselves
+      const result = await aiAnalysisService.analyzePerformanceMetrics(metrics, {
+        model: options.model,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        showMetadata: options.showMetadata
       });
       
-      // Update state with analysis
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        lastAnalysis: analysis,
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        lastPerformanceAnalysis: result 
       }));
       
-      return analysis;
+      return result;
     } catch (error) {
-      // Handle errors
       const errorObj = error instanceof Error ? error : new Error(String(error));
       
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: errorObj,
+        error: errorObj
       }));
       
       throw errorObj;
     }
-  }, [defaultOptions]);
+  }, [options]);
 
   /**
-   * Reset the AI analysis state
+   * Reset the analysis state
    */
   const reset = useCallback(() => {
     setState({
       isLoading: false,
       error: null,
-      lastResponse: null,
-      lastAnalysis: null,
+      lastChakraAnalysis: null,
+      lastPerformanceAnalysis: null
     });
   }, []);
 
   return {
     ...state,
-    askQuestion,
-    analyzeReflectionEntry,
+    analyzeChakraSystem,
+    analyzePerformanceMetrics,
     reset,
   };
 }

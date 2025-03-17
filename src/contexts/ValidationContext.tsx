@@ -10,10 +10,13 @@ import {
   ValidationResult, 
   ValidationErrorDetail, 
   ValidationSchema,
+  ValidationErrorCode
+} from '../types/core/validation/types';
+import {
   ValidationErrorCodes,
-  ErrorSeverities,
-  ValidationError
-} from '../types/core/validation';
+  ErrorSeverities
+} from '../types/core/validation/constants';
+import { ValidationError } from '../types/core/validation/results';
 
 interface ValidationContextType {
   validate: <T>(data: unknown, schema: ValidationSchema) => ValidationResult<T>;
@@ -41,7 +44,7 @@ export function ValidationProvider({ children }: ValidationProviderProps) {
       const isValid = true; // Replace with actual validation
       
       if (isValid) {
-        return { isValid: true, errors: [], value: data as T };
+        return { isValid: true, errors: [], value: data as T, validatedData: data as T };
       } else {
         return {
           isValid: false,

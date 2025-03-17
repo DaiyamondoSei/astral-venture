@@ -2,7 +2,7 @@
 /**
  * Validation system result types
  */
-import { ValidationErrorCode, ErrorSeverity } from './types';
+import { ValidationErrorCode, ErrorSeverity, ValidationResult, ValidationErrorDetail } from './types';
 import { ValidationErrorCodes, ErrorSeverities } from './constants';
 
 // Validation metadata for enhanced error details
@@ -12,30 +12,13 @@ export interface ValidationMetadata {
   path?: string;
 }
 
-// Validation error detail with required properties
-export interface ValidationErrorDetail {
-  path: string;
-  message: string;
-  code: ValidationErrorCode;
-  severity: ErrorSeverity;
-  metadata?: Record<string, unknown>;
-}
-
-// Validation result for generic type T
-export interface ValidationResult<T> {
-  isValid: boolean;
-  errors: ValidationErrorDetail[];
-  value?: T;
-  metadata?: ValidationMetadata;
-}
-
 // Helper function to create a successful validation result
 export function createSuccessResult<T>(value: T, metadata?: ValidationMetadata): ValidationResult<T> {
   return {
     isValid: true,
     errors: [],
     value,
-    metadata
+    validatedData: value // For backward compatibility
   };
 }
 
@@ -56,6 +39,7 @@ export class ValidationError extends Error {
   public field: string;
   public details: ValidationErrorDetail[];
   public expectedType?: string;
+  public code: ValidationErrorCode;
 
   constructor(
     message: string,
@@ -67,6 +51,7 @@ export class ValidationError extends Error {
     super(message);
     this.name = 'ValidationError';
     this.field = field;
+    this.code = code;
     this.expectedType = expectedType;
     this.details = [{
       path: field,
@@ -74,6 +59,33 @@ export class ValidationError extends Error {
       code: code,
       severity: severity
     }];
+  }
+
+  // Static helper methods
+  static requiredError(field: string, message?: string): ValidationError {
+    return new ValidationError(
+      message || `Field '${field}' is required`,
+      field,
+      ValidationErrorCodes.REQUIRED
+    );
+  }
+
+  static typeError(field: string, expectedType: string, message?: string): ValidationError {
+    return new ValidationError(
+      message || `Field '${field}' must be a ${expectedType}`,
+      field,
+      ValidationErrorCodes.TYPE_ERROR,
+      ErrorSeverities.ERROR,
+      expectedType
+    );
+  }
+
+  static formatError(field: string, format: string, message?: string): ValidationError {
+    return new ValidationError(
+      message || `Field '${field}' must match format: ${format}`,
+      field,
+      ValidationErrorCodes.FORMAT_ERROR
+    );
   }
 }
 

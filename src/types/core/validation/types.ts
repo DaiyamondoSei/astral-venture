@@ -91,18 +91,19 @@ export type Validator<T = any> = (
   context?: ValidationContext
 ) => Promise<ValidationResult<T>> | ValidationResult<T>;
 
-// ValidationResult type (imported from results.ts)
+// Validation error detail with required properties
+export interface ValidationErrorDetail {
+  path: string;
+  message: string;
+  code: ValidationErrorCode;
+  severity: ErrorSeverity;
+  metadata?: Record<string, unknown>;
+}
+
+// Validation result for generic type T
 export interface ValidationResult<T = any> {
-  valid: boolean;
-  validatedData?: T;
-  error?: {
-    path: string;
-    message: string;
-    code?: ValidationErrorCode;
-  };
-  errors?: Array<{
-    path: string;
-    message: string;
-    code?: ValidationErrorCode;
-  }>;
+  isValid: boolean;
+  errors: ValidationErrorDetail[];
+  value?: T;
+  validatedData?: T; // For backward compatibility
 }

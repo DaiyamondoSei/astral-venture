@@ -21,6 +21,8 @@ export class ValidationError extends Error {
   public readonly path?: string;
   public readonly context?: Record<string, unknown>;
   public readonly statusCode?: number;
+  public readonly field: string;
+  public readonly expectedType?: string;
 
   constructor(options: ValidationErrorOptions = {}) {
     const message = options.message || 'Validation error occurred';
@@ -30,6 +32,7 @@ export class ValidationError extends Error {
     this.code = options.code || ValidationErrorCodes.UNKNOWN_ERROR;
     this.details = options.details || [];
     this.path = options.path;
+    this.field = options.path || '';
     this.context = options.context || {};
     this.statusCode = options.statusCode;
     
@@ -93,39 +96,6 @@ export class ValidationError extends Error {
   }
 
   /**
-   * Creates a ValidationError for a schema error
-   */
-  static schemaError(errors: ValidationErrorDetail[]): ValidationError {
-    return new ValidationError({
-      code: ValidationErrorCodes.SCHEMA_ERROR,
-      message: 'Schema validation failed',
-      details: errors
-    });
-  }
-
-  /**
-   * Creates a ValidationError from an API error
-   */
-  static fromApiError(
-    error: Error | unknown, 
-    path?: string, 
-    code: ValidationErrorCode = ValidationErrorCodes.UNKNOWN_ERROR
-  ): ValidationError {
-    const message = error instanceof Error ? error.message : String(error);
-    return new ValidationError({
-      code,
-      path,
-      message,
-      details: [{
-        path: path || 'api',
-        message,
-        code,
-        severity: ErrorSeverities.ERROR
-      }]
-    });
-  }
-
-  /**
    * Check if an error is a ValidationError
    */
   static isValidationError(error: unknown): error is ValidationError {
@@ -143,20 +113,6 @@ export class ValidationError extends Error {
     return this.details
       .map(detail => detail.message)
       .join('\n');
-  }
-
-  /**
-   * Get details for UI display
-   */
-  getUIDetails() {
-    return {
-      message: this.message,
-      details: this.details.map(detail => ({
-        field: detail.path,
-        message: detail.message,
-        severity: detail.severity
-      }))
-    };
   }
 
   /**
