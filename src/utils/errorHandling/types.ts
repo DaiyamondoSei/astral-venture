@@ -1,10 +1,13 @@
 
 /**
- * Error handling type definitions
- * Following the Type-Value Pattern
+ * Error handling system types
+ * Following the Type-Value Pattern for type safety
  */
 
-// Error categories
+// Error severity levels for the application
+export type ErrorSeverity = 'critical' | 'high' | 'medium' | 'low';
+
+// Error categories for classification
 export type ErrorCategory = 
   | 'validation' 
   | 'network' 
@@ -15,41 +18,33 @@ export type ErrorCategory =
   | 'system' 
   | 'unknown';
 
-// Error severity levels
-export type ErrorSeverity = 'critical' | 'high' | 'medium' | 'low';
-
 // Error handling options
 export interface ErrorHandlingOptions {
-  showToUser?: boolean;
   logToConsole?: boolean;
   reportToService?: boolean;
-  rethrow?: boolean;
-  showToast?: boolean;
-  context?: string;
-  category?: ErrorCategory;
-  severity?: ErrorSeverity;
-  customMessage?: string;
-  isValidation?: boolean;
-  includeValidationDetails?: boolean;
-  metadata?: Record<string, any>;
-  logToServer?: boolean;
-  onError?: (error: Error) => void;
-}
-
-// Application error options
-export interface AppErrorOptions {
-  message: string;
-  originalError?: Error;
-  category?: ErrorCategory;
-  severity?: ErrorSeverity;
+  showToUser?: boolean;
   context?: Record<string, unknown>;
-  code?: string;
+  userId?: string;
+  severity?: ErrorSeverity;
 }
 
-// Props for the error fallback component
-export interface ErrorFallbackProps {
-  error: Error;
-  componentName?: string;
-  resetErrorBoundary: () => void;
-  showDetails?: boolean;
+// Application error details
+export interface AppErrorDetails {
+  code?: string;
+  message: string;
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  details?: Record<string, unknown>;
+  originalError?: Error;
+  context?: Record<string, unknown>;
+  timestamp: number;
+}
+
+// Options for creating application errors
+export interface AppErrorOptions {
+  severity?: ErrorSeverity;
+  category?: ErrorCategory;
+  details?: Record<string, unknown>;
+  context?: Record<string, unknown>;
+  originalError?: Error;
 }

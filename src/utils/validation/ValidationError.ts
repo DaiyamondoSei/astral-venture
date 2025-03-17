@@ -1,115 +1,117 @@
-
 /**
  * ValidationError class
- * 
- * A standardized error class for validation errors that provides
- * consistent error reporting across the application.
+ * A standardized error class for validation errors
  */
+import { ValidationErrorDetail, ValidationErrorCode, ErrorSeverity, ValidationErrorOptions } from '@/types/core/validation/types';
 import { ValidationErrorCodes, ErrorSeverities } from '@/types/core/validation/constants';
-import type { ValidationErrorDetail, ValidationErrorCode, ErrorSeverity } from '@/types/core/validation/types';
 
-export interface ValidationErrorOptions {
-  field?: string;
-  rule?: ValidationErrorCode;
-  expectedType?: string;
-  details?: Record<string, unknown>;
-  severity?: ErrorSeverity;
-  statusCode?: number;
-}
-
-/**
- * ValidationError represents an error that occurs during data validation
- */
 export class ValidationError extends Error {
-  /** The field that caused the validation error */
-  field: string;
-  
-  /** The validation rule that failed */
-  rule: ValidationErrorCode;
-  
-  /** Expected type for the field (when applicable) */
-  expectedType?: string;
-  
-  /** Additional error details */
-  details: Record<string, unknown>;
-  
-  /** Error severity level */
-  severity: ErrorSeverity;
-  
-  /** HTTP status code (for API validation errors) */
-  statusCode: number;
+  public readonly details: ValidationErrorDetail[];
+  public readonly code: ValidationErrorCode;
+  public readonly severity: ErrorSeverity;
+  public readonly path: string;
+  public readonly originalError?: Error;
 
   constructor(message: string, options: ValidationErrorOptions = {}) {
     super(message);
     this.name = 'ValidationError';
-    this.field = options.field || '';
-    this.rule = options.rule || ValidationErrorCodes.UNKNOWN_ERROR;
-    this.expectedType = options.expectedType;
-    this.details = options.details || {};
+    this.code = options.code || ValidationErrorCodes.UNKNOWN_ERROR;
     this.severity = options.severity || ErrorSeverities.ERROR;
-    this.statusCode = options.statusCode || 400;
-  }
-
-  /**
-   * Get a formatted message with field information
-   */
-  getFormattedMessage(): string {
-    if (this.field) {
-      return `${this.message} (Field: ${this.field})`;
-    }
-    return this.message;
-  }
-
-  /**
-   * Get details suitable for UI display
-   */
-  getUIDetails(): Record<string, unknown> {
-    return {
-      field: this.field,
-      message: this.message,
-      rule: this.rule,
-      ...(this.expectedType ? { expectedType: this.expectedType } : {}),
-      ...this.details
-    };
-  }
-
-  /**
-   * Convert to ValidationErrorDetail for consistent error format
-   */
-  toValidationErrorDetail(path: string = this.field): ValidationErrorDetail {
-    return {
-      path,
-      message: this.message,
-      code: this.rule,
-      severity: this.severity,
-      field: this.field
-    };
-  }
-
-  /**
-   * Create ValidationError from API error
-   */
-  static fromApiError(error: unknown, field: string = ''): ValidationError {
-    if (error instanceof ValidationError) {
-      return error;
+    this.path = options.path || '';
+    this.originalError = options.originalError;
+    
+    // If details were provided directly, use them
+    // Otherwise, create a single detail from the message and options
+    if (Array.isArray(options.details)) {
+      this.details = options.details as ValidationErrorDetail[];
+    } else {
+      this.details = [{
+        path: options.path || '',
+        field: options.path || '', // For backwards compatibility
+        message,
+        code: this.code,
+        severity: this.severity
+      }];
     }
     
-    const message = error instanceof Error 
-      ? error.message 
-      : String(error);
-    
-    return new ValidationError(message, { 
-      field,
-      rule: ValidationErrorCodes.UNKNOWN_ERROR,
+    // Capture stack trace
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ValidationError);
+    }
+  }
+
+  /**
+   * Creates a required field error
+   */
+  static createRequiredError(fieldName: string): ValidationError {
+    return new ValidationError(`Field '${fieldName}' is required`, {
+      code: ValidationErrorCodes.REQUIRED,
+      path: fieldName,
       severity: ErrorSeverities.ERROR
     });
   }
 
   /**
-   * Type guard to check if an error is a ValidationError
+   * Creates a type error
    */
-  static isValidationError(error: unknown): error is ValidationError {
-    return error instanceof ValidationError;
+  static createTypeError(fieldName: string, expectedType: string): ValidationError {
+    return new ValidationError(
+      `Field '${fieldName}' must be of type '${expectedType}'`, 
+      {
+        code: ValidationErrorCodes.TYPE_ERROR,
+        path: fieldName,
+        severity: ErrorSeverities.ERROR
+      }
+    );
+  }
+
+  /**
+   * Creates a format error
+   */
+  static createFormatError(fieldName: string, format: string): ValidationError {
+    return new ValidationError(
+      `Field '${fieldName}' must match format '${format}'`,
+      {
+        code: ValidationErrorCodes.FORMAT_ERROR,
+        path: fieldName,
+        severity: ErrorSeverities.ERROR
+      }
+    );
+  }
+
+  /**
+   * Creates an error from API response
+   */
+  static fromApiError(apiError: any): ValidationError {
+    let message = 'API validation error';
+    let details: ValidationErrorDetail[] = [];
+    let code = ValidationErrorCodes.UNKNOWN_ERROR;
+    
+    if (apiError && typeof apiError === 'object') {
+      // Handle common API error formats
+      if (apiError.message) {
+        message = apiError.message;
+      }
+      
+      if (apiError.code) {
+        code = apiError.code;
+      }
+      
+      if (Array.isArray(apiError.details)) {
+        details = apiError.details.map((detail: any) => ({
+          path: detail.path || detail.field || '',
+          field: detail.field || detail.path || '',
+          message: detail.message || 'Invalid value',
+          code: detail.code || ValidationErrorCodes.UNKNOWN_ERROR,
+          severity: detail.severity || ErrorSeverities.ERROR
+        }));
+      }
+    }
+    
+    return new ValidationError(message, {
+      code,
+      details
+    });
   }
 }
 
@@ -120,22 +122,6 @@ export function isValidationError(error: unknown): error is ValidationError {
   return error instanceof ValidationError;
 }
 
-/**
- * Helper to create a validation error with the REQUIRED code
- */
-export function createRequiredError(field: string, message?: string): ValidationError {
-  return new ValidationError(
-    message || `The field '${field}' is required`, 
-    { field, rule: ValidationErrorCodes.REQUIRED }
-  );
-}
-
-/**
- * Helper to create a validation error with the TYPE_ERROR code
- */
-export function createTypeError(field: string, expectedType: string, message?: string): ValidationError {
-  return new ValidationError(
-    message || `The field '${field}' must be of type '${expectedType}'`,
-    { field, rule: ValidationErrorCodes.TYPE_ERROR, expectedType }
-  );
-}
+// Export convenience functions
+export const createRequiredError = ValidationError.createRequiredError;
+export const createTypeError = ValidationError.createTypeError;

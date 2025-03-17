@@ -1,6 +1,6 @@
 
 /**
- * Error handling constants
+ * Error handling system constants
  * Following the Type-Value Pattern
  */
 import { ErrorCategory, ErrorSeverity } from './types';

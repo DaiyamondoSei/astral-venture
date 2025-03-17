@@ -30,6 +30,15 @@ export interface ValidationErrorDetail {
   field?: string; // For backward compatibility
 }
 
+// Validation error options used for creating errors
+export interface ValidationErrorOptions {
+  severity?: ErrorSeverity;
+  details?: Record<string, unknown>;
+  path?: string;
+  originalError?: Error;
+  code?: ValidationErrorCode;
+}
+
 // Validation result interface
 export interface ValidationResult<T> {
   valid: boolean;
