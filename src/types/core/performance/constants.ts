@@ -1,126 +1,211 @@
 
 /**
- * Runtime constants for performance types
+ * Performance Constants
  * 
- * This module defines constants that correspond to the types in types.ts,
- * following the Type-Value Pattern for TypeScript.
+ * This module provides runtime constants for performance configuration.
+ * These are paired with the types in types.ts following the Type-Value pattern.
  */
 
-import { 
-  DeviceCapability, 
-  PerformanceMode, 
-  QualityLevel, 
-  ResourceOptimizationLevel,
-  RenderFrequency,
-  RenderSetting,
-  AnimationComplexity,
-  RenderingEngine,
-  GlassmorphicVariant,
-  GlowIntensity,
-  CubeTheme,
-  CubeSize
-} from './types';
-
-// Device capability constants
+// Device capability levels
 export const DeviceCapabilities = {
-  LOW: 'low' as DeviceCapability,
-  MEDIUM: 'medium' as DeviceCapability,
-  HIGH: 'high' as DeviceCapability,
-  CORE: 'core' as DeviceCapability
-} as const;
+  LOW: 'low' as const,
+  MEDIUM: 'medium' as const,
+  HIGH: 'high' as const,
+  CORE: 'core' as const
+};
 
-// Performance mode constants
+// Performance optimization modes
 export const PerformanceModes = {
-  BALANCED: 'balanced' as PerformanceMode,
-  PERFORMANCE: 'performance' as PerformanceMode,
-  QUALITY: 'quality' as PerformanceMode
-} as const;
+  BALANCED: 'balanced' as const,
+  PERFORMANCE: 'performance' as const,
+  QUALITY: 'quality' as const
+};
 
-// Quality level constants
+// Visual quality levels
 export const QualityLevels = {
-  LOW: 'low' as QualityLevel,
-  MEDIUM: 'medium' as QualityLevel,
-  HIGH: 'high' as QualityLevel,
-  ULTRA: 'ultra' as QualityLevel
-} as const;
+  LOW: 'low' as const,
+  MEDIUM: 'medium' as const,
+  HIGH: 'high' as const,
+  ULTRA: 'ultra' as const
+};
 
-// Resource optimization level constants
+// Resource optimization levels
 export const ResourceOptimizationLevels = {
-  NONE: 'none' as ResourceOptimizationLevel,
-  CONSERVATIVE: 'conservative' as ResourceOptimizationLevel,
-  AGGRESSIVE: 'aggressive' as ResourceOptimizationLevel
-} as const;
+  NONE: 'none' as const,
+  CONSERVATIVE: 'conservative' as const,
+  AGGRESSIVE: 'aggressive' as const
+};
 
-// Render frequency constants
+// Render frequency levels
 export const RenderFrequencies = {
-  LOW: 'low' as RenderFrequency,
-  MEDIUM: 'medium' as RenderFrequency,
-  HIGH: 'high' as RenderFrequency,
-  ADAPTIVE: 'adaptive' as RenderFrequency
-} as const;
+  LOW: 'low' as const,
+  MEDIUM: 'medium' as const,
+  HIGH: 'high' as const,
+  ADAPTIVE: 'adaptive' as const
+};
 
-// Render setting constants
+// Render setting levels
 export const RenderSettings = {
-  AUTO: 'auto' as RenderSetting,
-  LOW: 'low' as RenderSetting,
-  MEDIUM: 'medium' as RenderSetting,
-  HIGH: 'high' as RenderSetting
-} as const;
+  AUTO: 'auto' as const,
+  LOW: 'low' as const,
+  MEDIUM: 'medium' as const,
+  HIGH: 'high' as const
+};
 
-// Animation complexity constants
+// Animation complexity levels
 export const AnimationComplexities = {
-  NONE: 'none' as AnimationComplexity,
-  MINIMAL: 'minimal' as AnimationComplexity,
-  STANDARD: 'standard' as AnimationComplexity,
-  ENHANCED: 'enhanced' as AnimationComplexity
-} as const;
+  NONE: 'none' as const,
+  MINIMAL: 'minimal' as const,
+  STANDARD: 'standard' as const,
+  ENHANCED: 'enhanced' as const
+};
 
-// Rendering engine constants
+// Rendering engine types
 export const RenderingEngines = {
-  CANVAS: 'canvas' as RenderingEngine,
-  WEBGL: 'webgl' as RenderingEngine,
-  SVG: 'svg' as RenderingEngine,
-  CSS: 'css' as RenderingEngine,
-  HTML: 'html' as RenderingEngine
-} as const;
+  CANVAS: 'canvas' as const,
+  WEBGL: 'webgl' as const,
+  SVG: 'svg' as const,
+  CSS: 'css' as const,
+  HTML: 'html' as const
+};
 
-// Glassmorphic variant constants
+// Glassmorphic variant types
 export const GlassmorphicVariants = {
-  DEFAULT: 'default' as GlassmorphicVariant,
-  SUBTLE: 'subtle' as GlassmorphicVariant,
-  MEDIUM: 'medium' as GlassmorphicVariant,
-  ELEVATED: 'elevated' as GlassmorphicVariant,
-  ETHEREAL: 'ethereal' as GlassmorphicVariant,
-  COSMIC: 'cosmic' as GlassmorphicVariant,
-  PURPLE: 'purple' as GlassmorphicVariant,
-  QUANTUM: 'quantum' as GlassmorphicVariant
-} as const;
+  DEFAULT: 'default' as const,
+  SUBTLE: 'subtle' as const,
+  MEDIUM: 'medium' as const,
+  ELEVATED: 'elevated' as const,
+  ETHEREAL: 'ethereal' as const,
+  COSMIC: 'cosmic' as const,
+  PURPLE: 'purple' as const,
+  QUANTUM: 'quantum' as const
+};
 
-// Glow intensity constants
+// Glow intensity levels
 export const GlowIntensities = {
-  NONE: 'none' as GlowIntensity,
-  LOW: 'low' as GlowIntensity,
-  MEDIUM: 'medium' as GlowIntensity,
-  HIGH: 'high' as GlowIntensity
-} as const;
+  NONE: 'none' as const,
+  LOW: 'low' as const,
+  MEDIUM: 'medium' as const,
+  HIGH: 'high' as const
+};
 
-// Cube theme constants
+// Cube theme types
 export const CubeThemes = {
-  DEFAULT: 'default' as CubeTheme,
-  COSMIC: 'cosmic' as CubeTheme,
-  ETHEREAL: 'ethereal' as CubeTheme,
-  CHAKRA: 'chakra' as CubeTheme,
-  ENERGY: 'energy' as CubeTheme,
-  SPIRITUAL: 'spiritual' as CubeTheme,
-  QUANTUM: 'quantum' as CubeTheme
-} as const;
+  DEFAULT: 'default' as const,
+  COSMIC: 'cosmic' as const,
+  ETHEREAL: 'ethereal' as const,
+  CHAKRA: 'chakra' as const,
+  ENERGY: 'energy' as const,
+  SPIRITUAL: 'spiritual' as const,
+  QUANTUM: 'quantum' as const
+};
 
-// Cube size constants
+// Cube size options
 export const CubeSizes = {
-  XS: 'xs' as CubeSize,
-  SM: 'sm' as CubeSize,
-  MD: 'md' as CubeSize,
-  LG: 'lg' as CubeSize,
-  XL: 'xl' as CubeSize,
-  FULL: 'full' as CubeSize
-} as const;
+  XS: 'xs' as const,
+  SM: 'sm' as const,
+  MD: 'md' as const,
+  LG: 'lg' as const,
+  XL: 'xl' as const,
+  FULL: 'full' as const
+};
+
+// Default performance configurations for different device capabilities
+export const DEFAULT_PERF_CONFIGS = {
+  low: {
+    deviceCapability: DeviceCapabilities.LOW,
+    useManualCapability: false,
+    disableAnimations: true,
+    disableEffects: true,
+    disableBlur: true,
+    disableShadows: true,
+    samplingRate: 2000,
+    throttleInterval: 1000,
+    maxTrackedComponents: 10,
+    resourceOptimizationLevel: ResourceOptimizationLevels.AGGRESSIVE,
+    metricsPersistence: false,
+    enablePerformanceTracking: false,
+    enableRenderTracking: false,
+    enableValidation: false,
+    enablePropTracking: false,
+    enableDebugLogging: false,
+    intelligentProfiling: false,
+    inactiveTabThrottling: true,
+    batchUpdates: true,
+    slowRenderThreshold: 16
+  },
+  medium: {
+    deviceCapability: DeviceCapabilities.MEDIUM,
+    useManualCapability: false,
+    disableAnimations: false,
+    disableEffects: false,
+    disableBlur: false,
+    disableShadows: false,
+    samplingRate: 1000,
+    throttleInterval: 500,
+    maxTrackedComponents: 25,
+    resourceOptimizationLevel: ResourceOptimizationLevels.CONSERVATIVE,
+    metricsPersistence: true,
+    enablePerformanceTracking: true,
+    enableRenderTracking: true,
+    enableValidation: false,
+    enablePropTracking: false,
+    enableDebugLogging: false,
+    intelligentProfiling: true,
+    inactiveTabThrottling: true,
+    batchUpdates: true,
+    slowRenderThreshold: 8
+  },
+  high: {
+    deviceCapability: DeviceCapabilities.HIGH,
+    useManualCapability: false,
+    disableAnimations: false,
+    disableEffects: false,
+    disableBlur: false,
+    disableShadows: false,
+    samplingRate: 500,
+    throttleInterval: 100,
+    maxTrackedComponents: 50,
+    resourceOptimizationLevel: ResourceOptimizationLevels.NONE,
+    metricsPersistence: true,
+    enablePerformanceTracking: true,
+    enableRenderTracking: true,
+    enableValidation: true,
+    enablePropTracking: true,
+    enableDebugLogging: true,
+    intelligentProfiling: true,
+    inactiveTabThrottling: false,
+    batchUpdates: true,
+    slowRenderThreshold: 5
+  }
+};
+
+// Default quality levels for different device capabilities
+export const DEFAULT_QUALITY_LEVELS = {
+  low: QualityLevels.LOW,
+  medium: QualityLevels.MEDIUM,
+  high: QualityLevels.HIGH
+};
+
+// Performance boundaries for monitoring
+export const DEFAULT_PERFORMANCE_BOUNDARIES = {
+  lowFpsThreshold: 30,
+  mediumFpsThreshold: 45,
+  highFpsThreshold: 55,
+  excessiveRenderTimeMs: 16,
+  highMemoryUsageMb: 100
+};
+
+// Default monitor configuration
+export const DEFAULT_MONITOR_CONFIG = {
+  samplingInterval: 1000,
+  metricsBufferSize: 100,
+  autoStart: true,
+  trackComponents: true,
+  trackInteractions: true,
+  trackWebVitals: true,
+  logWarnings: true,
+  captureElementMetrics: true,
+  adaptiveMode: true,
+  throttleUpdates: true
+};

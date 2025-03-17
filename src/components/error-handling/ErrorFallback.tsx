@@ -1,53 +1,52 @@
 
-/**
- * ErrorFallback Component
- * 
- * Used by ErrorBoundary to display errors in a user-friendly way
- */
 import React from 'react';
-import { ErrorFallbackProps } from './index';
-import { getUserFriendlyErrorMessage } from '@/utils/errorHandling/errorReporter';
+import { Button } from '@/components/ui/button';
+import { AlertCircle } from 'lucide-react';
 
-const ErrorFallback: React.FC<ErrorFallbackProps> = ({ 
-  error, 
-  componentName, 
-  resetErrorBoundary 
-}) => {
-  const errorMessage = getUserFriendlyErrorMessage(error);
-  const displayName = componentName || 'this component';
+export interface ErrorFallbackProps {
+  error: Error;
+  resetErrorBoundary: () => void;
+}
 
+const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, resetErrorBoundary }) => {
   return (
-    <div className="p-4 border border-red-300 bg-red-50 rounded-md">
-      <div className="flex items-center gap-2 mb-2">
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className="h-6 w-6 text-red-500" 
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth={2} 
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
-          />
-        </svg>
-        <h3 className="text-lg font-medium text-red-800">
-          Something went wrong in {displayName}
-        </h3>
+    <div className="flex flex-col items-center justify-center min-h-[200px] p-6 rounded-lg bg-black/20 backdrop-blur-md border border-red-500/20">
+      <div className="flex items-center justify-center mb-4 w-12 h-12 rounded-full bg-red-500/10">
+        <AlertCircle className="text-red-500" size={24} />
       </div>
       
-      <p className="mb-4 text-red-700">{errorMessage}</p>
+      <h2 className="text-xl font-display text-white mb-2">
+        Something went wrong
+      </h2>
       
-      <div className="flex justify-end">
-        <button
+      <p className="text-sm text-white/70 mb-4 max-w-md text-center">
+        {error.message || 'An unexpected error occurred'}
+      </p>
+      
+      <div className="flex gap-4">
+        <Button 
           onClick={resetErrorBoundary}
-          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          variant="default"
         >
           Try Again
-        </button>
+        </Button>
+        
+        <Button
+          onClick={() => window.location.href = '/'}
+          variant="outline"
+        >
+          Go to Home
+        </Button>
       </div>
+      
+      {process.env.NODE_ENV !== 'production' && (
+        <details className="mt-4 p-2 border border-white/10 rounded text-xs text-white/50 max-w-full overflow-auto">
+          <summary className="cursor-pointer">Error Details</summary>
+          <pre className="p-2 mt-2 whitespace-pre-wrap break-words">
+            {error.stack}
+          </pre>
+        </details>
+      )}
     </div>
   );
 };

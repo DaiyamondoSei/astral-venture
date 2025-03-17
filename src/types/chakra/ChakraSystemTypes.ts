@@ -39,3 +39,57 @@ export interface ChakraActivationProps {
   level: number;
   onActivate: (chakra: ChakraType) => void;
 }
+
+// Extended types for Metatron's Cube integration
+export interface ChakraNodeData {
+  chakraType: ChakraType;
+  level: number;
+  energy: number;
+  active: boolean;
+  position: {
+    x: number;
+    y: number;
+  };
+}
+
+export interface ChakraConnectionData {
+  source: ChakraType;
+  target: ChakraType;
+  strength: number;
+  active: boolean;
+}
+
+export interface ChakraVisualizationProps {
+  system: ChakraSystem;
+  activatedChakras: ChakraType[];
+  onChakraActivated?: (chakra: ChakraType) => void;
+  size?: 'sm' | 'md' | 'lg';
+  interactive?: boolean;
+  showLabels?: boolean;
+  animationLevel?: 'none' | 'minimal' | 'standard' | 'enhanced';
+}
+
+export interface ChakraInsight {
+  id: string;
+  chakraType: ChakraType;
+  title: string;
+  description: string;
+  actionItems: string[];
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface ChakraBalance {
+  overallBalance: number;
+  individualBalances: Record<ChakraType, number>;
+  recommendations: string[];
+  dominantChakra?: ChakraType;
+  blockages: ChakraType[];
+}
+
+export interface ChakraInsightsOptions {
+  userId?: string;
+  includeRecommendations?: boolean;
+  detailedAnalysis?: boolean;
+  chakraTypes?: ChakraType[];
+  historyDepth?: number;
+}

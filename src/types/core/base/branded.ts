@@ -1,152 +1,130 @@
 
 /**
- * Core Branded Types
+ * Branded Types
  * 
- * This module provides utilities for creating and working with branded types.
- * Branded types help ensure type safety by adding a unique brand property.
- * 
- * @category Core
- * @version 1.0.0
+ * This module provides type-safe identifiers using branded types.
+ * A branded type is a primitive type with an added phantom property
+ * that makes it distinct from the underlying primitive type at compile time.
  */
 
 /**
- * Create a branded type by adding a readonly __brand property
- * This provides type safety while using primitive types
+ * Creates a branded type using a phantom property
  */
 export type Brand<K, T> = K & { readonly __brand: T };
 
-/**
- * Creates a branded type with validation
- * 
- * @param value The value to brand
- * @param validator A function that validates the value
- * @param brandName The name of the brand for error messages
- * @returns The branded value
- * @throws Error if validation fails
- */
-export function createBrandedType<K, T>(
-  value: K,
-  validator: (value: K) => boolean,
-  brandName: string
-): Brand<K, T> {
-  if (!validator(value)) {
-    throw new Error(`Invalid ${brandName}: ${String(value)}`);
-  }
-  return value as Brand<K, T>;
-}
+// Basic branded types
+/** UUID branded type for type-safe identifiers */
+export type UUID = Brand<string, 'UUID'>;
+
+/** Timestamp branded type for type-safe timestamps */
+export type Timestamp = Brand<number, 'Timestamp'>;
+
+/** Energy points branded type for type-safe energy values */
+export type EnergyPoints = Brand<number, 'EnergyPoints'>;
+
+/** Date string branded type for type-safe date strings */
+export type DateString = Brand<string, 'DateString'>;
 
 /**
- * Creates a UUID branded type
- */
-export function createUUID(id: string): UUID {
-  return createBrandedType<string, 'uuid'>(
-    id,
-    (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
-    'UUID'
-  );
-}
-
-/**
- * Safe version of createUUID that returns a default UUID if validation fails
- */
-export function safeCreateUUID(id: string | null | undefined): UUID {
-  if (!id) return 'unknown-uuid' as UUID;
-  
-  try {
-    return createUUID(id);
-  } catch (e) {
-    console.warn(`Invalid UUID: ${id}, using fallback`);
-    return 'unknown-uuid' as UUID;
-  }
-}
-
-/**
- * Creates a Timestamp branded type
- */
-export function createTimestamp(timestamp: number): Timestamp {
-  return createBrandedType<number, 'timestamp'>(
-    timestamp,
-    (value) => Number.isFinite(value) && value > 0,
-    'Timestamp'
-  );
-}
-
-/**
- * Creates an EnergyPoints branded type
- */
-export function createEnergyPoints(points: number): EnergyPoints {
-  return createBrandedType<number, 'energy-points'>(
-    points,
-    (value) => Number.isFinite(value) && value >= 0,
-    'EnergyPoints'
-  );
-}
-
-/**
- * Creates a DateString branded type
- */
-export function createDateString(date: string): DateString {
-  return createBrandedType<string, 'date-string'>(
-    date,
-    (value) => /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/.test(value),
-    'DateString'
-  );
-}
-
-/**
- * Type predicate for checking if a value is a UUID
+ * Checks if a value is a valid UUID
  */
 export function isUUID(value: unknown): value is UUID {
   if (typeof value !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  
+  // UUID v4 format regex
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidPattern.test(value);
 }
 
 /**
- * Type predicate for checking if a value is a Timestamp
+ * Checks if a value is a valid timestamp
  */
 export function isTimestamp(value: unknown): value is Timestamp {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+  return typeof value === 'number' && !isNaN(value) && isFinite(value) && value > 0;
 }
 
 /**
- * Type predicate for checking if a value is EnergyPoints
+ * Checks if a value is valid energy points
  */
 export function isEnergyPoints(value: unknown): value is EnergyPoints {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+  return typeof value === 'number' && !isNaN(value) && isFinite(value) && value >= 0;
 }
 
 /**
- * Type predicate for checking if a value is a DateString
+ * Checks if a value is a valid date string
  */
 export function isDateString(value: unknown): value is DateString {
   if (typeof value !== 'string') return false;
-  return /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/.test(value);
+  
+  // ISO date format or YYYY-MM-DD
+  const date = new Date(value);
+  return !isNaN(date.getTime());
 }
 
 /**
- * Safe type assertion that won't throw - for UUID
+ * Creates a UUID from a string (with validation)
  */
-export function asUUID(value: unknown): UUID {
-  return isUUID(value) ? value : 'unknown-uuid' as UUID;
+export function asUUID(value: string): UUID {
+  if (!isUUID(value)) {
+    throw new Error(`Invalid UUID: ${value}`);
+  }
+  return value as UUID;
 }
 
 /**
- * Safe type assertion that won't throw - for Timestamp
+ * Creates a Timestamp from a number (with validation)
  */
-export function asTimestamp(value: unknown): Timestamp {
-  return isTimestamp(value) ? value : (Date.now() as Timestamp);
+export function asTimestamp(value: number): Timestamp {
+  if (!isTimestamp(value)) {
+    throw new Error(`Invalid Timestamp: ${value}`);
+  }
+  return value as Timestamp;
 }
 
 /**
- * Safe type assertion that won't throw - for EnergyPoints
+ * Creates EnergyPoints from a number (with validation)
  */
-export function asEnergyPoints(value: unknown): EnergyPoints {
-  return isEnergyPoints(value) ? value : (0 as EnergyPoints);
+export function asEnergyPoints(value: number): EnergyPoints {
+  if (!isEnergyPoints(value)) {
+    throw new Error(`Invalid EnergyPoints: ${value}`);
+  }
+  return value as EnergyPoints;
 }
 
 /**
- * Safe type assertion that won't throw - for DateString
+ * Creates a DateString from a string (with validation)
  */
-export function asDateString(value: unknown): DateString {
-  return isDateString(value) ? value : (new Date().toISOString() as DateString);
+export function asDateString(value: string): DateString {
+  if (!isDateString(value)) {
+    throw new Error(`Invalid DateString: ${value}`);
+  }
+  return value as DateString;
+}
+
+/**
+ * Creates a UUID safely, returning null on invalid input
+ */
+export function safeCreateUUID(value: string): UUID | null {
+  return isUUID(value) ? value as UUID : null;
+}
+
+/**
+ * Creates a Timestamp safely, returning null on invalid input
+ */
+export function safeCreateTimestamp(value: number): Timestamp | null {
+  return isTimestamp(value) ? value as Timestamp : null;
+}
+
+/**
+ * Creates EnergyPoints safely, returning null on invalid input
+ */
+export function safeCreateEnergyPoints(value: number): EnergyPoints | null {
+  return isEnergyPoints(value) ? value as EnergyPoints : null;
+}
+
+/**
+ * Creates a DateString safely, returning null on invalid input
+ */
+export function safeCreateDateString(value: string): DateString | null {
+  return isDateString(value) ? value as DateString : null;
 }

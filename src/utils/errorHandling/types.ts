@@ -1,24 +1,25 @@
 
 /**
- * Error handling system types
- * Following the Type-Value Pattern for type safety
+ * Error Handling Types
+ * 
+ * This module provides types for the error handling system.
  */
 
-// Error severity levels for the application
-export type ErrorSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type ErrorSeverity = 'error' | 'warning' | 'info' | 'low' | 'medium' | 'high';
 
-// Error categories for classification
 export type ErrorCategory = 
   | 'validation' 
+  | 'authentication' 
+  | 'authorization' 
   | 'network' 
-  | 'api' 
-  | 'auth' 
   | 'database' 
-  | 'ui' 
-  | 'system' 
+  | 'api' 
+  | 'internal' 
+  | 'ui'
+  | 'performance'
+  | 'security'
   | 'unknown';
 
-// Error handling options
 export interface ErrorHandlingOptions {
   logToConsole?: boolean;
   reportToService?: boolean;
@@ -28,23 +29,17 @@ export interface ErrorHandlingOptions {
   severity?: ErrorSeverity;
 }
 
-// Application error details
-export interface AppErrorDetails {
-  code?: string;
-  message: string;
-  category: ErrorCategory;
-  severity: ErrorSeverity;
-  details?: Record<string, unknown>;
-  originalError?: Error;
+export interface ErrorReportOptions {
+  userId?: string;
   context?: Record<string, unknown>;
-  timestamp: number;
-}
-
-// Options for creating application errors
-export interface AppErrorOptions {
   severity?: ErrorSeverity;
   category?: ErrorCategory;
-  details?: Record<string, unknown>;
-  context?: Record<string, unknown>;
-  originalError?: Error;
+  tags?: string[];
+  stackTrace?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ErrorFallbackProps {
+  error: Error;
+  resetErrorBoundary: () => void;
 }

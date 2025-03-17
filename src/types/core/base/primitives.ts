@@ -2,131 +2,130 @@
 /**
  * Core Primitive Types
  * 
- * This module provides base primitive types used throughout the application.
- * These are the foundation of our type system.
- * 
- * @category Core
- * @version 1.0.0
+ * This module provides foundational primitive types for use across the application.
  */
 
 /**
- * Unique identifier string branded with UUID type
- */
-export type UUID = string & { readonly __brand: 'uuid' };
-
-/**
- * Timestamp number branded with Timestamp type
- */
-export type Timestamp = number & { readonly __brand: 'timestamp' };
-
-/**
- * Energy points number branded with EnergyPoints type
- */
-export type EnergyPoints = number & { readonly __brand: 'energy-points' };
-
-/**
- * Generic JSON value type
- */
-export type Json = 
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json }
-  | Json[];
-
-/**
- * Record with string keys and unknown values
- */
-export type Dictionary<T = unknown> = Record<string, T>;
-
-/**
- * Type for identifying ID strings in the system
- */
-export type ID = string;
-
-/**
- * An ISO-8601 formatted date string
- */
-export type DateString = string & { readonly __brand: 'date-string' };
-
-/**
- * Non-empty array type
- */
-export type NonEmptyArray<T> = [T, ...T[]];
-
-/**
- * Type for functions that don't return a value
- */
-export type VoidFunction = () => void;
-
-/**
- * Type for functions that can be called with any arguments
- */
-export type AnyFunction = (...args: any[]) => any;
-
-/**
- * Type for objects with any string keys
- */
-export type AnyObject = Record<string, any>;
-
-/**
- * Type that requires at least one property from T
- */
-export type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
-  Pick<T, Exclude<keyof T, Keys>> 
-  & {
-      [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>>
-    }[Keys];
-
-/**
- * Type that makes nested properties partially optional
- */
-export type DeepPartial<T> = T extends object
-  ? { [P in keyof T]?: DeepPartial<T[P]> }
-  : T;
-
-/**
- * Type for version strings
- */
-export type Version = string & { readonly __brand: 'version' };
-
-/**
- * Default entity interface to ensure all entities have an ID
- * This helps prevent the "Property 'id' does not exist on type 'never'" error
+ * Basic entity interface that all database entities should implement
  */
 export interface Entity {
   id: string;
-}
-
-/**
- * Safe entity type that ensures an id property exists
- * Use this when working with unknown entity types to prevent "id does not exist on type 'never'" errors
- */
-export type SafeEntity<T> = T extends { id: string } ? T : T & Entity;
-
-/**
- * Ensures that an object has an ID field even if the type is unknown
- * @param obj Potentially any object
- * @returns The same object with id guaranteed to exist in the type system
- */
-export function ensureEntityId<T>(obj: T): SafeEntity<T> {
-  if (!obj) {
-    return { id: 'unknown-id' } as SafeEntity<T>;
-  }
-  
-  if (typeof obj === 'object' && obj !== null && !('id' in obj)) {
-    return { ...obj as object, id: 'unknown-id' } as SafeEntity<T>;
-  }
-  
-  return obj as SafeEntity<T>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
  * Type guard to check if an object has an id property
- * @param obj Any object to check
- * @returns Type predicate indicating if the object has an id property
  */
 export function hasId(obj: unknown): obj is { id: string } {
   return typeof obj === 'object' && obj !== null && 'id' in obj && typeof (obj as any).id === 'string';
+}
+
+/**
+ * Ensures that an entity has a valid ID, throws if not
+ */
+export function ensureEntityId<T extends { id?: string }>(entity: T): asserts entity is T & { id: string } {
+  if (!entity.id || typeof entity.id !== 'string' || entity.id.trim() === '') {
+    throw new Error('Entity missing valid ID');
+  }
+}
+
+/**
+ * Represents a point in 2D space
+ */
+export interface Point2D {
+  x: number;
+  y: number;
+}
+
+/**
+ * Represents a point in 3D space
+ */
+export interface Point3D extends Point2D {
+  z: number;
+}
+
+/**
+ * Represents a size in 2D
+ */
+export interface Size2D {
+  width: number;
+  height: number;
+}
+
+/**
+ * Represents a rectangle in 2D space
+ */
+export interface Rect extends Point2D, Size2D {}
+
+/**
+ * Represents a color in RGB format
+ */
+export interface RGBColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/**
+ * Represents a color in RGBA format
+ */
+export interface RGBAColor extends RGBColor {
+  a: number;
+}
+
+/**
+ * Represents an HSL color
+ */
+export interface HSLColor {
+  h: number; // 0-360
+  s: number; // 0-100
+  l: number; // 0-100
+}
+
+/**
+ * Represents an HSLA color
+ */
+export interface HSLAColor extends HSLColor {
+  a: number; // 0-1
+}
+
+/**
+ * Represents a time duration in milliseconds
+ */
+export type Duration = number;
+
+/**
+ * Represents a percentage (0-100)
+ */
+export type Percentage = number;
+
+/**
+ * Represents a normalized value (0-1)
+ */
+export type Normalized = number;
+
+/**
+ * Utility type to make all properties of T optional and nullable
+ */
+export type Nullable<T> = { [K in keyof T]: T[K] | null };
+
+/**
+ * Utility type to make selected properties of T required
+ */
+export type RequiredProperties<T, K extends keyof T> = T & { [P in K]-?: T[P] };
+
+/**
+ * Utility type to extract the keys of T whose values are of type U
+ */
+export type KeysOfType<T, U> = { [K in keyof T]: T[K] extends U ? K : never }[keyof T];
+
+/**
+ * Represents a data record with metadata
+ */
+export interface DataRecord {
+  id: string;
+  created_at: string;
+  updated_at?: string;
+  metadata?: Record<string, unknown>;
 }
