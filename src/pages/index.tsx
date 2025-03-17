@@ -1,144 +1,107 @@
 
-import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
-import AuthStateManager from '@/components/AuthStateManager';
-import OnboardingManager from '@/components/onboarding/OnboardingManager';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import { usePerformance } from '@/contexts/PerformanceContext';
-import { initializeApp } from '@/utils/appInitializer';
-// Import the useAuth hook from the correct location
-import { useAuth } from '@/hooks/auth';
+import { Inter } from "next/font/google";
+import { Button } from "@/components/ui/button";
+import { AiAnalysisDemo } from "@/components/ai/AiAnalysisDemo";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Brain, Zap, BarChart, Gauge } from "lucide-react";
 
-// Import lazy-loaded components using our optimized lazy loader
-import {
-  VisualizationTabs,
-  CosmicAstralBody,
-  AstralBody
-} from '@/components/lazy';
+const inter = Inter({ subsets: ["latin"] });
 
-// Lazy load components that aren't needed for initial render
-const UserDashboardView = lazy(() => import('@/components/UserDashboardView'));
-const LandingView = lazy(() => import('@/components/LandingView'));
-const EntryAnimationView = lazy(() => import('@/components/EntryAnimationView'));
-const ChallengeManager = lazy(() => import('@/components/ChallengeManager'));
-
-// Loading fallback components with performance adaptability
-const LoadingFallback = () => {
-  const { isLowPerformance } = usePerformance();
-  
+export default function Home() {
   return (
-    <div className="min-h-[70vh] flex items-center justify-center">
-      <div className={`${isLowPerformance ? '' : 'animate-pulse'} text-white/70`}>
-        Loading view...
-      </div>
-    </div>
-  );
-};
-
-const Index = () => {
-  const [showEntryAnimation, setShowEntryAnimation] = useState(false);
-  const [authState, setAuthState] = useState<any>(null);
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { isLowPerformance } = usePerformance();
-
-  // Initialize app with performance optimizations
-  useEffect(() => {
-    initializeApp({ 
-      route: 'index', 
-      prioritizeLCP: true,
-      enableMonitoring: process.env.NODE_ENV === 'development'
-    });
-  }, []);
-
-  // Simplified debug logging
-  useEffect(() => {
-    console.log("Index component - auth state:", { 
-      user: !!user, 
-      authState: !!authState 
-    });
-  }, [user, authState]);
-
-  useEffect(() => {
-    if (user && !localStorage.getItem(`entry-animation-shown-${user.id}`)) {
-      const dreamCaptureCompleted = localStorage.getItem('dreamCaptureCompleted');
-      
-      if (!dreamCaptureCompleted) {
-        navigate('/dream-capture');
-      } else {
-        setShowEntryAnimation(true);
-      }
-    }
-  }, [user, navigate]);
-
-  const handleAuthStateLoaded = (authData: any) => {
-    console.log("Auth state loaded:", authData.user ? "User exists" : "No user");
-    setAuthState(authData);
-  };
-
-  const handleEntryAnimationComplete = () => {
-    setShowEntryAnimation(false);
-    if (user) {
-      localStorage.setItem(`entry-animation-shown-${user.id}`, 'true');
-    }
-  };
-
-  // Create a more adaptive fallback component based on performance
-  const SuspenseFallback = () => (
-    <div className={`min-h-[70vh] flex items-center justify-center ${isLowPerformance ? '' : 'animate-pulse'}`}>
-      <div className="text-white/70">Loading view...</div>
-    </div>
-  );
-
-  return (
-    <Layout>
-      <ErrorBoundary>
-        <AuthStateManager onLoadingComplete={handleAuthStateLoaded} />
+    <main
+      className={`flex min-h-screen flex-col p-8 ${inter.className}`}
+    >
+      <div className="container mx-auto max-w-5xl">
+        <h1 className="text-4xl font-bold mb-6 text-center">AI-Powered Analysis System</h1>
+        <p className="text-xl text-center text-muted-foreground mb-10">
+          Offloading heavy analysis to OpenAI API for enhanced insights
+        </p>
         
-        {authState && (
-          <ErrorBoundary>
-            <Suspense fallback={<SuspenseFallback />}>
-              {showEntryAnimation ? (
-                <EntryAnimationView 
-                  onComplete={handleEntryAnimationComplete}
-                  showTestButton={false}
-                />
-              ) : (!authState.user ? (
-                <LandingView />
-              ) : (
-                <OnboardingManager userId={authState.user.id}>
-                  <ErrorBoundary>
-                    <Suspense fallback={<SuspenseFallback />}>
-                      <ChallengeManager
-                        userProfile={authState.userProfile}
-                        activatedChakras={authState.activatedChakras || []}
-                        updateUserProfile={authState.updateUserProfile}
-                        updateActivatedChakras={authState.updateActivatedChakras}
-                      >
-                        {(handleChallengeComplete) => (
-                          <UserDashboardView
-                            todayChallenge={authState.todayChallenge}
-                            userStreak={authState.userStreak || { current: 0, longest: 0 }}
-                            activatedChakras={authState.activatedChakras || []}
-                            onLogout={authState.handleLogout}
-                            updateStreak={authState.updateStreak}
-                            updateActivatedChakras={authState.updateActivatedChakras}
-                            updateUserProfile={authState.updateUserProfile}
-                            onChallengeComplete={handleChallengeComplete}
-                          />
-                        )}
-                      </ChallengeManager>
-                    </Suspense>
-                  </ErrorBoundary>
-                </OnboardingManager>
-              ))}
-            </Suspense>
-          </ErrorBoundary>
-        )}
-      </ErrorBoundary>
-    </Layout>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Brain className="mr-2 h-5 w-5" />
+                Chakra Analysis
+              </CardTitle>
+              <CardDescription>
+                AI-powered insights into chakra activations and patterns
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Offload complex chakra pattern analysis to the OpenAI API, which can process emotional connections,
+                reflection content, and chakra activations to provide personalized insights and recommendations.
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BarChart className="mr-2 h-5 w-5" />
+                Performance Metrics
+              </CardTitle>
+              <CardDescription>
+                AI interpretation of application performance data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Let AI analyze complex performance metrics including component render times, memory usage, and network requests
+                to identify bottlenecks and provide optimization recommendations.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div className="mb-10">
+          <AiAnalysisDemo />
+        </div>
+        
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Gauge className="mr-2 h-5 w-5" />
+              Implementation Progress
+            </CardTitle>
+            <CardDescription>
+              Phase 1 of the AI integration plan
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium">Completed Features:</h3>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Enhanced AI Analysis Service with caching and offline fallbacks</li>
+                  <li>AI Analysis Context Provider for app-wide access</li>
+                  <li>Secure edge function for OpenAI API integration</li>
+                  <li>API key management system</li>
+                  <li>Demo component showcasing AI capabilities</li>
+                </ul>
+              </div>
+              
+              <div className="mt-4">
+                <h3 className="font-medium">Next Steps:</h3>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Integrate AI analysis with existing components</li>
+                  <li>Enhance data visualization for AI insights</li>
+                  <li>Implement performance monitoring and metrics tracking</li>
+                  <li>Add visual analysis capabilities</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" className="w-full">
+              <Zap className="mr-2 h-4 w-4" />
+              Continue with Phase 2 Implementation
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    </main>
   );
-};
-
-export default Index;
+}
