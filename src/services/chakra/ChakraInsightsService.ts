@@ -1,93 +1,143 @@
+import { ChakraType, ChakraTypes } from '@/types/chakra/ChakraSystemTypes';
 
-import { supabase } from '@/integrations/supabase/client';
-import { handleError, ErrorCategory, ErrorSeverity } from '@/utils/errorHandling';
-import type { ChakraInsight, ChakraInsightsOptions } from '@/hooks/useChakraInsights';
+export interface ChakraInsight {
+  id: string;
+  chakraType: ChakraType;
+  title: string;
+  description: string;
+  actionItems: string[];
+  priority: 'high' | 'medium' | 'low';
+}
 
+/**
+ * Service for providing insights and recommendations for chakra system
+ */
 class ChakraInsightsService {
-  /**
-   * Fetch the user's chakra insights from recent reflections
-   * 
-   * @param options - Filtering and configuration options
-   * @returns Array of chakra insights
-   */
-  async getUserChakraInsights(options: ChakraInsightsOptions = {}): Promise<ChakraInsight[]> {
-    try {
-      const { data: reflections, error } = await supabase
-        .from('energy_reflections')
-        .select(`
-          id,
-          content,
-          chakra_analysis,
-          created_at
-        `)
-        .order('created_at', { ascending: false })
-        .limit(options.limit || 10);
-
-      if (error) throw error;
-
-      if (!reflections || reflections.length === 0) {
-        return [];
+  private chakraInsightsMap: Record<ChakraType, ChakraInsight[]> = {
+    [ChakraTypes.ROOT]: [
+      {
+        id: 'root-1',
+        chakraType: ChakraTypes.ROOT,
+        title: 'Grounding Practice',
+        description: 'Establish a stronger connection with your physical body and the earth.',
+        actionItems: ['Daily walking meditation', 'Gardening', 'Barefoot connection with nature'],
+        priority: 'medium'
       }
+    ],
+    [ChakraTypes.SACRAL]: [
+      {
+        id: 'sacral-1',
+        chakraType: ChakraTypes.SACRAL,
+        title: 'Creative Expression',
+        description: 'Engage your creative energy through artistic expression.',
+        actionItems: ['Dance freely', 'Journal your emotions', 'Create art without judgment'],
+        priority: 'medium'
+      }
+    ],
+    [ChakraTypes.SOLAR]: [
+      {
+        id: 'solar-1',
+        chakraType: ChakraTypes.SOLAR,
+        title: 'Personal Power',
+        description: 'Strengthen your sense of self and personal boundaries.',
+        actionItems: ['Practice saying no', 'Set clear intentions', 'Core-strengthening exercises'],
+        priority: 'high'
+      }
+    ],
+    [ChakraTypes.HEART]: [
+      {
+        id: 'heart-1',
+        chakraType: ChakraTypes.HEART,
+        title: 'Compassion Practice',
+        description: 'Open your heart to yourself and others with compassion.',
+        actionItems: ['Self-forgiveness meditation', 'Random acts of kindness', 'Gratitude journaling'],
+        priority: 'high'
+      }
+    ],
+    [ChakraTypes.THROAT]: [
+      {
+        id: 'throat-1',
+        chakraType: ChakraTypes.THROAT,
+        title: 'Authentic Expression',
+        description: 'Speak your truth with clarity and confidence.',
+        actionItems: ['Singing or chanting', 'Share an important truth', 'Practice active listening'],
+        priority: 'medium'
+      }
+    ],
+    [ChakraTypes.THIRD_EYE]: [
+      {
+        id: 'third-eye-1',
+        chakraType: ChakraTypes.THIRD_EYE,
+        title: 'Intuition Development',
+        description: 'Strengthen your connection to your inner wisdom.',
+        actionItems: ['Visualization meditation', 'Dream journaling', 'Trust your first impression'],
+        priority: 'medium'
+      }
+    ],
+    [ChakraTypes.CROWN]: [
+      {
+        id: 'crown-1',
+        chakraType: ChakraTypes.CROWN,
+        title: 'Spiritual Connection',
+        description: 'Deepen your connection to higher consciousness.',
+        actionItems: ['Silent meditation', 'Contemplation of life purpose', 'Study spiritual texts'],
+        priority: 'low'
+      }
+    ]
+  };
 
-      // Process the reflections to extract chakra insights
-      const insights: ChakraInsight[] = [];
-      
-      // Process each reflection's chakra_analysis to create ChakraInsight objects
-      reflections.forEach(reflection => {
-        if (!reflection.chakra_analysis) return;
-        
-        try {
-          const chakraAnalysis = typeof reflection.chakra_analysis === 'string' 
-            ? JSON.parse(reflection.chakra_analysis) 
-            : reflection.chakra_analysis;
-            
-          // Map the chakra analysis to ChakraInsight objects
-          Object.entries(chakraAnalysis).forEach(([chakraType, data]) => {
-            if (!data) return;
-            
-            const chakraData = data as any;
-            const affinity = chakraData.affinity || 0;
-            
-            // Skip if below minimum affinity threshold (if specified)
-            if (options.minAffinity !== undefined && affinity < options.minAffinity) {
-              return;
-            }
-            
-            // Skip if not in the specified chakra types (if specified)
-            if (options.chakraTypes && options.chakraTypes.length > 0 && 
-                !options.chakraTypes.includes(chakraType)) {
-              return;
-            }
-            
-            insights.push({
-              id: `${reflection.id}-${chakraType}`,
-              chakraType,
-              status: chakraData.status || 'balanced',
-              insights: chakraData.insights || [],
-              recommendations: options.includeRecommendations ? (chakraData.recommendations || []) : [],
-              affinity
-            });
-          });
-        } catch (err) {
-          handleError(err, {
-            category: ErrorCategory.DATA_PROCESSING,
-            severity: ErrorSeverity.WARNING,
-            context: 'Chakra analysis processing',
-          });
+  /**
+   * Get insights based on activated chakras
+   */
+  async getInsights(activatedChakras: number[] = []): Promise<ChakraInsight[]> {
+    // Convert numeric chakra indices to ChakraType
+    const chakraTypes = this.mapIndicesToChakraTypes(activatedChakras);
+    let insights: ChakraInsight[] = [];
+    
+    // If no specific chakras are activated, provide insights for all chakras
+    if (chakraTypes.length === 0) {
+      Object.values(this.chakraInsightsMap).forEach(chakraInsights => {
+        insights = [...insights, ...chakraInsights];
+      });
+    } else {
+      // Otherwise, provide insights for the activated chakras
+      chakraTypes.forEach(chakraType => {
+        if (this.chakraInsightsMap[chakraType]) {
+          insights = [...insights, ...this.chakraInsightsMap[chakraType]];
         }
       });
-
-      return insights;
-    } catch (error) {
-      handleError(error, {
-        category: ErrorCategory.DATA_PROCESSING,
-        severity: ErrorSeverity.ERROR,
-        context: 'Chakra insights service',
-      });
-      throw error;
     }
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return insights;
+  }
+
+  /**
+   * Map numeric chakra indices to ChakraType values
+   */
+  private mapIndicesToChakraTypes(indices: number[]): ChakraType[] {
+    const chakraTypes: ChakraType[] = [];
+    const chakraTypesArray: ChakraType[] = [
+      ChakraTypes.ROOT,
+      ChakraTypes.SACRAL,
+      ChakraTypes.SOLAR,
+      ChakraTypes.HEART,
+      ChakraTypes.THROAT,
+      ChakraTypes.THIRD_EYE,
+      ChakraTypes.CROWN
+    ];
+    
+    indices.forEach(index => {
+      if (index >= 0 && index < chakraTypesArray.length) {
+        chakraTypes.push(chakraTypesArray[index]);
+      }
+    });
+    
+    return chakraTypes;
   }
 }
 
+// Export singleton instance
 export const chakraInsightsService = new ChakraInsightsService();
-export default chakraInsightsService;

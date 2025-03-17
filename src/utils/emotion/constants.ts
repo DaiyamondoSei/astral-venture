@@ -1,118 +1,78 @@
 
-/**
- * Emotion system constants
- * Following the Type-Value Pattern
- */
-import { EmotionCategory, EmotionalDepthLevel, DreamTheme, EmotionIntensity, AnalysisDetailLevel } from './types';
-import { ChakraType } from '@/types/chakra/ChakraSystemTypes';
+import { ChakraType, ChakraTypes } from '@/types/chakra/ChakraSystemTypes';
 
-// Runtime values for EmotionCategory
-export const EmotionCategories = {
-  JOY: 'joy' as EmotionCategory,
-  SADNESS: 'sadness' as EmotionCategory,
-  ANGER: 'anger' as EmotionCategory,
-  FEAR: 'fear' as EmotionCategory,
-  SURPRISE: 'surprise' as EmotionCategory,
-  DISGUST: 'disgust' as EmotionCategory,
-  ANTICIPATION: 'anticipation' as EmotionCategory,
-  TRUST: 'trust' as EmotionCategory,
-  OTHER: 'other' as EmotionCategory
-} as const;
-
-// Runtime values for EmotionalDepthLevel
-export const EmotionalDepthLevels = {
-  SURFACE: 'surface' as EmotionalDepthLevel,
-  SHALLOW: 'shallow' as EmotionalDepthLevel,
-  MODERATE: 'moderate' as EmotionalDepthLevel,
-  DEEP: 'deep' as EmotionalDepthLevel,
-  PROFOUND: 'profound' as EmotionalDepthLevel
-} as const;
-
-// Runtime values for DreamTheme
-export const DreamThemes = {
-  WATER: 'water' as DreamTheme,
-  FIRE: 'fire' as DreamTheme,
-  EARTH: 'earth' as DreamTheme,
-  AIR: 'air' as DreamTheme,
-  LIGHT: 'light' as DreamTheme,
-  DARKNESS: 'darkness' as DreamTheme,
-  TRANSFORMATION: 'transformation' as DreamTheme,
-  JOURNEY: 'journey' as DreamTheme,
-  CONFLICT: 'conflict' as DreamTheme,
-  UNKNOWN: 'unknown' as DreamTheme
-} as const;
-
-// Runtime values for EmotionIntensity
-export const EmotionIntensities = {
-  LOW: 'low' as EmotionIntensity,
-  MEDIUM: 'medium' as EmotionIntensity,
-  HIGH: 'high' as EmotionIntensity,
-  EXTREME: 'extreme' as EmotionIntensity
-} as const;
-
-// Runtime values for AnalysisDetailLevel
-export const AnalysisDetailLevels = {
-  BASIC: 'basic' as AnalysisDetailLevel,
-  STANDARD: 'standard' as AnalysisDetailLevel,
-  DETAILED: 'detailed' as AnalysisDetailLevel,
-  COMPREHENSIVE: 'comprehensive' as AnalysisDetailLevel
-} as const;
-
-// Chakra colors for visualization
-export const CHAKRA_COLORS = [
-  "#FF0000", // Root - Red
-  "#FF8000", // Sacral - Orange
-  "#FFFF00", // Solar Plexus - Yellow
-  "#00FF00", // Heart - Green
-  "#00FFFF", // Throat - Light Blue
-  "#0000FF", // Third Eye - Indigo
-  "#8000FF"  // Crown - Violet
-];
-
-// Chakra names for display
-export const CHAKRA_NAMES = [
-  "Root",
-  "Sacral",
-  "Solar Plexus",
-  "Heart",
-  "Throat",
-  "Third Eye",
-  "Crown"
-];
-
-// Import ChakraTypes from ChakraSystemTypes
-import { ChakraTypes } from '@/types/chakra/constants';
-export { ChakraTypes };
-
-// Chakra color mappings
-export const CHAKRA_COLOR_MAP: Record<ChakraType, string> = {
-  'root': CHAKRA_COLORS[0],
-  'sacral': CHAKRA_COLORS[1],
-  'solar': CHAKRA_COLORS[2],
-  'heart': CHAKRA_COLORS[3],
-  'throat': CHAKRA_COLORS[4],
-  'third-eye': CHAKRA_COLORS[5],
-  'crown': CHAKRA_COLORS[6]
+// Chakra color mapping
+export const CHAKRA_COLORS: Record<ChakraType, string> = {
+  [ChakraTypes.ROOT]: '#ff0000',      // Red
+  [ChakraTypes.SACRAL]: '#ff7f00',    // Orange
+  [ChakraTypes.SOLAR]: '#ffff00',     // Yellow
+  [ChakraTypes.HEART]: '#00ff00',     // Green
+  [ChakraTypes.THROAT]: '#00bfff',    // Light Blue
+  [ChakraTypes.THIRD_EYE]: '#0000ff', // Indigo
+  [ChakraTypes.CROWN]: '#8b00ff'      // Violet
 };
 
-// Chakra name mappings
-export const CHAKRA_NAME_MAP: Record<ChakraType, string> = {
-  'root': CHAKRA_NAMES[0],
-  'sacral': CHAKRA_NAMES[1],
-  'solar': CHAKRA_NAMES[2],
-  'heart': CHAKRA_NAMES[3],
-  'throat': CHAKRA_NAMES[4],
-  'third-eye': CHAKRA_NAMES[5],
-  'crown': CHAKRA_NAMES[6]
+// Chakra name mapping
+export const CHAKRA_NAMES: Record<ChakraType, string> = {
+  [ChakraTypes.ROOT]: 'Root',
+  [ChakraTypes.SACRAL]: 'Sacral',
+  [ChakraTypes.SOLAR]: 'Solar Plexus',
+  [ChakraTypes.HEART]: 'Heart',
+  [ChakraTypes.THROAT]: 'Throat',
+  [ChakraTypes.THIRD_EYE]: 'Third Eye',
+  [ChakraTypes.CROWN]: 'Crown'
 };
 
-// Element associations for chakras
-export const CHAKRA_ELEMENTS = {
-  'root': 'earth',
-  'sacral': 'water',
-  'solar': 'fire',
-  'heart': 'air',
-  'throat': 'sound',
-  'third-eye': 'light',
-  'crown': 'consciousness'
+// Color mapping with hex values
+export const CHAKRA_COLOR_MAP = {
+  root: '#ff0000',      // Red
+  sacral: '#ff7f00',    // Orange
+  solar: '#ffff00',     // Yellow
+  heart: '#00ff00',     // Green
+  throat: '#00bfff',    // Light Blue
+  'third-eye': '#0000ff', // Indigo
+  crown: '#8b00ff'      // Violet
+};
+
+// Emotion to chakra mapping
+export const EMOTION_TO_CHAKRA_MAP: Record<string, ChakraType> = {
+  // Root chakra emotions
+  'fear': ChakraTypes.ROOT,
+  'anxiety': ChakraTypes.ROOT,
+  'insecurity': ChakraTypes.ROOT,
+  
+  // Sacral chakra emotions
+  'passion': ChakraTypes.SACRAL,
+  'pleasure': ChakraTypes.SACRAL,
+  'desire': ChakraTypes.SACRAL,
+  'creativity': ChakraTypes.SACRAL,
+  
+  // Solar plexus emotions
+  'confidence': ChakraTypes.SOLAR,
+  'power': ChakraTypes.SOLAR,
+  'anger': ChakraTypes.SOLAR,
+  'frustration': ChakraTypes.SOLAR,
+  
+  // Heart chakra emotions
+  'love': ChakraTypes.HEART,
+  'compassion': ChakraTypes.HEART,
+  'grief': ChakraTypes.HEART,
+  'sadness': ChakraTypes.HEART,
+  
+  // Throat chakra emotions
+  'expression': ChakraTypes.THROAT,
+  'truth': ChakraTypes.THROAT,
+  'communication': ChakraTypes.THROAT,
+  
+  // Third eye emotions
+  'intuition': ChakraTypes.THIRD_EYE,
+  'insight': ChakraTypes.THIRD_EYE,
+  'clarity': ChakraTypes.THIRD_EYE,
+  'confusion': ChakraTypes.THIRD_EYE,
+  
+  // Crown chakra emotions
+  'connection': ChakraTypes.CROWN,
+  'enlightenment': ChakraTypes.CROWN,
+  'awareness': ChakraTypes.CROWN,
+  'wisdom': ChakraTypes.CROWN
 };

@@ -1,17 +1,17 @@
 
 import React from 'react';
-import { Card } from '@/components/ui/card';
 
 /**
- * A simple dashboard wrapper for testing purposes
+ * TestDashboardWrapper component for the test route
+ * This is a simple wrapper component used for testing purposes
  */
-const TestDashboardWrapper: React.FC = () => {
+const TestDashboardWrapper: React.FC = ({ children }) => {
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Test Dashboard</h1>
-      <Card className="p-6">
-        <p>This is a test dashboard for development and testing purposes.</p>
-      </Card>
+    <div className="test-dashboard-wrapper">
+      <h1>Test Dashboard</h1>
+      <div className="test-content">
+        {children || <p>No test content available. This is a placeholder for testing purposes.</p>}
+      </div>
     </div>
   );
 };

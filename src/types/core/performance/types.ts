@@ -1,131 +1,106 @@
 
 /**
- * Performance monitoring system types
- * Following the Type-Value Pattern for consistent type definitions
+ * Performance system type definitions
+ * Following the Type-Value Pattern for type safety
  */
 
-// Device capability type
-export type DeviceCapability = 'low' | 'medium' | 'high';
+// Device capability levels
+export type DeviceCapability = 'low-end' | 'mid-range' | 'high-end' | 'core';
 
-// Performance mode type
-export type PerformanceMode = 'battery' | 'balanced' | 'performance' | 'auto' | 'quality';
+// Performance optimization modes
+export type PerformanceMode = 'balanced' | 'performance' | 'quality';
 
-// Render frequency type
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
-
-// Quality level type
+// Visual quality levels
 export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
 
-// Metric type for performance tracking
-export type MetricType = 
-  | 'render' 
-  | 'interaction' 
-  | 'load' 
-  | 'memory'
-  | 'network'
-  | 'resource'
-  | 'javascript'
-  | 'css'
-  | 'animation'
-  | 'metric'
-  | 'summary'
-  | 'performance'
-  | 'web_vital';
+// Render frequency settings
+export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive';
 
-// Web vital categories
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
+// Resource optimization levels
+export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
+
+// Glassmorphic variants
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'cosmic';
+
+// Rendering engine options
+export type RenderingEngine = 'canvas' | 'svg' | 'webgl';
+
+// Glow intensity levels
+export type GlowIntensity = 'low' | 'medium' | 'high';
+
+// Cube theme variants
+export type CubeTheme = 'cosmic' | 'energetic' | 'etheric' | 'quantum';
+
+// Cube size options
+export type CubeSize = 'small' | 'medium' | 'large';
 
 // Performance configuration interface
-export interface PerformanceConfig {
-  // Core settings
+export interface PerfConfig {
+  // Capability settings
   deviceCapability: DeviceCapability;
   useManualCapability: boolean;
+  
+  // Visual settings
   disableAnimations: boolean;
   disableEffects: boolean;
+  disableBlur: boolean;
+  disableShadows: boolean;
   
-  // Sampling settings
+  // Performance settings
   samplingRate: number;
   throttleInterval: number;
-  
-  // Monitoring configuration
-  slowRenderThreshold: number;
   maxTrackedComponents: number;
   
-  // Optimizations
+  // Feature flags
+  enablePerformanceTracking: boolean;
+  enableRenderTracking: boolean;
   enableValidation: boolean;
-  batchUpdates: boolean;
-  inactiveTabThrottling: boolean;
-  intelligentProfiling: boolean;
-  resourceOptimizationLevel: 'none' | 'conservative' | 'aggressive';
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
   
   // Advanced settings
-  customThrottleInterval?: number;
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
+  resourceOptimizationLevel: ResourceOptimizationLevel;
   metricsPersistence: boolean;
 }
 
-// Performance metric structure
-export interface PerformanceMetric {
-  metric_name: string;
-  value: number;
-  type: MetricType;
-  timestamp?: number;
-  category?: string;
-}
-
-// Web vital metric structure
-export interface WebVitalMetric {
-  metric_name: string;
-  category: WebVitalCategory;
-  value: number;
-  type: 'web_vital';
-  timestamp?: number;
-}
-
-// Component metrics structure
+// Performance metrics interfaces
 export interface ComponentMetrics {
   componentName: string;
   renderCount: number;
   totalRenderTime: number;
   averageRenderTime: number;
-  lastRenderTime?: number;
-  slowRenderCount?: number;
-  firstRenderTime?: number;
+  lastRenderTime: number;
+  reRenderCount: number;
 }
 
-// Device information structure
+export interface WebVitalMetric {
+  metric_name: string;
+  category: 'loading' | 'interaction' | 'visual_stability';
+  value: number;
+  type: 'web-vital';
+  timestamp: number;
+}
+
+export interface PerformanceMetric {
+  metric_name: string;
+  category: string;
+  value: number;
+  type: 'performance' | 'resource' | 'component';
+  timestamp?: number;
+}
+
 export interface DeviceInfo {
   userAgent: string;
   deviceCategory: 'mobile' | 'tablet' | 'desktop';
-  deviceMemory?: number;
-  hardwareConcurrency?: number;
-  connectionType?: string;
-  viewport?: {
-    width: number;
-    height: number;
-  };
   screenSize: {
     width: number;
     height: number;
   };
-  pixelRatio?: number;
 }
 
-// Render event types
-export type RenderEventType = 'render' | 'interaction' | 'load';
-
-// Performance tracking options
-export interface PerformanceTrackingOptions {
-  autoStart?: boolean;
-  slowRenderThreshold?: number;
-  enableDebugLogging?: boolean;
-  trackRenders?: boolean;
-  trackReRenders?: boolean;
-}
-
-// Performance data structure
-export interface PerformanceData {
-  metrics: ComponentMetrics[];
-  webVitals: WebVitalMetric[];
-  deviceInfo: DeviceInfo;
-  timestamp: number;
-}
+// Web vital types
+export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
+export type MetricType = 'performance' | 'resource' | 'component' | 'web-vital';

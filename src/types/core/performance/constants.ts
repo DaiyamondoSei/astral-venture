@@ -1,112 +1,93 @@
 
 /**
- * Performance system type definitions
- * Following the Type-Value Pattern
+ * Performance system constants
+ * Following the Type-Value Pattern for type safety
  */
 import { 
-  DeviceCapability,
-  PerformanceMode,
+  DeviceCapability, 
+  PerformanceMode, 
+  QualityLevel, 
   RenderFrequency,
-  QualityLevel,
-  MetricType,
-  WebVitalCategory
+  ResourceOptimizationLevel,
+  GlassmorphicVariant,
+  RenderingEngine,
+  GlowIntensity,
+  CubeTheme,
+  CubeSize
 } from './types';
 
-// Device capability values
+// Device capability constants
 export const DeviceCapabilities = {
-  LOW: 'low' as DeviceCapability,
-  MEDIUM: 'medium' as DeviceCapability,
-  HIGH: 'high' as DeviceCapability
-} as const;
+  LOW_END: 'low-end' as DeviceCapability,
+  MID_RANGE: 'mid-range' as DeviceCapability,
+  HIGH_END: 'high-end' as DeviceCapability,
+  CORE: 'core' as DeviceCapability
+};
 
-// Performance mode values
+// Performance mode constants
 export const PerformanceModes = {
-  BATTERY: 'battery' as PerformanceMode,
   BALANCED: 'balanced' as PerformanceMode,
   PERFORMANCE: 'performance' as PerformanceMode,
-  AUTO: 'auto' as PerformanceMode,
   QUALITY: 'quality' as PerformanceMode
-} as const;
+};
 
-// Render frequency values
-export const RenderFrequencies = {
-  LOW: 'low' as RenderFrequency,
-  MEDIUM: 'medium' as RenderFrequency,
-  HIGH: 'high' as RenderFrequency,
-  EXCESSIVE: 'excessive' as RenderFrequency
-} as const;
-
-// Quality level values
+// Quality level constants
 export const QualityLevels = {
   LOW: 'low' as QualityLevel,
   MEDIUM: 'medium' as QualityLevel,
   HIGH: 'high' as QualityLevel,
   ULTRA: 'ultra' as QualityLevel
-} as const;
+};
 
-// Metric types
-export const MetricTypes = {
-  RENDER: 'render' as MetricType,
-  INTERACTION: 'interaction' as MetricType,
-  LOAD: 'load' as MetricType,
-  MEMORY: 'memory' as MetricType,
-  NETWORK: 'network' as MetricType,
-  RESOURCE: 'resource' as MetricType,
-  JAVASCRIPT: 'javascript' as MetricType,
-  CSS: 'css' as MetricType,
-  ANIMATION: 'animation' as MetricType,
-  METRIC: 'metric' as MetricType,
-  SUMMARY: 'summary' as MetricType,
-  PERFORMANCE: 'performance' as MetricType,
-  WEB_VITAL: 'web_vital' as MetricType
-} as const;
+// Render frequency constants
+export const RenderFrequencies = {
+  LOW: 'low' as RenderFrequency,
+  MEDIUM: 'medium' as RenderFrequency,
+  HIGH: 'high' as RenderFrequency,
+  ADAPTIVE: 'adaptive' as RenderFrequency
+};
 
-// Web vital categories
-export const WebVitalCategories = {
-  LOADING: 'loading' as WebVitalCategory,
-  INTERACTION: 'interaction' as WebVitalCategory,
-  VISUAL_STABILITY: 'visual_stability' as WebVitalCategory
-} as const;
-
-// Resource optimization levels
-export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
-
+// Resource optimization level constants
 export const ResourceOptimizationLevels = {
   NONE: 'none' as ResourceOptimizationLevel,
   CONSERVATIVE: 'conservative' as ResourceOptimizationLevel,
   AGGRESSIVE: 'aggressive' as ResourceOptimizationLevel
-} as const;
+};
 
-// Performance configuration interface
-export interface PerfConfig {
-  // Core settings
-  deviceCapability: DeviceCapability;
-  useManualCapability: boolean;
-  disableAnimations: boolean;
-  disableEffects: boolean;
-  
-  // Sampling settings
-  samplingRate: number;
-  throttleInterval: number;
-  
-  // Monitoring configuration
-  slowRenderThreshold: number;
-  maxTrackedComponents: number;
-  
-  // Feature toggles
-  enableValidation: boolean;
-  enablePerformanceTracking: boolean;
-  enableRenderTracking: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  
-  // Optimizations
-  batchUpdates: boolean;
-  inactiveTabThrottling: boolean;
-  intelligentProfiling: boolean;
-  resourceOptimizationLevel: ResourceOptimizationLevel;
-  
-  // Advanced settings
-  customThrottleInterval?: number;
-  metricsPersistence: boolean;
-}
+// Glassmorphic variant constants
+export const GlassmorphicVariants = {
+  DEFAULT: 'default' as GlassmorphicVariant,
+  QUANTUM: 'quantum' as GlassmorphicVariant,
+  ETHEREAL: 'ethereal' as GlassmorphicVariant,
+  ELEVATED: 'elevated' as GlassmorphicVariant,
+  COSMIC: 'cosmic' as GlassmorphicVariant
+};
+
+// Rendering engine constants
+export const RenderingEngines = {
+  CANVAS: 'canvas' as RenderingEngine,
+  SVG: 'svg' as RenderingEngine,
+  WEBGL: 'webgl' as RenderingEngine
+};
+
+// Glow intensity constants
+export const GlowIntensities = {
+  LOW: 'low' as GlowIntensity,
+  MEDIUM: 'medium' as GlowIntensity,
+  HIGH: 'high' as GlowIntensity
+};
+
+// Cube theme constants
+export const CubeThemes = {
+  COSMIC: 'cosmic' as CubeTheme,
+  ENERGETIC: 'energetic' as CubeTheme,
+  ETHERIC: 'etheric' as CubeTheme,
+  QUANTUM: 'quantum' as CubeTheme
+};
+
+// Cube size constants
+export const CubeSizes = {
+  SMALL: 'small' as CubeSize,
+  MEDIUM: 'medium' as CubeSize,
+  LARGE: 'large' as CubeSize
+};

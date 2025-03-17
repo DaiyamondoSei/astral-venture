@@ -1,9 +1,16 @@
 
 /**
  * Validation system constants
- * Following the Type-Value Pattern
+ * Following the Type-Value Pattern for type safety
  */
 import { ValidationErrorCode, ErrorSeverity } from './types';
+
+// Runtime values for ErrorSeverity
+export const ErrorSeverities = {
+  ERROR: 'error' as ErrorSeverity,
+  WARNING: 'warning' as ErrorSeverity,
+  INFO: 'info' as ErrorSeverity
+};
 
 // Runtime values for ValidationErrorCode
 export const ValidationErrorCodes = {
@@ -18,14 +25,4 @@ export const ValidationErrorCodes = {
   CONSTRAINT_ERROR: 'CONSTRAINT_ERROR' as ValidationErrorCode,
   FIELD_REQUIRED: 'FIELD_REQUIRED' as ValidationErrorCode,
   UNKNOWN_ERROR: 'UNKNOWN_ERROR' as ValidationErrorCode
-} as const;
-
-// Runtime values for ErrorSeverity
-export const ErrorSeverities = {
-  ERROR: 'error' as ErrorSeverity,
-  WARNING: 'warning' as ErrorSeverity,
-  INFO: 'info' as ErrorSeverity
-} as const;
-
-// Validation severity aliases for backward compatibility
-export const ValidationSeverities = ErrorSeverities;
+};
