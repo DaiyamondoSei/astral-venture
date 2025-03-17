@@ -2,363 +2,301 @@
 /**
  * Geometry Utilities
  * 
- * Utilities for creating and manipulating geometric patterns.
+ * Provides functions for procedural generation of sacred geometry patterns.
+ * This serves as a local fallback when AI-generated geometry is not available.
  */
 
-// Type definitions for geometry
-export interface Point {
-  x: number;
-  y: number;
-}
+import { GeometryPattern } from '../ai/VisualProcessingService';
 
-export interface GeometryNode extends Point {
-  id: string;
-  size?: number;
-  energy?: number;
-  active?: boolean;
-}
+// Constants for pattern types
+export const GEOMETRY_TYPES = {
+  FLOWER_OF_LIFE: 'flower_of_life',
+  METATRON_CUBE: 'metatron_cube',
+  SRI_YANTRA: 'sri_yantra',
+  FIBONACCI_SPIRAL: 'fibonacci_spiral',
+  SEED_OF_LIFE: 'seed_of_life',
+  MERKABA: 'merkaba',
+  TORUS: 'torus'
+};
 
-export interface GeometryConnection {
-  from: string;
-  to: string;
-  type?: string;
-  energy?: number;
-  width?: number;
-  active?: boolean;
-}
+// Chakra associations for geometry patterns
+export const GEOMETRY_CHAKRA_MAPPING = {
+  [GEOMETRY_TYPES.FLOWER_OF_LIFE]: [2, 4, 6],  // Sacral, Heart, Third Eye
+  [GEOMETRY_TYPES.METATRON_CUBE]: [3, 6, 7],   // Solar Plexus, Third Eye, Crown
+  [GEOMETRY_TYPES.SRI_YANTRA]: [1, 4, 7],      // Root, Heart, Crown
+  [GEOMETRY_TYPES.FIBONACCI_SPIRAL]: [2, 5],   // Sacral, Throat
+  [GEOMETRY_TYPES.SEED_OF_LIFE]: [1, 2, 4],    // Root, Sacral, Heart
+  [GEOMETRY_TYPES.MERKABA]: [3, 6, 7],         // Solar Plexus, Third Eye, Crown
+  [GEOMETRY_TYPES.TORUS]: [4, 7]               // Heart, Crown
+};
 
-export interface GeometryPattern {
-  nodes: GeometryNode[];
-  connections: GeometryConnection[];
+/**
+ * Generate a pseudo-random number based on a string seed
+ */
+export function seedRandom(seed: string): () => number {
+  // Simple implementation of seeded PRNG
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  
+  // Return a function that generates a random number between 0 and 1
+  return () => {
+    hash = (hash * 9301 + 49297) % 233280;
+    return hash / 233280;
+  };
 }
 
 /**
- * Generate points for a regular polygon
+ * Generate points for a circle
  */
-export function generatePolygonPoints(
-  sides: number,
-  radius: number,
-  startAngle: number = 0,
-  centerX: number = 0,
-  centerY: number = 0
-): Point[] {
-  if (sides < 3) {
-    console.warn('Polygon must have at least 3 sides');
-    sides = Math.max(3, sides);
+function generateCirclePoints(centerX: number, centerY: number, radius: number, numPoints: number): [number, number][] {
+  const points: [number, number][] = [];
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i / numPoints) * Math.PI * 2;
+    const x = centerX + Math.cos(angle) * radius;
+    const y = centerY + Math.sin(angle) * radius;
+    points.push([x, y]);
   }
-  
-  const points: Point[] = [];
-  const angleStep = (Math.PI * 2) / sides;
-  
-  for (let i = 0; i < sides; i++) {
-    const angle = startAngle + i * angleStep;
-    const x = centerX + radius * Math.cos(angle);
-    const y = centerY + radius * Math.sin(angle);
-    points.push({ x, y });
-  }
-  
   return points;
 }
 
 /**
- * Generate the Flower of Life pattern
+ * Generate a SVG path for a circle
  */
-export function generateFlowerOfLife(
-  radius: number,
-  detail: number = 2,
-  centerX: number = 0,
-  centerY: number = 0
-): GeometryPattern {
-  const nodes: GeometryNode[] = [];
-  const connections: GeometryConnection[] = [];
-  
-  // Add center circle
-  nodes.push({
-    id: 'center',
-    x: centerX,
-    y: centerY,
-    size: radius * 0.1,
-    active: true
-  });
-  
-  // Generate first ring of 6 circles
-  const firstRing = generatePolygonPoints(6, radius, 0, centerX, centerY);
-  
-  firstRing.forEach((point, index) => {
-    const id = `ring1-${index}`;
-    nodes.push({
-      id,
-      x: point.x,
-      y: point.y,
-      size: radius * 0.1,
-      active: true
-    });
-    
-    // Connect to center
-    connections.push({
-      from: 'center',
-      to: id,
-      type: 'primary',
-      active: true
-    });
-    
-    // Connect to neighbors in the ring
-    const prevId = index === 0 ? `ring1-${firstRing.length - 1}` : `ring1-${index - 1}`;
-    connections.push({
-      from: id,
-      to: prevId,
-      type: 'primary',
-      active: true
-    });
-  });
-  
-  // Add more detail if requested
-  if (detail > 1) {
-    // Generate additional rings
-    for (let ring = 2; ring <= detail; ring++) {
-      const ringPoints = generatePolygonPoints(6 * ring, radius * ring, 0, centerX, centerY);
-      
-      ringPoints.forEach((point, index) => {
-        const id = `ring${ring}-${index}`;
-        nodes.push({
-          id,
-          x: point.x,
-          y: point.y,
-          size: radius * 0.08 / ring,
-          active: ring === 2 // Only the second ring is active by default
-        });
-        
-        // Connect to closest nodes
-        const closestNodes = findClosestNodes(point, nodes, 3);
-        closestNodes.forEach(nodeId => {
-          connections.push({
-            from: id,
-            to: nodeId,
-            type: ring === 2 ? 'secondary' : 'tertiary',
-            active: ring === 2 // Only connections in the second ring are active by default
-          });
-        });
-      });
-    }
-  }
-  
-  return { nodes, connections };
+function generateCirclePath(centerX: number, centerY: number, radius: number): string {
+  return `M ${centerX - radius} ${centerY} a ${radius} ${radius} 0 1 0 ${radius * 2} 0 a ${radius} ${radius} 0 1 0 -${radius * 2} 0`;
 }
 
 /**
- * Generate Metatron's Cube
+ * Generate a Flower of Life pattern
  */
-export function generateMetatronsCube(
-  radius: number,
-  detail: number = 3,
-  centerX: number = 0,
-  centerY: number = 0
-): GeometryPattern {
-  const nodes: GeometryNode[] = [];
-  const connections: GeometryConnection[] = [];
+function generateFlowerOfLife(random: () => number, complexity: number): { svgPath: string; points: [number, number][] } {
+  const centerX = 50;
+  const centerY = 50;
+  const baseRadius = 10 + (random() * 5);
+  const circleCount = 1 + Math.floor(complexity * 2);
   
-  // Create center node
-  nodes.push({
-    id: 'center',
-    x: centerX,
-    y: centerY,
-    size: radius * 0.1,
-    energy: 1,
-    active: true
-  });
+  let svgPath = '';
+  const points: [number, number][] = [];
   
-  // Create first ring of 6 nodes (hexagon)
-  const hexagon = generatePolygonPoints(6, radius, 0, centerX, centerY);
-  hexagon.forEach((point, index) => {
-    const id = `hex-${index}`;
-    nodes.push({
-      id,
-      x: point.x,
-      y: point.y,
-      size: radius * 0.08,
-      energy: 0.9,
-      active: true
-    });
+  // Center circle
+  svgPath += generateCirclePath(centerX, centerY, baseRadius);
+  points.push(...generateCirclePoints(centerX, centerY, baseRadius, 12));
+  
+  // Surrounding circles
+  for (let i = 0; i < circleCount; i++) {
+    const angle = (i / circleCount) * Math.PI * 2;
+    const x = centerX + Math.cos(angle) * baseRadius;
+    const y = centerY + Math.sin(angle) * baseRadius;
     
-    // Connect to center
-    connections.push({
-      from: 'center',
-      to: id,
-      type: 'primary',
-      energy: 0.9,
-      active: true
-    });
+    svgPath += ' ' + generateCirclePath(x, y, baseRadius);
+    points.push(...generateCirclePoints(x, y, baseRadius, 12));
     
-    // Connect to neighbors
-    if (index < hexagon.length - 1) {
-      connections.push({
-        from: id,
-        to: `hex-${index + 1}`,
-        type: 'primary',
-        energy: 0.8,
-        active: true
-      });
-    }
-  });
-  
-  // Connect last to first to complete the hexagon
-  connections.push({
-    from: `hex-${hexagon.length - 1}`,
-    to: 'hex-0',
-    type: 'primary',
-    energy: 0.8,
-    active: true
-  });
-  
-  // Add Platonic solids if detail is high enough
-  if (detail >= 2) {
-    // Add points for an inner circle (cube/octahedron)
-    const innerRadius = radius * 0.6;
-    const square = generatePolygonPoints(4, innerRadius, Math.PI / 4, centerX, centerY);
-    
-    square.forEach((point, index) => {
-      const id = `square-${index}`;
-      nodes.push({
-        id,
-        x: point.x,
-        y: point.y,
-        size: radius * 0.07,
-        energy: 0.8,
-        active: true
-      });
+    if (complexity > 2) {
+      // Add a second layer for higher complexity
+      const outerAngle = (i / circleCount) * Math.PI * 2;
+      const outerX = centerX + Math.cos(outerAngle) * (baseRadius * 2);
+      const outerY = centerY + Math.sin(outerAngle) * (baseRadius * 2);
       
-      // Connect to center
-      connections.push({
-        from: 'center',
-        to: id,
-        type: 'secondary',
-        energy: 0.7,
-        active: true
-      });
-      
-      // Connect square points to each other
-      if (index < square.length - 1) {
-        connections.push({
-          from: id,
-          to: `square-${index + 1}`,
-          type: 'secondary',
-          energy: 0.7,
-          active: true
-        });
-      }
-    });
-    
-    // Complete the square
-    connections.push({
-      from: `square-${square.length - 1}`,
-      to: 'square-0',
-      type: 'secondary',
-      energy: 0.7,
-      active: true
-    });
-    
-    // Connect square to hexagon
-    for (let i = 0; i < square.length; i++) {
-      for (let j = 0; j < hexagon.length; j++) {
-        connections.push({
-          from: `square-${i}`,
-          to: `hex-${j}`,
-          type: 'energy',
-          energy: 0.5,
-          active: false  // These are initially inactive
-        });
-      }
+      svgPath += ' ' + generateCirclePath(outerX, outerY, baseRadius);
+      points.push(...generateCirclePoints(outerX, outerY, baseRadius, 12));
     }
   }
   
-  // Add more complex structures for higher detail levels
-  if (detail >= 3) {
-    // Add a 12-pointed star around the edge (icosahedron projection)
-    const outerRadius = radius * 1.2;
-    const star = generatePolygonPoints(12, outerRadius, Math.PI / 12, centerX, centerY);
+  return { svgPath, points };
+}
+
+/**
+ * Generate a Sri Yantra pattern (simplified)
+ */
+function generateSriYantra(random: () => number, complexity: number): { svgPath: string; points: [number, number][] } {
+  const centerX = 50;
+  const centerY = 50;
+  const baseSize = 20 + (random() * 10);
+  const triangles = Math.min(4 + Math.floor(complexity), 9);
+  
+  let svgPath = '';
+  const points: [number, number][] = [];
+  
+  // Generate triangles
+  for (let i = 0; i < triangles; i++) {
+    const size = baseSize * (1 - i * 0.1);
+    const upOffset = i * 1.5;
+    const downOffset = i * 1.5;
     
-    star.forEach((point, index) => {
-      const id = `star-${index}`;
-      nodes.push({
-        id,
-        x: point.x,
-        y: point.y,
-        size: radius * 0.06,
-        energy: 0.6,
-        active: index % 3 === 0  // Only some points are active by default
-      });
-      
-      // Connect alternating points to center
-      if (index % 2 === 0) {
-        connections.push({
-          from: 'center',
-          to: id,
-          type: 'tertiary',
-          energy: 0.5,
-          active: index % 6 === 0
-        });
-      }
-      
-      // Connect to neighbors
-      if (index < star.length - 1) {
-        connections.push({
-          from: id,
-          to: `star-${index + 1}`,
-          type: 'tertiary',
-          energy: 0.4,
-          active: index % 3 === 0
-        });
-      }
-    });
+    // Upward triangle
+    const upP1: [number, number] = [centerX, centerY - size + upOffset];
+    const upP2: [number, number] = [centerX + size, centerY + size/2 + upOffset];
+    const upP3: [number, number] = [centerX - size, centerY + size/2 + upOffset];
     
-    // Complete the star
-    connections.push({
-      from: `star-${star.length - 1}`,
-      to: 'star-0',
-      type: 'tertiary',
-      energy: 0.4,
-      active: false
-    });
+    svgPath += ` M ${upP1[0]} ${upP1[1]} L ${upP2[0]} ${upP2[1]} L ${upP3[0]} ${upP3[1]} Z`;
+    points.push(upP1, upP2, upP3);
+    
+    // Downward triangle
+    const downP1: [number, number] = [centerX, centerY + size - downOffset];
+    const downP2: [number, number] = [centerX + size, centerY - size/2 - downOffset];
+    const downP3: [number, number] = [centerX - size, centerY - size/2 - downOffset];
+    
+    svgPath += ` M ${downP1[0]} ${downP1[1]} L ${downP2[0]} ${downP2[1]} L ${downP3[0]} ${downP3[1]} Z`;
+    points.push(downP1, downP2, downP3);
   }
   
-  // Create even more complex structures for very high detail
-  if (detail >= 4) {
-    // Inner connection patterns (representing higher-dimensional projections)
-    for (let i = 0; i < hexagon.length; i++) {
-      for (let j = i + 2; j < hexagon.length; j++) {
-        if (j !== i + 3 || i !== 0) { // Skip some connections for aesthetic purposes
-          connections.push({
-            from: `hex-${i}`,
-            to: `hex-${j}`,
-            type: 'resonance',
-            energy: 0.3,
-            active: false // Initially inactive
-          });
+  // Add center point and bindu (dot)
+  svgPath += ` M ${centerX-1} ${centerY} a 1 1 0 1 0 2 0 a 1 1 0 1 0 -2 0`;
+  points.push([centerX, centerY]);
+  
+  return { svgPath, points };
+}
+
+/**
+ * Generate a Metatron's Cube pattern
+ */
+function generateMetatronCube(random: () => number, complexity: number): { svgPath: string; points: [number, number][] } {
+  const centerX = 50;
+  const centerY = 50;
+  const radius = 20 + (random() * 10);
+  
+  const points: [number, number][] = [];
+  let svgPath = '';
+  
+  // Create hexagon vertices
+  const hexPoints: [number, number][] = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const x = centerX + Math.cos(angle) * radius;
+    const y = centerY + Math.sin(angle) * radius;
+    hexPoints.push([x, y]);
+  }
+  
+  // Add center point
+  points.push([centerX, centerY]);
+  
+  // Draw hexagon
+  svgPath += `M ${hexPoints[0][0]} ${hexPoints[0][1]}`;
+  hexPoints.forEach(point => {
+    svgPath += ` L ${point[0]} ${point[1]}`;
+    points.push(point);
+  });
+  svgPath += ' Z';
+  
+  // Add inner lines based on complexity
+  if (complexity >= 2) {
+    // Connect center to vertices
+    hexPoints.forEach(point => {
+      svgPath += ` M ${centerX} ${centerY} L ${point[0]} ${point[1]}`;
+    });
+    
+    // Connect alternate vertices if high complexity
+    if (complexity >= 3) {
+      for (let i = 0; i < 6; i++) {
+        const p1 = hexPoints[i];
+        for (let j = i + 2; j < 6; j++) {
+          const p2 = hexPoints[j];
+          svgPath += ` M ${p1[0]} ${p1[1]} L ${p2[0]} ${p2[1]}`;
         }
       }
     }
   }
   
-  return { nodes, connections };
+  return { svgPath, points };
 }
 
 /**
- * Find the closest nodes to a point
+ * Generate a pattern based on the seed and complexity
  */
-function findClosestNodes(
-  point: Point,
-  nodes: GeometryNode[],
-  count: number = 3
-): string[] {
-  // Calculate distances
-  const distances = nodes.map(node => ({
-    id: node.id,
-    distance: Math.sqrt(Math.pow(node.x - point.x, 2) + Math.pow(node.y - point.y, 2))
-  }));
+export function generateLocalGeometry(
+  seed: string,
+  complexity: number = 3,
+  chakraAssociations: number[] = []
+): GeometryPattern {
+  // Create random generator from seed
+  const random = seedRandom(seed);
   
-  // Sort by distance
-  distances.sort((a, b) => a.distance - b.distance);
+  // Determine pattern type based on seed and chakra associations
+  let patternType = GEOMETRY_TYPES.FLOWER_OF_LIFE;
   
-  // Return the IDs of the closest nodes (excluding the first one if it's the same point)
-  return distances.slice(0, count + 1).map(d => d.id);
+  // If chakras are provided, find best matching pattern
+  if (chakraAssociations.length > 0) {
+    let bestMatch = 0;
+    let bestPatternType = patternType;
+    
+    // Find pattern with most chakra matches
+    Object.entries(GEOMETRY_CHAKRA_MAPPING).forEach(([type, chakras]) => {
+      const matches = chakraAssociations.filter(chakra => chakras.includes(chakra)).length;
+      if (matches > bestMatch) {
+        bestMatch = matches;
+        bestPatternType = type;
+      }
+    });
+    
+    // Use best match if found, otherwise random
+    if (bestMatch > 0) {
+      patternType = bestPatternType;
+    } else {
+      // Random selection based on seed
+      const patternTypes = Object.values(GEOMETRY_TYPES);
+      patternType = patternTypes[Math.floor(random() * patternTypes.length)];
+    }
+  } else {
+    // Random selection based on seed if no chakras provided
+    const patternTypes = Object.values(GEOMETRY_TYPES);
+    patternType = patternTypes[Math.floor(random() * patternTypes.length)];
+  }
+  
+  // Generate the pattern based on type
+  let patternData: { svgPath: string; points: [number, number][] };
+  
+  switch (patternType) {
+    case GEOMETRY_TYPES.FLOWER_OF_LIFE:
+      patternData = generateFlowerOfLife(random, complexity);
+      break;
+    case GEOMETRY_TYPES.SRI_YANTRA:
+      patternData = generateSriYantra(random, complexity);
+      break;
+    case GEOMETRY_TYPES.METATRON_CUBE:
+      patternData = generateMetatronCube(random, complexity);
+      break;
+    default:
+      patternData = generateFlowerOfLife(random, complexity);
+  }
+  
+  // Map pattern type to chakra associations if none provided
+  const associatedChakras = chakraAssociations.length > 0 
+    ? chakraAssociations 
+    : GEOMETRY_CHAKRA_MAPPING[patternType] || [];
+  
+  // Generate energy alignment based on chakra associations
+  const energyAlignment = associatedChakras.map(chakraId => {
+    switch (chakraId) {
+      case 1: return 'grounding';
+      case 2: return 'creative';
+      case 3: return 'empowering';
+      case 4: return 'loving';
+      case 5: return 'expressive';
+      case 6: return 'intuitive';
+      case 7: return 'transcendent';
+      default: return 'balanced';
+    }
+  });
+  
+  // Create animation properties based on pattern type and complexity
+  const animationProperties = {
+    duration: 3000 + (complexity * 1000),
+    easing: 'ease-in-out',
+    rotation: patternType === GEOMETRY_TYPES.FLOWER_OF_LIFE || patternType === GEOMETRY_TYPES.TORUS,
+    pulsate: patternType === GEOMETRY_TYPES.SRI_YANTRA || patternType === GEOMETRY_TYPES.MERKABA,
+    scale: random() > 0.5,
+    particleEffect: complexity > 3
+  };
+  
+  return {
+    svgPath: patternData.svgPath,
+    points: patternData.points,
+    complexity,
+    energyAlignment,
+    chakraAssociations: associatedChakras,
+    animationProperties
+  };
 }
