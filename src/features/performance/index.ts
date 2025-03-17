@@ -6,8 +6,10 @@
  * that work with the protected performance components.
  */
 
+// Export sub-modules
 export * from './adapters';
-// In future we might add:
-// export * from './hooks';
-// export * from './components';
-// export * from './utils';
+export * from './hooks';
+export * from './components';
+
+// Export utility functions
+export * from './utils';

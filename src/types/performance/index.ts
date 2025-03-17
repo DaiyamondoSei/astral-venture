@@ -1,13 +1,40 @@
 
 /**
- * Performance Monitoring Types Barrel Export
+ * Performance Types
  * 
- * This file centralizes all performance-related type exports to provide
- * a consistent import pattern for consumers.
+ * This module re-exports all performance-related types used throughout the application.
+ * It serves as a central point for importing performance types.
  */
 
-// Export all from the metrics types
-export * from './metrics';
+// Import and re-export types from other modules
+import { 
+  DeviceCapability,
+  PerformanceMode,
+  RenderFrequency,
+  ComponentMetrics,
+  PerformanceMetric,
+  WebVitalMetric,
+  DeviceInfo,
+  PerformanceSettings,
+  WebVitalCategory,
+  WebVitalRating,
+  PerformanceMonitorConfig,
+  AdaptiveSettings
+} from '@/utils/performance/types';
 
-// Export all from the device types
-export * from './device';
+// Re-export types
+export type {
+  DeviceCapability,
+  PerformanceMode,
+  RenderFrequency,
+  ComponentMetrics,
+  PerformanceMetric,
+  WebVitalMetric,
+  DeviceInfo,
+  PerformanceSettings,
+  WebVitalCategory,
+  WebVitalRating,
+  PerformanceMonitorConfig,
+  AdaptiveSettings
+};
+

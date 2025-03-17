@@ -1,87 +1,53 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { MainLayout } from '@/layouts/MainLayout';
-import { AuthLayout } from '@/layouts/AuthLayout';
-import { EntryLayout } from '@/layouts/EntryLayout';
-
-// Pages
-import Dashboard from '@/pages/Dashboard';
-import LoginPage from '@/pages/auth/LoginPage';
-import RegisterPage from '@/pages/auth/RegisterPage';
+import MainLayout from '@/layouts/MainLayout';
+import AuthLayout from '@/layouts/AuthLayout';
+import EntryLayout from '@/layouts/EntryLayout';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+import DashboardPage from '@/pages/DashboardPage';
+import EntryAnimation from '@/pages/EntryAnimation';
+import HomePage from '@/pages/HomePage';
+import ProtectedRoute from './ProtectedRoute';
 import ChakraSystemPage from '@/pages/ChakraSystemPage';
 import MeditationPage from '@/pages/MeditationPage';
 import ProfilePage from '@/pages/ProfilePage';
-import NotFoundPage from '@/pages/NotFoundPage';
+import PerformanceDemoPage from '@/pages/PerformanceDemoPage';
 
-// Protected route wrapper
-import { ProtectedRoute } from './ProtectedRoute';
-
-// Dev routes (only loaded in development)
+// Development routes - conditionally loaded in development
 import DevRoutes from './dev';
 
 const AppRoutes = () => {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Auth routes */}
+        {/* Authentication routes */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
-        
-        {/* Entry experience */}
+
+        {/* Entry animation routes */}
         <Route element={<EntryLayout />}>
-          <Route path="/entry" element={<div>Entry Experience (Coming Soon)</div>} />
-          <Route path="/onboarding" element={<div>Onboarding (Coming Soon)</div>} />
+          <Route path="/entry" element={<EntryAnimation />} />
         </Route>
-        
-        {/* Main authenticated routes */}
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/chakras" element={
-            <ProtectedRoute>
-              <ChakraSystemPage />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/meditation" element={
-            <ProtectedRoute>
-              <MeditationPage />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/dreams" element={
-            <ProtectedRoute>
-              <div>Dream Journal (Coming Soon)</div>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/astral" element={
-            <ProtectedRoute>
-              <div>Astral Projection (Coming Soon)</div>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          } />
+
+        {/* Main app routes - protected by auth */}
+        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/chakra-system" element={<ChakraSystemPage />} />
+          <Route path="/meditation" element={<MeditationPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/performance" element={<PerformanceDemoPage />} />
         </Route>
-        
-        {/* Development routes - only loaded in development */}
-        {process.env.NODE_ENV === 'development' && DevRoutes()}
-        
-        {/* Catch-all route */}
-        <Route path="*" element={<NotFoundPage />} />
+
+        {/* Development routes - only available in development mode */}
+        {isDevelopment && <DevRoutes />}
       </Routes>
     </BrowserRouter>
   );
