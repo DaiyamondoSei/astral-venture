@@ -1,109 +1,122 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useMeditationTimer } from '../hooks/useMeditationTimer';
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-export interface MeditationTimerProps {
-  duration?: number; // Duration in minutes
+interface MeditationTimerProps {
+  initialDuration?: number; // in minutes
   onComplete?: () => void;
-  onProgress?: (progress: number) => void;
-  chakraFocus?: string[];
-  className?: string;
+  onStart?: () => void;
+  onPause?: () => void;
 }
 
 /**
  * MeditationTimer Component
  * 
- * Displays a timer for meditation sessions with progress indicator
+ * A meditation timer with controls for duration and playback.
  */
-export const MeditationTimer: React.FC<MeditationTimerProps> = ({
-  duration = 10,
+const MeditationTimer: React.FC<MeditationTimerProps> = ({
+  initialDuration = 5,
   onComplete,
-  onProgress,
-  chakraFocus = [],
-  className = '',
+  onStart,
+  onPause
 }) => {
-  const { 
-    isRunning, 
-    timeRemaining, 
-    progress, 
-    start, 
-    pause, 
-    reset 
-  } = useMeditationTimer({
-    duration,
-    onComplete,
-    onProgress,
-    chakraFocus
-  });
-  
-  // Format time as mm:ss
-  const formatTime = useCallback((timeInSeconds: number) => {
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = timeInSeconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }, []);
-  
+  const [duration, setDuration] = useState(initialDuration);
+  const [timeRemaining, setTimeRemaining] = useState(duration * 60); // convert to seconds
+  const [isRunning, setIsRunning] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  // Reset timer when duration changes
+  useEffect(() => {
+    setTimeRemaining(duration * 60);
+    setIsComplete(false);
+  }, [duration]);
+
+  // Timer functionality
+  useEffect(() => {
+    if (isRunning && timeRemaining > 0) {
+      timerRef.current = window.setTimeout(() => {
+        setTimeRemaining(prev => prev - 1);
+      }, 1000);
+    } else if (isRunning && timeRemaining === 0) {
+      setIsRunning(false);
+      setIsComplete(true);
+      onComplete?.();
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [isRunning, timeRemaining, onComplete]);
+
+  const toggleTimer = () => {
+    if (isComplete) {
+      // Reset timer if complete
+      setTimeRemaining(duration * 60);
+      setIsComplete(false);
+      setIsRunning(true);
+      onStart?.();
+    } else if (isRunning) {
+      // Pause timer
+      setIsRunning(false);
+      onPause?.();
+    } else {
+      // Start or resume timer
+      setIsRunning(true);
+      onStart?.();
+    }
+  };
+
+  // Format time as MM:SS
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className={`meditation-timer ${className}`}>
-      <div className="flex flex-col items-center">
-        <div className="relative w-64 h-64">
-          {/* Circular progress indicator */}
-          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-            {/* Background circle */}
-            <circle
-              cx="50"
-              cy="50"
-              r="45"
-              fill="transparent"
-              stroke="#2d3748"
-              strokeWidth="8"
-            />
-            {/* Progress circle */}
-            <circle
-              cx="50"
-              cy="50"
-              r="45"
-              fill="transparent"
-              stroke="#9f7aea"
-              strokeWidth="8"
-              strokeDasharray={`${2 * Math.PI * 45}`}
-              strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress)}`}
-              strokeLinecap="round"
-            />
-          </svg>
-          
-          {/* Time display */}
-          <div className="absolute inset-0 flex items-center justify-center text-4xl font-medium">
-            {formatTime(timeRemaining)}
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Meditation Timer</CardTitle>
+        <CardDescription>Set your meditation duration and press start</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex flex-col space-y-2">
+          <label className="text-sm font-medium">Duration: {duration} minutes</label>
+          <Slider
+            value={[duration]}
+            min={1}
+            max={60}
+            step={1}
+            onValueChange={(value) => {
+              if (!isRunning) {
+                setDuration(value[0]);
+              }
+            }}
+            disabled={isRunning}
+            className="w-full"
+          />
+        </div>
+
+        <div className="flex items-center justify-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <div className="text-center">
+            <div className="text-4xl font-bold mb-4">{formatTime(timeRemaining)}</div>
+            <Button
+              size="lg"
+              variant={isComplete ? "default" : isRunning ? "destructive" : "default"}
+              onClick={toggleTimer}
+            >
+              {isComplete ? 'Restart' : isRunning ? 'Pause' : 'Start'}
+            </Button>
           </div>
         </div>
-        
-        {/* Controls */}
-        <div className="flex gap-4 mt-6">
-          {isRunning ? (
-            <button 
-              onClick={pause}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded"
-            >
-              Pause
-            </button>
-          ) : (
-            <button 
-              onClick={start}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded"
-            >
-              {timeRemaining < duration * 60 ? 'Resume' : 'Start'}
-            </button>
-          )}
-          
-          <button 
-            onClick={reset}
-            className="px-5 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
+
+export default MeditationTimer;

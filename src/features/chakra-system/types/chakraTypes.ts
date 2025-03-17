@@ -1,74 +1,52 @@
 
 /**
- * Types for the chakra system
+ * Chakra System Types
+ * 
+ * This file contains type definitions for the chakra system feature.
  */
 
-/**
- * Represents a single chakra
- */
+// Chakra identifiers
+export type ChakraType = 'crown' | 'third-eye' | 'throat' | 'heart' | 'solar' | 'sacral' | 'root';
+
+// Chakra data structure
 export interface ChakraData {
-  id: string;
+  type: ChakraType;
   name: string;
+  description: string;
   color: string;
-  activationLevel: number;
-  position: number;
-  description?: string;
-  element?: string;
-  associatedGlands?: string[];
-  associatedOrgans?: string[];
+  activationLevel: number; // 0-100
+  isActive: boolean;
+  isBlocked: boolean;
+  relatedEmotions: string[];
 }
 
-/**
- * Represents a complete chakra system
- */
-export interface ChakraSystemData {
-  id: string;
-  userId: string;
-  chakras: ChakraData[];
-  dominantChakra: string;
-  overallBalance: number;
-  lastUpdated: string;
-  history?: ChakraHistoryEntry[];
+// Chakra system state
+export interface ChakraSystemState {
+  chakras: Record<ChakraType, ChakraData>;
+  activeChakras: ChakraType[];
+  overallBalance: number; // 0-100
+  dominantChakra: ChakraType | null;
+  energyLevel: number; // 0-100
 }
 
-/**
- * A single history entry for chakra system changes
- */
-export interface ChakraHistoryEntry {
-  date: string;
-  chakras: {
-    id: string;
-    activationLevel: number;
-  }[];
-  overallBalance: number;
+// Chakra activation settings
+export interface ChakraActivationOptions {
+  intensity: number; // 0-100
+  duration: number; // in seconds
+  autoBalance: boolean;
+  focusedChakras?: ChakraType[];
 }
 
-/**
- * Chakra activity that can affect chakra levels
- */
-export interface ChakraActivity {
-  id: string;
-  name: string;
-  description?: string;
-  primaryChakra: string;
-  secondaryChakras?: string[];
-  activationEffect: number;
-  duration: number;
-}
-
-/**
- * Chakra meditation session
- */
-export interface ChakraMeditationSession {
-  id: string;
-  userId: string;
-  date: string;
-  duration: number;
-  targetChakras: string[];
-  activationChanges: {
-    chakraId: string;
-    before: number;
-    after: number;
-  }[];
-  notes?: string;
+// Chakra analysis result
+export interface ChakraAnalysisResult {
+  dominantChakras: ChakraType[];
+  blockages: Array<{
+    chakra: ChakraType;
+    intensity: number;
+    suggestedPractices: string[];
+  }>;
+  overallBalance: number; // 0-100
+  activationLevels: Record<ChakraType, number>;
+  insights: string[];
+  recommendedFocus: ChakraType[];
 }
