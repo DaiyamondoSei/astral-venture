@@ -2,19 +2,12 @@
 /**
  * Validation Constants
  * 
- * This module provides runtime constants for validation types following the Type-Value pattern.
+ * This module provides constants for the validation system.
  */
 
-import { ValidationSeverity, ValidationErrorCode, ValidationFieldType } from './types';
+import { ValidationErrorCode, ValidationSeverity } from './types';
 
-// Validation error severity constants
-export const ValidationSeverities = {
-  ERROR: 'error' as ValidationSeverity,
-  WARNING: 'warning' as ValidationSeverity,
-  INFO: 'info' as ValidationSeverity
-} as const;
-
-// Validation error code constants
+// Validation error codes
 export const ValidationErrorCodes = {
   REQUIRED: 'REQUIRED' as ValidationErrorCode,
   TYPE_ERROR: 'TYPE_ERROR' as ValidationErrorCode,
@@ -36,27 +29,11 @@ export const ValidationErrorCodes = {
   MAX_DATE: 'MAX_DATE' as ValidationErrorCode,
   INVALID_ENUM: 'INVALID_ENUM' as ValidationErrorCode,
   INVALID_FORMAT: 'INVALID_FORMAT' as ValidationErrorCode
-} as const;
+};
 
-// Validation field type constants
-export const ValidationFieldTypes = {
-  STRING: 'string' as ValidationFieldType,
-  NUMBER: 'number' as ValidationFieldType,
-  BOOLEAN: 'boolean' as ValidationFieldType,
-  OBJECT: 'object' as ValidationFieldType,
-  ARRAY: 'array' as ValidationFieldType,
-  DATE: 'date' as ValidationFieldType,
-  EMAIL: 'email' as ValidationFieldType,
-  URL: 'url' as ValidationFieldType,
-  UUID: 'uuid' as ValidationFieldType,
-  INTEGER: 'integer' as ValidationFieldType,
-  FLOAT: 'float' as ValidationFieldType,
-  ENUM: 'enum' as ValidationFieldType
-} as const;
-
-// Default validation options
-export const DEFAULT_VALIDATION_OPTIONS = {
-  abortEarly: false,
-  strict: false,
-  stripUnknown: false
+// Validation error severities
+export const ErrorSeverities = {
+  ERROR: 'error' as ValidationSeverity,
+  WARNING: 'warning' as ValidationSeverity,
+  INFO: 'info' as ValidationSeverity
 };

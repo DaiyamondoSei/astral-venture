@@ -1,13 +1,14 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { ErrorFallbackProps } from '@/utils/errorHandling/types';
+import ErrorFallback from './ErrorFallback';
+import { handleError } from '@/utils/errorHandling';
 
 interface Props {
-  fallback: React.ReactNode | ((props: ErrorFallbackProps) => React.ReactNode);
   children: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  onReset?: () => void;
+  fallback?: ReactNode;
   componentName?: string;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  showDetails?: boolean;
 }
 
 interface State {
@@ -16,58 +17,71 @@ interface State {
 }
 
 /**
- * ErrorBoundary catches errors in child components and displays fallback UI
+ * ErrorBoundary Component
  * 
- * Usage:
- * ```tsx
- * <ErrorBoundary fallback={<p>Something went wrong</p>}>
- *   <ComponentThatMightError />
- * </ErrorBoundary>
- * ```
+ * Catches JavaScript errors anywhere in its child component tree,
+ * logs those errors, and displays a fallback UI instead of crashing.
  */
 class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+  public state: State = {
+    hasError: false,
+    error: null
+  };
 
   static getDerivedStateFromError(error: Error): State {
+    // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log the error
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log the error to an error reporting service
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
-    // Call the onError callback if provided
+    // Call custom error handler if provided
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
+    
+    // Handle error with centralized error handler
+    handleError(error, {
+      context: this.props.componentName || 'ErrorBoundary',
+      showToast: false,
+      logToConsole: true
+    });
   }
 
-  resetErrorBoundary = (): void => {
+  resetError = () => {
     this.setState({ hasError: false, error: null });
-    
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
   };
 
-  render(): ReactNode {
-    if (this.state.hasError && this.state.error) {
-      const { fallback, componentName } = this.props;
-      
-      // Handle fallback as a render function
-      if (typeof fallback === 'function') {
-        return fallback({
-          error: this.state.error,
-          componentName,
-          resetErrorBoundary: this.resetErrorBoundary
-        });
+  render() {
+    if (this.state.hasError) {
+      // Render custom fallback UI or the provided fallback
+      if (this.props.fallback) {
+        return this.props.fallback;
       }
       
-      // Handle fallback as a ReactNode
-      return fallback;
+      return this.state.error ? (
+        <ErrorFallback 
+          error={this.state.error} 
+          resetErrorBoundary={this.resetError} 
+          componentName={this.props.componentName}
+          showDetails={this.props.showDetails}
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center p-6 rounded-lg bg-black/20 backdrop-blur-md">
+          <h2 className="text-xl font-display text-white mb-2">
+            An unknown error occurred
+            {this.props.componentName && <span className="text-sm text-white/70"> in {this.props.componentName}</span>}
+          </h2>
+          <button 
+            onClick={this.resetError}
+            className="px-4 py-2 bg-primary text-white rounded-md"
+          >
+            Try Again
+          </button>
+        </div>
+      );
     }
 
     return this.props.children;

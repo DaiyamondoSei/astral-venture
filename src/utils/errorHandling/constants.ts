@@ -1,42 +1,56 @@
 
 /**
- * Error handling system constants
- * Following the Type-Value Pattern
+ * Error Handling Constants
+ * 
+ * Shared constants for the error handling system.
  */
 import { ErrorCategory, ErrorSeverity } from './types';
 
-// Runtime values for ErrorCategory
+// Error categories constants
 export const ErrorCategories = {
   VALIDATION: 'validation' as ErrorCategory,
+  AUTHENTICATION: 'authentication' as ErrorCategory,
+  AUTHORIZATION: 'authorization' as ErrorCategory,
   NETWORK: 'network' as ErrorCategory,
-  API: 'api' as ErrorCategory,
-  AUTH: 'auth' as ErrorCategory,
   DATABASE: 'database' as ErrorCategory,
+  API: 'api' as ErrorCategory,
+  INTERNAL: 'internal' as ErrorCategory,
   UI: 'ui' as ErrorCategory,
-  SYSTEM: 'system' as ErrorCategory,
+  PERFORMANCE: 'performance' as ErrorCategory,
+  SECURITY: 'security' as ErrorCategory,
   UNKNOWN: 'unknown' as ErrorCategory
-} as const;
+};
 
-// Runtime values for ErrorSeverity
+// Error severity constants
 export const ErrorSeverities = {
-  CRITICAL: 'critical' as ErrorSeverity,
-  HIGH: 'high' as ErrorSeverity,
+  ERROR: 'error' as ErrorSeverity,
+  WARNING: 'warning' as ErrorSeverity,
+  INFO: 'info' as ErrorSeverity,
+  LOW: 'low' as ErrorSeverity,
   MEDIUM: 'medium' as ErrorSeverity,
-  LOW: 'low' as ErrorSeverity
-} as const;
+  HIGH: 'high' as ErrorSeverity
+};
 
-// Map validation severity to error severity
-export const mapValidationToErrorSeverity = (
-  validationSeverity: import('../validation/types').ErrorSeverity
-): ErrorSeverity => {
-  switch (validationSeverity) {
-    case 'error':
-      return ErrorSeverities.HIGH;
-    case 'warning':
-      return ErrorSeverities.MEDIUM;
-    case 'info':
-      return ErrorSeverities.LOW;
-    default:
-      return ErrorSeverities.MEDIUM;
-  }
+// Common error codes
+export const ErrorCodes = {
+  // Generic errors
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  API_ERROR: 'API_ERROR',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  
+  // Authentication errors
+  AUTH_ERROR: 'AUTH_ERROR',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  
+  // Data errors
+  DATA_ERROR: 'DATA_ERROR',
+  NOT_FOUND: 'NOT_FOUND',
+  DUPLICATE: 'DUPLICATE',
+  
+  // Operation errors
+  TIMEOUT: 'TIMEOUT',
+  RATE_LIMIT: 'RATE_LIMIT',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE'
 };

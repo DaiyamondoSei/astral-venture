@@ -1,22 +1,11 @@
 
 /**
- * Unified error handling components and utilities
+ * Error Handling Components
  * 
- * Provides a consistent API for error handling across the application
+ * Centralized export of all error handling components
  */
 
-// Export unified error boundary components
-export { 
-  default as ErrorBoundary,
-  ErrorBoundaryProvider,
-  withErrorBoundary 
-} from './UnifiedErrorBoundary';
-
-// Export error fallback components
+export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as ErrorFallback } from './ErrorFallback';
-
-// Export error reporting utilities
-export * from '../../utils/errorHandling/errorReporter';
-
-// Export error handling types
-export * from '../../utils/errorHandling/types';
+export { default as ErrorHandlingProvider } from './ErrorHandlingProvider';
+export { default as withErrorBoundary } from './withErrorBoundary';
