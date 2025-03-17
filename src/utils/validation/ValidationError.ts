@@ -1,3 +1,4 @@
+
 /**
  * ValidationError class
  * A standardized error class for validation errors
@@ -80,7 +81,7 @@ export class ValidationError extends Error {
   }
 
   /**
-   * Creates an error from API response
+   * Create an error from API response
    */
   static fromApiError(apiError: any): ValidationError {
     let message = 'API validation error';
