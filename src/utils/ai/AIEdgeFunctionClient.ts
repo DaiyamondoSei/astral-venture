@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/lib/supabaseUnified';
+import { AI_CONFIG } from '@/config/aiConfig';
 import { 
   AIAnalysisOptions, 
   AIAnalysisResult,
@@ -32,7 +33,7 @@ function createFallbackResult<T>(operation: string, data: any): AIAnalysisResult
 
 // Main client class
 export class AIEdgeFunctionClient {
-  private edgeFunctionName = 'ai-analyzer';
+  private edgeFunctionName = AI_CONFIG.edgeFunctions.aiProcessor || 'ai-processor-enhanced';
   
   /**
    * Check if edge functions are available

@@ -49,6 +49,13 @@ export const AI_CONFIG = {
     maxTokensPerDay: 10000,
   },
   
+  // Edge function names
+  edgeFunctions: {
+    aiProcessor: 'ai-processor-enhanced',
+    analyzeChakra: 'analyze-chakra',
+    analyzePerformance: 'analyze-performance',
+  },
+  
   // UI messaging
   messages: {
     offlineNotice: "You're currently offline. AI analysis will use local fallbacks until you're back online.",
