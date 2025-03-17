@@ -1,22 +1,22 @@
 
 /**
- * Validation System Types
+ * Validation Types
  * 
- * This module provides the foundational types for the validation system.
+ * This module provides type definitions for the validation system.
  */
 
-// Validation error severity levels
-export type ErrorSeverity = 'error' | 'warning' | 'info';
+// Validation error severity
+export type ValidationSeverity = 'error' | 'warning' | 'info';
 
-// Validation error codes
+// Validation error code
 export type ValidationErrorCode = 
-  | 'REQUIRED' 
-  | 'TYPE_ERROR' 
-  | 'FORMAT_ERROR' 
-  | 'MIN_LENGTH_ERROR' 
-  | 'MAX_LENGTH_ERROR' 
-  | 'MIN_VALUE_ERROR' 
-  | 'MAX_VALUE_ERROR' 
+  | 'REQUIRED'
+  | 'TYPE_ERROR'
+  | 'FORMAT_ERROR'
+  | 'MIN_LENGTH_ERROR'
+  | 'MAX_LENGTH_ERROR'
+  | 'MIN_VALUE_ERROR'
+  | 'MAX_VALUE_ERROR'
   | 'PATTERN_ERROR'
   | 'CONSTRAINT_ERROR'
   | 'FIELD_REQUIRED'
@@ -29,53 +29,16 @@ export type ValidationErrorCode =
   | 'MIN_DATE'
   | 'MAX_DATE'
   | 'INVALID_ENUM'
-  | 'INVALID_FORMAT'
-  | 'MISSING_USER_ID'
-  | 'MISSING_ACHIEVEMENT_ID'
-  | 'FETCH_ACHIEVEMENTS_ERROR'
-  | 'FETCH_USER_ACHIEVEMENTS_ERROR'
-  | 'UPDATE_ACHIEVEMENT_PROGRESS_ERROR'
-  | 'CHECK_ACHIEVEMENT_ERROR'
-  | 'AWARD_ACHIEVEMENT_ERROR'
-  | 'GET_ACHIEVEMENT_PROGRESS_ERROR';
+  | 'INVALID_FORMAT';
 
-// Validation error detail with required properties
-export interface ValidationErrorDetail {
-  path: string;
-  message: string;
-  code: ValidationErrorCode;
-  severity: ErrorSeverity;
-  metadata?: Record<string, unknown>;
-}
-
-// Validation result for generic type T
-export interface ValidationResult<T = unknown> {
-  isValid: boolean;
-  errors: ValidationErrorDetail[];
-  value?: T;
-  validatedData?: T; // For backward compatibility
-  metadata?: Record<string, unknown>;
-}
-
-// Validation field options for constraining values
-export interface ValidationFieldOptions {
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  minValue?: number;
-  maxValue?: number;
-  pattern?: RegExp;
-  custom?: (value: any) => boolean | string;
-}
-
-// Validation field type options
+// Field type for validation
 export type ValidationFieldType = 
-  | 'string' 
-  | 'number' 
-  | 'boolean' 
-  | 'object' 
-  | 'array' 
-  | 'date' 
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'object'
+  | 'array'
+  | 'date'
   | 'email'
   | 'url'
   | 'uuid'
@@ -83,38 +46,34 @@ export type ValidationFieldType =
   | 'float'
   | 'enum';
 
-// Validation schema field definition
-export interface ValidationSchemaField {
-  type: ValidationFieldType;
-  options?: ValidationFieldOptions;
-  items?: ValidationSchemaField; // For array types
-  properties?: Record<string, ValidationSchemaField>; // For object types
-  enum?: string[] | number[]; // For enum types
+// Validation error detail
+export interface ValidationErrorDetail {
+  path: string;
+  message: string;
+  code: ValidationErrorCode;
+  severity: ValidationSeverity;
 }
 
-// Validation schema definition
-export type ValidationSchema = Record<string, ValidationSchemaField>;
-
-// Additional validation context interface for enhanced validations
-export interface ValidationContext {
-  userId?: string;
-  path?: string;
-  parentValue?: any;
-  rootValue?: any;
-  isOptional?: boolean;
-  metadata?: Record<string, unknown>;
+// Validation result interface
+export interface ValidationResult<T> {
+  isValid: boolean;
+  value?: T;
+  errors?: ValidationErrorDetail[];
 }
 
-// Validator function type - used for creating custom validators
-export type Validator<T = unknown> = (
-  value: unknown,
-  context?: ValidationContext
-) => Promise<ValidationResult<T>> | ValidationResult<T>;
+// Validator interface
+export interface Validator<T> {
+  (value: unknown): ValidationResult<T>;
+}
 
-// Validation metadata
-export interface ValidationMetadata {
-  timestamp: number;
-  validatorName: string;
-  contextPath?: string;
-  executionTime?: number;
+// Validation options
+export interface ValidationOptions {
+  abortEarly?: boolean;
+  strict?: boolean;
+  stripUnknown?: boolean;
+}
+
+// Validation schema interface
+export interface ValidationSchema<T> {
+  validate(value: unknown, options?: ValidationOptions): ValidationResult<T>;
 }

@@ -1,75 +1,91 @@
 
 /**
- * Core Performance Types
+ * Performance Core Types
  * 
- * This module provides the foundational types for the performance system.
+ * This module provides type definitions for performance systems.
  */
 
-// Device capability levels
-export type DeviceCapability = 'low' | 'medium' | 'high' | 'core';
+// Device capability type (what the device is capable of)
+export type DeviceCapability = 'low' | 'medium' | 'high' | 'ultra' | 'core';
 
-// Performance optimization modes
-export type PerformanceMode = 'balanced' | 'performance' | 'quality';
+// Performance mode type (how the app should perform)
+export type PerformanceMode = 'auto' | 'balanced' | 'quality' | 'performance' | 'battery-saver' | 'ultra';
 
-// Visual quality levels
+// Render frequency type
+export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive' | 'ultra';
+
+// Quality level type
 export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
 
-// Resource optimization levels
+// Resource optimization level type
 export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
 
-// Render frequency levels
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive';
+// Render settings type
+export type RenderSetting = 'simple' | 'standard' | 'enhanced' | 'ultra';
 
-// Render setting levels
-export type RenderSetting = 'auto' | 'low' | 'medium' | 'high';
+// Animation complexity type 
+export type AnimationComplexity = 'minimal' | 'standard' | 'complex' | 'ultra';
 
-// Animation complexity levels
-export type AnimationComplexity = 'none' | 'minimal' | 'standard' | 'enhanced';
+// Rendering engine type
+export type RenderingEngine = 'canvas' | 'svg' | 'webgl' | 'three.js' | 'css';
 
-// Rendering engine types
-export type RenderingEngine = 'canvas' | 'webgl' | 'svg' | 'css' | 'html';
+// Glassmorphic variant type
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'cosmic';
 
-// Glassmorphic variant types
-export type GlassmorphicVariant = 'default' | 'subtle' | 'medium' | 'elevated' | 'ethereal' | 'cosmic' | 'purple' | 'quantum';
+// Glow intensity type
+export type GlowIntensity = 'low' | 'medium' | 'high';
 
-// Glow intensity levels
-export type GlowIntensity = 'none' | 'low' | 'medium' | 'high';
+// Cube theme type
+export type CubeTheme = 'light' | 'dark' | 'quantum' | 'ethereal' | 'cosmic';
 
-// Cube theme types
-export type CubeTheme = 'default' | 'cosmic' | 'ethereal' | 'chakra' | 'energy' | 'spiritual' | 'quantum';
+// Cube size type
+export type CubeSize = 'small' | 'medium' | 'large';
 
-// Cube size options
-export type CubeSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+// Web vital category type
+export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
 
-// Performance configuration interface
+// Metric type
+export type MetricType = 'render' | 'interaction' | 'load';
+
+// Performance config type
 export interface PerfConfig {
   deviceCapability: DeviceCapability;
   useManualCapability: boolean;
   disableAnimations: boolean;
   disableEffects: boolean;
-  disableBlur: boolean;
-  disableShadows: boolean;
   samplingRate: number;
   throttleInterval: number;
   maxTrackedComponents: number;
   resourceOptimizationLevel: ResourceOptimizationLevel;
+  enableValidation: boolean;
+  enableRenderTracking: boolean;
+  enablePerformanceTracking: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
   metricsPersistence: boolean;
-  
-  // Feature flags
-  enablePerformanceTracking?: boolean;
-  enableRenderTracking?: boolean;
-  enableValidation?: boolean;
-  enablePropTracking?: boolean;
-  enableDebugLogging?: boolean;
-  
-  // Optimization strategies
-  intelligentProfiling?: boolean;
-  inactiveTabThrottling?: boolean;
-  batchUpdates?: boolean;
-  slowRenderThreshold?: number;
 }
 
-// Component metrics interface
+// Performance metric type
+export interface PerformanceMetric {
+  metric_name: string;
+  value: number;
+  timestamp: number;
+  category: string;
+  type: MetricType;
+}
+
+// Web vital metric type
+export interface WebVitalMetric {
+  name: string;
+  value: number;
+  category: WebVitalCategory;
+  timestamp: number;
+}
+
+// Component metrics type
 export interface ComponentMetrics {
   componentName: string;
   renderCount: number;
@@ -77,82 +93,24 @@ export interface ComponentMetrics {
   averageRenderTime: number;
   lastRenderTime: number;
   reRenderCount: number;
-  firstRenderTime?: number;
-  slowRenderCount?: number;
-  memoryUsage?: number;
-  renderSizes?: number[];
-  domSize?: {
+}
+
+// Device info type
+export interface DeviceInfo {
+  userAgent: string;
+  deviceCategory: 'mobile' | 'tablet' | 'desktop';
+  screenSize: {
     width: number;
     height: number;
-    elements?: number;
   };
 }
 
-// Performance metric data structure
-export interface PerformanceMetric {
-  metric_name: string;
-  value: number;
+// Performance data type
+export interface PerformanceData {
+  metrics: Record<string, ComponentMetrics>;
+  webVitals: Record<string, number>;
+  deviceInfo: DeviceInfo;
+  fps: number;
+  memoryUsage?: number;
   timestamp: number;
-  category: string;
-  type: MetricType;
-  metadata?: Record<string, unknown>;
-  rating?: 'good' | 'needs-improvement' | 'poor';
-}
-
-// Metric types
-export type MetricType = 
-  | 'render' 
-  | 'interaction'
-  | 'load'
-  | 'memory'
-  | 'network'
-  | 'resource'
-  | 'javascript'
-  | 'css'
-  | 'animation'
-  | 'metric'
-  | 'summary'
-  | 'performance'
-  | 'webVital';
-
-// Web vital metrics
-export interface WebVitalMetric {
-  name: string;
-  value: number;
-  category: WebVitalCategory;
-  timestamp: number;
-  rating?: WebVitalRating;
-}
-
-// Web vitals categories
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
-
-// Web vitals rating
-export type WebVitalRating = 'good' | 'needs-improvement' | 'poor';
-
-// Web vitals names
-export type WebVitalName = 'CLS' | 'FCP' | 'LCP' | 'TTFB' | 'FID' | 'INP';
-
-// Performance boundaries
-export interface PerformanceBoundaries {
-  lowFpsThreshold: number;
-  mediumFpsThreshold: number;
-  highFpsThreshold: number;
-  excessiveRenderTimeMs: number;
-  highMemoryUsageMb: number;
-}
-
-// Performance monitor configuration
-export interface PerformanceMonitorConfig {
-  samplingInterval: number;
-  metricsBufferSize: number;
-  autoStart: boolean;
-  trackComponents: boolean;
-  trackInteractions: boolean;
-  trackWebVitals: boolean;
-  logWarnings: boolean;
-  captureElementMetrics: boolean;
-  adaptiveMode: boolean;
-  throttleUpdates: boolean;
-  optimizationLevel?: string;
 }

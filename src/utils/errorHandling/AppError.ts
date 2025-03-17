@@ -6,28 +6,7 @@
  */
 
 import { ValidationError } from '../validation/ValidationError';
-
-export enum ErrorSeverity {
-  DEBUG = 'debug',
-  INFO = 'info',
-  WARNING = 'warning',
-  ERROR = 'error',
-  CRITICAL = 'critical'
-}
-
-export enum ErrorCategory {
-  VALIDATION = 'validation',
-  NETWORK = 'network',
-  API = 'api',
-  AUTHENTICATION = 'authentication',
-  AUTHORIZATION = 'authorization',
-  DATABASE = 'database',
-  UNEXPECTED = 'unexpected',
-  BUSINESS_LOGIC = 'business_logic',
-  UI = 'ui',
-  DATA_PROCESSING = 'data_processing',
-  EXTERNAL_SERVICE = 'external_service'
-}
+import { ErrorCategory, ErrorSeverity } from './types';
 
 export interface AppErrorOptions {
   severity?: ErrorSeverity;
@@ -67,8 +46,8 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = 'AppError';
-    this.severity = options.severity || ErrorSeverity.ERROR;
-    this.category = options.category || ErrorCategory.UNEXPECTED;
+    this.severity = options.severity || 'error';
+    this.category = options.category || 'unknown';
     this.userMessage = options.userMessage || 'An unexpected error occurred';
     this.statusCode = options.statusCode;
     this.context = options.context;
@@ -127,7 +106,7 @@ export function createAppError(
   
   if (error instanceof ValidationError) {
     message = error.message;
-    category = ErrorCategory.VALIDATION;
+    category = 'validation';
   } else if (error instanceof Error) {
     message = error.message;
   } else if (typeof error === 'string') {

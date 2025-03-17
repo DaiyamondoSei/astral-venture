@@ -24,9 +24,17 @@ export interface ErrorHandlingOptions {
   logToConsole?: boolean;
   reportToService?: boolean;
   showToUser?: boolean;
-  context?: Record<string, unknown>;
+  showToast?: boolean;
+  context?: Record<string, unknown> | string;
   userId?: string;
   severity?: ErrorSeverity;
+  category?: ErrorCategory;
+  customMessage?: string;
+  onError?: (error: Error) => void;
+  rethrow?: boolean;
+  isValidation?: boolean;
+  includeValidationDetails?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ErrorReportOptions {
@@ -41,5 +49,7 @@ export interface ErrorReportOptions {
 
 export interface ErrorFallbackProps {
   error: Error;
+  componentName?: string;
   resetErrorBoundary: () => void;
+  showDetails?: boolean;
 }

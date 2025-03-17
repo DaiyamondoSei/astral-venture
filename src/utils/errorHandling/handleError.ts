@@ -5,8 +5,7 @@
  * This module provides a centralized error handling system for the application.
  */
 
-import { ErrorHandlingOptions } from './types';
-import { ErrorSeverity, ErrorCategory } from './types';
+import { ErrorHandlingOptions, ErrorSeverity, ErrorCategory } from './types';
 import { determineErrorCategory, determineErrorSeverity, extractErrorMessage } from './errorClassification';
 import { displayErrorToast, formatValidationDetails, logErrorToConsole } from './errorDisplay';
 import { isValidationError } from '../validation/ValidationError';
@@ -42,22 +41,22 @@ export function handleError(
   
   // Determine severity if not specified
   if (!opts.severity) {
-    opts.severity = determineErrorSeverity(opts.category);
+    opts.severity = determineErrorSeverity(opts.category as ErrorCategory);
   }
   
   // Convert to AppError for consistent processing
   const appError = createAppError(error, { 
     context: opts.context,
-    severity: opts.severity,
-    category: opts.category
+    severity: opts.severity as any, // Type conversion between modules
+    category: opts.category as any // Type conversion between modules
   });
   
   // Log to console if enabled
   if (opts.logToConsole) {
     logErrorToConsole(
       error,
-      appError.severity,
-      appError.category,
+      appError.severity as any, // Type conversion between modules
+      appError.category as any, // Type conversion between modules
       typeof opts.context === 'string' ? opts.context : undefined,
       opts.metadata
     );
@@ -72,7 +71,7 @@ export function handleError(
         ? `Error in ${opts.context}` 
         : undefined;
     
-    displayErrorToast(message, appError.severity, details);
+    displayErrorToast(message, appError.severity as any, details);
   }
   
   // Log to server if enabled
@@ -113,7 +112,7 @@ export function handleValidationError(
     showToast: true,
     logToServer: false, // Usually don't need to log validation errors to server
     rethrow: false,
-    category: ErrorCategory.VALIDATION,
+    category: 'validation' as ErrorCategory,
     isValidation: true,
     includeValidationDetails: true,
     ...options
@@ -131,7 +130,7 @@ export function handleApiError(
     showToast: true,
     logToServer: true,
     rethrow: false,
-    category: ErrorCategory.NETWORK,
+    category: 'network' as ErrorCategory,
     ...options
   });
 }

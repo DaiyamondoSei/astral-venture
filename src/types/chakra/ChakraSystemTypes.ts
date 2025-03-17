@@ -41,22 +41,37 @@ export interface ChakraActivationProps {
 }
 
 // Extended types for Metatron's Cube integration
-export interface ChakraNodeData {
+export interface MetatronsNode {
+  id: string;
   chakraType: ChakraType;
   level: number;
   energy: number;
   active: boolean;
+  pulsating?: boolean;
   position: {
     x: number;
     y: number;
   };
 }
 
-export interface ChakraConnectionData {
-  source: ChakraType;
-  target: ChakraType;
+export interface MetatronsConnection {
+  id: string;
+  source: string;
+  target: string;
   strength: number;
   active: boolean;
+}
+
+export interface MetatronsCubeProps {
+  nodes: MetatronsNode[];
+  connections: MetatronsConnection[];
+  interactive?: boolean;
+  onNodeActivated?: (nodeId: string) => void;
+  variant?: string;
+  qualityLevel?: string;
+  withAnimation?: boolean;
+  intensity?: number;
+  activeNodeId?: string;
 }
 
 export interface ChakraVisualizationProps {
@@ -93,3 +108,14 @@ export interface ChakraInsightsOptions {
   chakraTypes?: ChakraType[];
   historyDepth?: number;
 }
+
+// Type constants for ChakraTypes
+export const ChakraTypes = {
+  ROOT: 'root' as ChakraType,
+  SACRAL: 'sacral' as ChakraType,
+  SOLAR: 'solar' as ChakraType,
+  HEART: 'heart' as ChakraType,
+  THROAT: 'throat' as ChakraType,
+  THIRD_EYE: 'third-eye' as ChakraType,
+  CROWN: 'crown' as ChakraType
+} as const;
