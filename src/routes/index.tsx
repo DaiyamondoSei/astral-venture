@@ -1,75 +1,90 @@
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '@/shared/hooks/useAuth';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { MainLayout } from '@/layouts/MainLayout';
+import { AuthLayout } from '@/layouts/AuthLayout';
+import { EntryLayout } from '@/layouts/EntryLayout';
 
-// Layouts
-import MainLayout from '@/layouts/MainLayout';
-import AuthLayout from '@/layouts/AuthLayout';
-import EntryLayout from '@/layouts/EntryLayout';
-
-// Auth Pages
+// Pages
+import Dashboard from '@/pages/Dashboard';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
+import ChakraSystemPage from '@/pages/ChakraSystemPage';
+import MeditationPage from '@/pages/MeditationPage';
+import ProfilePage from '@/pages/ProfilePage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
-// Main Pages
-import DashboardPage from '@/pages/DashboardPage';
-import JournalPage from '@/pages/JournalPage';
+// Protected route wrapper
+import { ProtectedRoute } from './ProtectedRoute';
 
-// Development Routes (only in development)
-import DevRoutes from '@/routes/dev';
+// Dev routes (only loaded in development)
+import DevRoutes from './dev';
 
-// Create a protected route wrapper
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>;
-  }
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-const MainRoutes: React.FC = () => {
+const AppRoutes = () => {
   return (
-    <Routes>
-      {/* Auth Routes */}
-      <Route element={<AuthLayout />}>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-      </Route>
-      
-      {/* Entry Experience */}
-      <Route element={<EntryLayout />}>
-        <Route path="/onboarding" element={<div>Onboarding Page (Coming Soon)</div>} />
-        <Route path="/entry" element={<div>Entry Experience (Coming Soon)</div>} />
-      </Route>
-      
-      {/* Protected Routes */}
-      <Route element={
-        <ProtectedRoute>
-          <MainLayout />
-        </ProtectedRoute>
-      }>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/chakras" element={<div>Chakras Page (Coming Soon)</div>} />
-        <Route path="/meditation" element={<div>Meditation Page (Coming Soon)</div>} />
-        <Route path="/journal" element={<JournalPage />} />
-        <Route path="/astral" element={<div>Astral Projection Page (Coming Soon)</div>} />
-        <Route path="/profile" element={<div>Profile Page (Coming Soon)</div>} />
-      </Route>
-      
-      {/* Development Routes - only shown in development */}
-      {process.env.NODE_ENV === 'development' && <DevRoutes />}
-      
-      {/* Catch-all route */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+        {/* Auth routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+        
+        {/* Entry experience */}
+        <Route element={<EntryLayout />}>
+          <Route path="/entry" element={<div>Entry Experience (Coming Soon)</div>} />
+          <Route path="/onboarding" element={<div>Onboarding (Coming Soon)</div>} />
+        </Route>
+        
+        {/* Main authenticated routes */}
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/chakras" element={
+            <ProtectedRoute>
+              <ChakraSystemPage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/meditation" element={
+            <ProtectedRoute>
+              <MeditationPage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/dreams" element={
+            <ProtectedRoute>
+              <div>Dream Journal (Coming Soon)</div>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/astral" element={
+            <ProtectedRoute>
+              <div>Astral Projection (Coming Soon)</div>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          } />
+        </Route>
+        
+        {/* Development routes - only loaded in development */}
+        {process.env.NODE_ENV === 'development' && DevRoutes()}
+        
+        {/* Catch-all route */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
 
-export default MainRoutes;
+export default AppRoutes;
