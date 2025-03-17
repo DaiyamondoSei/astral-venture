@@ -1,16 +1,13 @@
 
+import React, { useState, useEffect } from 'react';
 import './App.css';
-import { useState, useEffect } from 'react';
-import { Routes, Route, BrowserRouter } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
-import LandingPage from './pages';
-import EntryAnimationPage from './pages/EntryAnimationPage';
-import DesignSystemDemo from './pages/DesignSystemDemo';
-import ErrorBoundary from './components/ErrorBoundary';
-import { PerformanceProvider } from './contexts/PerformanceContext';
+import ErrorBoundary from '@/shared/components/error/ErrorBoundary';
+import { PerformanceProvider } from '@/shared/contexts/PerformanceContext';
 import { supabase, isSupabaseConfigValid } from './lib/supabaseClientSingleton';
-import TestPage from './routes/test';
 import { assetRegistry, initializeGlobalAssets } from './utils/assetManager';
+import AppRoutes from './routes';
+import { AuthProvider } from './shared/contexts/AuthContext';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -118,14 +115,9 @@ function App() {
   return (
     <ErrorBoundary>
       <PerformanceProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/entry" element={<EntryAnimationPage />} />
-            <Route path="/design" element={<DesignSystemDemo />} />
-            <Route path="/test" element={<TestPage />} />
-          </Routes>
-        </BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </PerformanceProvider>
     </ErrorBoundary>
   );

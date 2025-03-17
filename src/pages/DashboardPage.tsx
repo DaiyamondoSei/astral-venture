@@ -1,23 +1,32 @@
 
 import React from 'react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { useUser } from '@/hooks/useUser';
-import { useLogout } from '@/hooks/useLogout';
+import { useNavigate } from 'react-router-dom';
+import DashboardOverview from '@/features/dashboard/components/DashboardOverview';
+import ChakraBalanceWidget from '@/features/chakras/components/ChakraBalanceWidget';
+import RecentReflectionsWidget from '@/features/journal/components/RecentReflectionsWidget';
+import MeditationStatsWidget from '@/features/meditation/components/MeditationStatsWidget';
+import AstralProgressWidget from '@/features/astral/components/AstralProgressWidget';
+import { useAuth } from '@/shared/hooks/useAuth';
 
-const DashboardPage = () => {
-  const user = useUser();
-  const { logout } = useLogout();
+const DashboardPage: React.FC = () => {
+  const { user, userProfile } = useAuth();
+  const navigate = useNavigate();
   
   return (
-    <DashboardLayout 
-      username={user?.email || 'Explorer'} 
-      astralLevel={1} 
-      onLogout={logout}
-    >
-      <div className="dashboard-content">
-        {/* Dashboard content will be rendered by DashboardLayout */}
+    <div className="space-y-8">
+      <DashboardOverview 
+        username={userProfile?.username || user?.email?.split('@')[0] || 'Explorer'} 
+        energyPoints={userProfile?.energyPoints || 0}
+        astralLevel={userProfile?.astralLevel || 1}
+      />
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <ChakraBalanceWidget onClick={() => navigate('/chakras')} />
+        <RecentReflectionsWidget onClick={() => navigate('/journal')} />
+        <MeditationStatsWidget onClick={() => navigate('/meditation')} />
+        <AstralProgressWidget onClick={() => navigate('/astral')} />
       </div>
-    </DashboardLayout>
+    </div>
   );
 };
 
