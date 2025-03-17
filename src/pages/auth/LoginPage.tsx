@@ -1,20 +1,23 @@
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '@/shared/hooks/useAuth';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { AlertCircle } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from '@/components/ui/use-toast';
 
-const LoginPage: React.FC = () => {
+const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, error } = useAuth();
-  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get redirect path from location state or default to home
+  const from = (location.state as any)?.from?.pathname || '/';
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,86 +25,95 @@ const LoginPage: React.FC = () => {
     if (!email || !password) {
       toast({
         title: "Missing fields",
-        description: "Please fill in all fields",
-        variant: "destructive",
+        description: "Please enter both email and password",
+        variant: "destructive"
       });
       return;
     }
     
     try {
-      setIsSubmitting(true);
-      await login(email, password);
-    } catch (err) {
+      setIsLoading(true);
+      const result = await login(email, password);
+      
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+      
+      toast({
+        title: "Login successful",
+        description: "Welcome back to your consciousness journey!"
+      });
+      
+      // Redirect to the page they were trying to access or home
+      navigate(from, { replace: true });
+    } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
-        description: error || "Please check your credentials and try again",
-        variant: "destructive",
+        description: error.message || "Failed to sign in. Please check your credentials.",
+        variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
   
   return (
-    <div className="w-full">
-      <Card className="border-quantum-700 bg-quantum-800/50">
+    <div className="flex items-center justify-center min-h-screen p-4">
+      <Card className="w-full max-w-md border-quantum-700 bg-quantum-800/30 backdrop-blur-xl">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Login</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Sign In</CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access your account
+            Enter your email and password to access your account
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-quantum-900/50"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link to="/forgot-password" className="text-xs text-quantum-400 hover:text-purple-400">
-                  Forgot password?
-                </Link>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="cosmic@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-quantum-700/50"
+                />
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-quantum-900/50"
-                required
-              />
-            </div>
-            
-            {error && (
-              <div className="flex items-center space-x-2 text-red-500 text-sm">
-                <AlertCircle size={16} />
-                <span>{error}</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link 
+                    to="/forgot-password" 
+                    className="text-xs text-quantum-300 hover:text-quantum-100"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-quantum-700/50"
+                />
               </div>
-            )}
-            
-            <Button
-              type="submit"
-              className="w-full bg-purple-600 hover:bg-purple-700"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Signing in..." : "Sign in"}
-            </Button>
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                disabled={isLoading}
+              >
+                {isLoading ? "Signing in..." : "Sign In"}
+              </Button>
+            </div>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <div className="text-sm text-center text-quantum-400">
-            Don't have an account?{' '}
+          <div className="text-center text-sm text-quantum-300">
+            Don't have an account?{" "}
             <Link to="/register" className="text-purple-400 hover:text-purple-300">
               Sign up
             </Link>

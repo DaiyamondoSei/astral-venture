@@ -26,3 +26,6 @@ export * from './astral-projection';
 
 // User Progression
 export * from './user-progression';
+
+// Performance Utilities
+export * from './performance';

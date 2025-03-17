@@ -1,21 +1,27 @@
 
 import React from 'react';
 import { Route } from 'react-router-dom';
+import MainLayout from '@/layouts/MainLayout';
+import PerformanceDemoPage from '@/pages/PerformanceDemoPage';
+import ChakraDemoPage from '@/pages/dev/ChakraDemoPage';
+import MeditationDemoPage from '@/pages/dev/MeditationDemoPage';
+import ComponentLibraryPage from '@/pages/dev/ComponentLibraryPage';
 
-// Dev Components
-import DesignSystemDemo from '@/dev/pages/DesignSystemDemo';
-import TestPage from '@/dev/pages/TestPage';
-import AstralBodyDemo from '@/dev/pages/AstralBodyDemo';
-import AIPlayground from '@/dev/pages/AIPlayground';
-
-// A dedicated router for development routes
-const DevRoutes: React.FC = () => {
+/**
+ * Development-only routes
+ * 
+ * These routes are only available in development mode
+ */
+const DevRoutes = () => {
   return (
     <>
-      <Route path="/dev/design" element={<DesignSystemDemo />} />
-      <Route path="/dev/test" element={<TestPage />} />
-      <Route path="/dev/astral-body" element={<AstralBodyDemo />} />
-      <Route path="/dev/ai-playground" element={<AIPlayground />} />
+      {/* Development tools */}
+      <Route path="/dev" element={<MainLayout />}>
+        <Route path="components" element={<ComponentLibraryPage />} />
+        <Route path="chakra-demo" element={<ChakraDemoPage />} />
+        <Route path="meditation-demo" element={<MeditationDemoPage />} />
+        <Route path="performance" element={<PerformanceDemoPage />} />
+      </Route>
     </>
   );
 };

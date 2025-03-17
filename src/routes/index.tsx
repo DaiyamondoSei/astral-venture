@@ -14,6 +14,8 @@ import ChakraSystemPage from '@/pages/ChakraSystemPage';
 import MeditationPage from '@/pages/MeditationPage';
 import ProfilePage from '@/pages/ProfilePage';
 import PerformanceDemoPage from '@/pages/PerformanceDemoPage';
+import OnboardingPage from '@/pages/onboarding/OnboardingPage';
+import AstralProjectionPage from '@/pages/astral-projection/AstralProjectionPage';
 
 // Development routes - conditionally loaded in development
 import DevRoutes from './dev';
@@ -30,6 +32,9 @@ const AppRoutes = () => {
           <Route path="/register" element={<RegisterPage />} />
         </Route>
 
+        {/* Onboarding routes */}
+        <Route path="/onboarding" element={<OnboardingPage />} />
+
         {/* Entry animation routes */}
         <Route element={<EntryLayout />}>
           <Route path="/entry" element={<EntryAnimation />} />
@@ -42,6 +47,7 @@ const AppRoutes = () => {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/chakra-system" element={<ChakraSystemPage />} />
           <Route path="/meditation" element={<MeditationPage />} />
+          <Route path="/astral-projection" element={<AstralProjectionPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/performance" element={<PerformanceDemoPage />} />
         </Route>

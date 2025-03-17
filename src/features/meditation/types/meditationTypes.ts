@@ -3,88 +3,85 @@
  * Types for meditation features
  */
 
-/**
- * Meditation session data
- */
 export interface MeditationSession {
   id: string;
   userId: string;
-  date: string;
   duration: number; // in seconds
-  completed: boolean;
+  startTime: string;
+  endTime: string;
   type: MeditationType;
-  focusedChakras?: string[];
-  guidanceType?: MeditationGuidanceType;
-  reflection?: string;
-  energyPoints?: number;
+  guided: boolean;
+  completionRate: number; // percentage
+  chakrasActivated?: string[];
+  notes?: string;
 }
 
-/**
- * Type of meditation
- */
 export type MeditationType = 
   | 'mindfulness'
+  | 'focused'
   | 'chakra-balancing'
-  | 'transcendental'
-  | 'guided'
-  | 'breathwork'
-  | 'body-scan'
-  | 'energy-flow'
-  | 'sound-healing'
+  | 'energy-healing'
+  | 'astral-preparation'
+  | 'quantum-consciousness'
   | 'custom';
 
-/**
- * Type of meditation guidance
- */
-export type MeditationGuidanceType =
-  | 'audio'
-  | 'text'
-  | 'video'
-  | 'none';
-
-/**
- * Meditation preset
- */
-export interface MeditationPreset {
+export interface BreathingPattern {
   id: string;
   name: string;
   description: string;
-  duration: number; // in minutes
-  type: MeditationType;
-  chakraFocus?: string[];
-  guidanceId?: string;
-  guidanceType?: MeditationGuidanceType;
-  requirementLevel: number; // 1-10 difficulty/experience level
+  inhaleSeconds: number;
+  holdInhaleSeconds: number;
+  exhaleSeconds: number;
+  holdExhaleSeconds: number;
+  repetitions: number;
+  chakraAssociation?: string[];
   benefits: string[];
-  imageUrl?: string;
 }
 
-/**
- * Meditation guidance content
- */
-export interface MeditationGuidance {
+export interface MeditationGuide {
   id: string;
   title: string;
-  type: MeditationGuidanceType;
-  content: string; // URL for audio/video, text for text guidance
-  duration: number; // in seconds
-  creator?: string;
+  description: string;
+  durationSeconds: number;
+  type: MeditationType;
+  steps: MeditationStep[];
   chakraFocus?: string[];
-  tags: string[];
+  breathingPattern?: BreathingPattern;
+  audioUrl?: string;
+  createdAt: string;
 }
 
-/**
- * Meditation progress tracker
- */
-export interface MeditationProgress {
+export interface MeditationStep {
+  id: string;
+  order: number;
+  durationSeconds: number;
+  instruction: string;
+  voiceInstruction?: string;
+  visualInstruction?: string;
+}
+
+export interface MeditationPreference {
   userId: string;
-  totalMinutes: number;
+  preferredDuration: number; // in seconds
+  preferredTypes: MeditationType[];
+  preferredTime: string;
+  preferredChakras?: string[];
+  reminders: boolean;
+  reminderTime?: string;
+  soundEnabled: boolean;
+  backgroundSoundId?: string;
+  guidanceLevel: 'minimal' | 'moderate' | 'detailed';
+}
+
+export interface MeditationStats {
+  userId: string;
   totalSessions: number;
+  totalDuration: number; // in seconds
   longestStreak: number;
   currentStreak: number;
-  lastMeditationDate?: string;
-  preferredTypes: MeditationType[];
-  averageDuration: number; // in minutes
-  levelProgress: number; // 0-100 percentage to next level
-  level: number;
+  lastSessionDate: string;
+  averageDuration: number;
+  preferredType: MeditationType;
+  mostActivatedChakras: string[];
+  progressRate: number;
 }

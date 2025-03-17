@@ -1,30 +1,29 @@
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '@/shared/hooks/useAuth';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { AlertCircle } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from '@/components/ui/use-toast';
 
-const RegisterPage: React.FC = () => {
+const RegisterPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { register, error } = useAuth();
-  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const { register } = useAuth();
+  const navigate = useNavigate();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !confirmPassword) {
+    if (!email || !password) {
       toast({
         title: "Missing fields",
-        description: "Please fill in all fields",
-        variant: "destructive",
+        description: "Please enter email and password",
+        variant: "destructive"
       });
       return;
     }
@@ -33,7 +32,7 @@ const RegisterPage: React.FC = () => {
       toast({
         title: "Passwords don't match",
         description: "Please ensure both passwords match",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -42,92 +41,97 @@ const RegisterPage: React.FC = () => {
       toast({
         title: "Password too short",
         description: "Password must be at least 6 characters long",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
     
     try {
-      setIsSubmitting(true);
-      await register(email, password);
-    } catch (err) {
+      setIsLoading(true);
+      const result = await register(email, password);
+      
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+      
+      toast({
+        title: "Registration successful",
+        description: "Your account has been created. Welcome to your consciousness journey!"
+      });
+      
+      // Redirect to onboarding
+      navigate('/onboarding');
+    } catch (error: any) {
+      console.error('Registration error:', error);
       toast({
         title: "Registration failed",
-        description: error || "There was a problem creating your account",
-        variant: "destructive",
+        description: error.message || "Failed to create account. Please try again.",
+        variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
   
   return (
-    <div className="w-full">
-      <Card className="border-quantum-700 bg-quantum-800/50">
+    <div className="flex items-center justify-center min-h-screen p-4">
+      <Card className="w-full max-w-md border-quantum-700 bg-quantum-800/30 backdrop-blur-xl">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Create an Account</CardTitle>
           <CardDescription className="text-center">
-            Enter your information to create your account
+            Enter your details to begin your consciousness journey
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-quantum-900/50"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-quantum-900/50"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="bg-quantum-900/50"
-                required
-              />
-            </div>
-            
-            {error && (
-              <div className="flex items-center space-x-2 text-red-500 text-sm">
-                <AlertCircle size={16} />
-                <span>{error}</span>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="cosmic@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-quantum-700/50"
+                />
               </div>
-            )}
-            
-            <Button
-              type="submit"
-              className="w-full bg-purple-600 hover:bg-purple-700"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Creating account..." : "Create account"}
-            </Button>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-quantum-700/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="bg-quantum-700/50"
+                />
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                disabled={isLoading}
+              >
+                {isLoading ? "Creating Account..." : "Create Account"}
+              </Button>
+            </div>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <div className="text-sm text-center text-quantum-400">
-            Already have an account?{' '}
+          <div className="text-center text-sm text-quantum-300">
+            Already have an account?{" "}
             <Link to="/login" className="text-purple-400 hover:text-purple-300">
               Sign in
             </Link>
