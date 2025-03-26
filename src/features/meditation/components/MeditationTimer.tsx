@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Play, Pause, RotateCcw, Check } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 interface MeditationTimerProps {
   initialDuration?: number;
@@ -22,6 +23,7 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
   const [timeRemaining, setTimeRemaining] = useState(duration * 60);
   const [isActive, setIsActive] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const { toast } = useToast();
 
   // Reset timer when duration changes
   useEffect(() => {
@@ -40,36 +42,43 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
     } else if (isActive && timeRemaining === 0) {
       setIsActive(false);
       setIsComplete(true);
+      
+      // Show notification
+      toast({
+        title: "Meditation Complete",
+        description: `You've completed a ${duration} minute meditation session.`,
+      });
+      
       if (onComplete) onComplete();
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, timeRemaining, onComplete]);
+  }, [isActive, timeRemaining, onComplete, duration, toast]);
 
   // Format time as MM:SS
-  const formatTime = (seconds: number): string => {
+  const formatTime = useCallback((seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const startTimer = () => {
+  const startTimer = useCallback(() => {
     setIsActive(true);
     if (onStart) onStart();
-  };
+  }, [onStart]);
 
-  const pauseTimer = () => {
+  const pauseTimer = useCallback(() => {
     setIsActive(false);
     if (onPause) onPause();
-  };
+  }, [onPause]);
 
-  const resetTimer = () => {
+  const resetTimer = useCallback(() => {
     setIsActive(false);
     setIsComplete(false);
     setTimeRemaining(duration * 60);
-  };
+  }, [duration]);
 
   return (
     <Card className="w-full max-w-md bg-white/10 backdrop-blur-md border-0">

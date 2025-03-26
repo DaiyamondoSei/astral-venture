@@ -1,14 +1,11 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import ErrorFallback from './ErrorFallback';
-import { handleError } from '@/utils/errorHandling';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
   componentName?: string;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  showDetails?: boolean;
 }
 
 interface State {
@@ -34,20 +31,13 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the error to an error reporting service
+    // Log the error to console
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
     // Call custom error handler if provided
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-    
-    // Handle error with centralized error handler
-    handleError(error, {
-      context: this.props.componentName || 'ErrorBoundary',
-      showToast: false,
-      logToConsole: true
-    });
   }
 
   resetError = () => {
@@ -56,24 +46,18 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // Render custom fallback UI or the provided fallback
+      // Render custom fallback UI if provided
       if (this.props.fallback) {
         return this.props.fallback;
       }
       
-      return this.state.error ? (
-        <ErrorFallback 
-          error={this.state.error} 
-          resetErrorBoundary={this.resetError} 
-          componentName={this.props.componentName}
-          showDetails={this.props.showDetails}
-        />
-      ) : (
+      return (
         <div className="flex flex-col items-center justify-center p-6 rounded-lg bg-black/20 backdrop-blur-md">
-          <h2 className="text-xl font-display text-white mb-2">
-            An unknown error occurred
+          <h2 className="text-xl text-white mb-2">
+            An error occurred
             {this.props.componentName && <span className="text-sm text-white/70"> in {this.props.componentName}</span>}
           </h2>
+          {this.state.error && <p className="text-red-300 mb-4">{this.state.error.message}</p>}
           <button 
             onClick={this.resetError}
             className="px-4 py-2 bg-primary text-white rounded-md"

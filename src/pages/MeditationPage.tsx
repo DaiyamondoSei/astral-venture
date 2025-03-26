@@ -1,6 +1,6 @@
 
 import React from 'react';
-import MeditationTimer from '@/components/meditation/MeditationTimer';
+import { MeditationTimer } from '@/features/meditation/components';
 
 /**
  * Meditation Page

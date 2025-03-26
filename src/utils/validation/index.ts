@@ -1,45 +1,49 @@
 
 /**
- * Validation System
- * 
- * Central exports for the validation system
+ * Simplified Validation System
  */
 
-// Export core types and constants from the types directory
-// These types are our source of truth following the Type-Value Pattern
+// Export core types and constants
 export * from '@/types/core/validation/types';
 export * from '@/types/core/validation/constants';
 
 // Export ValidationError and related utilities
-export { 
-  ValidationError, 
-  isValidationError,
-  createRequiredError,
-  createTypeError
-} from './ValidationError';
+export { ValidationError, isValidationError } from './ValidationError';
 
-// Export core validators and validation utilities
-export * from './validationUtils';
-export * from './validators';
+// Helper functions for creating validation results
+export function createValidResult<T>(value: T): ValidationResult<T> {
+  return {
+    isValid: true,
+    value,
+    errors: []
+  };
+}
 
-// Export validation services and pipelines
-export * from './ValidationService';
-export * from './ValidationPipeline';
+export function createInvalidResult<T>(errors: string[]): ValidationResult<T> {
+  return {
+    isValid: false,
+    errors
+  };
+}
 
-// Export schema validation utilities
-export * from './schemaValidator';
-export * from './inputValidator';
+// Basic validator functions
+export function validateRequired(value: unknown, fieldName: string): ValidationResult {
+  if (value === undefined || value === null || value === '') {
+    return createInvalidResult([`${fieldName} is required`]);
+  }
+  return createValidResult(value);
+}
 
-// Export runtime validation utilities
-export * from './runtimeValidator';
-export * from './runtimeValidation';
-export * from './typeValidation';
+export function validateString(value: unknown, fieldName: string): ValidationResult<string> {
+  if (typeof value !== 'string') {
+    return createInvalidResult([`${fieldName} must be a string`]);
+  }
+  return createValidResult(value);
+}
 
-// Export type-safe validation
-export * from './core';
-
-// Export performance validation
-export * from './performanceValidator';
-
-// Export type validation bridge
-export * from './typeValidationBridge';
+export function validateNumber(value: unknown, fieldName: string): ValidationResult<number> {
+  if (typeof value !== 'number' || isNaN(value)) {
+    return createInvalidResult([`${fieldName} must be a number`]);
+  }
+  return createValidResult(value);
+}
