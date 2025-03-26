@@ -5,20 +5,20 @@
  * Centralizes chakra-related utility functions
  */
 import { ChakraType } from '@/types/chakra/ChakraSystemTypes';
-import { CHAKRA_COLOR_MAP, CHAKRA_NAME_MAP, CHAKRA_COLORS, CHAKRA_NAMES } from './constants';
+import { CHAKRA_COLORS, CHAKRA_NAMES } from './constants';
 
 /**
  * Get chakra names for display
  */
 export function getChakraNames(): string[] {
-  return CHAKRA_NAMES;
+  return Object.values(CHAKRA_NAMES);
 }
 
 /**
  * Get chakra colors for visualization
  */
 export function getChakraColors(): string[] {
-  return CHAKRA_COLORS;
+  return Object.values(CHAKRA_COLORS);
 }
 
 /**
@@ -27,9 +27,9 @@ export function getChakraColors(): string[] {
  */
 export function getChakraColor(chakra: ChakraType | number): string {
   if (typeof chakra === 'number') {
-    return CHAKRA_COLORS[chakra % CHAKRA_COLORS.length];
+    return Object.values(CHAKRA_COLORS)[chakra % Object.values(CHAKRA_COLORS).length];
   }
-  return CHAKRA_COLOR_MAP[chakra] || CHAKRA_COLORS[0];
+  return CHAKRA_COLORS[chakra] || Object.values(CHAKRA_COLORS)[0];
 }
 
 /**
@@ -38,17 +38,26 @@ export function getChakraColor(chakra: ChakraType | number): string {
  */
 export function getChakraName(chakra: ChakraType | number): string {
   if (typeof chakra === 'number') {
-    return CHAKRA_NAMES[chakra % CHAKRA_NAMES.length];
+    return Object.values(CHAKRA_NAMES)[chakra % Object.values(CHAKRA_NAMES).length];
   }
-  return CHAKRA_NAME_MAP[chakra] || CHAKRA_NAMES[0];
+  return CHAKRA_NAMES[chakra] || Object.values(CHAKRA_NAMES)[0];
 }
 
 /**
  * Calculate overall chakra balance
  * @param chakras Chakra activation values
  */
-export function calculateChakraBalance(chakras: Record<ChakraType, number>): number {
-  const values = Object.values(chakras);
+export function calculateChakraBalance(chakras: Record<ChakraType, number> | number[]): number {
+  let values: number[];
+  
+  if (Array.isArray(chakras)) {
+    // Handle array input (for backward compatibility)
+    values = chakras.map(chakra => typeof chakra === 'number' ? 1 : 0); // Convert to activation values
+  } else {
+    // Handle record input
+    values = Object.values(chakras);
+  }
+  
   if (values.length === 0) return 0;
   
   const sum = values.reduce((a, b) => a + b, 0);
