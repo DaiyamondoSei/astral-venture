@@ -6,6 +6,7 @@
  */
 
 import { ValidationErrorCode, ValidationSeverity } from './types';
+import { MetricType, WebVitalCategory, WebVitalName } from '../performance/types';
 
 // Validation error codes
 export const ValidationErrorCodes = {

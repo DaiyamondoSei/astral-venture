@@ -51,15 +51,6 @@ export interface ValidationSchema {
   validate: (value: unknown, options?: ValidationOptions) => ValidationResult<any>;
 }
 
-// Web vital category
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
-
-// Web vital name
-export type WebVitalName = 'CLS' | 'FID' | 'LCP' | 'FCP' | 'TTFB' | 'INP';
-
-// Metric type
-export type MetricType = 'render' | 'interaction' | 'network' | 'resource' | 'memory' | 'custom';
-
 // Type guard for validation result
 export function isValidationResult<T>(value: unknown): value is ValidationResult<T> {
   return value !== null && 

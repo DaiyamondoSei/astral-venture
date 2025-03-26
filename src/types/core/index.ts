@@ -1,11 +1,8 @@
 
 /**
- * Core Types Index
+ * Core Type System
  * 
- * This module serves as the central barrel export for all core types
- * used throughout the application.
- * 
- * @version 1.0.0
+ * This module exports all core types used throughout the application
  */
 
 // Base types
@@ -13,39 +10,18 @@ export * from './base/primitives';
 export * from './base/branded';
 export * from './base/generic';
 
-// Validation types
-export * from './validation';
+// Validation system types
+export * from './validation/types';
+export * from './validation/constants';
+export * from './validation/results';
+export * from './validation/index';
 
-// Performance types
-export * from './performance';
+// Performance system types
+export * from './performance/types';
+export * from './performance/constants';
+export * from './performance/metrics';
 
-// Type guards
-export {
-  isUUID,
-  isTimestamp,
-  isEnergyPoints,
-  isDateString,
-  asUUID,
-  asTimestamp,
-  asEnergyPoints,
-  asDateString,
-  safeCreateUUID
-} from './base/branded';
-
-export {
-  hasId,
-  ensureEntityId
-} from './base/primitives';
-
-export {
-  isValidationErrorDetail,
-  isValidationResult,
-  createValidSuccess,
-  createValidError,
-  createValidErrors,
-  ValidationError
-} from './validation';
-
+// Export type guards for performance
 export {
   isValidMetricType,
   isValidWebVitalName,
@@ -53,3 +29,25 @@ export {
   isComponentMetrics,
   ensureMetricId
 } from './performance/metrics';
+
+// Export validation helpers
+export {
+  success,
+  failure,
+  fromValidationError,
+  fromError,
+  unwrap,
+  unwrapOr,
+  createValidator
+} from './validation/results';
+
+// Export validation type guards
+export {
+  isValidationSeverity,
+  isValidationErrorCode,
+  isValidationErrorDetail,
+  isValidationResult,
+  isMetricType,
+  isWebVitalCategory,
+  isWebVitalName
+} from './validation/index';

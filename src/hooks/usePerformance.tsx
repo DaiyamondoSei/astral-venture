@@ -5,7 +5,12 @@ import {
   DeviceCapability, 
   PerformanceMode,
   QualityLevel
-} from '@/types/core/performance';
+} from '@/types/core/performance/types';
+import {
+  DeviceCapabilities,
+  PerformanceModes,
+  QualityLevels
+} from '@/types/core/performance/constants';
 
 /**
  * Hook to access performance settings and capabilities
@@ -18,15 +23,21 @@ export function usePerformance() {
     return {
       // Core settings
       config: {
-        deviceCapability: 'medium' as DeviceCapability,
+        deviceCapability: DeviceCapabilities.MEDIUM,
         disableAnimations: false,
-        disableEffects: false
+        disableEffects: false,
+        useManualCapability: false,
+        enableAdaptiveRendering: true,
+        enableProgressiveEnhancement: true,
+        resourceOptimizationLevel: 'conservative',
       },
       updateConfig: () => console.warn('PerformanceContext is not available'),
       
       // Derived state
-      deviceCapability: 'medium' as DeviceCapability,
+      deviceCapability: DeviceCapabilities.MEDIUM,
       isLowPerformance: false,
+      isMediumPerformance: true,
+      isHighPerformance: false,
       
       // Feature flags based on configuration
       enableBlur: true,
@@ -34,7 +45,10 @@ export function usePerformance() {
       enableComplexAnimations: true,
       
       // Configuration export
-      exportConfig: () => ({ success: false, error: 'PerformanceContext is not available' }),
+      exportConfig: () => ({ 
+        type: 'failure',
+        error: new Error('PerformanceContext is not available')
+      }),
     };
   }
   

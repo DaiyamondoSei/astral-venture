@@ -1,105 +1,51 @@
 
 /**
- * Performance Metrics
+ * Performance Metrics Types
  * 
- * Types for performance metrics collection and processing
+ * Utility types and functions for performance metrics
  */
 
-import { 
-  WebVitalName,
-  WebVitalCategory,
-  MetricType,
-  ComponentMetrics,
-  WebVitalMetric,
-  PerformanceMetric
-} from './types';
+import { MetricType, WebVitalCategory, WebVitalName, ComponentMetrics } from './types';
+import { MetricTypes, WebVitalCategories, WebVitalNames } from './constants';
 
-// Metric collection options
-export interface MetricsCollectionOptions {
-  enabled: boolean;
-  samplingRate: number;
-  maxItems: number;
-  throttleInterval: number;
-  persistData: boolean;
+/**
+ * Check if a value is a valid metric type
+ */
+export function isValidMetricType(value: unknown): value is MetricType {
+  return typeof value === 'string' && 
+    Object.values(MetricTypes).includes(value as any);
 }
 
-// Performance data collected by monitoring
-export interface PerformanceData {
-  metrics: PerformanceMetric[];
-  webVitals: Record<WebVitalName, number>;
-  components: Record<string, ComponentMetrics>;
-  fps: number[];
-  memory: number[];
-  pageLoads: number[];
-  interactions: Record<string, { count: number; avgTime: number }>;
-  timestamp: number;
+/**
+ * Check if a value is a valid web vital name
+ */
+export function isValidWebVitalName(value: unknown): value is WebVitalName {
+  return typeof value === 'string' && 
+    Object.values(WebVitalNames).includes(value as any);
 }
 
-// Web vital report from web-vitals library
-export interface WebVitalReport {
-  name: string;
-  id: string;
-  value: number;
-  delta: number;
-  entries: PerformanceEntry[];
+/**
+ * Check if a value is a valid web vital category
+ */
+export function isValidWebVitalCategory(value: unknown): value is WebVitalCategory {
+  return typeof value === 'string' && 
+    Object.values(WebVitalCategories).includes(value as any);
 }
 
-// Performance monitor options
-export interface PerformanceMonitorOptions {
-  enabled?: boolean;
-  debug?: boolean;
-  trackComponents?: boolean;
-  trackWebVitals?: boolean;
-  trackFPS?: boolean;
-  trackMemory?: boolean;
-  sampleInterval?: number;
+/**
+ * Check if a value is a component metrics object
+ */
+export function isComponentMetrics(value: unknown): value is ComponentMetrics {
+  return typeof value === 'object' && 
+    value !== null &&
+    'componentName' in value &&
+    'renderCount' in value &&
+    'totalRenderTime' in value;
 }
 
-// Component metric with timestamp
-export interface TimestampedComponentMetric extends ComponentMetrics {
-  timestamp: number;
-}
-
-// Performance metrics service interface
-export interface MetricsCollector {
-  trackComponentMetric: (
-    componentName: string, 
-    renderTime: number, 
-    type?: 'render' | 'interaction' | 'load'
-  ) => void;
-  
-  addWebVital: (
-    name: string, 
-    value: number, 
-    category: WebVitalCategory
-  ) => void;
-  
-  getAllMetrics: () => Record<string, ComponentMetrics>;
-  
-  getWebVitals: () => Record<string, number>;
-  
-  getSlowestComponents: (limit?: number) => ComponentMetrics[];
-  
-  getMostReRenderedComponents: (limit?: number) => ComponentMetrics[];
-  
-  reportNow: () => Promise<{success: boolean; error?: string}>;
-  
-  reset: () => void;
-}
-
-// Performance monitoring hook result
-export interface PerformanceMonitorHookResult {
-  startTiming: () => void;
-  endTiming: (metricName?: string) => void;
-  trackInteraction: (interactionName: string) => () => void;
-  measureDomSize: (element: HTMLElement) => void;
-  getPerformanceData: () => PerformanceData;
-  ref: React.MutableRefObject<HTMLElement | null>;
-}
-
-// Performance tracking options
-export interface PerformanceTrackingOptions {
-  trackRender?: boolean;
-  trackInteractions?: boolean;
-  trackDomSize?: boolean;
+/**
+ * Ensure a metric has a unique ID
+ */
+export function ensureMetricId(metricName: string, timestamp: number): string {
+  return `${metricName}_${timestamp}_${Math.random().toString(36).substring(2, 9)}`;
 }

@@ -6,52 +6,58 @@
  */
 
 // Device capability levels
-export type DeviceCapability = 'low' | 'medium' | 'high' | 'ultra';
+export type DeviceCapability = 'low' | 'medium' | 'high';
 
-// Performance modes for adaptive rendering
-export type PerformanceMode = 'quality' | 'balanced' | 'performance';
+// Performance optimization modes
+export type PerformanceMode = 'balanced' | 'performance' | 'quality';
 
-// Render frequency settings
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
-
-// Cube rendering visual themes
-export type CubeTheme = 'default' | 'quantum' | 'ethereal' | 'cosmic';
-
-// Cube size options
-export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
-
-// Glow effect intensity
-export type GlowIntensity = 'none' | 'low' | 'medium' | 'high';
-
-// Glassmorphic container variants
-export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'cosmic' | 'purple' | 'medium' | 'subtle';
-
-// Rendering engines
-export type RenderingEngine = 'canvas' | 'svg' | 'webgl' | 'auto';
-
-// Quality levels
+// Quality level settings
 export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
 
-// Resource optimization levels
+// Resource optimization level
 export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
 
-// Animation complexity
-export type AnimationComplexity = 'minimal' | 'reduced' | 'normal' | 'enhanced';
+// Rendering engine options
+export type RenderingEngine = 'canvas' | 'svg' | 'webgl' | 'auto';
+
+// Animation complexity levels
+export type AnimationComplexity = 'minimal' | 'reduced' | 'standard' | 'enhanced';
 
 // Render settings
-export type RenderSetting = 'auto' | 'fixed' | 'adaptive';
+export type RenderSetting = 'auto' | 'low' | 'medium' | 'high';
 
-// Device information
-export interface DeviceInfo {
-  userAgent: string;
-  deviceCategory: 'mobile' | 'tablet' | 'desktop';
-  screenSize: {
-    width: number;
-    height: number;
-  };
+// Glassmorphic variant
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal';
+
+// Render frequency options
+export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
+
+// Glow intensity levels
+export type GlowIntensity = 'low' | 'medium' | 'high';
+
+// Cube theme options
+export type CubeTheme = 'default' | 'quantum' | 'chakra' | 'cosmic';
+
+// Cube size options
+export type CubeSize = 'tiny' | 'small' | 'medium' | 'large' | 'xlarge';
+
+// Performance configuration interface
+export interface PerfConfig {
+  // Core settings
+  deviceCapability: DeviceCapability;
+  useManualCapability: boolean;
+  disableAnimations: boolean;
+  disableEffects: boolean;
+  
+  // Feature flags
+  enableAdaptiveRendering: boolean;
+  enableProgressiveEnhancement: boolean;
+  
+  // Resource settings
+  resourceOptimizationLevel: ResourceOptimizationLevel;
 }
 
-// Performance metrics interface for components
+// Performance metrics for components
 export interface ComponentMetrics {
   componentName: string;
   renderCount: number;
@@ -63,13 +69,13 @@ export interface ComponentMetrics {
 
 // Web vital metric
 export interface WebVitalMetric {
-  name: WebVitalName;
+  name: string;
   value: number;
   category: WebVitalCategory;
   timestamp: number;
 }
 
-// General performance metric
+// Generic performance metric
 export interface PerformanceMetric {
   metric_name: string;
   value: number;
@@ -78,89 +84,41 @@ export interface PerformanceMetric {
   type: MetricType;
 }
 
-// Performance config
-export interface PerfConfig {
-  // Device capabilities
-  deviceCapability: DeviceCapability;
-  
-  // User preferences
-  useManualCapability: boolean;
-  disableAnimations: boolean;
-  disableEffects: boolean;
-  
-  // Metrics collection settings
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  
-  // Feature flags
-  enableValidation: boolean;
-  enableRenderTracking: boolean;
-  enablePerformanceTracking: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  
-  // Optimization settings
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  
-  // Rendering settings
-  renderQuality: QualityLevel;
-  resourceOptimizationLevel: ResourceOptimizationLevel;
-  
-  // Storage
-  metricsPersistence: boolean;
+// Device information
+export interface DeviceInfo {
+  userAgent: string;
+  deviceCategory: 'mobile' | 'tablet' | 'desktop';
+  screenSize: { width: number; height: number };
 }
 
-// Metatron's cube node
-export interface MetatronsNode {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  active: boolean;
-  pulsating?: boolean;
-  glowing?: boolean;
-  color?: string;
-  secondaryColor?: string;
-  size?: number;
+// Performance monitoring options
+export interface PerformanceMonitorOptions {
+  enabled?: boolean;
+  debug?: boolean;
+  trackComponents?: boolean;
+  trackWebVitals?: boolean;
+  trackFPS?: boolean;
+  trackMemory?: boolean;
+  sampleInterval?: number;
 }
 
-// Metatron's cube connection
-export interface MetatronsConnection {
-  id: string;
-  source: string;
-  target: string;
-  active?: boolean;
-  color?: string;
-}
+// Web vital category
+export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
 
-// Core performance context type
-export interface PerformanceContextType {
-  // Core settings
-  config: PerfConfig;
-  updateConfig: (updates: Partial<PerfConfig>) => void;
-  
-  // Derived state
-  deviceCapability: DeviceCapability;
-  isLowPerformance: boolean;
-  
-  // Feature flags based on configuration
-  enableBlur: boolean;
-  enableShadows: boolean;
-  enableComplexAnimations: boolean;
-  
-  // Metrics and monitoring
-  setManualPerformanceMode?: (mode: PerformanceMode) => void;
-  trackEvent?: (name: string, value?: number) => void;
-  
-  // Configuration export
-  exportConfig: () => { success: boolean; data?: PerfConfig; error?: string };
-  
-  // Performance settings used for rendering decisions
-  features: {
-    qualityLevel: QualityLevel;
-    webVitals: Record<string, number>;
-  };
+// Web vital name
+export type WebVitalName = 'CLS' | 'FID' | 'LCP' | 'FCP' | 'TTFB' | 'INP';
+
+// Metric type
+export type MetricType = 'render' | 'interaction' | 'network' | 'resource' | 'memory' | 'custom';
+
+// Adaptive settings for performance optimization
+export interface AdaptiveSettings {
+  qualityLevel: QualityLevel;
+  particleCount: number;
+  disableBlur: boolean;
+  disableShadows: boolean;
+  simplifiedGeometry: boolean;
+  useSimplifiedEffects: boolean;
+  maxAnimatedElements: number;
+  maxRenderedElements: number;
 }
