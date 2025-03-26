@@ -1,101 +1,47 @@
 
 /**
- * Performance Core Types
+ * Performance Types
  * 
- * This module provides type definitions for performance systems.
+ * Core type definitions for the performance monitoring system
  */
 
-// Device capability type (what the device is capable of)
-export type DeviceCapability = 'low' | 'medium' | 'high' | 'ultra' | 'core';
+// Device capability levels
+export type DeviceCapability = 'low' | 'medium' | 'high' | 'ultra';
 
-// Performance mode type (how the app should perform)
-export type PerformanceMode = 'auto' | 'balanced' | 'quality' | 'performance' | 'battery-saver' | 'ultra';
+// Performance modes for adaptive rendering
+export type PerformanceMode = 'quality' | 'balanced' | 'performance';
 
-// Render frequency type
-export type RenderFrequency = 'low' | 'medium' | 'high' | 'adaptive' | 'ultra';
+// Render frequency settings
+export type RenderFrequency = 'low' | 'medium' | 'high' | 'excessive';
 
-// Quality level type
+// Cube rendering visual themes
+export type CubeTheme = 'default' | 'quantum' | 'ethereal' | 'cosmic';
+
+// Cube size options
+export type CubeSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+// Glow effect intensity
+export type GlowIntensity = 'none' | 'low' | 'medium' | 'high';
+
+// Glassmorphic container variants
+export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'cosmic' | 'purple' | 'medium' | 'subtle';
+
+// Rendering engines
+export type RenderingEngine = 'canvas' | 'svg' | 'webgl' | 'auto';
+
+// Quality levels
 export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
 
-// Resource optimization level type
+// Resource optimization levels
 export type ResourceOptimizationLevel = 'none' | 'conservative' | 'aggressive';
 
-// Render settings type
-export type RenderSetting = 'simple' | 'standard' | 'enhanced' | 'ultra';
+// Animation complexity
+export type AnimationComplexity = 'minimal' | 'reduced' | 'normal' | 'enhanced';
 
-// Animation complexity type 
-export type AnimationComplexity = 'minimal' | 'standard' | 'complex' | 'ultra';
+// Render settings
+export type RenderSetting = 'auto' | 'fixed' | 'adaptive';
 
-// Rendering engine type
-export type RenderingEngine = 'canvas' | 'svg' | 'webgl' | 'three.js' | 'css';
-
-// Glassmorphic variant type
-export type GlassmorphicVariant = 'default' | 'quantum' | 'ethereal' | 'elevated' | 'cosmic';
-
-// Glow intensity type
-export type GlowIntensity = 'low' | 'medium' | 'high';
-
-// Cube theme type
-export type CubeTheme = 'light' | 'dark' | 'quantum' | 'ethereal' | 'cosmic';
-
-// Cube size type
-export type CubeSize = 'small' | 'medium' | 'large';
-
-// Web vital category type
-export type WebVitalCategory = 'loading' | 'interaction' | 'visual_stability';
-
-// Metric type
-export type MetricType = 'render' | 'interaction' | 'load';
-
-// Performance config type
-export interface PerfConfig {
-  deviceCapability: DeviceCapability;
-  useManualCapability: boolean;
-  disableAnimations: boolean;
-  disableEffects: boolean;
-  samplingRate: number;
-  throttleInterval: number;
-  maxTrackedComponents: number;
-  resourceOptimizationLevel: ResourceOptimizationLevel;
-  enableValidation: boolean;
-  enableRenderTracking: boolean;
-  enablePerformanceTracking: boolean;
-  enablePropTracking: boolean;
-  enableDebugLogging: boolean;
-  intelligentProfiling: boolean;
-  inactiveTabThrottling: boolean;
-  batchUpdates: boolean;
-  metricsPersistence: boolean;
-}
-
-// Performance metric type
-export interface PerformanceMetric {
-  metric_name: string;
-  value: number;
-  timestamp: number;
-  category: string;
-  type: MetricType;
-}
-
-// Web vital metric type
-export interface WebVitalMetric {
-  name: string;
-  value: number;
-  category: WebVitalCategory;
-  timestamp: number;
-}
-
-// Component metrics type
-export interface ComponentMetrics {
-  componentName: string;
-  renderCount: number;
-  totalRenderTime: number;
-  averageRenderTime: number;
-  lastRenderTime: number;
-  reRenderCount: number;
-}
-
-// Device info type
+// Device information
 export interface DeviceInfo {
   userAgent: string;
   deviceCategory: 'mobile' | 'tablet' | 'desktop';
@@ -105,12 +51,116 @@ export interface DeviceInfo {
   };
 }
 
-// Performance data type
-export interface PerformanceData {
-  metrics: Record<string, ComponentMetrics>;
-  webVitals: Record<string, number>;
-  deviceInfo: DeviceInfo;
-  fps: number;
-  memoryUsage?: number;
+// Performance metrics interface for components
+export interface ComponentMetrics {
+  componentName: string;
+  renderCount: number;
+  totalRenderTime: number;
+  averageRenderTime: number;
+  lastRenderTime: number;
+  reRenderCount: number;
+}
+
+// Web vital metric
+export interface WebVitalMetric {
+  name: WebVitalName;
+  value: number;
+  category: WebVitalCategory;
   timestamp: number;
+}
+
+// General performance metric
+export interface PerformanceMetric {
+  metric_name: string;
+  value: number;
+  timestamp: number;
+  category: string;
+  type: MetricType;
+}
+
+// Performance config
+export interface PerfConfig {
+  // Device capabilities
+  deviceCapability: DeviceCapability;
+  
+  // User preferences
+  useManualCapability: boolean;
+  disableAnimations: boolean;
+  disableEffects: boolean;
+  
+  // Metrics collection settings
+  samplingRate: number;
+  throttleInterval: number;
+  maxTrackedComponents: number;
+  
+  // Feature flags
+  enableValidation: boolean;
+  enableRenderTracking: boolean;
+  enablePerformanceTracking: boolean;
+  enablePropTracking: boolean;
+  enableDebugLogging: boolean;
+  
+  // Optimization settings
+  intelligentProfiling: boolean;
+  inactiveTabThrottling: boolean;
+  batchUpdates: boolean;
+  
+  // Rendering settings
+  renderQuality: QualityLevel;
+  resourceOptimizationLevel: ResourceOptimizationLevel;
+  
+  // Storage
+  metricsPersistence: boolean;
+}
+
+// Metatron's cube node
+export interface MetatronsNode {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  active: boolean;
+  pulsating?: boolean;
+  glowing?: boolean;
+  color?: string;
+  secondaryColor?: string;
+  size?: number;
+}
+
+// Metatron's cube connection
+export interface MetatronsConnection {
+  id: string;
+  source: string;
+  target: string;
+  active?: boolean;
+  color?: string;
+}
+
+// Core performance context type
+export interface PerformanceContextType {
+  // Core settings
+  config: PerfConfig;
+  updateConfig: (updates: Partial<PerfConfig>) => void;
+  
+  // Derived state
+  deviceCapability: DeviceCapability;
+  isLowPerformance: boolean;
+  
+  // Feature flags based on configuration
+  enableBlur: boolean;
+  enableShadows: boolean;
+  enableComplexAnimations: boolean;
+  
+  // Metrics and monitoring
+  setManualPerformanceMode?: (mode: PerformanceMode) => void;
+  trackEvent?: (name: string, value?: number) => void;
+  
+  // Configuration export
+  exportConfig: () => { success: boolean; data?: PerfConfig; error?: string };
+  
+  // Performance settings used for rendering decisions
+  features: {
+    qualityLevel: QualityLevel;
+    webVitals: Record<string, number>;
+  };
 }

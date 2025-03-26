@@ -1,11 +1,15 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import ErrorFallback from './ErrorFallback';
+import { ValidationError } from '@/utils/validation/ValidationError';
+import { ErrorSeverities } from '@/types/core/validation';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
   componentName?: string;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  showDetails?: boolean;
 }
 
 interface State {
@@ -34,9 +38,23 @@ class ErrorBoundary extends Component<Props, State> {
     // Log the error to console
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
+    // Add severity and category for better error handling
+    const enhancedError = error as Error & { 
+      severity?: string;
+      category?: string;
+    };
+    
+    if (!enhancedError.severity) {
+      enhancedError.severity = ErrorSeverities.ERROR;
+    }
+    
+    if (!enhancedError.category) {
+      enhancedError.category = 'ui';
+    }
+    
     // Call custom error handler if provided
     if (this.props.onError) {
-      this.props.onError(error, errorInfo);
+      this.props.onError(enhancedError, errorInfo);
     }
   }
 
@@ -45,30 +63,39 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   render() {
-    if (this.state.hasError) {
+    const { hasError, error } = this.state;
+    const { fallback, children, componentName, showDetails } = this.props;
+    
+    if (hasError) {
       // Render custom fallback UI if provided
-      if (this.props.fallback) {
-        return this.props.fallback;
+      if (fallback) {
+        return fallback;
       }
       
+      // If the error is a ValidationError, show a specialized message
+      if (ValidationError.isValidationError(error)) {
+        return (
+          <ErrorFallback 
+            error={error} 
+            resetErrorBoundary={this.resetError}
+            componentName={componentName}
+            showDetails={showDetails}
+          />
+        );
+      }
+      
+      // Default error fallback
       return (
-        <div className="flex flex-col items-center justify-center p-6 rounded-lg bg-black/20 backdrop-blur-md">
-          <h2 className="text-xl text-white mb-2">
-            An error occurred
-            {this.props.componentName && <span className="text-sm text-white/70"> in {this.props.componentName}</span>}
-          </h2>
-          {this.state.error && <p className="text-red-300 mb-4">{this.state.error.message}</p>}
-          <button 
-            onClick={this.resetError}
-            className="px-4 py-2 bg-primary text-white rounded-md"
-          >
-            Try Again
-          </button>
-        </div>
+        <ErrorFallback 
+          error={error!}
+          resetErrorBoundary={this.resetError}
+          componentName={componentName}
+          showDetails={showDetails}
+        />
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }
 

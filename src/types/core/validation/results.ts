@@ -1,73 +1,93 @@
 
 /**
- * Validation Result Types
+ * Validation Results
  * 
- * This module provides standardized types for representing validation results.
+ * Standard response types for validation operations
  */
-import { ValidationErrorDetail } from './types';
+
+import { ValidationResult, ValidationErrorDetail } from './types';
+import { ValidationError } from '@/utils/validation/ValidationError';
 
 /**
- * Result of a validation operation.
- * Contains information about whether validation succeeded, the validated value,
- * and any validation errors that occurred.
+ * Creates a success validation result
  */
-export interface ValidationResult<T> {
-  /** Whether validation succeeded */
-  isValid: boolean;
-  
-  /** The validated value if validation succeeded */
-  value?: T;
-  
-  /** Any validation errors that occurred */
-  errors?: ValidationErrorDetail[];
-}
-
-/**
- * Create a successful validation result
- */
-export function createSuccessResult<T>(value: T): ValidationResult<T> {
+export function success<T>(value: T): ValidationResult<T> {
   return {
     isValid: true,
-    value
+    value,
+    validatedData: value,
+    errors: []
   };
 }
 
 /**
- * Create a failed validation result
+ * Creates a failure validation result
  */
-export function createErrorResult<T>(errors: ValidationErrorDetail | ValidationErrorDetail[]): ValidationResult<T> {
+export function failure<T>(errors: string[] | ValidationErrorDetail[]): ValidationResult<T> {
   return {
     isValid: false,
-    errors: Array.isArray(errors) ? errors : [errors]
+    errors
   };
 }
 
 /**
- * Create a validation result based on a condition
+ * Converts a ValidationError to a ValidationResult
  */
-export function createConditionalResult<T>(
-  condition: boolean, 
-  value: T, 
-  error: ValidationErrorDetail
-): ValidationResult<T> {
-  return condition
-    ? createSuccessResult(value)
-    : createErrorResult<T>(error);
+export function fromValidationError<T>(error: ValidationError): ValidationResult<T> {
+  return {
+    isValid: false,
+    errors: error.details || [error.message]
+  };
 }
 
-export class ValidationError extends Error {
-  path: string;
-  code: string;
-  details?: string;
-  
-  constructor(message: string, path: string, code: string, details?: string) {
-    super(message);
-    this.name = 'ValidationError';
-    this.path = path;
-    this.code = code;
-    this.details = details;
-    
-    // Required for extending Error in TypeScript
-    Object.setPrototypeOf(this, ValidationError.prototype);
+/**
+ * Converts any error to a ValidationResult
+ */
+export function fromError<T>(error: unknown): ValidationResult<T> {
+  if (error instanceof ValidationError) {
+    return fromValidationError(error);
   }
+  
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    isValid: false,
+    errors: [message]
+  };
+}
+
+/**
+ * Safely unwraps a validation result, returning the value or throwing error
+ */
+export function unwrap<T>(result: ValidationResult<T>): T {
+  if (!result.isValid) {
+    const message = Array.isArray(result.errors) 
+      ? result.errors.map(e => typeof e === 'string' ? e : e.message).join(', ')
+      : 'Validation failed';
+    throw new ValidationError(message);
+  }
+  return result.value!;
+}
+
+/**
+ * Safely unwraps a validation result with a default value if invalid
+ */
+export function unwrapOr<T>(result: ValidationResult<T>, defaultValue: T): T {
+  return result.isValid ? result.value! : defaultValue;
+}
+
+/**
+ * Creates a simple validator function
+ */
+export function createValidator<T>(
+  validate: (value: unknown) => boolean,
+  errorMessage: string | ((value: unknown) => string)
+): (value: unknown) => ValidationResult<T> {
+  return (value: unknown): ValidationResult<T> => {
+    if (validate(value)) {
+      return success(value as T);
+    } else {
+      const message = typeof errorMessage === 'function' ? errorMessage(value) : errorMessage;
+      return failure([message]);
+    }
+  };
 }

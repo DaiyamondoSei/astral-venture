@@ -1,75 +1,105 @@
 
 /**
- * Performance Metrics Types
+ * Performance Metrics
  * 
- * This module provides types for performance metrics and monitoring.
+ * Types for performance metrics collection and processing
  */
 
-import { MetricType, WebVitalCategory, WebVitalName } from './types';
+import { 
+  WebVitalName,
+  WebVitalCategory,
+  MetricType,
+  ComponentMetrics,
+  WebVitalMetric,
+  PerformanceMetric
+} from './types';
 
-// Component render metrics
-export interface RenderMetrics {
-  componentName: string;
-  renderTime: number;
-  renderCount: number;
-  timeToFirstRender?: number;
-  reRenderCount?: number;
-  lastUpdate: number;
+// Metric collection options
+export interface MetricsCollectionOptions {
+  enabled: boolean;
+  samplingRate: number;
+  maxItems: number;
+  throttleInterval: number;
+  persistData: boolean;
 }
 
-// Performance summary metrics
-export interface PerformanceSummary {
-  averageFPS: number;
-  memoryUsage: number;
-  cpuUsage?: number;
-  totalComponentsRendered: number;
-  averageRenderTime: number;
-  slowRenders: number;
+// Performance data collected by monitoring
+export interface PerformanceData {
+  metrics: PerformanceMetric[];
+  webVitals: Record<WebVitalName, number>;
+  components: Record<string, ComponentMetrics>;
+  fps: number[];
+  memory: number[];
+  pageLoads: number[];
+  interactions: Record<string, { count: number; avgTime: number }>;
   timestamp: number;
-  windowSize: { width: number; height: number };
 }
 
-// Device information for metrics context
-export interface DeviceInfo {
-  userAgent: string;
-  deviceCategory: 'mobile' | 'tablet' | 'desktop';
-  screenSize: {
-    width: number;
-    height: number;
-  };
-  connection?: {
-    type?: string;
-    speed?: number;
-  };
+// Web vital report from web-vitals library
+export interface WebVitalReport {
+  name: string;
+  id: string;
+  value: number;
+  delta: number;
+  entries: PerformanceEntry[];
 }
 
-// Type guards for metrics
-export function isValidMetricType(type: string): type is MetricType {
-  return ['render', 'interaction', 'load', 'memory', 'network', 'resource', 
-          'javascript', 'css', 'animation', 'metric', 'summary', 
-          'performance', 'webVital'].includes(type);
+// Performance monitor options
+export interface PerformanceMonitorOptions {
+  enabled?: boolean;
+  debug?: boolean;
+  trackComponents?: boolean;
+  trackWebVitals?: boolean;
+  trackFPS?: boolean;
+  trackMemory?: boolean;
+  sampleInterval?: number;
 }
 
-export function isValidWebVitalName(name: string): name is WebVitalName {
-  return ['CLS', 'FCP', 'LCP', 'TTFB', 'FID', 'INP'].includes(name);
+// Component metric with timestamp
+export interface TimestampedComponentMetric extends ComponentMetrics {
+  timestamp: number;
 }
 
-export function isValidWebVitalCategory(category: string): category is WebVitalCategory {
-  return ['loading', 'interaction', 'visual_stability'].includes(category);
-}
-
-export function isComponentMetrics(metrics: unknown): metrics is ComponentMetrics {
-  if (!metrics || typeof metrics !== 'object') return false;
+// Performance metrics service interface
+export interface MetricsCollector {
+  trackComponentMetric: (
+    componentName: string, 
+    renderTime: number, 
+    type?: 'render' | 'interaction' | 'load'
+  ) => void;
   
-  const m = metrics as Partial<ComponentMetrics>;
-  return (
-    typeof m.componentName === 'string' &&
-    typeof m.renderCount === 'number' &&
-    typeof m.averageRenderTime === 'number'
-  );
+  addWebVital: (
+    name: string, 
+    value: number, 
+    category: WebVitalCategory
+  ) => void;
+  
+  getAllMetrics: () => Record<string, ComponentMetrics>;
+  
+  getWebVitals: () => Record<string, number>;
+  
+  getSlowestComponents: (limit?: number) => ComponentMetrics[];
+  
+  getMostReRenderedComponents: (limit?: number) => ComponentMetrics[];
+  
+  reportNow: () => Promise<{success: boolean; error?: string}>;
+  
+  reset: () => void;
 }
 
-// Helper function to create an ID for metrics
-export function ensureMetricId(metric: { metric_name: string; timestamp?: number }): string {
-  return `${metric.metric_name}-${metric.timestamp || Date.now()}`;
+// Performance monitoring hook result
+export interface PerformanceMonitorHookResult {
+  startTiming: () => void;
+  endTiming: (metricName?: string) => void;
+  trackInteraction: (interactionName: string) => () => void;
+  measureDomSize: (element: HTMLElement) => void;
+  getPerformanceData: () => PerformanceData;
+  ref: React.MutableRefObject<HTMLElement | null>;
+}
+
+// Performance tracking options
+export interface PerformanceTrackingOptions {
+  trackRender?: boolean;
+  trackInteractions?: boolean;
+  trackDomSize?: boolean;
 }

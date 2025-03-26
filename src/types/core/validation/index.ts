@@ -1,105 +1,76 @@
 
 /**
- * Validation Types and Constants Index
+ * Core Validation System
  * 
- * This file serves as the central export point for all validation-related
- * types and their corresponding runtime constants.
- * 
- * @version 1.0.0
+ * Re-exports all validation-related types, constants, and utilities
  */
 
-// Export all types
+// Export main type definitions
 export * from './types';
 
-// Export all runtime constants
+// Export constants
 export * from './constants';
 
-// Export additional utility types
+// Export result utilities
 export * from './results';
 
-// Type guards for validation types
-export const isValidationErrorDetail = (value: unknown): value is ValidationErrorDetail => {
-  if (!value || typeof value !== 'object') return false;
-  
-  const detail = value as Partial<ValidationErrorDetail>;
-  return (
-    typeof detail.path === 'string' &&
-    typeof detail.message === 'string' &&
-    typeof detail.code === 'string' &&
-    typeof detail.severity === 'string'
-  );
-};
+// Following the Type-Value pattern, create type guards for runtime values
 
-export const isValidationResult = <T = unknown>(value: unknown): value is ValidationResult<T> => {
-  if (!value || typeof value !== 'object') return false;
-  
-  const result = value as Partial<ValidationResult<T>>;
-  return (
-    typeof result.isValid === 'boolean' &&
-    Array.isArray(result.errors)
-  );
-};
-
-// Helper functions for creating validation results
-export function createValidSuccess<T>(value: T): ValidationResult<T> {
-  return {
-    isValid: true,
-    errors: [],
-    value,
-    validatedData: value
-  };
+/**
+ * Type guard for ValidationSeverity
+ */
+export function isValidationSeverity(value: unknown): value is ValidationSeverity {
+  return typeof value === 'string' && 
+    Object.values(ErrorSeverities).includes(value as any);
 }
 
-export function createValidError<T>(code: ValidationErrorCode, message: string, path: string): ValidationResult<T> {
-  return {
-    isValid: false,
-    errors: [{
-      code,
-      message,
-      path,
-      severity: 'error'
-    }],
-    value: undefined,
-    validatedData: undefined
-  };
+/**
+ * Type guard for ValidationErrorCode
+ */
+export function isValidationErrorCode(value: unknown): value is ValidationErrorCode {
+  return typeof value === 'string' && 
+    Object.values(ValidationErrorCodes).includes(value as any);
 }
 
-export function createValidErrors<T>(errors: ValidationErrorDetail[]): ValidationResult<T> {
-  return {
-    isValid: false,
-    errors,
-    value: undefined,
-    validatedData: undefined
-  };
+/**
+ * Type guard for ValidationErrorDetail
+ */
+export function isValidationErrorDetail(value: unknown): value is ValidationErrorDetail {
+  return typeof value === 'object' && 
+    value !== null && 
+    'path' in value && 
+    'message' in value;
 }
 
-// Exported validation error class
-export class ValidationError extends Error {
-  code: ValidationErrorCode;
-  path: string;
-  severity: ErrorSeverity;
-  metadata?: Record<string, unknown>;
-  
-  constructor(message: string, code: ValidationErrorCode, path: string, severity: ErrorSeverity = 'error') {
-    super(message);
-    this.name = 'ValidationError';
-    this.code = code;
-    this.path = path;
-    this.severity = severity;
-  }
-  
-  static fromErrorDetail(detail: ValidationErrorDetail): ValidationError {
-    const error = new ValidationError(
-      detail.message,
-      detail.code,
-      detail.path,
-      detail.severity
-    );
-    
-    if (detail.metadata) {
-      error.metadata = detail.metadata;
-    }
-    
-    return error;
-  }
+/**
+ * Type guard for ValidationResult
+ */
+export function isValidationResult<T>(value: unknown): value is ValidationResult<T> {
+  return typeof value === 'object' && 
+    value !== null && 
+    'isValid' in value;
+}
+
+/**
+ * Type guard for MetricType
+ */
+export function isMetricType(value: unknown): value is MetricType {
+  return typeof value === 'string' && 
+    Object.values(MetricTypes).includes(value as any);
+}
+
+/**
+ * Type guard for WebVitalCategory
+ */
+export function isWebVitalCategory(value: unknown): value is WebVitalCategory {
+  return typeof value === 'string' && 
+    Object.values(WebVitalCategories).includes(value as any);
+}
+
+/**
+ * Type guard for WebVitalName
+ */
+export function isWebVitalName(value: unknown): value is WebVitalName {
+  return typeof value === 'string' && 
+    Object.values(WebVitalNames).includes(value as any);
 }
