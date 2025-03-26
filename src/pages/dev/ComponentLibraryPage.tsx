@@ -1,42 +1,50 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 
 /**
- * Component Library Demo Page
+ * Component Library Page
  * 
- * This page showcases various UI components available in the application
- * for development and testing purposes.
+ * A showcase of available UI components for developers.
  */
 const ComponentLibraryPage: React.FC = () => {
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6 text-center text-primary">Component Library</h1>
+    <div className="container mx-auto p-4 max-w-5xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Component Library</h1>
+        <p className="text-gray-500 dark:text-gray-400">
+          A showcase of available UI components for development
+        </p>
+      </div>
       
-      <Tabs defaultValue="buttons" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-8">
+      <Tabs defaultValue="buttons" className="mb-8">
+        <TabsList className="mb-4">
           <TabsTrigger value="buttons">Buttons</TabsTrigger>
           <TabsTrigger value="inputs">Inputs</TabsTrigger>
           <TabsTrigger value="cards">Cards</TabsTrigger>
-          <TabsTrigger value="specialized">Specialized</TabsTrigger>
+          <TabsTrigger value="data">Data Display</TabsTrigger>
         </TabsList>
         
+        {/* Buttons Section */}
         <TabsContent value="buttons" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Button Variants</CardTitle>
-              <CardDescription>
-                Different button styles and variants available in the application
-              </CardDescription>
+              <CardTitle>Buttons</CardTitle>
+              <CardDescription>Button components in different variants and sizes.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <div className="flex flex-wrap gap-4">
-                <Button variant="default">Default</Button>
+                <Button>Default</Button>
                 <Button variant="destructive">Destructive</Button>
                 <Button variant="outline">Outline</Button>
                 <Button variant="secondary">Secondary</Button>
@@ -44,95 +52,124 @@ const ComponentLibraryPage: React.FC = () => {
                 <Button variant="link">Link</Button>
               </div>
               
-              <div className="mt-6">
-                <h3 className="text-lg font-medium mb-2">Button Sizes</h3>
-                <div className="flex flex-wrap items-center gap-4">
-                  <Button size="sm">Small</Button>
-                  <Button size="default">Default</Button>
-                  <Button size="lg">Large</Button>
-                </div>
+              <Separator />
+              
+              <div className="flex flex-wrap gap-4 items-center">
+                <Button size="sm">Small</Button>
+                <Button>Default</Button>
+                <Button size="lg">Large</Button>
+                <Button disabled>Disabled</Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
         
+        {/* Inputs Section */}
         <TabsContent value="inputs" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Form Inputs</CardTitle>
-              <CardDescription>
-                Various input components for forms
-              </CardDescription>
+              <CardTitle>Form Controls</CardTitle>
+              <CardDescription>Input, checkbox, switch, and slider components.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input type="email" id="email" placeholder="Email" />
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" placeholder="Your email address" />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" type="password" placeholder="Your password" />
+                </div>
               </div>
               
-              <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input type="password" id="password" placeholder="Password" />
-              </div>
+              <Separator />
               
-              <div className="flex items-center space-x-2">
-                <Checkbox id="terms" />
-                <Label htmlFor="terms">Accept terms and conditions</Label>
+              <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="terms" />
+                    <Label htmlFor="terms">Accept terms and conditions</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch id="notifications" />
+                    <Label htmlFor="notifications">Enable notifications</Label>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <Label>Volume Level</Label>
+                  <Slider defaultValue={[50]} max={100} step={1} />
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="cards" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Card</CardTitle>
-                <CardDescription>A simple card component with title and description</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Card content goes here. This is a basic example of a card component.</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Interactive Card</CardTitle>
-                <CardDescription>Card with interactive elements</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p>Cards can contain any content, including buttons and other interactive elements.</p>
-                <Button>Action Button</Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="specialized" className="space-y-6">
+        {/* Cards Section */}
+        <TabsContent value="cards" className="grid gap-6 grid-cols-1 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Specialized Components</CardTitle>
-              <CardDescription>
-                Application-specific components for various features
-              </CardDescription>
+              <CardTitle>Basic Card</CardTitle>
+              <CardDescription>A simple card with header and content.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Energy Visualization</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Components for visualizing energy and chakra systems</p>
+              <p>This is a basic card component that can be used to group related content.</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Interactive Card</CardTitle>
+              <CardDescription>A card with interactive elements.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>This card includes a button in the footer for actions.</p>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline">Cancel</Button>
+              <Button>Submit</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        {/* Data Display Section */}
+        <TabsContent value="data" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Display Components</CardTitle>
+              <CardDescription>Badges, avatars, and other data display components.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium">Badges</h3>
+                <div className="flex flex-wrap gap-2">
+                  <Badge>Default</Badge>
+                  <Badge variant="secondary">Secondary</Badge>
+                  <Badge variant="destructive">Destructive</Badge>
+                  <Badge variant="outline">Outline</Badge>
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Meditation Tools</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Components for meditation practice and tracking</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Consciousness Metrics</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Components for displaying and tracking consciousness growth</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Reflection Journal</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Components for journaling and reflection</p>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium">Avatars</h3>
+                <div className="flex flex-wrap gap-4">
+                  <Avatar>
+                    <AvatarImage src="https://github.com/shadcn.png" alt="User" />
+                    <AvatarFallback>CN</AvatarFallback>
+                  </Avatar>
+                  
+                  <Avatar>
+                    <AvatarFallback>JD</AvatarFallback>
+                  </Avatar>
+                  
+                  <Avatar>
+                    <AvatarFallback>👤</AvatarFallback>
+                  </Avatar>
                 </div>
               </div>
             </CardContent>

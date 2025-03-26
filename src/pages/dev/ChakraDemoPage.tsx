@@ -1,77 +1,102 @@
 
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import ChakraVisualization from '@/features/chakra-system/components/ChakraVisualization';
+import { ChakraType } from '@/features/chakra-system/types/chakraTypes';
 
 /**
- * Chakra System Demo Page
- * 
- * This page demonstrates various chakra system components and visualizations
- * for development and testing purposes.
+ * A demo page to showcase the chakra system visualization
  */
 const ChakraDemoPage: React.FC = () => {
+  const [energyLevel, setEnergyLevel] = useState(50);
+  const [activatedChakras, setActivatedChakras] = useState<ChakraType[]>(['heart', 'throat']);
+
+  // All chakra types
+  const allChakras: ChakraType[] = [
+    'crown', 'third-eye', 'throat', 'heart', 'solar', 'sacral', 'root'
+  ];
+  
+  // Toggle a chakra's activation
+  const toggleChakra = (chakra: ChakraType) => {
+    if (activatedChakras.includes(chakra)) {
+      setActivatedChakras(activatedChakras.filter(c => c !== chakra));
+    } else {
+      setActivatedChakras([...activatedChakras, chakra]);
+    }
+  };
+
+  // Reset all chakras
+  const resetChakras = () => {
+    setActivatedChakras([]);
+    setEnergyLevel(0);
+  };
+
+  // Activate all chakras
+  const activateAllChakras = () => {
+    setActivatedChakras([...allChakras]);
+    setEnergyLevel(100);
+  };
+
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6 text-center text-primary">Chakra System Demo</h1>
+    <div className="container mx-auto p-4 max-w-4xl">
+      <h1 className="text-2xl font-bold mb-6">Chakra System Demo</h1>
       
-      <Tabs defaultValue="visualization" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="visualization">Visualization</TabsTrigger>
-          <TabsTrigger value="activation">Activation</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Chakra Visualization */}
+        <ChakraVisualization 
+          activatedChakras={activatedChakras} 
+          energyLevel={energyLevel} 
+        />
         
-        <TabsContent value="visualization" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Chakra System Visualization</CardTitle>
-              <CardDescription>
-                Visual representation of the chakra system with interactive elements
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-              <div className="h-[400px] w-full flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-950 rounded-lg">
-                <p className="text-center text-gray-400">Chakra visualization will appear here</p>
-                {/* Chakra visualization component would be placed here */}
+        {/* Controls */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Controls</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Energy Level Slider */}
+            <div className="space-y-2">
+              <h3 className="text-lg font-medium">Energy Level: {energyLevel}%</h3>
+              <Slider 
+                value={[energyLevel]} 
+                min={0} 
+                max={100} 
+                step={1}
+                onValueChange={(value) => setEnergyLevel(value[0])}
+              />
+            </div>
+            
+            {/* Chakra Activation Buttons */}
+            <div className="space-y-2">
+              <h3 className="text-lg font-medium">Activate Chakras</h3>
+              <div className="flex flex-wrap gap-2">
+                {allChakras.map(chakra => (
+                  <Button 
+                    key={chakra}
+                    variant={activatedChakras.includes(chakra) ? "default" : "outline"}
+                    onClick={() => toggleChakra(chakra)}
+                    className="capitalize"
+                  >
+                    {chakra}
+                  </Button>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="activation" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Chakra Activation Controls</CardTitle>
-              <CardDescription>
-                Test different chakra activation patterns and states
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <p className="text-center text-gray-500 dark:text-gray-400">Chakra activation controls will appear here</p>
-                {/* Chakra activation component would be placed here */}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="insights" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Chakra System Insights</CardTitle>
-              <CardDescription>
-                Analysis and insights based on chakra system data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <p className="text-center text-gray-500 dark:text-gray-400">Chakra insights will appear here</p>
-                {/* Chakra insights component would be placed here */}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4">
+              <Button onClick={activateAllChakras} className="flex-1">
+                Activate All
+              </Button>
+              <Button onClick={resetChakras} variant="outline" className="flex-1">
+                Reset All
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

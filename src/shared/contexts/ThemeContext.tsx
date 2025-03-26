@@ -1,41 +1,49 @@
 
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 
-type Theme = 'light' | 'dark' | 'system';
+// Type definitions
+export type Theme = 'light' | 'dark' | 'system';
+
 type ThemeContextType = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
 };
 
+// Create context with a default undefined value
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Props for ThemeProvider component
 interface ThemeProviderProps {
   children: ReactNode;
   defaultTheme?: Theme;
 }
 
+// ThemeProvider component
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ 
   children, 
   defaultTheme = 'system' 
 }) => {
+  // Initialize theme state from localStorage if available
   const [theme, setTheme] = useState<Theme>(() => {
-    // Check if theme is stored in localStorage
-    const savedTheme = typeof window !== 'undefined' 
-      ? localStorage.getItem('theme') as Theme 
-      : null;
+    if (typeof window === 'undefined') return defaultTheme;
     
-    return savedTheme || defaultTheme;
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+      return savedTheme;
+    }
+    
+    return defaultTheme;
   });
 
+  // Function to update theme and save to localStorage
   const updateTheme = (newTheme: Theme) => {
     setTheme(newTheme);
     
-    // Save to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('theme', newTheme);
     }
     
-    // Update document classes
+    // Update document classes for theme
     if (newTheme === 'dark' || (newTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
@@ -43,13 +51,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     }
   };
 
-  // Initialize theme on mount
-  React.useEffect(() => {
+  // Initialize theme on mount and listen for system theme changes
+  useEffect(() => {
     updateTheme(theme);
     
-    // Listen for system theme changes
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      
       const handleChange = () => {
         if (theme === 'system') {
           updateTheme('system');
@@ -61,6 +69,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     }
   }, [theme]);
 
+  // Provide theme context to children
   return (
     <ThemeContext.Provider value={{ theme, setTheme: updateTheme }}>
       {children}
@@ -68,6 +77,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   );
 };
 
+// Custom hook to use the theme context
 export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
   if (context === undefined) {

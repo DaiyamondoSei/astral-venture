@@ -14,15 +14,12 @@ import ComponentLibraryPage from '@/pages/dev/ComponentLibraryPage';
  */
 const DevRoutes = () => {
   return (
-    <>
-      {/* Development tools */}
-      <Route path="/dev" element={<MainLayout />}>
-        <Route path="components" element={<ComponentLibraryPage />} />
-        <Route path="chakra-demo" element={<ChakraDemoPage />} />
-        <Route path="meditation-demo" element={<MeditationDemoPage />} />
-        <Route path="performance" element={<PerformanceDemoPage />} />
-      </Route>
-    </>
+    <Route path="/dev" element={<MainLayout />}>
+      <Route path="components" element={<ComponentLibraryPage />} />
+      <Route path="chakra-demo" element={<ChakraDemoPage />} />
+      <Route path="meditation-demo" element={<MeditationDemoPage />} />
+      <Route path="performance" element={<PerformanceDemoPage />} />
+    </Route>
   );
 };
 

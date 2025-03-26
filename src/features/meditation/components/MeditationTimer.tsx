@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface MeditationTimerProps {
   initialDuration?: number; // in minutes
@@ -12,9 +12,9 @@ interface MeditationTimerProps {
 }
 
 /**
- * MeditationTimer Component
+ * Simplified MeditationTimer Component
  * 
- * A meditation timer with controls for duration and playback.
+ * A basic meditation timer with minimal controls for duration and playback.
  */
 const MeditationTimer: React.FC<MeditationTimerProps> = ({
   initialDuration = 5,
@@ -43,7 +43,7 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
     } else if (isRunning && timeRemaining === 0) {
       setIsRunning(false);
       setIsComplete(true);
-      onComplete?.();
+      if (onComplete) onComplete();
     }
 
     return () => {
@@ -59,15 +59,15 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
       setTimeRemaining(duration * 60);
       setIsComplete(false);
       setIsRunning(true);
-      onStart?.();
+      if (onStart) onStart();
     } else if (isRunning) {
       // Pause timer
       setIsRunning(false);
-      onPause?.();
+      if (onPause) onPause();
     } else {
       // Start or resume timer
       setIsRunning(true);
-      onStart?.();
+      if (onStart) onStart();
     }
   };
 
@@ -82,7 +82,6 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Meditation Timer</CardTitle>
-        <CardDescription>Set your meditation duration and press start</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex flex-col space-y-2">
@@ -90,7 +89,7 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
           <Slider
             value={[duration]}
             min={1}
-            max={60}
+            max={30}
             step={1}
             onValueChange={(value) => {
               if (!isRunning) {
@@ -98,18 +97,13 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
               }
             }}
             disabled={isRunning}
-            className="w-full"
           />
         </div>
 
         <div className="flex items-center justify-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
           <div className="text-center">
             <div className="text-4xl font-bold mb-4">{formatTime(timeRemaining)}</div>
-            <Button
-              size="lg"
-              variant={isComplete ? "default" : isRunning ? "destructive" : "default"}
-              onClick={toggleTimer}
-            >
+            <Button onClick={toggleTimer}>
               {isComplete ? 'Restart' : isRunning ? 'Pause' : 'Start'}
             </Button>
           </div>

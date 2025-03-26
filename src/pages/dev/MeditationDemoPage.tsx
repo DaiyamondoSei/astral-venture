@@ -1,117 +1,98 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import MeditationTimer from '@/features/meditation/components/MeditationTimer';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 
 /**
- * Meditation Demo Page
- * 
- * This page demonstrates various meditation components and features
- * for development and testing purposes.
+ * A demo page to showcase the meditation timer functionality
  */
 const MeditationDemoPage: React.FC = () => {
-  const [duration, setDuration] = useState(5);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [completedSessions, setCompletedSessions] = useState(0);
+  
+  // Log events
+  const addLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs(prev => [`[${timestamp}] ${message}`, ...prev].slice(0, 10));
+  };
+  
+  // Handle meditation session complete
+  const handleSessionComplete = () => {
+    addLog('Meditation session completed');
+    setCompletedSessions(prev => prev + 1);
+  };
+  
+  // Handle session start
+  const handleSessionStart = () => {
+    addLog('Meditation session started');
+  };
+  
+  // Handle session pause
+  const handleSessionPause = () => {
+    addLog('Meditation session paused');
+  };
   
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6 text-center text-primary">Meditation Demo</h1>
+    <div className="container mx-auto p-4 max-w-4xl">
+      <h1 className="text-2xl font-bold mb-6">Meditation Demo</h1>
       
-      <Tabs defaultValue="timer" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="timer">Meditation Timer</TabsTrigger>
-          <TabsTrigger value="breathing">Breathing Patterns</TabsTrigger>
-          <TabsTrigger value="techniques">Techniques</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Meditation Timer */}
+        <div>
+          <MeditationTimer 
+            initialDuration={5}
+            onComplete={handleSessionComplete}
+            onStart={handleSessionStart}
+            onPause={handleSessionPause}
+          />
+        </div>
         
-        <TabsContent value="timer" className="space-y-6">
+        {/* Session Stats & Logs */}
+        <div className="space-y-6">
+          {/* Stats Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Meditation Timer</CardTitle>
-              <CardDescription>
-                Test the meditation timer component with different durations and settings
-              </CardDescription>
+              <CardTitle>Meditation Stats</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                <div className="flex flex-col space-y-2">
-                  <label className="text-sm font-medium">Duration: {duration} minutes</label>
-                  <Slider 
-                    value={[duration]} 
-                    min={1} 
-                    max={60} 
-                    step={1}
-                    onValueChange={(value) => setDuration(value[0])}
-                    className="w-full"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold">{completedSessions}</div>
+                  <div className="text-sm text-gray-500">Completed Sessions</div>
                 </div>
-                
-                <div className="flex items-center justify-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold mb-4">{duration}:00</div>
-                    <Button 
-                      size="lg"
-                      onClick={() => setIsPlaying(!isPlaying)}
-                    >
-                      {isPlaying ? 'Pause' : 'Start Meditation'}
-                    </Button>
-                  </div>
+                <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold">{completedSessions * 5}</div>
+                  <div className="text-sm text-gray-500">Total Minutes</div>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="breathing" className="space-y-6">
+          
+          {/* Logs Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Breathing Patterns</CardTitle>
-              <CardDescription>
-                Test different breathing pattern visualizations
-              </CardDescription>
+              <CardTitle>Activity Log</CardTitle>
+              <CardDescription>Recent meditation activity</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <p className="text-center text-gray-500 dark:text-gray-400">Breathing pattern visualizations will appear here</p>
-                {/* Breathing pattern component would be placed here */}
-              </div>
+              {logs.length > 0 ? (
+                <div className="space-y-2 text-sm font-mono max-h-[300px] overflow-y-auto">
+                  {logs.map((log, index) => (
+                    <div key={index} className="border-b border-gray-200 dark:border-gray-700 pb-1">
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-center py-6">
+                  No activity yet. Start a meditation session.
+                </div>
+              )}
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="techniques" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Meditation Techniques</CardTitle>
-              <CardDescription>
-                Browse and test different meditation techniques
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Mindful Breathing</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Focus on the breath to anchor awareness in the present moment</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Body Scan</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Systematically bring attention to different parts of the body</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Loving-Kindness</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Cultivate feelings of goodwill, kindness, and warmth towards others</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium">Visualization</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Use mental imagery to promote relaxation and positive change</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,39 +1,40 @@
 
 /**
- * Performance Core Constants
+ * Performance-related constant values
  * 
- * This module provides runtime constants for performance types following the Type-Value pattern.
+ * Following the type-value pattern, this file contains runtime constants
+ * that correspond to the types defined in the performance types.
  */
 
-// Device capability constants
+// Device capability levels
 export const DeviceCapabilities = {
   LOW: 'low' as const,
   MEDIUM: 'medium' as const,
-  HIGH: 'high' as const,
-  ULTRA: 'ultra' as const,
-  CORE: 'core' as const
+  HIGH: 'high' as const
 } as const;
 
-// Performance mode constants
+export type DeviceCapability = typeof DeviceCapabilities[keyof typeof DeviceCapabilities];
+
+// Performance modes
 export const PerformanceModes = {
-  AUTO: 'auto' as const,
-  BALANCED: 'balanced' as const,
   QUALITY: 'quality' as const,
-  PERFORMANCE: 'performance' as const,
-  BATTERY_SAVER: 'battery-saver' as const,
-  ULTRA: 'ultra' as const
+  BALANCED: 'balanced' as const,
+  PERFORMANCE: 'performance' as const
 } as const;
 
-// Render frequency constants
+export type PerformanceMode = typeof PerformanceModes[keyof typeof PerformanceModes];
+
+// Render frequencies
 export const RenderFrequencies = {
   LOW: 'low' as const,
   MEDIUM: 'medium' as const,
   HIGH: 'high' as const,
-  ADAPTIVE: 'adaptive' as const,
-  ULTRA: 'ultra' as const
+  EXCESSIVE: 'excessive' as const
 } as const;
 
-// Quality level constants
+export type RenderFrequency = typeof RenderFrequencies[keyof typeof RenderFrequencies];
+
+// Quality levels
 export const QualityLevels = {
   LOW: 'low' as const,
   MEDIUM: 'medium' as const,
@@ -41,39 +42,9 @@ export const QualityLevels = {
   ULTRA: 'ultra' as const
 } as const;
 
-// Resource optimization level constants
-export const ResourceOptimizationLevels = {
-  NONE: 'none' as const,
-  CONSERVATIVE: 'conservative' as const,
-  AGGRESSIVE: 'aggressive' as const
-} as const;
+export type QualityLevel = typeof QualityLevels[keyof typeof QualityLevels];
 
-// Render settings constants
-export const RenderSettings = {
-  SIMPLE: 'simple' as const,
-  STANDARD: 'standard' as const,
-  ENHANCED: 'enhanced' as const,
-  ULTRA: 'ultra' as const
-} as const;
-
-// Animation complexity constants
-export const AnimationComplexities = {
-  MINIMAL: 'minimal' as const,
-  STANDARD: 'standard' as const,
-  COMPLEX: 'complex' as const,
-  ULTRA: 'ultra' as const
-} as const;
-
-// Rendering engine constants
-export const RenderingEngines = {
-  CANVAS: 'canvas' as const,
-  SVG: 'svg' as const,
-  WEBGL: 'webgl' as const,
-  THREE_JS: 'three.js' as const,
-  CSS: 'css' as const
-} as const;
-
-// Glassmorphic variant constants
+// Glassmorphic variants
 export const GlassmorphicVariants = {
   DEFAULT: 'default' as const,
   QUANTUM: 'quantum' as const,
@@ -82,33 +53,35 @@ export const GlassmorphicVariants = {
   COSMIC: 'cosmic' as const
 } as const;
 
-// Glow intensity constants
+export type GlassmorphicVariant = typeof GlassmorphicVariants[keyof typeof GlassmorphicVariants];
+
+// Glow intensity levels
 export const GlowIntensities = {
+  NONE: 'none' as const,
   LOW: 'low' as const,
   MEDIUM: 'medium' as const,
   HIGH: 'high' as const
 } as const;
 
-// Cube theme constants
+export type GlowIntensity = typeof GlowIntensities[keyof typeof GlowIntensities];
+
+// Cube themes
 export const CubeThemes = {
-  LIGHT: 'light' as const,
-  DARK: 'dark' as const,
-  QUANTUM: 'quantum' as const,
+  DEFAULT: 'default' as const,
+  COSMIC: 'cosmic' as const,
   ETHEREAL: 'ethereal' as const,
-  COSMIC: 'cosmic' as const
+  SACRED: 'sacred' as const
 } as const;
 
-// Cube size constants
+export type CubeTheme = typeof CubeThemes[keyof typeof CubeThemes];
+
+// Cube sizes
 export const CubeSizes = {
-  SMALL: 'small' as const,
-  MEDIUM: 'medium' as const,
-  LARGE: 'large' as const
+  SM: 'sm' as const,
+  MD: 'md' as const,
+  LG: 'lg' as const,
+  XL: 'xl' as const,
+  FULL: 'full' as const
 } as const;
 
-// Performance config constants
-export const PerfConfig = {
-  DEFAULT_SAMPLING_RATE: 1000,
-  DEFAULT_THROTTLE_INTERVAL: 300,
-  DEFAULT_MAX_TRACKED_COMPONENTS: 50,
-  DEFAULT_THRESHOLD_RENDER_TIME: 16
-};
+export type CubeSize = typeof CubeSizes[keyof typeof CubeSizes];
