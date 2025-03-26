@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from '@/layouts/MainLayout';
 import AuthLayout from '@/layouts/AuthLayout';
 import EntryLayout from '@/layouts/EntryLayout';
@@ -24,38 +24,36 @@ const AppRoutes = () => {
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Authentication routes */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-        </Route>
+    <Routes>
+      {/* Authentication routes */}
+      <Route element={<AuthLayout />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
 
-        {/* Onboarding routes */}
-        <Route path="/onboarding" element={<OnboardingPage />} />
+      {/* Onboarding routes */}
+      <Route path="/onboarding" element={<OnboardingPage />} />
 
-        {/* Entry animation routes */}
-        <Route element={<EntryLayout />}>
-          <Route path="/entry" element={<EntryAnimation />} />
-        </Route>
+      {/* Entry animation routes */}
+      <Route element={<EntryLayout />}>
+        <Route path="/entry" element={<EntryAnimation />} />
+      </Route>
 
-        {/* Main app routes - protected by auth */}
-        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/chakra-system" element={<ChakraSystemPage />} />
-          <Route path="/meditation" element={<MeditationPage />} />
-          <Route path="/astral-projection" element={<AstralProjectionPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/performance" element={<PerformanceDemoPage />} />
-        </Route>
+      {/* Main app routes - protected by auth */}
+      <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/chakra-system" element={<ChakraSystemPage />} />
+        <Route path="/meditation" element={<MeditationPage />} />
+        <Route path="/astral-projection" element={<AstralProjectionPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/performance" element={<PerformanceDemoPage />} />
+      </Route>
 
-        {/* Development routes - only available in development mode */}
-        {isDevelopment && <DevRoutes />}
-      </Routes>
-    </BrowserRouter>
+      {/* Development routes - only available in development mode */}
+      {isDevelopment && <DevRoutes />}
+    </Routes>
   );
 };
 
