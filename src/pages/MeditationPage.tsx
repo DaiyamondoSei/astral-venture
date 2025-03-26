@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MeditationTimer } from '@/features/meditation/components/MeditationTimer';
+import MeditationTimer from '@/features/meditation/components/MeditationTimer';
 
 /**
  * Meditation Page
@@ -23,7 +23,7 @@ const MeditationPage: React.FC = () => {
           
           <div className="flex flex-col items-center justify-center py-8">
             <MeditationTimer 
-              duration={10} 
+              initialDuration={10} 
               onComplete={handleMeditationComplete}
               chakraFocus={['heart', 'crown']}
             />

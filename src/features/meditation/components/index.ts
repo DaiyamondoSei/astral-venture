@@ -1,8 +1,7 @@
-
 /**
  * Meditation Components
  */
 
-export * from './MeditationTimer';
+export { default as MeditationTimer } from './MeditationTimer';
 export * from './MeditationGuide';
 export * from './MeditationHistory';
