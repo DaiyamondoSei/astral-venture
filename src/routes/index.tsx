@@ -17,8 +17,10 @@ import PerformanceDemoPage from '@/pages/PerformanceDemoPage';
 import OnboardingPage from '@/pages/onboarding/OnboardingPage';
 import AstralProjectionPage from '@/pages/astral-projection/AstralProjectionPage';
 
-// Development routes - conditionally loaded in development
-import DevRoutes from './dev';
+// Development routes - import individual components instead of the whole module
+import ChakraDemoPage from '@/pages/dev/ChakraDemoPage';
+import MeditationDemoPage from '@/pages/dev/MeditationDemoPage';
+import ComponentLibraryPage from '@/pages/dev/ComponentLibraryPage';
 
 const AppRoutes = () => {
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -52,7 +54,14 @@ const AppRoutes = () => {
       </Route>
 
       {/* Development routes - only available in development mode */}
-      {isDevelopment && <DevRoutes />}
+      {isDevelopment && (
+        <Route path="/dev" element={<MainLayout />}>
+          <Route path="components" element={<ComponentLibraryPage />} />
+          <Route path="chakra-demo" element={<ChakraDemoPage />} />
+          <Route path="meditation-demo" element={<MeditationDemoPage />} />
+          <Route path="performance" element={<PerformanceDemoPage />} />
+        </Route>
+      )}
     </Routes>
   );
 };
