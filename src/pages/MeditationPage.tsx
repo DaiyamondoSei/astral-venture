@@ -1,6 +1,6 @@
 
 import React from 'react';
-import MeditationTimer from '@/features/meditation/components/MeditationTimer';
+import MeditationTimer from '@/components/meditation/MeditationTimer';
 
 /**
  * Meditation Page
@@ -10,7 +10,7 @@ import MeditationTimer from '@/features/meditation/components/MeditationTimer';
 const MeditationPage: React.FC = () => {
   const handleMeditationComplete = () => {
     console.log('Meditation session completed');
-    // TODO: Log to backend, update user stats, etc.
+    // Simplified: Just log completion for now
   };
   
   return (
@@ -25,7 +25,6 @@ const MeditationPage: React.FC = () => {
             <MeditationTimer 
               initialDuration={10} 
               onComplete={handleMeditationComplete}
-              chakraFocus={['heart', 'crown']}
             />
             
             <div className="mt-8 text-center">

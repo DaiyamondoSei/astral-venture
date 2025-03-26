@@ -1,21 +1,17 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Play, Pause, RotateCcw, Check } from 'lucide-react';
 
 interface MeditationTimerProps {
-  initialDuration?: number; // in minutes
+  initialDuration?: number;
   onComplete?: () => void;
   onStart?: () => void;
   onPause?: () => void;
 }
 
-/**
- * Simplified MeditationTimer Component
- * 
- * A basic meditation timer with minimal controls for duration and playback.
- */
 const MeditationTimer: React.FC<MeditationTimerProps> = ({
   initialDuration = 5,
   onComplete,
@@ -23,10 +19,9 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
   onPause
 }) => {
   const [duration, setDuration] = useState(initialDuration);
-  const [timeRemaining, setTimeRemaining] = useState(duration * 60); // convert to seconds
-  const [isRunning, setIsRunning] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(duration * 60);
+  const [isActive, setIsActive] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const timerRef = useRef<number | null>(null);
 
   // Reset timer when duration changes
   useEffect(() => {
@@ -36,40 +31,22 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
 
   // Timer functionality
   useEffect(() => {
-    if (isRunning && timeRemaining > 0) {
-      timerRef.current = window.setTimeout(() => {
-        setTimeRemaining(prev => prev - 1);
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isActive && timeRemaining > 0) {
+      interval = setInterval(() => {
+        setTimeRemaining((prevTime) => prevTime - 1);
       }, 1000);
-    } else if (isRunning && timeRemaining === 0) {
-      setIsRunning(false);
+    } else if (isActive && timeRemaining === 0) {
+      setIsActive(false);
       setIsComplete(true);
       if (onComplete) onComplete();
     }
-
+    
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
+      if (interval) clearInterval(interval);
     };
-  }, [isRunning, timeRemaining, onComplete]);
-
-  const toggleTimer = () => {
-    if (isComplete) {
-      // Reset timer if complete
-      setTimeRemaining(duration * 60);
-      setIsComplete(false);
-      setIsRunning(true);
-      if (onStart) onStart();
-    } else if (isRunning) {
-      // Pause timer
-      setIsRunning(false);
-      if (onPause) onPause();
-    } else {
-      // Start or resume timer
-      setIsRunning(true);
-      if (onStart) onStart();
-    }
-  };
+  }, [isActive, timeRemaining, onComplete]);
 
   // Format time as MM:SS
   const formatTime = (seconds: number): string => {
@@ -78,34 +55,86 @@ const MeditationTimer: React.FC<MeditationTimerProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Meditation Timer</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex flex-col space-y-2">
-          <label className="text-sm font-medium">Duration: {duration} minutes</label>
-          <Slider
-            value={[duration]}
-            min={1}
-            max={30}
-            step={1}
-            onValueChange={(value) => {
-              if (!isRunning) {
-                setDuration(value[0]);
-              }
-            }}
-            disabled={isRunning}
-          />
-        </div>
+  const startTimer = () => {
+    setIsActive(true);
+    if (onStart) onStart();
+  };
 
-        <div className="flex items-center justify-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <div className="text-center">
-            <div className="text-4xl font-bold mb-4">{formatTime(timeRemaining)}</div>
-            <Button onClick={toggleTimer}>
-              {isComplete ? 'Restart' : isRunning ? 'Pause' : 'Start'}
-            </Button>
+  const pauseTimer = () => {
+    setIsActive(false);
+    if (onPause) onPause();
+  };
+
+  const resetTimer = () => {
+    setIsActive(false);
+    setIsComplete(false);
+    setTimeRemaining(duration * 60);
+  };
+
+  return (
+    <Card className="w-full max-w-md bg-white/10 backdrop-blur-md border-0">
+      <CardContent className="p-6 space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-4">Meditation Timer</h2>
+          
+          <div className="text-6xl font-mono mb-6">
+            {formatTime(timeRemaining)}
+          </div>
+          
+          {!isActive && !isComplete && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm mb-2">
+                  Duration: {duration} minutes
+                </label>
+                <Slider
+                  min={1}
+                  max={60}
+                  step={1}
+                  value={[duration]}
+                  onValueChange={(val) => setDuration(val[0])}
+                  disabled={isActive}
+                />
+                <div className="flex justify-between text-xs">
+                  <span>1 min</span>
+                  <span>60 min</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-center space-x-4 mt-6">
+            {!isActive && !isComplete && (
+              <Button onClick={startTimer} size="lg" className="px-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500">
+                <Play className="mr-2 h-5 w-5" />
+                Begin
+              </Button>
+            )}
+            
+            {isActive && (
+              <Button onClick={pauseTimer} variant="outline" size="lg" className="px-8 rounded-full">
+                <Pause className="mr-2 h-5 w-5" />
+                Pause
+              </Button>
+            )}
+            
+            {(isActive || timeRemaining < duration * 60) && (
+              <Button onClick={resetTimer} variant="outline" size="lg" className="px-8 rounded-full">
+                <RotateCcw className="mr-2 h-5 w-5" />
+                Reset
+              </Button>
+            )}
+            
+            {isComplete && (
+              <Button 
+                onClick={resetTimer} 
+                size="lg" 
+                className="px-8 rounded-full bg-gradient-to-r from-green-500 to-teal-500"
+              >
+                <Check className="mr-2 h-5 w-5" />
+                Complete
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
